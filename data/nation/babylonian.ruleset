@@ -1,0 +1,62 @@
+[nation_babylonian]
+
+name=_("Babylonian")
+plural=_("?plural:Babylonians")
+groups="Ancient", "Asian"
+legend=_("Babylon was the dominant city of Mesopotamia from the 18th to\
+ 7th centuries BC under a succession of peoples including Amorites,\
+ Kassites, Assyrians, and Chaldeans.")
+leader=
+ "Hammurabi",
+ "Sharru-Kin II", ; a.k.a. Sargon II
+ "Nabu-Kudurri-Usur II", ; a.k.a. Nebuchadnezzar II
+ "Tukulti-Apil-Eshara III", ; a.k.a. Tiglath-Pileser III
+ "Burnaburish II", ; a.k.a. Burnaburiash II
+ "Nabu-Nasir" ; a.k.a. Nabonassar
+leader_sex="Male", "Male", "Male", "Male", "Male", "Male"
+flag = "babylon"
+flag_alt = "iraq_old"
+city_style = "Babylonian"
+
+ruler_titles = { "government",	"male_title",	"female_title"
+		 ; /* TRANS: Lugal = Great Man */
+		 "Despotism",	_("Lugal"),	 _("?female:Lugal")
+	       } 
+
+init_techs=""
+init_buildings=""
+init_government="Despotism"
+init_units=""
+civilwar_nations = "israeli", "persian", "aramean", "sumerian", "assyrian"
+
+cities =
+ "Babilum", ; Babylon
+ "Lagash",
+ "Nibbur", ; Nippur
+ "Ur",
+ "Kish",
+ "Shuruppak",
+ "Kisurra",
+ "Kutha",
+ "Adab",
+ "Umma",
+ "Akkad",
+ "Ea", ; Eridu
+ "Larsa",
+ "Borsippa",
+ "Sippar",
+ "Ninua", ; Nineveh
+ "Assur", ; Ashur
+ "Kalakh", ; Calach
+ "Karkar", ; Carcar
+ "Hamath", ; Hamat
+ "Upija", ; Opis
+ "Urum",
+ "Arbela",
+ "Nisibis",
+ "Harranu", ; Carrhae
+ "Seleukeia", ; Seleucia
+ "Kasfia", ; Ctesiphon
+ "Sattagu", ; Sittace
+ "Uruk", ; Orchoe
+ "Apameia" ; Apamea

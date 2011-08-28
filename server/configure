@@ -1,0 +1,36 @@
+#!/bin/bash
+#  -Iclient/gui-stub client/gui-stub/*.c
+GCC_PARAMS="-Iserver -Iserver/generator -Iserver/scripting -Icommon -Icommon/aicore -Iutility -Iai -Ilua -Itolua -I. -DHAVE_CONFIG_H"
+EXCLUDE_FILES="lua/luac.c"
+ADD_SYMBOLS="none"
+ADD_SYMBOLS_FLAGS="-g"
+
+output() {
+    echo "$1" >> Makefile.tmp
+}
+echo > Makefile.tmp
+
+ev=""
+for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
+	if echo "$name" | grep "$EXCLUDE_FILES"; then
+		continue
+	fi
+    objfile=objectfiles/$(basename $name .c).o
+    if echo "$name" | grep -P "$ADD_SYMBOLS"; then
+        additional="$ADD_SYMBOLS_FLAGS"
+    else
+        additional=""
+    fi
+    ev="$ev $objfile"
+    output "$objfile: $name"
+    output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
+done
+
+echo "all: freeciv-server" > client.mk
+echo "objectfiles.a: $ev
+	ar r objectfiles.a objectfiles/*.o" >> client.mk
+echo "freeciv-server: objectfiles.a
+	gcc -o freeciv-server -lm -lz objectfiles/*.o" >> client.mk
+cat Makefile.tmp >> client.mk
+mv client.mk Makefile
+rm Makefile.tmp

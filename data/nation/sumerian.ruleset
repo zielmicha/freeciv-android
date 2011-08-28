@@ -1,0 +1,67 @@
+[nation_sumerian]
+
+name=_("Sumerian")
+plural=_("?plural:Sumerians")
+groups="Ancient", "Asian"
+legend=_("Sumer controlled southern Mesopotamia until the rise of\
+ Babylonia. Tablets of Sumerian writing some 5500 years old have been\
+ found, pre-dating every other writing in history.")
+leader=
+ "Shulgi",
+ "Gilgamesh",
+ "Ur-Nanshe", ; a.k.a. Ur-Nina
+ "Lugal-Za-Gesi",
+ "En-Mer-Kar",
+ "Urukagina",
+ "Etana",
+ "Ur-Nammu",
+ "Ibbi-Sin",
+ "Nin-Kasalsi"
+leader_sex="Male", "Male", "Male", "Male", "Male", "Male", "Male", "Male",
+ "Male", "Female"
+flag = "sumeria"
+flag_alt = "-"
+city_style = "Babylonian"
+
+ruler_titles = { "government", "male_title", "female_title"
+                 "Monarchy",   _("Lugal"),   _("?female:Lugal")
+                 "Communism",  _("Ensi"),    _("?female:Ensi")
+               }
+
+init_techs=""
+init_buildings=""
+init_government="Despotism"
+init_units=""
+civilwar_nations="assyrian", "egyptian", "babylonian"
+
+cities =
+ "Unug", ; Uruk
+ "Eridug", ; Eridu
+ "Urim", ; Ur
+ "Sirpurla", ; Lagash
+ "Nibru", ; Nippur
+ "Umma",
+ "Larsa",
+ "Kish",
+ "Adab",
+ "Hit",
+ "Agade", ; Akkad
+ "Borsippa",
+ "Isin",
+ "Shuruppak",
+ "Ngirsu", ; Girsu
+ "Bad-tibira",
+ "Zimbir", ; Sippar
+ "Gudua", ; Kutha
+ "Dilbat",
+ "Marda", ; Marad
+ "Der",
+ "Kisurra",
+ "Zabala",
+ "Kisiga", ; Kuara
+ "Kes",
+ "Hamazi",
+ "Eshnunna",
+ "Akshak",
+ "Mari",
+ "Kesh"

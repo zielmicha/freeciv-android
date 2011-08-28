@@ -1,0 +1,637 @@
+#include "pyclient.h"
+// void update_info_label(void)
+void update_info_label(void){
+	PyObject* ret = PY_CALL("s", "update_info_label");
+}
+// void update_unit_info_label(struct unit_list *punitlist)
+void update_unit_info_label(struct unit_list *punitlist){
+	PyObject* ret = PY_CALL("sO", "update_unit_info_label", py_mapper_unit_list(punitlist));
+}
+// void update_mouse_cursor(enum cursor_type new_cursor_type)
+void update_mouse_cursor(enum cursor_type new_cursor_type){
+	PyObject* ret = PY_CALL("si", "update_mouse_cursor", (int)new_cursor_type);
+}
+// void update_timeout_label(void)
+void update_timeout_label(void){
+	PyObject* ret = PY_CALL("s", "update_timeout_label");
+}
+// void update_turn_done_button(bool do_restore)
+void update_turn_done_button(bool do_restore){
+	PyObject* ret = PY_CALL("si", "update_turn_done_button", (int)do_restore);
+}
+// void set_indicator_icons(struct sprite *bulb, struct sprite *sol, struct sprite *flake, struct sprite *gov)
+void set_indicator_icons(struct sprite *bulb, struct sprite *sol, struct sprite *flake, struct sprite *gov){
+	PyObject* ret = PY_CALL("sOOOO", "set_indicator_icons", py_get_pyobject(bulb), py_get_pyobject(sol), py_get_pyobject(flake), py_get_pyobject(gov));
+}
+// struct canvas *get_overview_window(void)
+struct canvas *get_overview_window(void){
+	PyObject* ret = PY_CALL("s", "get_overview_window");
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from get_overview_window (expected 'O')\n");
+	
+	struct canvas* retstru = py_alloc_struct(retval);
+	return retstru;
+        
+}
+// void flush_mapcanvas(int canvas_x, int canvas_y, int pixel_width, int pixel_height)
+void flush_mapcanvas(int canvas_x, int canvas_y, int pixel_width, int pixel_height){
+	PyObject* ret = PY_CALL("siiii", "flush_mapcanvas", canvas_x, canvas_y, pixel_width, pixel_height);
+}
+// void dirty_rect(int canvas_x, int canvas_y, int pixel_width, int pixel_height)
+void dirty_rect(int canvas_x, int canvas_y, int pixel_width, int pixel_height){
+	PyObject* ret = PY_CALL("siiii", "dirty_rect", canvas_x, canvas_y, pixel_width, pixel_height);
+}
+// void dirty_all(void)
+void dirty_all(void){
+	PyObject* ret = PY_CALL("s", "dirty_all");
+}
+// void flush_dirty(void)
+void flush_dirty(void){
+	PyObject* ret = PY_CALL("s", "flush_dirty");
+}
+// void gui_flush(void)
+void gui_flush(void){
+	PyObject* ret = PY_CALL("s", "gui_flush");
+}
+// void update_map_canvas_scrollbars(void)
+void update_map_canvas_scrollbars(void){
+	PyObject* ret = PY_CALL("s", "update_map_canvas_scrollbars");
+}
+// void update_map_canvas_scrollbars_size(void)
+void update_map_canvas_scrollbars_size(void){
+	PyObject* ret = PY_CALL("s", "update_map_canvas_scrollbars_size");
+}
+// void put_cross_overlay_tile(struct tile *ptile)
+void put_cross_overlay_tile(struct tile *ptile){
+	PyObject* ret = PY_CALL("sO", "put_cross_overlay_tile", py_mapper_tile(ptile));
+}
+// void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h)
+void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h){
+	PyObject* ret = PY_CALL("siiii", "draw_selection_rectangle", canvas_x, canvas_y, w, h);
+}
+// void tileset_changed(void)
+void tileset_changed(void){
+	PyObject* ret = PY_CALL("s", "tileset_changed");
+}
+// void get_overview_area_dimensions(int *width, int *height)
+// ignored
+
+// void overview_size_changed(void)
+void overview_size_changed(void){
+	PyObject* ret = PY_CALL("s", "overview_size_changed");
+}
+// const char **gfx_fileextensions(void)
+// ignored
+
+// struct sprite *load_gfxfile(const char *filename)
+struct sprite *load_gfxfile(const char *filename){
+	PyObject* ret = PY_CALL("ss", "load_gfxfile", filename);
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from load_gfxfile (expected 'O')\n");
+	
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;
+        
+}
+// struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y)
+struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y){
+	PyObject* ret = PY_CALL("sOiiiiOii", "crop_sprite", py_get_pyobject(source), x, y, width, height, py_get_pyobject(mask), mask_offset_x, mask_offset_y);
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from crop_sprite (expected 'O')\n");
+	
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;
+        
+}
+// void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
+// ignored
+
+// void free_sprite(struct sprite *s)
+void free_sprite(struct sprite *s){
+	PyObject* ret = PY_CALL("sO", "free_sprite", py_get_pyobject(s));
+}
+// void update_menus(void)
+void update_menus(void){
+	PyObject* ret = PY_CALL("s", "update_menus");
+}
+// void popup_goto_dialog(void)
+void popup_goto_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_goto_dialog");
+}
+// void popup_rates_dialog(void)
+void popup_rates_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_rates_dialog");
+}
+// void voteinfo_gui_update(void)
+void voteinfo_gui_update(void){
+	PyObject* ret = PY_CALL("s", "voteinfo_gui_update");
+}
+// void popup_city_dialog(struct city *pcity)
+void popup_city_dialog(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "popup_city_dialog", py_mapper_city(pcity));
+}
+// void popdown_city_dialog(struct city *pcity)
+void popdown_city_dialog(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "popdown_city_dialog", py_mapper_city(pcity));
+}
+// void popdown_all_city_dialogs(void)
+void popdown_all_city_dialogs(void){
+	PyObject* ret = PY_CALL("s", "popdown_all_city_dialogs");
+}
+// void refresh_city_dialog(struct city *pcity)
+void refresh_city_dialog(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "refresh_city_dialog", py_mapper_city(pcity));
+}
+// void refresh_unit_city_dialogs(struct unit *punit)
+void refresh_unit_city_dialogs(struct unit *punit){
+	PyObject* ret = PY_CALL("sO", "refresh_unit_city_dialogs", py_mapper_unit(punit));
+}
+// bool city_dialog_is_open(struct city *pcity)
+// ignored
+
+// struct canvas *canvas_create(int width, int height)
+struct canvas *canvas_create(int width, int height){
+	PyObject* ret = PY_CALL("sii", "canvas_create", width, height);
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from canvas_create (expected 'O')\n");
+	
+	struct canvas* retstru = py_alloc_struct(retval);
+	return retstru;
+        
+}
+// void canvas_free(struct canvas *store)
+void canvas_free(struct canvas *store){
+	PyObject* ret = PY_CALL("sO", "canvas_free", py_get_pyobject(store));
+}
+// void canvas_copy(struct canvas *dest, struct canvas *src, int src_x, int src_y, int dest_x, int dest_y, int width, int height)
+void canvas_copy(struct canvas *dest, struct canvas *src, int src_x, int src_y, int dest_x, int dest_y, int width, int height){
+	PyObject* ret = PY_CALL("sOOiiiiii", "canvas_copy", py_get_pyobject(dest), py_get_pyobject(src), src_x, src_y, dest_x, dest_y, width, height);
+}
+// void canvas_put_sprite(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *sprite, int offset_x, int offset_y, int width, int height)
+void canvas_put_sprite(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *sprite, int offset_x, int offset_y, int width, int height){
+	PyObject* ret = PY_CALL("sOiiOiiii", "canvas_put_sprite", py_get_pyobject(pcanvas), canvas_x, canvas_y, py_get_pyobject(sprite), offset_x, offset_y, width, height);
+}
+// void canvas_put_sprite_full(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *sprite)
+void canvas_put_sprite_full(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *sprite){
+	PyObject* ret = PY_CALL("sOiiO", "canvas_put_sprite_full", py_get_pyobject(pcanvas), canvas_x, canvas_y, py_get_pyobject(sprite));
+}
+// void canvas_put_sprite_fogged(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *psprite, bool fog, int fog_x, int fog_y)
+void canvas_put_sprite_fogged(struct canvas *pcanvas, int canvas_x, int canvas_y, struct sprite *psprite, bool fog, int fog_x, int fog_y){
+	PyObject* ret = PY_CALL("sOiiOiii", "canvas_put_sprite_fogged", py_get_pyobject(pcanvas), canvas_x, canvas_y, py_get_pyobject(psprite), (int)fog, fog_x, fog_y);
+}
+// void canvas_put_rectangle(struct canvas *pcanvas, struct color *pcolor, int canvas_x, int canvas_y, int width, int height)
+void canvas_put_rectangle(struct canvas *pcanvas, struct color *pcolor, int canvas_x, int canvas_y, int width, int height){
+	PyObject* ret = PY_CALL("sOOiiii", "canvas_put_rectangle", py_get_pyobject(pcanvas), py_mapper_color(pcolor), canvas_x, canvas_y, width, height);
+}
+// void canvas_fill_sprite_area(struct canvas *pcanvas, struct sprite *psprite, struct color *pcolor, int canvas_x, int canvas_y)
+void canvas_fill_sprite_area(struct canvas *pcanvas, struct sprite *psprite, struct color *pcolor, int canvas_x, int canvas_y){
+	PyObject* ret = PY_CALL("sOOOii", "canvas_fill_sprite_area", py_get_pyobject(pcanvas), py_get_pyobject(psprite), py_mapper_color(pcolor), canvas_x, canvas_y);
+}
+// void canvas_fog_sprite_area(struct canvas *pcanvas, struct sprite *psprite, int canvas_x, int canvas_y)
+void canvas_fog_sprite_area(struct canvas *pcanvas, struct sprite *psprite, int canvas_x, int canvas_y){
+	PyObject* ret = PY_CALL("sOOii", "canvas_fog_sprite_area", py_get_pyobject(pcanvas), py_get_pyobject(psprite), canvas_x, canvas_y);
+}
+// void canvas_put_line(struct canvas *pcanvas, struct color *pcolor, enum line_type ltype, int start_x, int start_y, int dx, int dy)
+void canvas_put_line(struct canvas *pcanvas, struct color *pcolor, enum line_type ltype, int start_x, int start_y, int dx, int dy){
+	PyObject* ret = PY_CALL("sOOiiiii", "canvas_put_line", py_get_pyobject(pcanvas), py_mapper_color(pcolor), (int)ltype, start_x, start_y, dx, dy);
+}
+// void canvas_put_curved_line(struct canvas *pcanvas, struct color *pcolor, enum line_type ltype, int start_x, int start_y, int dx, int dy)
+void canvas_put_curved_line(struct canvas *pcanvas, struct color *pcolor, enum line_type ltype, int start_x, int start_y, int dx, int dy){
+	PyObject* ret = PY_CALL("sOOiiiii", "canvas_put_curved_line", py_get_pyobject(pcanvas), py_mapper_color(pcolor), (int)ltype, start_x, start_y, dx, dy);
+}
+// void get_text_size(int *width, int *height, enum client_font font, const char *text)
+// ignored
+
+// void canvas_put_text(struct canvas *pcanvas, int canvas_x, int canvas_y, enum client_font font, struct color *pcolor, const char *text)
+void canvas_put_text(struct canvas *pcanvas, int canvas_x, int canvas_y, enum client_font font, struct color *pcolor, const char *text){
+	PyObject* ret = PY_CALL("sOiiiOs", "canvas_put_text", py_get_pyobject(pcanvas), canvas_x, canvas_y, (int)font, py_mapper_color(pcolor), text);
+}
+// void popup_city_report_dialog(bool raise)
+void popup_city_report_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_city_report_dialog", (int)raise);
+}
+// void city_report_dialog_update(void)
+void city_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "city_report_dialog_update");
+}
+// void city_report_dialog_update_city(struct city *pcity)
+void city_report_dialog_update_city(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "city_report_dialog_update_city", py_mapper_city(pcity));
+}
+// void city_report_dialog_update_city(struct city *pcity)
+// continue city_report_dialog_update_city - was processed
+// void city_report_dialog_update_city(struct city *pcity)
+// continue city_report_dialog_update_city - was processed
+// void popup_meswin_dialog(bool raise)
+void popup_meswin_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_meswin_dialog", (int)raise);
+}
+// bool is_meswin_open(void)
+bool is_meswin_open(void){
+	PyObject* ret = PY_CALL("s", "is_meswin_open");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from is_meswin_open (expected 'i')\n");
+	return (bool)retval;
+}
+// void real_update_meswin_dialog(void)
+void real_update_meswin_dialog(void){
+	PyObject* ret = PY_CALL("s", "real_update_meswin_dialog");
+}
+// void set_client_page(enum client_pages page)
+void set_client_page(enum client_pages page){
+	PyObject* ret = PY_CALL("si", "set_client_page", (int)page);
+}
+// void gui_set_rulesets(int num_rulesets, char **rulesets)
+// ignored
+
+// enum client_pages get_client_page(void)
+enum client_pages get_client_page(void){
+	PyObject* ret = PY_CALL("s", "get_client_page");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from get_client_page (expected 'i')\n");
+	return (enum client_pages)retval;
+}
+// void update_start_page(void)
+void update_start_page(void){
+	PyObject* ret = PY_CALL("s", "update_start_page");
+}
+// void popup_players_dialog(bool raise)
+void popup_players_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_players_dialog", (int)raise);
+}
+// void update_players_dialog(void)
+void update_players_dialog(void){
+	PyObject* ret = PY_CALL("s", "update_players_dialog");
+}
+// void science_dialog_update(void)
+void science_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "science_dialog_update");
+}
+// void popup_science_dialog(bool raise)
+void popup_science_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_science_dialog", (int)raise);
+}
+// void economy_report_dialog_update(void)
+void economy_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "economy_report_dialog_update");
+}
+// void popup_economy_report_dialog(bool raise)
+void popup_economy_report_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_economy_report_dialog", (int)raise);
+}
+// void activeunits_report_dialog_update(void)
+void activeunits_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "activeunits_report_dialog_update");
+}
+// void popup_activeunits_report_dialog(bool raise)
+void popup_activeunits_report_dialog(bool raise){
+	PyObject* ret = PY_CALL("si", "popup_activeunits_report_dialog", (int)raise);
+}
+// void popup_activeunits_report_dialog(bool raise)
+// continue popup_activeunits_report_dialog - was processed
+// void popup_settable_options_dialog(void)
+void popup_settable_options_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_settable_options_dialog");
+}
+// void science_dialog_redraw(void)
+void science_dialog_redraw(void){
+	PyObject* ret = PY_CALL("s", "science_dialog_redraw");
+}
+// void set_city_names_font_sizes(int my_city_names_font_size, int my_city_productions_font_size)
+void set_city_names_font_sizes(int my_city_names_font_size, int my_city_productions_font_size){
+	PyObject* ret = PY_CALL("sii", "set_city_names_font_sizes", my_city_names_font_size, my_city_productions_font_size);
+}
+// void ui_init(void)
+void ui_init(void){
+	PyObject* ret = PY_CALL("s", "ui_init");
+}
+// void ui_main(int argc, char *argv[])
+// ignored
+
+// void ui_exit()
+void ui_exit(){
+	PyObject* ret = PY_CALL("s", "ui_exit");
+}
+// void update_conn_list_dialog(void)
+void update_conn_list_dialog(void){
+	PyObject* ret = PY_CALL("s", "update_conn_list_dialog");
+}
+// void sound_bell(void)
+void sound_bell(void){
+	PyObject* ret = PY_CALL("s", "sound_bell");
+}
+// void add_net_input(int sock)
+void add_net_input(int sock){
+	PyObject* ret = PY_CALL("si", "add_net_input", sock);
+}
+// void remove_net_input(void)
+void remove_net_input(void){
+	PyObject* ret = PY_CALL("s", "remove_net_input");
+}
+// void add_ggz_input(int sock)
+void add_ggz_input(int sock){
+	PyObject* ret = PY_CALL("si", "add_ggz_input", sock);
+}
+// void remove_ggz_input(void)
+void remove_ggz_input(void){
+	PyObject* ret = PY_CALL("s", "remove_ggz_input");
+}
+// void set_unit_icon(int idx, struct unit *punit)
+void set_unit_icon(int idx, struct unit *punit){
+	PyObject* ret = PY_CALL("siO", "set_unit_icon", idx, py_mapper_unit(punit));
+}
+// void set_unit_icons_more_arrow(bool onoff)
+void set_unit_icons_more_arrow(bool onoff){
+	PyObject* ret = PY_CALL("si", "set_unit_icons_more_arrow", (int)onoff);
+}
+// void add_idle_callback(void (callback)(void *), void *data)
+// ignored
+
+// void gui_update_font(const char *font_name, const char *font_value)
+void gui_update_font(const char *font_name, const char *font_value){
+	PyObject* ret = PY_CALL("sss", "gui_update_font", font_name, font_value);
+}
+// void popup_help_dialog_typed(const char *item, enum help_page_type htype)
+void popup_help_dialog_typed(const char *item, enum help_page_type htype){
+	PyObject* ret = PY_CALL("ssi", "popup_help_dialog_typed", item, (int)htype);
+}
+// void popdown_help_dialog(void)
+void popdown_help_dialog(void){
+	PyObject* ret = PY_CALL("s", "popdown_help_dialog");
+}
+// void popup_find_dialog(void)
+void popup_find_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_find_dialog");
+}
+// void popup_intel_dialog(struct player *p)
+void popup_intel_dialog(struct player *p){
+	PyObject* ret = PY_CALL("sO", "popup_intel_dialog", py_mapper_player(p));
+}
+// void update_intel_dialog(struct player *p)
+void update_intel_dialog(struct player *p){
+	PyObject* ret = PY_CALL("sO", "update_intel_dialog", py_mapper_player(p));
+}
+// void update_worklist_report_dialog(void)
+void update_worklist_report_dialog(void){
+	PyObject* ret = PY_CALL("s", "update_worklist_report_dialog");
+}
+// void popup_newcity_dialog(struct unit *punit, char *suggestname)
+void popup_newcity_dialog(struct unit *punit, char *suggestname){
+	PyObject* ret = PY_CALL("sOs", "popup_newcity_dialog", py_mapper_unit(punit), suggestname);
+}
+// void set_turn_done_button_state(bool state)
+void set_turn_done_button_state(bool state){
+	PyObject* ret = PY_CALL("si", "set_turn_done_button_state", (int)state);
+}
+// void create_line_at_mouse_pos(void)
+void create_line_at_mouse_pos(void){
+	PyObject* ret = PY_CALL("s", "create_line_at_mouse_pos");
+}
+// void update_rect_at_mouse_pos(void)
+void update_rect_at_mouse_pos(void){
+	PyObject* ret = PY_CALL("s", "update_rect_at_mouse_pos");
+}
+// void real_output_window_append(const char *astring, const struct text_tag_list *tags, int conn_id)
+void real_output_window_append(const char *astring, const struct text_tag_list *tags, int conn_id){
+	PyObject* ret = PY_CALL("ssOi", "real_output_window_append", astring, py_mapper_text_tag_list(tags), conn_id);
+}
+// void log_output_window(void)
+void log_output_window(void){
+	PyObject* ret = PY_CALL("s", "log_output_window");
+}
+// void clear_output_window(void)
+void clear_output_window(void){
+	PyObject* ret = PY_CALL("s", "clear_output_window");
+}
+// void popup_notify_goto_dialog(const char *headline, const char *lines, const struct text_tag_list *tags, struct tile *ptile)
+void popup_notify_goto_dialog(const char *headline, const char *lines, const struct text_tag_list *tags, struct tile *ptile){
+	PyObject* ret = PY_CALL("sssOO", "popup_notify_goto_dialog", headline, lines, py_mapper_text_tag_list(tags), py_mapper_tile(ptile));
+}
+// void popup_connect_msg(const char *headline, const char *message)
+void popup_connect_msg(const char *headline, const char *message){
+	PyObject* ret = PY_CALL("sss", "popup_connect_msg", headline, message);
+}
+// void popup_notify_dialog(const char *caption, const char *headline, const char *lines)
+void popup_notify_dialog(const char *caption, const char *headline, const char *lines){
+	PyObject* ret = PY_CALL("ssss", "popup_notify_dialog", caption, headline, lines);
+}
+// void popup_races_dialog(struct player *pplayer)
+void popup_races_dialog(struct player *pplayer){
+	PyObject* ret = PY_CALL("sO", "popup_races_dialog", py_mapper_player(pplayer));
+}
+// void popdown_races_dialog(void)
+void popdown_races_dialog(void){
+	PyObject* ret = PY_CALL("s", "popdown_races_dialog");
+}
+// void popup_unit_select_dialog(struct tile *ptile)
+void popup_unit_select_dialog(struct tile *ptile){
+	PyObject* ret = PY_CALL("sO", "popup_unit_select_dialog", py_mapper_tile(ptile));
+}
+// void races_toggles_set_sensitive(void)
+void races_toggles_set_sensitive(void){
+	PyObject* ret = PY_CALL("s", "races_toggles_set_sensitive");
+}
+// void popup_revolution_dialog(void)
+void popup_revolution_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_revolution_dialog");
+}
+// void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity)
+void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity){
+	PyObject* ret = PY_CALL("sOOO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity));
+}
+// bool caravan_dialog_is_open(int *unit_id, int *city_id)
+// ignored
+
+// void popup_diplomat_dialog(struct unit *punit, struct tile *ptile)
+void popup_diplomat_dialog(struct unit *punit, struct tile *ptile){
+	PyObject* ret = PY_CALL("sOO", "popup_diplomat_dialog", py_mapper_unit(punit), py_mapper_tile(ptile));
+}
+// void popup_incite_dialog(struct city *pcity, int cost)
+void popup_incite_dialog(struct city *pcity, int cost){
+	PyObject* ret = PY_CALL("sOi", "popup_incite_dialog", py_mapper_city(pcity), cost);
+}
+// void popup_bribe_dialog(struct unit *punit, int cost)
+void popup_bribe_dialog(struct unit *punit, int cost){
+	PyObject* ret = PY_CALL("sOi", "popup_bribe_dialog", py_mapper_unit(punit), cost);
+}
+// void popup_sabotage_dialog(struct city *pcity)
+void popup_sabotage_dialog(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "popup_sabotage_dialog", py_mapper_city(pcity));
+}
+// void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases)
+// ignored
+
+// void popup_tileset_suggestion_dialog(void)
+void popup_tileset_suggestion_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_tileset_suggestion_dialog");
+}
+// bool popup_theme_suggestion_dialog(const char *theme_name)
+bool popup_theme_suggestion_dialog(const char *theme_name){
+	PyObject* ret = PY_CALL("ss", "popup_theme_suggestion_dialog", theme_name);
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from popup_theme_suggestion_dialog (expected 'i')\n");
+	return (bool)retval;
+}
+// void popdown_all_game_dialogs(void)
+void popdown_all_game_dialogs(void){
+	PyObject* ret = PY_CALL("s", "popdown_all_game_dialogs");
+}
+// void popdown_all_game_dialogs(void)
+// continue popdown_all_game_dialogs - was processed
+// void popdown_all_game_dialogs(void)
+// continue popdown_all_game_dialogs - was processed
+// void popdown_all_game_dialogs(void)
+// continue popdown_all_game_dialogs - was processed
+// void really_close_connection_dialog(void)
+void really_close_connection_dialog(void){
+	PyObject* ret = PY_CALL("s", "really_close_connection_dialog");
+}
+// void close_connection_dialog()
+void close_connection_dialog(){
+	PyObject* ret = PY_CALL("s", "close_connection_dialog");
+}
+// void handle_game_load(struct packet_game_load *packet)
+void handle_game_load(struct packet_game_load *packet){
+	PyObject* ret = PY_CALL("sO", "handle_game_load", py_mapper_packet_game_load(packet));
+}
+// void gui_server_connect(void)
+void gui_server_connect(void){
+	PyObject* ret = PY_CALL("s", "gui_server_connect");
+}
+// bool isometric_view_supported(void)
+bool isometric_view_supported(void){
+	PyObject* ret = PY_CALL("s", "isometric_view_supported");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from isometric_view_supported (expected 'i')\n");
+	return (bool)retval;
+}
+// bool overhead_view_supported(void)
+bool overhead_view_supported(void){
+	PyObject* ret = PY_CALL("s", "overhead_view_supported");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from overhead_view_supported (expected 'i')\n");
+	return (bool)retval;
+}
+// void load_intro_gfx(void)
+void load_intro_gfx(void){
+	PyObject* ret = PY_CALL("s", "load_intro_gfx");
+}
+// void load_cursors(void)
+void load_cursors(void){
+	PyObject* ret = PY_CALL("s", "load_cursors");
+}
+// void popup_spaceship_dialog(struct player *pplayer)
+void popup_spaceship_dialog(struct player *pplayer){
+	PyObject* ret = PY_CALL("sO", "popup_spaceship_dialog", py_mapper_player(pplayer));
+}
+// void popdown_spaceship_dialog(struct player *pplayer)
+void popdown_spaceship_dialog(struct player *pplayer){
+	PyObject* ret = PY_CALL("sO", "popdown_spaceship_dialog", py_mapper_player(pplayer));
+}
+// void refresh_spaceship_dialog(struct player *pplayer)
+void refresh_spaceship_dialog(struct player *pplayer){
+	PyObject* ret = PY_CALL("sO", "refresh_spaceship_dialog", py_mapper_player(pplayer));
+}
+// struct color *color_alloc(int r, int g, int b)
+// ignored
+
+// void color_free(struct color *color)
+void color_free(struct color *color){
+	PyObject* ret = PY_CALL("sO", "color_free", py_mapper_color(color));
+}
+// void handle_diplomacy_accept_treaty(int counterpart, bool I_accepted, bool other_accepted)
+void handle_diplomacy_accept_treaty(int counterpart, bool I_accepted, bool other_accepted){
+	PyObject* ret = PY_CALL("siii", "handle_diplomacy_accept_treaty", counterpart, (int)I_accepted, (int)other_accepted);
+}
+// void handle_diplomacy_init_meeting(int counterpart, int initiated_from)
+void handle_diplomacy_init_meeting(int counterpart, int initiated_from){
+	PyObject* ret = PY_CALL("sii", "handle_diplomacy_init_meeting", counterpart, initiated_from);
+}
+// void handle_diplomacy_create_clause(int counterpart, int giver, enum clause_type type, int value)
+void handle_diplomacy_create_clause(int counterpart, int giver, enum clause_type type, int value){
+	PyObject* ret = PY_CALL("siiii", "handle_diplomacy_create_clause", counterpart, giver, (int)type, value);
+}
+// void handle_diplomacy_cancel_meeting(int counterpart, int initiated_from)
+void handle_diplomacy_cancel_meeting(int counterpart, int initiated_from){
+	PyObject* ret = PY_CALL("sii", "handle_diplomacy_cancel_meeting", counterpart, initiated_from);
+}
+// void handle_diplomacy_remove_clause(int counterpart, int giver, enum clause_type type, int value)
+void handle_diplomacy_remove_clause(int counterpart, int giver, enum clause_type type, int value){
+	PyObject* ret = PY_CALL("siiii", "handle_diplomacy_remove_clause", counterpart, giver, (int)type, value);
+}
+// void close_all_diplomacy_dialogs(void)
+void close_all_diplomacy_dialogs(void){
+	PyObject* ret = PY_CALL("s", "close_all_diplomacy_dialogs");
+}
+// void popup_messageopt_dialog(void)
+void popup_messageopt_dialog(void){
+	PyObject* ret = PY_CALL("s", "popup_messageopt_dialog");
+}
+// int diplomat_handled_in_diplomat_dialog(void)
+int diplomat_handled_in_diplomat_dialog(void){
+	PyObject* ret = PY_CALL("s", "diplomat_handled_in_diplomat_dialog");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from diplomat_handled_in_diplomat_dialog (expected 'i')\n");
+	return retval;
+}
+// void toggle_city_hilite(struct city *pcity, bool on_off)
+void toggle_city_hilite(struct city *pcity, bool on_off){
+	PyObject* ret = PY_CALL("sOi", "toggle_city_hilite", py_mapper_city(pcity), (int)on_off);
+}
+// void hilite_cities_from_canvas(void)
+void hilite_cities_from_canvas(void){
+	PyObject* ret = PY_CALL("s", "hilite_cities_from_canvas");
+}
+// void caravan_dialog_update(void)
+void caravan_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "caravan_dialog_update");
+}
+// void close_diplomat_dialog(void)
+void close_diplomat_dialog(void){
+	PyObject* ret = PY_CALL("s", "close_diplomat_dialog");
+}
+// void popup_endgame_report_dialog(struct packet_endgame_report *packet)
+void popup_endgame_report_dialog(struct packet_endgame_report *packet){
+	PyObject* ret = PY_CALL("sO", "popup_endgame_report_dialog", py_mapper_packet_endgame_report(packet));
+}
+// void update_city_descriptions(void)
+void update_city_descriptions(void){
+	PyObject* ret = PY_CALL("s", "update_city_descriptions");
+}
+// void handle_authentication_req(enum authentication_type type, char *message)
+void handle_authentication_req(enum authentication_type type, char *message){
+	PyObject* ret = PY_CALL("sis", "handle_authentication_req", (int)type, message);
+}
+// void update_report_dialogs(void)
+void update_report_dialogs(void){
+	PyObject* ret = PY_CALL("s", "update_report_dialogs");
+}
+// char **get_gui_specific_themes_directories(int *count)
+// ignored
+
+// void gui_load_theme(const char *directory, const char *theme_name)
+void gui_load_theme(const char *directory, const char *theme_name){
+	PyObject* ret = PY_CALL("sss", "gui_load_theme", directory, theme_name);
+}
+// void gui_clear_theme(void)
+void gui_clear_theme(void){
+	PyObject* ret = PY_CALL("s", "gui_clear_theme");
+}
+// char **get_useable_themes_in_directory(const char *directory, int *count)
+// ignored
+
+// IGNORED:
+//  void get_overview_area_dimensions(int *width, int *height)
+//  const char **gfx_fileextensions(void)
+//  void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
+//  bool city_dialog_is_open(struct city *pcity)
+//  void get_text_size(int *width, int *height, enum client_font font, const char *text)
+//  void gui_set_rulesets(int num_rulesets, char **rulesets)
+//  void ui_main(int argc, char *argv[])
+//  void add_idle_callback(void (callback)(void *), void *data)
+//  bool caravan_dialog_is_open(int *unit_id, int *city_id)
+//  void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases)
+//  struct color *color_alloc(int r, int g, int b)
+//  char **get_gui_specific_themes_directories(int *count)
+//  char **get_useable_themes_in_directory(const char *directory, int *count)
+// processed 132 ignored 13
