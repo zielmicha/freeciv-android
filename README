@@ -1,0 +1,45 @@
+It includes Freeciv 2.2.7
+
+
+== DEPENDENCIES ==
+Execute:
+    ./download-dep
+
+Or:
+    Put lua in server/lua
+    Put tolua in server/tolua
+    Put Pygame Subset for Android in android/build/pygame
+    Put zlib in zlib-1.2.5
+    Execute:
+        cp zlib.mk zlib-1.2.5/Android.mk
+        rm -r android/build/pygame/src
+        ln -s $PWD/android/src android/build/pygame/src
+    
+== CONFIGURE ==
+./build-skel.sh
+cd server/
+./configure
+cd src/
+./configure
+
+== BUILD ==
+Change ANDROID_PATH in android/info.sh to point
+your Android SDK.
+Put NDK in $PATH or create file ~/setup-ndk
+which will be included.
+
+Build zlib:
+    android/zlib.sh
+
+Build data for Android
+    android/build.sh
+
+Build APK for Android
+    android/debug.sh
+
+Build Touch Freeciv for desktop
+    make -Csrc
+    make -Cserver
+
+Run Touch Freeciv on desktop
+    python main.py
