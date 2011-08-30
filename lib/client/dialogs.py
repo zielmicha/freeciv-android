@@ -46,13 +46,13 @@ def get_client_page():
 def set_client_page(page):
     global client_page
     client_page = page
-    print 'set_client_page', page
+    #print 'set_client_page', page
     
     if page == freeciv.const.PAGE_START:
-        print 'page_start'
+        #print 'page_start'
         page_start()
     elif page == freeciv.const.PAGE_GAME:
-        print 'page_game'
+        #print 'page_game'
         page_game()
 
 def page_start():

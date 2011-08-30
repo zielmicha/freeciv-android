@@ -569,6 +569,162 @@ static PyObject* python_set_unit_focus(PyObject* self, PyObject* args) {
 	set_unit_focus((struct unit*)arg_punit);
 	return Py_BuildValue("i", 0);
 }
+// void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
+void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas);
+
+static PyObject* python_city_dialog_redraw_map(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	PyObject* arg_canvas;
+	if(PyArg_ParseTuple(args, "iO", &arg_pcity, &arg_canvas) == 0) return NULL;
+
+
+	struct canvas* argp_canvas = py_alloc_struct(arg_canvas);
+        
+	city_dialog_redraw_map((struct city*)arg_pcity, argp_canvas);
+	return Py_BuildValue("i", 0);
+}
+// int get_citydlg_canvas_width()
+int get_citydlg_canvas_width();
+
+static PyObject* python_get_citydlg_canvas_width(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	int retval = get_citydlg_canvas_width();
+	return Py_BuildValue("i", retval);
+}
+// int get_citydlg_canvas_height()
+int get_citydlg_canvas_height();
+
+static PyObject* python_get_citydlg_canvas_height(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	int retval = get_citydlg_canvas_height();
+	return Py_BuildValue("i", retval);
+}
+// bool city_unhappy(const struct city *pcity)
+bool city_unhappy(const struct city *pcity);
+
+static PyObject* python_city_unhappy(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	bool retval = city_unhappy((struct city*)arg_pcity);
+	return Py_BuildValue("i", (int)retval);
+}
+// bool city_happy(const struct city *pcity)
+bool city_happy(const struct city *pcity);
+
+static PyObject* python_city_happy(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	bool retval = city_happy((struct city*)arg_pcity);
+	return Py_BuildValue("i", (int)retval);
+}
+// bool city_celebrating(const struct city *pcity)
+bool city_celebrating(const struct city *pcity);
+
+static PyObject* python_city_celebrating(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	bool retval = city_celebrating((struct city*)arg_pcity);
+	return Py_BuildValue("i", (int)retval);
+}
+// int city_get_prod(struct city* pCity, int mode, int type)
+int city_get_prod(struct city* pCity, int mode, int type);
+
+static PyObject* python_city_get_prod(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	int arg_mode;
+	int arg_type;
+	if(PyArg_ParseTuple(args, "iii", &arg_pCity, &arg_mode, &arg_type) == 0) return NULL;
+
+
+
+	int retval = city_get_prod((struct city*)arg_pCity, arg_mode, arg_type);
+	return Py_BuildValue("i", retval);
+}
+// int city_get_size(struct city* pCity)
+int city_get_size(struct city* pCity);
+
+static PyObject* python_city_get_size(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	int retval = city_get_size((struct city*)arg_pCity);
+	return Py_BuildValue("i", retval);
+}
+// int city_turns_to_grow(const struct city *pCity)
+int city_turns_to_grow(const struct city *pCity);
+
+static PyObject* python_city_turns_to_grow(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	int retval = city_turns_to_grow((struct city*)arg_pCity);
+	return Py_BuildValue("i", retval);
+}
+// int city_granary_size(int size)
+int city_granary_size(int size);
+
+static PyObject* python_city_granary_size(PyObject* self, PyObject* args) {
+	int arg_size;
+	if(PyArg_ParseTuple(args, "i", &arg_size) == 0) return NULL;
+
+	int retval = city_granary_size(arg_size);
+	return Py_BuildValue("i", retval);
+}
+// int city_production_turns_to_build(const struct city *pcity, bool include_shield_stock)
+int city_production_turns_to_build(const struct city *pcity, bool include_shield_stock);
+
+static PyObject* python_city_production_turns_to_build(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	int arg_include_shield_stock;
+	if(PyArg_ParseTuple(args, "ii", &arg_pcity, &arg_include_shield_stock) == 0) return NULL;
+
+
+	int retval = city_production_turns_to_build((struct city*)arg_pcity, (bool)arg_include_shield_stock);
+	return Py_BuildValue("i", retval);
+}
+// int city_get_shield_stock(struct city* pCity)
+int city_get_shield_stock(struct city* pCity);
+
+static PyObject* python_city_get_shield_stock(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	int retval = city_get_shield_stock((struct city*)arg_pCity);
+	return Py_BuildValue("i", retval);
+}
+// struct sprite* city_get_production_image(struct city* pCity)
+struct sprite* city_get_production_image(struct city* pCity);
+
+static PyObject* python_city_get_production_image(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	struct sprite* retval = city_get_production_image((struct city*)arg_pCity);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// int city_get_production_cost(struct city* pCity)
+int city_get_production_cost(struct city* pCity);
+
+static PyObject* python_city_get_production_cost(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	int retval = city_get_production_cost((struct city*)arg_pCity);
+	return Py_BuildValue("i", retval);
+}
+// char* city_get_production_name(struct city* pCity)
+char* city_get_production_name(struct city* pCity);
+
+static PyObject* python_city_get_production_name(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	char* retval = city_get_production_name((struct city*)arg_pCity);
+	return Py_BuildValue("s", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -689,4 +845,34 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "request_new_unit_activity", (int)ptr);
 	ptr = python_set_unit_focus;
 	PY_CALL("ssi", "add_function", "set_unit_focus", (int)ptr);
+	ptr = python_city_dialog_redraw_map;
+	PY_CALL("ssi", "add_function", "city_dialog_redraw_map", (int)ptr);
+	ptr = python_get_citydlg_canvas_width;
+	PY_CALL("ssi", "add_function", "get_citydlg_canvas_width", (int)ptr);
+	ptr = python_get_citydlg_canvas_height;
+	PY_CALL("ssi", "add_function", "get_citydlg_canvas_height", (int)ptr);
+	ptr = python_city_unhappy;
+	PY_CALL("ssi", "add_function", "city_unhappy", (int)ptr);
+	ptr = python_city_happy;
+	PY_CALL("ssi", "add_function", "city_happy", (int)ptr);
+	ptr = python_city_celebrating;
+	PY_CALL("ssi", "add_function", "city_celebrating", (int)ptr);
+	ptr = python_city_get_prod;
+	PY_CALL("ssi", "add_function", "city_get_prod", (int)ptr);
+	ptr = python_city_get_size;
+	PY_CALL("ssi", "add_function", "city_get_size", (int)ptr);
+	ptr = python_city_turns_to_grow;
+	PY_CALL("ssi", "add_function", "city_turns_to_grow", (int)ptr);
+	ptr = python_city_granary_size;
+	PY_CALL("ssi", "add_function", "city_granary_size", (int)ptr);
+	ptr = python_city_production_turns_to_build;
+	PY_CALL("ssi", "add_function", "city_production_turns_to_build", (int)ptr);
+	ptr = python_city_get_shield_stock;
+	PY_CALL("ssi", "add_function", "city_get_shield_stock", (int)ptr);
+	ptr = python_city_get_production_image;
+	PY_CALL("ssi", "add_function", "city_get_production_image", (int)ptr);
+	ptr = python_city_get_production_cost;
+	PY_CALL("ssi", "add_function", "city_get_production_cost", (int)ptr);
+	ptr = python_city_get_production_name;
+	PY_CALL("ssi", "add_function", "city_get_production_name", (int)ptr);
 }

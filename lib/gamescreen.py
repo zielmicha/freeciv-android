@@ -13,6 +13,7 @@
 import ui
 import client
 import pygame
+import pygame.gfxdraw
 import functools
 
 from client import freeciv
@@ -40,10 +41,10 @@ class ScreenClient(client.Client):
     
     def popup_city_dialog(self, city):
         dialog = citydlg.Dialog(self, city)
-        ui.set(dialog)
+        ui.set(dialog.ui)
     
     def overview_size_changed(self, w, h):
-        self.ui.resize_left_pane(w)
+        self.ui.resize_left_pane(self.ui.overview.size[0])
     
     def update_menus(self, unit):
         actions = unit.get_actions()
@@ -75,7 +76,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.menu = gamemenu.Menu(client)
         self.end_turn_button = ui.Button('End turn', self.client.end_turn)
         
-        self.left_panel = ui.LinearLayoutWidget()
+        self.left_panel = ui.LinearLayoutWidget(spacing=0)
         self.map_wrapper = ui.AbsoluteLayoutWidget()
         
         self.add(self.left_panel)
@@ -85,8 +86,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.map_wrapper.add(self.menu, (0, 0), align=ui.BOTTOM)
         
         self.left_panel.add(self.overview)
-        self.msg_scroll = ui.ScrollWrapper(self.console, width=200, height=100, ways=ui.SCROLL_HEIGHT|ui.SCROLL_WIDTH)
-        self.left_panel.add(self.msg_scroll)
+        self.left_panel.add(self.console.scroll)
         self.left_panel.add(self.end_turn_button)
         
         # key_end_turn()
@@ -94,8 +94,9 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.focus = self.map
     
     def resize_left_pane(self, width):
-        print 'from', self.msg_scroll.width, 'to', width
-        self.msg_scroll.width = width
+        self.console.width = width
+        self.console.scroll.width = width
+        self.console.scroll.height = 100
     
     def tick(self):
         self.map.size = ui.screen_width - self.overview.size[0], ui.screen_height
@@ -108,10 +109,13 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
 class OverviewWidget(object):
     def __init__(self, client):
         self.client = client
+        self.scale_width = 150
     
     @property
     def size(self):
-        return self.client.get_overview_size()
+        w, h = self.client.get_overview_size()
+        ratio = h / float(w)
+        return (self.scale_width, int(ratio * self.scale_width))
     
     def tick(self):
         pass
@@ -120,16 +124,19 @@ class OverviewWidget(object):
         pass
     
     def draw(self, surf, pos):
-        self.client.draw_overview(surf, pos)
+        self.client.draw_overview(surf, pos, scale=self.size)
         pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
         super(ConsoleWidget, self).__init__(spacing=0)
+        self.client = client
+        self.width = 0
+        self.scroll = ConsoleScrollWrapper(self)
     
-    #@property
-    #def size(self):
-    #    return (200, 100)
+    @property
+    def size(self):
+        return (self.width, self._size[1])
     
     def line(self, text):
         self.add(ui.Label(text, font=ui.consolefont))
@@ -139,9 +146,25 @@ class ConsoleWidget(ui.LinearLayoutWidget):
     
     def draw(self, surf, pos):
         #clip = surf.get_clip()
-        #surf.set_clip(pos + self.size)
+        #surf.set_clip(pos + self._size)
+        pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
         super(ConsoleWidget, self).draw(surf, pos)
         #surf.set_clip(clip)
+    
+    def event(self, ev):
+        if ev.type == pygame.MOUSEBUTTONDOWN:
+            myabspos = ui._subpoints(ev.abs_pos, ev.pos)
+            ui.add_overlay(self.scroll, myabspos)
+        elif ev.type == pygame.MOUSEBUTTONUP:
+            if self.scroll in ui.overlays:
+                ui.overlays.remove(self.scroll)
+
+class ConsoleScrollWrapper(ui.ScrollWrapper):
+    def get_clip(self, pos):
+        return pos + (self.item._size[0], self.size[1])
+    
+    def canceled_event(self, event):
+        self.item.event(event)
 
 class MapWidget(object):
     def __init__(self, client):
@@ -162,7 +185,7 @@ class MapWidget(object):
             self.client.set_map_size(self.size)
             self.last_size = self.size
         
-            self.client.update_map_canvas_visible() # but when???
+            self.client.update_map_canvas_visible()
         
         self.client.draw_map(surf, pos)
     

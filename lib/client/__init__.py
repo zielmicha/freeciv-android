@@ -97,9 +97,10 @@ class Client(object):
         mapview = freeciv.func.get_mapview_store()
         surf.blit(mapview, pos)
     
-    def draw_overview(self, surf, pos):
-        surf.blit(window.overview_surface, pos)
-        pygame.draw.rect(surf, (255, 255, 255), pos + window.overview_surface.get_size(), 1)
+    def draw_overview(self, surf, pos, scale):
+        dest_surf = pygame.transform.smoothscale(window.overview_surface, scale)
+        surf.blit(dest_surf, pos)
+        pygame.draw.rect(surf, (255, 255, 255), pos + scale, 1)
     
     def set_map_size(self, size):
         freeciv.func.map_canvas_resized(*size)

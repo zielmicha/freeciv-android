@@ -91,6 +91,7 @@ class LayoutWidget(object):
         self.focus = None
     
     def add(self, item):
+        assert item != None
         self.items.append(item)
     
     def event(self, event):
@@ -346,6 +347,22 @@ class WithText(object):
     def draw(self, surf, pos):
         surf.blit(self.label_image, (pos[0] + self.padding_left, pos[1] + self.padding_top))
 
+class Image(object):
+    def __init__(self, image, callback=None):
+        self.callback = callback
+        self.image = image
+    
+    def tick(self):
+        pass
+    
+    def event(self, event):
+        if event.type == pygame.MOUSEBUTTONUP:
+            if self.callback:
+                self.callback()
+    
+    def draw(self, surf, pos):
+        surf.blit(self.image, pos)
+
 class Button(WithText):
     def __init__(self, label, callback, font=None, color=None):
         WithText.__init__(self, label, callback, font, color)
@@ -441,9 +458,12 @@ class ScrollWrapper(object):
             fy -= self.y
         
         last = surf.get_clip()
-        surf.set_clip(pos + self.size)
+        surf.set_clip(self.get_clip(pos))
         self.item.draw(surf, (fx, fy))
         surf.set_clip(last)
+    
+    def get_clip(self, pos):
+        return pos + self.size
     
     def tick(self):
         if self.y > self.item.size[1] - self.height:
@@ -461,7 +481,9 @@ class ScrollWrapper(object):
     def event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self.start_dragging = event.pos
+            self.start_dragging_abs = event.abs_pos
             self.was_dragged = False
+            self.canceled_event(event)
         elif event.type == pygame.MOUSEMOTION:
             if self.start_dragging:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
@@ -477,12 +499,16 @@ class ScrollWrapper(object):
                 self.x += dx
             else:
                 if self.start_dragging:
-                    self.post_mouse_event(Event(pygame.MOUSEBUTTONDOWN, {'pos': self.start_dragging}))
+                    self.post_mouse_event(Event(pygame.MOUSEBUTTONDOWN, {'pos': self.start_dragging, 'abs_pos': self.start_dragging_abs}))
                 self.post_mouse_event(event)
             self.start_dragging = None
             self.was_dragged = False
+            self.canceled_event(event)
         else:
             self.item.event(event)
+    
+    def canceled_event(self, event):
+        pass
     
     def post_mouse_event(self, ev):
         pos = ev.pos

@@ -34,7 +34,6 @@ def get_overview_area_dimensions():
 
 @freeciv.register
 def overview_size_changed():
-    print 'overview_size_changed'
     global overview_surface
     w, h = freeciv.get_overview_size()
     overview_surface = pygame.Surface((w, h))

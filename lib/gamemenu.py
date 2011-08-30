@@ -43,7 +43,7 @@ class Menu(ui.LinearLayoutWidget):
         if actions:
             joystick_layout = ui.LinearLayoutWidget()
             joystick = Joystick(client)
-            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 70
+            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
             joystick_layout.add(joystick)
             self.items.insert(0, joystick_layout)
             for action_ident, action_name, action_length in actions:

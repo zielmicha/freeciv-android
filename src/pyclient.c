@@ -4,6 +4,12 @@
 #define PY_SETUP_CONST(name) PY_CALL("ssi", "set_const", #name, _RESOLV(name))
 #define B2I(B) ((B)?1:0)
 
+enum city_get_mode {
+    MODE_PROD,
+    MODE_SURPLUS,
+    MODE_WASTE
+};
+
 PyObject* py_mapper_city(struct city* s) {
     return Py_BuildValue("i", (int)s);
 }
@@ -285,6 +291,56 @@ static PyObject* get_overview_size(PyObject* self, PyObject* args) {
     return Py_BuildValue("ii", overview.width, overview.height);
 }
 
+int city_get_prod(struct city* city, int mode, int type) {
+    if(mode == MODE_PROD)
+        return city->prod[type];
+    if(mode == MODE_WASTE)
+        return city->waste[type];
+    if(mode == MODE_SURPLUS)
+        return city->surplus[type];
+    return FC_INFINITY;
+}
+int city_get_size(struct city* pCity) {
+    return pCity->size;
+}
+
+int city_get_shield_stock(struct city* pCity) {
+    return pCity->shield_stock;
+}
+
+struct sprite* city_get_production_image(struct city* pCity) {
+    int kind = pCity->production.kind;
+    if(kind == VUT_UTYPE) {
+        struct unit_type *pUnitType = pCity->production.value.utype;
+        return get_unittype_sprite(tileset, pUnitType);
+    } else {
+        struct impr_type *pImprove = pCity->production.value.building;
+        return get_building_sprite(tileset, pImprove);
+    }
+}
+
+int city_get_production_cost(struct city* pCity) {
+    int kind = pCity->production.kind;
+    if(kind == VUT_UTYPE) {
+        struct unit_type *pUnitType = pCity->production.value.utype;
+        return utype_build_shield_cost(pUnitType);
+    } else {
+        struct impr_type *pImprove = pCity->production.value.building;
+        return impr_build_shield_cost(pImprove);
+    }
+}
+
+char* city_get_production_name(struct city* pCity) {
+    int kind = pCity->production.kind;
+    if(kind == VUT_UTYPE) {
+        struct unit_type *pUnitType = pCity->production.value.utype;
+        return utype_name_translation(pUnitType);
+    } else {
+        struct impr_type *pImprove = pCity->production.value.building;
+        return improvement_name_translation(pImprove);
+    }
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);
@@ -311,6 +367,19 @@ static void py_setup_const() {
     PY_SETUP_CONST(DIR8_NORTHWEST);
     PY_SETUP_CONST(DIR8_SOUTHEAST);
     PY_SETUP_CONST(DIR8_SOUTHWEST);
+    
+    PY_SETUP_CONST(O_FOOD);
+    PY_SETUP_CONST(O_SHIELD);
+    PY_SETUP_CONST(O_TRADE);
+    PY_SETUP_CONST(O_GOLD);
+    PY_SETUP_CONST(O_SCIENCE);
+    PY_SETUP_CONST(O_LUXURY);
+    
+    PY_SETUP_CONST(MODE_PROD);
+    PY_SETUP_CONST(MODE_SURPLUS);
+    PY_SETUP_CONST(MODE_WASTE);
+    
+    PY_SETUP_CONST(FC_INFINITY);
 }
 
 static PyObject* set_callback(PyObject* self, PyObject* args) {
