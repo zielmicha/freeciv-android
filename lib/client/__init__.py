@@ -1,7 +1,3 @@
-import select
-import pygame
-
-import progress
 # Copyright (C) 2011 Michal Zielinski (michal@zielinscy.org.pl)
 #
 # This program is free software; you can redistribute it and/or modify
@@ -14,6 +10,12 @@ import progress
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import select
+import pygame
+import time
+
+import progress
+
 import freeciv
 
 import dialogs
@@ -23,7 +25,6 @@ import actions
 import city
 import key
 import misc
-import time
 
 net_socket = -1
 client = None
@@ -68,6 +69,7 @@ class Client(object):
         client = self
         self.next_time = time.time()
         self.cursor_pos = (0, 0)
+        self.draw_patrol_lines = False
     
     def tick(self):
         if self.next_time >= time.time():
@@ -134,6 +136,13 @@ class Client(object):
         buff = buff.rstrip(' ').rstrip('\0')
         if result == -1:
             print 'fail %r' % buff
+    
+    def escape(self):
+        if self.draw_patrol_lines:
+            self.key_event(pygame.KEYDOWN, pygame.K_ESCAPE)
+            self.draw_patrol_lines = False
+        else:
+            self.quit()
     
     def disable_menus(self):
         print 'disable_menus'

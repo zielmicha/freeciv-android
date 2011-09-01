@@ -725,6 +725,46 @@ static PyObject* python_city_get_production_name(PyObject* self, PyObject* args)
 	char* retval = city_get_production_name((struct city*)arg_pCity);
 	return Py_BuildValue("s", retval);
 }
+// int city_get_citizen_count(struct city* pCity, bool specialist, int type)
+int city_get_citizen_count(struct city* pCity, bool specialist, int type);
+
+static PyObject* python_city_get_citizen_count(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	int arg_specialist;
+	int arg_type;
+	if(PyArg_ParseTuple(args, "iii", &arg_pCity, &arg_specialist, &arg_type) == 0) return NULL;
+
+
+
+	int retval = city_get_citizen_count((struct city*)arg_pCity, (bool)arg_specialist, arg_type);
+	return Py_BuildValue("i", retval);
+}
+// void city_rotate_specialist(struct city *pcity, int citizen_index)
+void city_rotate_specialist(struct city *pcity, int citizen_index);
+
+static PyObject* python_city_rotate_specialist(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	int arg_citizen_index;
+	if(PyArg_ParseTuple(args, "ii", &arg_pcity, &arg_citizen_index) == 0) return NULL;
+
+
+	city_rotate_specialist((struct city*)arg_pcity, arg_citizen_index);
+	return Py_BuildValue("i", 0);
+}
+// void city_map_click(struct city* pCity, int canvas_x, int canvas_y)
+void city_map_click(struct city* pCity, int canvas_x, int canvas_y);
+
+static PyObject* python_city_map_click(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	int arg_canvas_x;
+	int arg_canvas_y;
+	if(PyArg_ParseTuple(args, "iii", &arg_pCity, &arg_canvas_x, &arg_canvas_y) == 0) return NULL;
+
+
+
+	city_map_click((struct city*)arg_pCity, arg_canvas_x, arg_canvas_y);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -875,4 +915,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_get_production_cost", (int)ptr);
 	ptr = python_city_get_production_name;
 	PY_CALL("ssi", "add_function", "city_get_production_name", (int)ptr);
+	ptr = python_city_get_citizen_count;
+	PY_CALL("ssi", "add_function", "city_get_citizen_count", (int)ptr);
+	ptr = python_city_rotate_specialist;
+	PY_CALL("ssi", "add_function", "city_rotate_specialist", (int)ptr);
+	ptr = python_city_map_click;
+	PY_CALL("ssi", "add_function", "city_map_click", (int)ptr);
 }

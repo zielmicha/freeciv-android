@@ -12,6 +12,12 @@
 
 import ui
 
+import client
+import icons
+
+import pygame
+import functools
+
 class Dialog(ui.HorizontalLayoutWidget):
     def __init__(self, client, city):
         super(Dialog, self).__init__()
@@ -21,11 +27,13 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.make_ui()
     
     def make_ui(self):
+        self.items = []
         self.canvas = CityCanvas(self, self.city)
         self.info_label = self.get_labels()
         self.citypanel = ui.LinearLayoutWidget()
         self.prodpanel = ui.LinearLayoutWidget()
         
+        self.citypanel.add(self.get_citizen_icons())
         self.citypanel.add(self.canvas)
         self.citypanel.add(self.info_label)
         
@@ -44,7 +52,32 @@ class Dialog(ui.HorizontalLayoutWidget):
             self.prodpanel.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns)))
         self.prodpanel.add(self.unit_img)
         
-        print self.city.get_production_cost()
+        self.update_layout()
+        #print self.city.get_production_cost()
+    
+    def get_citizen_icons(self):
+        def rotate_specialist(i):
+            self.city.rotate_specialist(i)
+            # self.refresh()
+        
+        panel = ui.HorizontalLayoutWidget(spacing=0)
+        index = 0
+        for name, count in self.city.get_citizens():
+            for i in xrange(count):
+                try:
+                    icon = icons.get_small_image('%s-%d' % (name, i % 2)) # man and woman
+                except KeyError:
+                    icon = icons.get_small_image(name) # elvis, taxman, scientist
+                panel.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
+                index += 1
+        return panel
+    
+    def refresh(self):
+        self.make_ui()
+    
+    def tick(self):
+        super(Dialog, self).tick()
+        self.client.tick()
     
     def get_labels(self):
         panel = ui.HorizontalLayoutWidget(spacing=10)
@@ -86,12 +119,18 @@ class CityCanvas(object):
         self.city = city
         self.image = self.city.make_citymap()
         self.size = self.image.get_size()
+        self.dialog = dialog
     
     def draw(self, surf, pos):
         surf.blit(self.image, pos)
     
     def event(self, ev):
-        pass
+        if ev.type == pygame.MOUSEBUTTONDOWN:
+            self.city.map_click(*ev.pos)
+            # self.dialog.refresh()
     
     def tick(self):
         pass
+
+def init():
+    icons.init()

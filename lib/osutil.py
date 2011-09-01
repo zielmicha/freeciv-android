@@ -24,6 +24,7 @@ is_desktop = not is_android
 def init():
     if android:
         android.init()
+        android.map_key(android.KEYCODE_BACK, pygame.K_ESCAPE)
 
 def get_android_data(append=''):
     chdir = os.getcwd()

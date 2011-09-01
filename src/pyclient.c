@@ -308,6 +308,14 @@ int city_get_shield_stock(struct city* pCity) {
     return pCity->shield_stock;
 }
 
+int city_get_citizen_count(struct city* pCity, bool specialist, int type) {
+    if(!specialist) {
+        return pCity->feel[type][FEELING_FINAL];
+    } else {
+        return pCity->specialists[type];
+    }
+}
+
 struct sprite* city_get_production_image(struct city* pCity) {
     int kind = pCity->production.kind;
     if(kind == VUT_UTYPE) {
@@ -334,10 +342,17 @@ char* city_get_production_name(struct city* pCity) {
     int kind = pCity->production.kind;
     if(kind == VUT_UTYPE) {
         struct unit_type *pUnitType = pCity->production.value.utype;
-        return utype_name_translation(pUnitType);
+        return (char*)utype_name_translation(pUnitType);
     } else {
         struct impr_type *pImprove = pCity->production.value.building;
-        return improvement_name_translation(pImprove);
+        return (char*)improvement_name_translation(pImprove);
+    }
+}
+
+void city_map_click(struct city* pCity, int canvas_x, int canvas_y) {
+    int city_x, city_y;
+    if (canvas_to_city_pos(&city_x, &city_y, canvas_x, canvas_y)) {
+        city_toggle_worker(pCity, city_x, city_y);
     }
 }
 
@@ -380,6 +395,11 @@ static void py_setup_const() {
     PY_SETUP_CONST(MODE_WASTE);
     
     PY_SETUP_CONST(FC_INFINITY);
+    
+    PY_SETUP_CONST(CITIZEN_HAPPY);
+    PY_SETUP_CONST(CITIZEN_CONTENT);
+    PY_SETUP_CONST(CITIZEN_UNHAPPY);
+    PY_SETUP_CONST(CITIZEN_ANGRY);
 }
 
 static PyObject* set_callback(PyObject* self, PyObject* args) {

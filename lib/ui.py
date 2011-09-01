@@ -79,8 +79,18 @@ class Animation(object):
     def event(self, ev):
         pass
 
-def fill(surf, rect, screen):
-    surf.fill((255, 255, 255), rect + screen_size)
+_fill_image = None
+
+def set_fill_image(image):
+    global _fill_image
+    
+    _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
+
+def fill(surf, rect, screen=None):
+    if not _fill_image:
+        surf.fill((255, 255, 255), rect + screen_size)
+    else:
+        surf.blit(_fill_image, rect)
 
 class LayoutWidget(object):
     def __init__(self):
@@ -299,7 +309,7 @@ def main():
         for overlay in overlays:
             overlay.tick()
         
-        surf.fill((255, 255, 255))
+        fill(surf, (0,0))
         screen.draw(surf, (0, 0))
         
         for overlay in overlays:

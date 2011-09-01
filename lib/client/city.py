@@ -15,13 +15,19 @@ import freeciv
 import client
 import common
 
+SP_ELVIS, SP_SCIENTIST, SP_TAXMAN = range(3)
+
 @freeciv.register
 def popup_city_dialog(city):
     client.client.popup_city_dialog(City(city))
 
 @freeciv.register
 def city_dialog_is_open(city):
-    return False
+    return client.client.city_dialog_is_open(City(city))
+
+@freeciv.register
+def refresh_city_dialog(city):
+    return client.client.refresh_city_dialog(City(city))
 
 @freeciv.register
 def diplomat_handled_in_diplomat_dialog():
@@ -31,11 +37,26 @@ class City(object):
     def __init__(self, handle):
         self.handle = handle
     
+    def __hash__(self):
+        return self.handle
+    
+    def __eq__(self, other):
+        return isinstance(other, City) and self.handle == other.handle
+    
     def make_citymap(self):
         size = freeciv.func.get_citydlg_canvas_width(), freeciv.func.get_citydlg_canvas_height()
         canvas = common.canvas_create(size[0], size[1])
         freeciv.func.city_dialog_redraw_map(self.handle, canvas)
         return canvas
+    
+    def get_citizens(self):
+        yield 'happy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_HAPPY)
+        yield 'content', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_CONTENT)
+        yield 'unhappy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_UNHAPPY)
+        yield 'angry', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_ANGRY)
+        yield 'elvis', freeciv.func.city_get_citizen_count(self.handle, True, SP_ELVIS)
+        yield 'scientist', freeciv.func.city_get_citizen_count(self.handle, True, SP_SCIENTIST)
+        yield 'taxman', freeciv.func.city_get_citizen_count(self.handle, True, SP_TAXMAN)
     
     def is_unhappy(self):
         return freeciv.func.city_unhappy(self.handle)
@@ -84,3 +105,10 @@ class City(object):
     
     def get_shield_stock(self):
         return freeciv.func.city_get_shield_stock(self.handle)
+    
+    def rotate_specialist(self, index):
+        freeciv.func.city_rotate_specialist(self.handle, index)
+    
+    def map_click(self, x, y):
+        freeciv.func.city_map_click(self.handle, x, y)
+    

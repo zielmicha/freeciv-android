@@ -64,6 +64,22 @@ class ScreenClient(client.Client):
             callback = functools.partial(focus, unit)
             panel.add(ui.Label(name, callback))
         ui.set(ui.ScrollWrapper(panel))
+    
+    def quit(self):
+        ui.back(allow_override=False)
+    
+    def city_dialog_is_open(self, city):
+        if not isinstance(ui.screen, ui.ScrollWrapper):
+            return False
+        item = ui.screen.item
+        if isinstance(item, citydlg.Dialog) and item.city == city:
+            return True
+        else:
+            return False
+    
+    def refresh_city_dialog(self, city):
+        if self.city_dialog_is_open(city):
+            ui.screen.item.refresh()
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):
@@ -190,7 +206,7 @@ class MapWidget(object):
         self.client.draw_map(surf, pos)
     
     def back(self):
-        self.client.key_event(pygame.KEYDOWN, pygame.K_ESCAPE)
+        self.client.escape()
     
     def event(self, ev):
         if ev.type == pygame.MOUSEMOTION:
@@ -237,6 +253,11 @@ class MapWidget(object):
         #print 'drag', x + delta[0], y + delta[1]
         freeciv.func.set_mapview_origin(x + delta[0], y + delta[1])
         self.last_drag_pos = pos
+        
 
 def init():
     gamemenu.init()
+    citydlg.init()
+    
+    ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
+    

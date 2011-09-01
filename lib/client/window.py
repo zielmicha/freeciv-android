@@ -75,6 +75,7 @@ mouse_pos = (0, 0)
 
 @freeciv.register
 def create_line_at_mouse_pos():
+    client.client.draw_patrol_lines = True
     freeciv.func.update_line(*mouse_pos)
 
 def load_cursors():
