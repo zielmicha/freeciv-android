@@ -356,6 +356,36 @@ void city_map_click(struct city* pCity, int canvas_x, int canvas_y) {
     }
 }
 
+int city_style_of_nation_id(int id) {
+    return city_style_of_nation(nation_by_number(id));
+}
+
+char* get_name_of_nation_id(int id) {
+    return nation_plural_translation(nation_by_number(id));
+}
+
+int get_playable_nation_count() {
+ 
+  int playable_nation_count = 0;
+    
+  nations_iterate(pnation) {
+    if (pnation->is_playable && !pnation->player && pnation->is_available)
+      ++playable_nation_count;        
+  } nations_iterate_end;
+
+  return playable_nation_count;
+  
+}
+
+// get_nation_leaders
+
+void set_nation_settings(int nation, char* leader_name, int sex, int city_style) {
+    if(client.conn.playing == NULL) errlog("set_nation_settings: client.conn.playing == NULL\n");
+    dsend_packet_nation_select_req(&client.conn,
+        player_number(client.conn.playing), nation,
+        sex, leader_name, city_style);
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);

@@ -11,11 +11,16 @@
 # GNU General Public License for more details.
 
 import pygame
+import pygame.gfxdraw
 import time
 
 history = []
 screen = None
 overlays = []
+
+screen_height = 0
+screen_width = 0
+screen_size = 0, 0
 
 def replace(new_screen):
     global screen
@@ -33,6 +38,53 @@ def set(new_screen, anim=True):
             replace(new_screen)
     else:
         replace(new_screen)
+
+def set_dialog(new_screen, scroll=False):
+    if scroll:
+        item = ScrollWrapper(new_screen, height=screen_height*0.7, width=screen_width*0.7, ways=SCROLL_HEIGHT|SCROLL_WIDTH)
+    else:
+        item = new_screen
+    set(Dialog(screen, item), anim=False)
+
+class Dialog(object):
+    def __init__(self, screen, item):
+        self.item = item
+        self.screen = screen
+    
+    def draw(self, surf, pos):
+        self.screen.draw(surf, pos)
+        pygame.gfxdraw.box(surf, (0, 0) + screen_size, (255, 255, 255, 100))
+        
+        x, y = self.get_pos()
+        size = self.item.size
+        rect = (x + pos[0], y + pos[1]) + size
+        
+        pygame.draw.rect(surf, (255, 255, 255), rect)
+        self.item.draw(surf, (x + pos[0], y + pos[1]))
+        pygame.draw.rect(surf, (0, 0, 0), rect, 1)
+    
+    def get_pos(self):
+        size = self.item.size
+        x = (screen_width - size[0]) / 2
+        y = (screen_height - size[1]) / 2
+        return (x, y)
+    
+    def tick(self):
+        self.item.tick()
+        self.screen.tick()
+    
+    def back(self):
+        back(allow_override=False, anim=False)
+    
+    def event(self, ev):
+        if hasattr(ev, 'pos'):
+            pos = self.get_pos()
+            ev.pos = _subpoints(ev.pos, pos)
+            result = self.item.event(ev)
+            ev.pos = _addpoints(ev.pos, pos)
+            return result
+        else:
+            self.item.event(ev)
 
 class Animation(object):
     spacing = 0.2
@@ -80,17 +132,21 @@ class Animation(object):
         pass
 
 _fill_image = None
+_fill_image_not_resized = None
 
 def set_fill_image(image):
-    global _fill_image
+    global _fill_image, _fill_image_not_resized
     
+    _fill_image_not_resized = image
     _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
 
 def fill(surf, rect, screen=None):
     if not _fill_image:
-        surf.fill((255, 255, 255), rect + screen_size)
+        surf.fill((255, 255, 255), rect + (screen_size or pygame.display.get_surface().get_size()))
     else:
         surf.blit(_fill_image, rect)
+
+LOCK_MOUSE_EVENT = object() # constant
 
 class LayoutWidget(object):
     def __init__(self):
@@ -98,11 +154,21 @@ class LayoutWidget(object):
         self.positions = []
         self.holds_mouse = None
         self.holds_mouse_pos = None
+        self.last_hovered = None
         self.focus = None
     
     def add(self, item):
         assert item != None
         self.items.append(item)
+    
+    def unhover(self):
+        for item in self.items:
+            self._call_unhover(item)
+    
+    @staticmethod
+    def _call_unhover(item):
+        if hasattr(item, 'unhover'):
+            item.unhover()
     
     def event(self, event):
         if hasattr(event, 'pos'):
@@ -119,14 +185,25 @@ class LayoutWidget(object):
                 result = item.event(event)
                 event.pos = _addpoints(event.pos, itempos)
                 if result != False:
+                    if self.last_hovered != item:
+                        self._call_unhover(self.last_hovered)
+                        self.last_hovered = None
+                    
                     if event.type == pygame.MOUSEBUTTONDOWN:
-                        self.holds_mouse = item
-                        self.holds_mouse_pos = itempos
+                        if result == LOCK_MOUSE_EVENT:
+                            self.holds_mouse = item
+                            self.holds_mouse_pos = itempos
+                            return LOCK_MOUSE_EVENT
+                        self.last_hovered = item
                     handled = True
                     break
             
             if event.type == pygame.MOUSEBUTTONUP:
                 self.holds_mouse = None
+            
+            if not handled:
+                self._call_unhover(self.last_hovered)
+                self.last_hovered = None
             
             return handled
         else:
@@ -272,9 +349,47 @@ def back(allow_override=True, anim=True):
 
 FPS = 15
 
+autoscale_enabled = False
+autoscale_scale = 1
+
 def add_overlay(overlay, pos):
     overlay.pos = pos
     overlays.append(overlay)
+
+def set_autoscale(surf):
+    global autoscale_enabled, _fill_image, autoscale_scale
+    autoscale_enabled = True
+    
+    h = surf.get_height() * 600 / surf.get_width()
+    autoscale_scale = 600.0 / surf.get_width()
+    
+    if _fill_image:
+        _fill_image = pygame.transform.smoothscale(_fill_image_not_resized, (600, h))
+    
+    dest = pygame.Surface((600, h))
+    
+    return dest
+    
+def autoscale_flip(surf):
+    display = pygame.display.get_surface()
+    pygame.transform.smoothscale(surf, display.get_size(), display)
+    pygame.display.flip()
+
+def flip(surf):
+    if autoscale_enabled:
+        autoscale_flip(surf)
+    else:
+        pygame.display.flip()
+
+def maybe_set_autoscale(surf):
+    if surf.get_width() < 600:
+        return set_autoscale(surf)
+    else:
+        global autoscale_scale, autoscale_enabled
+        autoscale_enabled = False
+        autoscale_scale = 1
+        return surf
+    
 
 def main():
     global screen_width, screen_height, screen_size
@@ -282,6 +397,7 @@ def main():
     per_frame = 1./FPS
     frame_last = 0
     surf = pygame.display.get_surface()
+    surf = maybe_set_autoscale(surf)
     screen_width, screen_height = screen_size = surf.get_size()
     while True:
         frame_start = time.time()
@@ -293,6 +409,8 @@ def main():
             ev_dict = event.dict
             if 'pos' in ev_dict:
                 ev_dict = dict(ev_dict)
+                x, y = ev_dict['pos']
+                ev_dict['pos'] =int(x*autoscale_scale), int(y*autoscale_scale)
                 ev_dict['abs_pos'] = ev_dict['pos']
             if event.type == pygame.QUIT:
                 back()
@@ -322,7 +440,7 @@ def main():
         else:
             lost_time += -sleep
         
-        pygame.display.flip()
+        flip(surf)
 
 class Event(object):
     def __init__(self, type, dict):
@@ -331,18 +449,20 @@ class Event(object):
             setattr(self, k, v)
 
 class WithText(object):
-    def __init__(self, label, callback, font=None, color=None):
+    def __init__(self, label, callback, font=None, color=None, padding=0):
         self.callback = callback
         self.font = font or mediumfont
         self.color = color or (0, 0, 0)
         self.label = None
+        self.padding = padding
         self.set_text(label)
     
     def set_text(self, label):
         if label != self.label:
             self.label = label
             self.label_image = render_text(self.font, label, self.color)
-            self.size = self.label_image.get_size()
+            size = self.label_image.get_size()
+            self.size = size[0] + self.padding*2, size[1] + self.padding*2
             self.padding_left = (self.size[0] - self.label_image.get_size()[0])/2
             self.padding_top = (self.size[1] - self.label_image.get_size()[1])/2
     
@@ -356,6 +476,35 @@ class WithText(object):
     
     def draw(self, surf, pos):
         surf.blit(self.label_image, (pos[0] + self.padding_left, pos[1] + self.padding_top))
+
+class Button(WithText):
+    def __init__(self, label, callback, font=None, color=None):
+        WithText.__init__(self, label, callback, font, color, padding=4)
+        self.active = False
+    
+    def draw(self, surf, pos):
+        pygame.draw.rect(surf, (255, 255, 255), pos + self.size, 1)
+        if self.active:
+            color = (255, 255, 255)
+        else:
+            color = (255, 255, 0, 50)
+        pygame.gfxdraw.box(surf, pos + self.size, color)
+        WithText.draw(self, surf, pos)
+    
+    def unhover(self):
+        self.active = False
+    
+    def event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.active = False
+            if self.callback:
+                self.callback()
+
+class Label(WithText):
+    def __init__(self, label, callback=None, font=None, color=None):
+        WithText.__init__(self, label, callback, font, color)
 
 class Image(object):
     def __init__(self, image, callback=None):
@@ -372,14 +521,6 @@ class Image(object):
     
     def draw(self, surf, pos):
         surf.blit(self.image, pos)
-
-class Button(WithText):
-    def __init__(self, label, callback, font=None, color=None):
-        WithText.__init__(self, label, callback, font, color)
-
-class Label(WithText):
-    def __init__(self, label, callback=None, font=None, color=None):
-        WithText.__init__(self, label, callback, font, color)
 
 class Tooltip(Label):
     def __init__(self, text, pos, **kwargs):
@@ -407,8 +548,8 @@ class Image(object):
         surf.blit(self.image, pos)
 
 class Menu(LinearLayoutWidget):
-    def __init__(self, font=None, force_full=True):
-        LinearLayoutWidget.__init__(self, center=True, force_full=force_full)
+    def __init__(self, font=None, force_full=True, center=True):
+        LinearLayoutWidget.__init__(self, center=center, force_full=force_full)
         self.font = font or bigfont
     
     def add(self, label, callback, color=(0, 0, 0)):
@@ -494,6 +635,7 @@ class ScrollWrapper(object):
             self.start_dragging_abs = event.abs_pos
             self.was_dragged = False
             self.canceled_event(event)
+            return LOCK_MOUSE_EVENT
         elif event.type == pygame.MOUSEMOTION:
             if self.start_dragging:
                 dx, dy = _subpoints(self.start_dragging, event.pos)

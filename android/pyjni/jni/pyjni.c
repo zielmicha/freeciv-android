@@ -20,6 +20,8 @@ PyObject* make_input_dialog(PyObject* self, PyObject* args) {
     JNIEnv* env = SDL_ANDROID_GetJNIEnv();
     aassert(env);
     
+    (*env)->PushLocalFrame(env, 16);
+    
     jclass cls = (*env)->FindClass(env, "org/renpy/android/Dialogs");
     aassert(cls);
     jmethodID mid = (*env)->GetStaticMethodID(env, cls, "showInputDialog", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;");
@@ -28,6 +30,8 @@ PyObject* make_input_dialog(PyObject* self, PyObject* args) {
     jstring msg_string = (*env)->NewStringUTF(env, msg);
     jstring default_string = (*env)->NewStringUTF(env, default_);
     (*env)->CallStaticObjectMethod(env, cls, mid, title_string, msg_string, default_string);
+    
+    env->PopLocalFrame(env, NULL);
     
     return Py_BuildValue("");
 }
@@ -39,15 +43,19 @@ PyObject* get_dialog_retval(PyObject* self, PyObject* args) {
     JNIEnv* env = SDL_ANDROID_GetJNIEnv();
     aassert(env);
     
+    (*env)->PushLocalFrame(env, 16);
+    
     jclass cls = (*env)->FindClass(env, "org/renpy/android/Dialogs");
     aassert(cls);
     jmethodID mid = (*env)->GetStaticMethodID(env, cls, "getRetVal", "()Ljava/lang/String;");
     aassert(mid);
     jobject obj = (*env)->CallStaticObjectMethod(env, cls, mid);
     
-    const char* retval = (*env)->GetStringUTFChars(env, obj, NULL);
+    const char* retval = (*env)->GetStringUTFChars(env, obj, NULL); // memory leak?
     char* safe_retval = malloc(strlen(retval));
     strcpy(safe_retval, retval);
+    
+    env->PopLocalFrame(env, NULL);
     
     return Py_BuildValue("s", safe_retval);
 }

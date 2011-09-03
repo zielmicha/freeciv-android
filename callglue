@@ -83,3 +83,11 @@ char* city_get_production_name(struct city* pCity)
 int city_get_citizen_count(struct city* pCity, bool specialist, int type)
 void city_rotate_specialist(struct city *pcity, int citizen_index)
 void city_map_click(struct city* pCity, int canvas_x, int canvas_y)
+
+int get_playable_nation_count()
+int city_style_of_nation_id(int id)
+char* get_name_of_nation_id(int id)
+
+void set_nation_settings(int nation, char* leader_name, int sex, int city_style)
+
+void disconnect_from_server(void);

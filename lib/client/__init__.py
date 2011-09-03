@@ -30,6 +30,9 @@ net_socket = -1
 client = None
 main = None
 
+class ConnectionError(Exception):
+    pass
+
 @freeciv.register
 def ui_main():
     progress.draw_frame('', 'loading tileset...', 1)
@@ -135,7 +138,7 @@ class Client(object):
         result = freeciv.func.connect_to_server(username, host, port, buff, bufflen)
         buff = buff.rstrip(' ').rstrip('\0')
         if result == -1:
-            print 'fail %r' % buff
+            raise ConnectionError(buff)
     
     def escape(self):
         if self.draw_patrol_lines:
@@ -154,5 +157,15 @@ class Client(object):
         else:
             return None
     
+    def disconnect(self):
+        self.chat('/quit')
+        freeciv.func.disconnect_from_server()
     
-    
+def get_nations():
+    return [
+        (freeciv.func.get_name_of_nation_id(i),
+         freeciv.func.city_style_of_nation_id(i), i)
+        for i in xrange(freeciv.func.get_playable_nation_count()) ]
+
+def get_nation_name(i):
+    return freeciv.func.get_name_of_nation_id(i)

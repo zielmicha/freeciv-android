@@ -13,6 +13,7 @@
 import pygame
 import freeciv
 
+import osutil
 import common
 import client
 
@@ -99,9 +100,10 @@ def draw_cursor(pos):
 current_cursor = None
 cursor_mapping = {}
 
-def init_screen():
+def init_screen(size=None):
     global screen, surface, overview_surface, cursors, cursor_names
-    screen = pygame.display.set_mode((800, 480), 0, 32)
+    ask_for_size = size or ((0, 0) if osutil.is_android else (800, 480))
+    screen = pygame.display.set_mode(ask_for_size, 0, 32) #((800, 480), 0, 32)
     pygame.display.set_caption("touchciv")
     surface = screen
 

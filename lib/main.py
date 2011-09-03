@@ -20,50 +20,44 @@ import os
 import random
 import tarfile
 import copy
+import functools
 import progress
 
+import save
 import uidialog
 import gamescreen
 import ui
 import client
 
-server_at = 6000
-
 def new_game():
-    client = gamescreen.ScreenClient()
-    client.connect_to_server('michal', 'localhost', server_at)
-    client.chat('/start')
-    ui.set(client.ui)
-
-def start_server():
-    thread.start_new_thread(server_loop, ())
-
-def server_loop():
-    global server_at
-    server_at = random.randrange(2000, 8000)
-    if osutil.is_android:
-        serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
-    else:
-        serverpath = 'server/freeciv-server'
-    args = '-p %s' % server_at
-    print 'starting server - executable at', serverpath
-    stat = os.stat(serverpath)
-    os.chmod(serverpath, 744)
-    stream = os.popen('%s %s 2>&1' % (serverpath, args), 'r', 1) # line buffering
-    os.chmod(serverpath, stat.st_mode)
-    for line in stream:
-        print '[server]', line.rstrip()
+    save.new_game()
 
 def client_main():
-    print 'client_main'
     menu = ui.Menu()
     
-    menu.add('Start server', start_server)
     menu.add('New game', new_game)
+    menu.add('Debug', debug_menu)
     
     ui.set(menu)
     
     ui.main()
+
+def debug_menu():
+    def fake_screen_size(size):
+        main(size, init=False)
+    
+    def fake_screen_size_menu():
+        menu = ui.Menu(center=False)
+        for size in [(320, 240), (480, 320), (640, 480)]:
+            menu.add(str(size), functools.partial(fake_screen_size, size))
+        ui.set_dialog(menu, scroll=True)
+    
+    menu = ui.Menu()
+    
+    menu.add('Fake screen size', fake_screen_size_menu)
+    menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
+    
+    ui.set(menu)
 
 client.main = client_main
 
@@ -89,15 +83,19 @@ def unpack_data():
         os.remove('data.tgz')
     progress.draw_frame('', 'starting...', 1)
 
-def main():
-    client.window.init_screen()
+def main(size=None, init=True):
+    client.window.init_screen(size)
     osutil.init()
     
     ui.init()
     unpack_data()
+    ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
     client.window.init()
     gamescreen.init()
-    client.freeciv.run()
+    if init:
+        client.freeciv.run()
+    else:
+        client_main()
 
 if __name__ == '__main__':
     main()

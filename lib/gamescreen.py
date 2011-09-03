@@ -62,11 +62,23 @@ class ScreenClient(client.Client):
         for unit in units:
             name = unit.get_name()
             callback = functools.partial(focus, unit)
-            panel.add(ui.Label(name, callback))
-        ui.set(ui.ScrollWrapper(panel))
+            panel.add(ui.Button(name, callback))
+        ui.set_dialog(panel, scroll=True)
     
     def quit(self):
-        ui.back(allow_override=False)
+        def quit():
+            self.disconnect()
+            ui.back(anim=False) # close dialog
+            ui.back(allow_override=False) # close game
+        
+        def save():
+            self.chat('/save')
+            ui.back()
+        
+        menu = ui.Menu(center=False)
+        menu.add('Quit', quit)
+        menu.add('Save', save)
+        ui.set_dialog(menu, scroll=True)
     
     def city_dialog_is_open(self, city):
         if not isinstance(ui.screen, ui.ScrollWrapper):
@@ -259,5 +271,4 @@ def init():
     gamemenu.init()
     citydlg.init()
     
-    ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
     

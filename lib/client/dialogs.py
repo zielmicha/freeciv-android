@@ -46,17 +46,18 @@ def get_client_page():
 def set_client_page(page):
     global client_page
     client_page = page
-    #print 'set_client_page', page
+    print 'set_client_page', page
     
     if page == freeciv.const.PAGE_START:
-        #print 'page_start'
         page_start()
     elif page == freeciv.const.PAGE_GAME:
-        #print 'page_game'
         page_game()
 
+def is_page_open(name):
+    return client_page == getattr(freeciv.const, 'PAGE_' + name)
+
 def page_start():
-    freeciv.func.send_chat('/start')
+    pass
 
 def page_game():
     pass
@@ -65,9 +66,9 @@ def page_game():
 def races_toggles_set_sensitive():
     pass
 
-@freeciv.register
-def popdown_all_city_dialogs():
-    pass
+#@freeciv.register
+#def popdown_all_city_dialogs():
+#    pass
 
 @freeciv.register
 def close_all_diplomacy_dialogs():

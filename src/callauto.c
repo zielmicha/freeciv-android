@@ -765,6 +765,58 @@ static PyObject* python_city_map_click(PyObject* self, PyObject* args) {
 	city_map_click((struct city*)arg_pCity, arg_canvas_x, arg_canvas_y);
 	return Py_BuildValue("i", 0);
 }
+// int get_playable_nation_count()
+int get_playable_nation_count();
+
+static PyObject* python_get_playable_nation_count(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	int retval = get_playable_nation_count();
+	return Py_BuildValue("i", retval);
+}
+// int city_style_of_nation_id(int id)
+int city_style_of_nation_id(int id);
+
+static PyObject* python_city_style_of_nation_id(PyObject* self, PyObject* args) {
+	int arg_id;
+	if(PyArg_ParseTuple(args, "i", &arg_id) == 0) return NULL;
+
+	int retval = city_style_of_nation_id(arg_id);
+	return Py_BuildValue("i", retval);
+}
+// char* get_name_of_nation_id(int id)
+char* get_name_of_nation_id(int id);
+
+static PyObject* python_get_name_of_nation_id(PyObject* self, PyObject* args) {
+	int arg_id;
+	if(PyArg_ParseTuple(args, "i", &arg_id) == 0) return NULL;
+
+	char* retval = get_name_of_nation_id(arg_id);
+	return Py_BuildValue("s", retval);
+}
+// void set_nation_settings(int nation, char* leader_name, int sex, int city_style)
+void set_nation_settings(int nation, char* leader_name, int sex, int city_style);
+
+static PyObject* python_set_nation_settings(PyObject* self, PyObject* args) {
+	int arg_nation;
+	char* arg_leader_name;
+	int arg_sex;
+	int arg_city_style;
+	if(PyArg_ParseTuple(args, "isii", &arg_nation, &arg_leader_name, &arg_sex, &arg_city_style) == 0) return NULL;
+
+
+
+
+	set_nation_settings(arg_nation, arg_leader_name, arg_sex, arg_city_style);
+	return Py_BuildValue("i", 0);
+}
+// void disconnect_from_server(void);
+void disconnect_from_server(void);;
+
+static PyObject* python_disconnect_from_server(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	disconnect_from_server();
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -921,4 +973,14 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_rotate_specialist", (int)ptr);
 	ptr = python_city_map_click;
 	PY_CALL("ssi", "add_function", "city_map_click", (int)ptr);
+	ptr = python_get_playable_nation_count;
+	PY_CALL("ssi", "add_function", "get_playable_nation_count", (int)ptr);
+	ptr = python_city_style_of_nation_id;
+	PY_CALL("ssi", "add_function", "city_style_of_nation_id", (int)ptr);
+	ptr = python_get_name_of_nation_id;
+	PY_CALL("ssi", "add_function", "get_name_of_nation_id", (int)ptr);
+	ptr = python_set_nation_settings;
+	PY_CALL("ssi", "add_function", "set_nation_settings", (int)ptr);
+	ptr = python_disconnect_from_server;
+	PY_CALL("ssi", "add_function", "disconnect_from_server", (int)ptr);
 }
