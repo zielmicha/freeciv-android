@@ -66,6 +66,10 @@ def real_update_meswin_dialog():
     count = freeciv.func.get_num_messages()
     client.update_meswin([ freeciv.func.get_message(i) for i in xrange(count) ])
 
+@freeciv.register
+def economy_report_dialog_update():
+    client.update_taxes()
+
 class Client(object):
     def __init__(self):
         global client
@@ -161,6 +165,37 @@ class Client(object):
         self.chat('/quit')
         freeciv.func.disconnect_from_server()
     
+    def get_tax_values(self):
+        lux = freeciv.func.get_tax_value(True)
+        science = freeciv.func.get_tax_value(False)
+        tax = 100 - lux - science
+        return tax, lux, science
+    
+    def set_tax_values(self, tax, lux, science):
+        freeciv.func.set_tax_values(tax, lux, science)
+    
+    def get_gold(self):
+        return freeciv.func.get_gold_amount()
+    
+    def get_gold_income(self):
+        return freeciv.func.get_gold_income()
+    
+    def get_current_tech(self):
+        return freeciv.func.get_current_tech()
+    
+    def get_techs(self):
+        return map(Tech, freeciv.func.get_techs())
+
+class Tech(object):
+    def __init__(self, (index, name, steps)):
+        self.index = index
+        self.name = name
+        self.steps = steps
+    
+    def set_as_goal(self):
+        freeciv.func.set_tech_goal(self.index)
+
+
 def get_nations():
     return [
         (freeciv.func.get_name_of_nation_id(i),

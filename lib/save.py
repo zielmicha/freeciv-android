@@ -21,6 +21,7 @@ import time
 import thread
 import random
 import os
+import gzip
 
 def new_game():
     port = random.randint(2000, 15000)
@@ -118,35 +119,92 @@ class ServerGUI(ui.LinearLayoutWidget):
         
         ui.set_dialog(nations, scroll=True)
 
-
 def server_command_dialog():
     cmd = uidialog.inputbox('Command')
     if cmd:
         print cmd
         client.client.chat(cmd)
 
+def load_dialog():
+    menu = ui.LinearLayoutWidget()
+    was_any = False
+    for name, path in get_saves():
+        callback = functools.partial(load_game, path)
+        menu.add(ui.Button(name, callback, font=ui.consolefont))
+        was_any = True
+    if not was_any:
+        menu.add(ui.Label('No saved games yet...'))
+    ui.set(ui.ScrollWrapper(menu))
+
+def get_saves():
+    def sort_key(name):
+        return os.path.getmtime(os.path.join(path, name))
+    
+    path = get_save_dir()
+    names = os.listdir(path)
+    names.sort(key=sort_key, reverse=True)
+    for name in names:
+        if '.sav' in name:
+            yield (name, os.path.join(path, name))
+
+def open_save(path):
+    if path.endswith('.gz'):
+        return gzip.open(path)
+    else:
+        return open(path)
+
+def get_save_username(path):
+    for name in open_save(path):
+        if name.startswith('name='):
+            return name[len('name='):].strip().strip('"')
+    return 'player'
+
+def load_game(path):
+    port = random.randint(1500, 12000)
+    start_server(port, "-f '%s'" % path)
+    
+    sc_client = gamescreen.ScreenClient()
+    sc_client.connect_to_server('player', 'localhost', port)
+    
+    callback = lambda: load_game_now(port, get_save_username(path))
+    
+    ui.replace(client.client.ui)
+    ui.set_dialog(ui.Button('Touch to start game', callback))
+    
+def load_game_now(port, username):
+    client.client.chat('/take "%s"' % username)
+    client.client.chat('/start')
+    ui.back()
 
 def start_client():
     client.client.chat('/start')
     ui.replace_anim(client.client.ui)
 
-def start_server(port):
-    thread.start_new_thread(server_loop, (port, ))
+def start_server(port, args=''):
+    thread.start_new_thread(server_loop, (port, args))
     time.sleep(0.3)
 
-def server_loop(port):
+def get_save_dir():
+    if osutil.is_android:
+        return 'saves'
+    else:
+        return os.path.expanduser('~/.freeciv/android-saves')
+
+def server_loop(port, args=''):
     if osutil.is_android:
         serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
     else:
         serverpath = 'server/freeciv-server'
-    args = '-p %d' % port
+    args = "--Ppm -p %d -s '%s' %s" % (port, get_save_dir(), args)
     print 'starting server - executable at', serverpath
+    print 'args', args
     stat = os.stat(serverpath)
     os.chmod(serverpath, 0o744) # octal!!!!
     stream = os.popen('%s %s 2>&1' % (serverpath, args), 'r', 1) # line buffering
-    #os.chmod(serverpath, stat.st_mode)
+    
     while True:
         line = stream.readline()
         if not line:
             break
         print '[server]', line.rstrip()
+

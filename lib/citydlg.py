@@ -33,6 +33,7 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.citypanel = ui.LinearLayoutWidget()
         self.prodpanel = ui.LinearLayoutWidget()
         
+        self.citypanel.add(ui.Label(self.city.get_name()))
         self.citypanel.add(self.get_citizen_icons())
         self.citypanel.add(self.canvas)
         self.citypanel.add(self.info_label)
@@ -43,17 +44,43 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.add(self.prodpanel)
         
         self.unit_img = ui.Image(self.city.get_production_image())
-        self.prodpanel.add(ui.Label(self.city.get_production_name()))
+        self.prodpanel.add(ui.Label(self.city.get_production_name(), font=ui.smallfont))
         
         stock = self.city.get_shield_stock()
         cost = self.city.get_production_cost()
         turns = self.city.get_production_turns_to_build()
         if cost != 999:
-            self.prodpanel.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns)))
+            self.prodpanel.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns), font=ui.smallfont))
         self.prodpanel.add(self.unit_img)
+        prodbuttons = ui.HorizontalLayoutWidget()
+        prodbuttons.add(ui.Label('Prod: '))
+        prodbuttons.add(ui.Button('Change', lambda: self.change_prod(add=False)))
+        #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
+        self.prodpanel.add(prodbuttons)
+        
+        #print self.city.get_buildable_improvements()
+        #print self.city.get_buildable_units()
         
         self.update_layout()
         #print self.city.get_production_cost()
+    
+    def change_prod(self, add=True):
+        panel = ui.LinearLayoutWidget()
+        
+        things = self.city.get_buildable_improvements() + \
+                    self.city.get_buildable_units()
+        
+        def change(type, handle):
+            self.city.set_production(type, handle)
+            ui.back()
+        
+        def add(handle, type, name, turns, stock, cost, ops):
+            panel.add(ui.Label('%s %s/%s %s' % (name, stock, cost, ops), functools.partial(change, type, handle)))
+        
+        for handle, type, name, turns, stock, cost, ops in things:
+            add(handle, type, name, turns, stock, cost, ops or '')
+        
+        ui.set_dialog(panel, scroll=True)
     
     def get_citizen_icons(self):
         def rotate_specialist(i):

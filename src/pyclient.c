@@ -4,6 +4,9 @@
 #define PY_SETUP_CONST(name) PY_CALL("ssi", "set_const", #name, _RESOLV(name))
 #define B2I(B) ((B)?1:0)
 
+#include "repodlgs_common.h"
+#include "fc_types.h"
+
 enum city_get_mode {
     MODE_PROD,
     MODE_SURPLUS,
@@ -360,8 +363,15 @@ int city_style_of_nation_id(int id) {
     return city_style_of_nation(nation_by_number(id));
 }
 
+void city_change_production_type(struct city* pCity, int type, int value) {
+    struct universal u;
+    u.kind = type;
+    u.value = (universals_u)value;
+    city_change_production(pCity, u);
+}
+
 char* get_name_of_nation_id(int id) {
-    return nation_plural_translation(nation_by_number(id));
+    return (char*)nation_plural_translation(nation_by_number(id));
 }
 
 int get_playable_nation_count() {
@@ -377,13 +387,118 @@ int get_playable_nation_count() {
   
 }
 
+PyObject* get_techs() {
+    PyObject* list = PyList_New(0);
+    
+    int num, i;
+    advance_index_iterate(A_FIRST, i) {
+        if (player_invention_reachable(client.conn.playing, i)
+            && TECH_KNOWN != player_invention_state(client.conn.playing, i)
+            && (11 > (num = num_unknown_techs_for_goal(client.conn.playing, i))
+                || i == get_player_research(client.conn.playing)->tech_goal)) {
+            
+            PyList_Append(list, Py_BuildValue("isi", i, advance_name_translation(advance_by_number(i)), num));
+        }
+    } advance_index_iterate_end;
+    
+    return list;
+}
+
+PyObject* get_current_tech() {
+    return Py_BuildValue("ss",
+        advance_name_researching(client.conn.playing),
+        get_science_target_text(NULL));
+}
+
+void set_tech_goal(int index) {
+    dsend_packet_player_tech_goal(&client.conn, index);
+}
+
 // get_nation_leaders
+
+PyObject* get_buildable_improvements_in_city(struct city* pCity) {
+    PyObject* list = PyList_New(0);
+    bool can_build;
+    improvement_iterate(pImprove) {
+        can_build = can_player_build_improvement_now(client.conn.playing, pImprove);
+        can_build = can_build && can_city_build_improvement_now(pCity, pImprove);
+        
+        if(can_build) {
+            const char* name = improvement_name_translation(pImprove);
+            //int turns = city_turns_to_build(pCity, cid_production(cid_encode_building(pImprove)), TRUE);
+            int stock = pCity->shield_stock;
+            int cost = impr_build_shield_cost(pImprove);
+            
+            PyList_Append(list, Py_BuildValue(
+                "iisiii()", (int)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost
+            ));
+        }
+        
+    } improvement_iterate_end;
+    
+    return list;
+}
+
+PyObject* get_buildable_units_in_city(struct city* pCity) {
+    PyObject* list = PyList_New(0);
+    bool can_build;
+    
+    unit_type_iterate(un) {
+        can_build = can_player_build_unit_now(client.conn.playing, un);
+        can_build = can_build && can_city_build_unit_now(pCity, un);
+        
+        if (can_build) {
+            const char* name = utype_name_translation(un);
+            int attack = un->attack_strength;
+            int defense = un->defense_strength;
+            int moves = un->move_rate;
+            int stock = pCity->shield_stock;
+            int cost = utype_build_shield_cost(un);
+            int turns = -1; //city_turns_to_build(pCity, cid_production(cid_encode_unit(un)), TRUE)
+            
+            PyList_Append(list, Py_BuildValue(
+                "iisiii(iii)", (int)un, VUT_UTYPE, name, turns, stock, cost,
+                attack, defense, moves
+            ));
+        }
+        
+    } unit_type_iterate_end;
+    
+    return list;
+}
 
 void set_nation_settings(int nation, char* leader_name, int sex, int city_style) {
     if(client.conn.playing == NULL) errlog("set_nation_settings: client.conn.playing == NULL\n");
     dsend_packet_nation_select_req(&client.conn,
         player_number(client.conn.playing), nation,
         sex, leader_name, city_style);
+}
+
+int get_tax_value(bool luxury) {
+    if(!client.conn.playing)
+        return 0;
+    if(luxury)
+        return client.conn.playing->economic.luxury;
+    else
+        return client.conn.playing->economic.science;
+}
+
+int get_gold_amount() {
+    if(!client.conn.playing)
+        return 0;
+    else
+        return client.conn.playing->economic.gold;
+}
+
+int get_gold_income() {
+    int total, tax, entries_used;
+    struct improvement_entry entries[B_LAST];
+    get_economy_report_data(entries, &entries_used, &total, &tax);
+    return tax - total;
+}
+
+void set_tax_values(int tax, int luxury, int science) {
+    dsend_packet_player_rates(&client.conn, tax, luxury, science);
 }
 
 static void py_setup_const() {

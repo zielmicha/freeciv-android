@@ -186,6 +186,15 @@ class Unit(object):
             freeciv.func.key_unit_wait()
         elif ident == ACTIVITY_DONE:
             freeciv.func.key_unit_done()
+        elif ident == ACTIVITY_DISBAND:
+            freeciv.func.key_unit_disband()
+
+def get_unit_in_focus():
+    units = freeciv.func.get_units_in_focus()
+    if units:
+        return Unit(units[0])
+    else:
+        return None
 
 @freeciv.register
 def update_menus():

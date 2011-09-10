@@ -37,6 +37,7 @@ void key_unit_homecity()
 void key_unit_unload_all()
 void key_unit_wait()
 void key_unit_done()
+void key_unit_disband()
 
 void action_button_pressed(int canvas_x, int canvas_y, int qtype)
 void free_ref(struct sprite* ref)
@@ -77,12 +78,14 @@ int city_turns_to_grow(const struct city *pCity)
 int city_granary_size(int size)
 int city_production_turns_to_build(const struct city *pcity, bool include_shield_stock)
 int city_get_shield_stock(struct city* pCity)
+const char* city_name(const struct city* pCity)
 struct sprite* city_get_production_image(struct city* pCity)
 int city_get_production_cost(struct city* pCity)
 char* city_get_production_name(struct city* pCity)
 int city_get_citizen_count(struct city* pCity, bool specialist, int type)
 void city_rotate_specialist(struct city *pcity, int citizen_index)
 void city_map_click(struct city* pCity, int canvas_x, int canvas_y)
+void city_change_production_type(struct city* pCity, int type, int value)
 
 int get_playable_nation_count()
 int city_style_of_nation_id(int id)
@@ -90,4 +93,16 @@ char* get_name_of_nation_id(int id)
 
 void set_nation_settings(int nation, char* leader_name, int sex, int city_style)
 
-void disconnect_from_server(void);
+void disconnect_from_server(void)
+
+PyObject* get_buildable_improvements_in_city(struct city* pcity)
+PyObject* get_buildable_units_in_city(struct city* pCity)
+
+void set_tax_values(int tax, int luxury, int science)
+int get_tax_value(bool luxury)
+int get_gold_amount()
+int get_gold_income()
+
+PyObject* get_techs()
+void set_tech_goal(int index)
+PyObject* get_current_tech()

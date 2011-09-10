@@ -20,6 +20,7 @@ from client import freeciv
 
 import citydlg
 import gamemenu
+import icons
 
 SELECT_POPUP = 0
 
@@ -92,6 +93,9 @@ class ScreenClient(client.Client):
     def refresh_city_dialog(self, city):
         if self.city_dialog_is_open(city):
             ui.screen.item.refresh()
+    
+    def update_taxes(self):
+        return self.ui.taxes_panel.update()
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):
@@ -103,6 +107,8 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client)
         self.end_turn_button = ui.Button('End turn', self.client.end_turn)
+        self.set_research_button = ui.Button('Research', self.research_dialog)
+        self.taxes_panel = TaxesPanel(client)
         
         self.left_panel = ui.LinearLayoutWidget(spacing=0)
         self.map_wrapper = ui.AbsoluteLayoutWidget()
@@ -116,6 +122,8 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.left_panel.add(self.overview)
         self.left_panel.add(self.console.scroll)
         self.left_panel.add(self.end_turn_button)
+        self.left_panel.add(self.taxes_panel)
+        self.left_panel.add(self.set_research_button)
         
         # key_end_turn()
         
@@ -126,6 +134,19 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.console.scroll.width = width
         self.console.scroll.height = 100
     
+    def research_dialog(self):
+        def set_goal(tech):
+            tech.set_as_goal()
+            ui.back()
+        
+        techs = ui.LinearLayoutWidget()
+        
+        techs.add(ui.Label(', '.join(self.client.get_current_tech())))
+        for tech in self.client.get_techs():
+            techs.add(ui.Button(tech.name, functools.partial(set_goal, tech)))
+        
+        ui.set(ui.ScrollWrapper(techs))
+    
     def tick(self):
         self.map.size = ui.screen_width - self.overview.size[0], ui.screen_height
         self.client.tick()
@@ -133,6 +154,98 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
     
     def back(self):
         self.map.back()
+
+class TaxesPanel(ui.LinearLayoutWidget):
+    def __init__(self, client):
+        ui.LinearLayoutWidget.__init__(self, spacing=10)
+        self.client = client
+        self.update()
+    
+    def update(self):
+        self.items = []
+        
+        self.update_gold_label()
+        self.update_tax()
+        self.update_layout()
+    
+    def update_gold_label(self):
+        plus = self.client.get_gold_income()
+        if plus >= 0:
+            plus = '+%d' % plus
+        else:
+            plus = '%s' % plus
+        
+        self.add(ui.Label('Gold: %d (%s)' % (self.client.get_gold(), plus), font=ui.consolefont))
+    
+    def update_tax(self):
+        panel = ui.HorizontalLayoutWidget()
+        tax, lux, science = self.client.get_tax_values()
+        
+        science_img = icons.get_small_image('scientist')
+        tax_img = icons.get_small_image('taxman')
+        lux_img = icons.get_small_image('elvis')
+        
+        def add(value, img):
+            for i in xrange(value/10):
+                panel.add(ui.Image(img))
+        
+        add(tax, tax_img)
+        add(lux, lux_img)
+        add(science, science_img)
+        
+        self.add(panel)
+    
+    def event(self, ev):
+        if ev.type == pygame.MOUSEBUTTONDOWN:
+            self.callback()
+    
+    def callback(self):
+        ui.set_dialog(TaxesDialog(self.client))
+
+class TaxesDialog(ui.LinearLayoutWidget):
+    def __init__(self, client):
+        ui.LinearLayoutWidget.__init__(self)
+        self.client = client        
+        self.update()
+        
+    def update(self):
+        self.items = []
+        self.update_tax()
+        self.update_layout()
+        
+    def update_tax(self):
+        panel = ui.LinearLayoutWidget()
+        tpl = list(self.client.get_tax_values())
+        
+        science_img = icons.get_small_image('scientist')
+        tax_img = icons.get_small_image('taxman')
+        lux_img = icons.get_small_image('elvis')
+        
+        font = ui.bigfont
+        
+        def change(type, val):
+            tpl[type] += val * 10
+            tpl[0] -= val * 10
+            a, b, c = map(lambda x: max(0, min(100, x)), tpl)
+            self.client.set_tax_values(a, b, c)
+            ui.screen.tick()
+            self.update()
+        
+        def add(type, img):
+            img = pygame.transform.smoothscale(img, (30, 50))
+            line = ui.HorizontalLayoutWidget()
+            line.add(ui.Image(img))
+            line.add(ui.Label('%d%%' % tpl[type], font=font))
+            if type != 0:
+                line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font))
+                line.add(ui.Button('+', functools.partial(change, type, +1), font=font))
+            panel.add(line)
+        
+        add(0, tax_img)
+        add(1, lux_img)
+        add(2, science_img)
+        
+        self.add(panel)
 
 class OverviewWidget(object):
     def __init__(self, client):

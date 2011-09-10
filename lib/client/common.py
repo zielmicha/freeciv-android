@@ -51,7 +51,7 @@ def show_masking_progress():
     mask_i += 1
     if mask_i > mask_numbers[mask_stage]:
         mask_i -= mask_numbers[mask_stage]
-        if mask_stage != len(mask_numbers):
+        if mask_stage + 1 < len(mask_numbers):
             mask_stage += 1
     mask_number = mask_numbers[mask_stage]
     if (time.time() - 0.1) > masking_shown:

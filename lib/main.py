@@ -36,6 +36,7 @@ def client_main():
     menu = ui.Menu()
     
     menu.add('New game', new_game)
+    menu.add('Load game', save.load_dialog)
     menu.add('Debug', debug_menu)
     
     ui.set(menu)

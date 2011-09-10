@@ -31,7 +31,7 @@ PyObject* make_input_dialog(PyObject* self, PyObject* args) {
     jstring default_string = (*env)->NewStringUTF(env, default_);
     (*env)->CallStaticObjectMethod(env, cls, mid, title_string, msg_string, default_string);
     
-    env->PopLocalFrame(env, NULL);
+    (*env)->PopLocalFrame(env, NULL);
     
     return Py_BuildValue("");
 }
@@ -55,7 +55,7 @@ PyObject* get_dialog_retval(PyObject* self, PyObject* args) {
     char* safe_retval = malloc(strlen(retval));
     strcpy(safe_retval, retval);
     
-    env->PopLocalFrame(env, NULL);
+    (*env)->PopLocalFrame(env, NULL);
     
     return Py_BuildValue("s", safe_retval);
 }

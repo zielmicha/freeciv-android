@@ -19,12 +19,12 @@ cd build/pygame
 export PATH="$PATH:$ANDROID_PATH"
 
 (python2.7 build.py --dir ../public --private ../private \
-	--package "$PKG_PACKAGE.debug" --name "$PKG_NAME Debug" \
-	$PKG_ARG debug \
-	--numeric-version 90 --version 0.9.0 2>&1 ) || exit 1 # 
+	--package "$PKG_PACKAGE" --name "$PKG_NAME" \
+	$PKG_ARG release \
+	--numeric-version $RELEASE_VERSION_ID --version $RELEASE_VERSION 2>&1 ) || exit 1 # 
 
 cd ../..
-mv build/pygame/bin/${PKG_NAME_NOSPACE}Debug-0.9.0-debug.apk build/apk/
+mv build/pygame/bin/${PKG_NAME_NOSPACE}-$RELEASE_VERSION-release.apk build/apk/
 if [ "$1" = "install" ]; then
-	./adb.sh install -r build/apk/${PKG_NAME_NOSPACE}Debug-0.9.0-debug.apk
+	./adb.sh install -r build/apk/${PKG_NAME_NOSPACE}-$RELEASE_VERSION-release.apk
 fi

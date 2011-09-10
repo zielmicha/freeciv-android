@@ -19,8 +19,10 @@ Or:
 ./build-skel.sh
 cd server/
 ./configure
+cd ..
 cd src/
 ./configure
+cd ..
 
 == BUILD ==
 Change ANDROID_PATH in android/info.sh to point

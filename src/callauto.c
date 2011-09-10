@@ -349,6 +349,14 @@ static PyObject* python_key_unit_done(PyObject* self, PyObject* args) {
 	key_unit_done();
 	return Py_BuildValue("i", 0);
 }
+// void key_unit_disband()
+void key_unit_disband();
+
+static PyObject* python_key_unit_disband(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	key_unit_disband();
+	return Py_BuildValue("i", 0);
+}
 // void action_button_pressed(int canvas_x, int canvas_y, int qtype)
 void action_button_pressed(int canvas_x, int canvas_y, int qtype);
 
@@ -695,6 +703,16 @@ static PyObject* python_city_get_shield_stock(PyObject* self, PyObject* args) {
 	int retval = city_get_shield_stock((struct city*)arg_pCity);
 	return Py_BuildValue("i", retval);
 }
+// const char* city_name(const struct city* pCity)
+const char* city_name(const struct city* pCity);
+
+static PyObject* python_city_name(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	const char* retval = city_name((struct city*)arg_pCity);
+	return Py_BuildValue("s", retval);
+}
 // struct sprite* city_get_production_image(struct city* pCity)
 struct sprite* city_get_production_image(struct city* pCity);
 
@@ -765,6 +783,20 @@ static PyObject* python_city_map_click(PyObject* self, PyObject* args) {
 	city_map_click((struct city*)arg_pCity, arg_canvas_x, arg_canvas_y);
 	return Py_BuildValue("i", 0);
 }
+// void city_change_production_type(struct city* pCity, int type, int value)
+void city_change_production_type(struct city* pCity, int type, int value);
+
+static PyObject* python_city_change_production_type(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	int arg_type;
+	int arg_value;
+	if(PyArg_ParseTuple(args, "iii", &arg_pCity, &arg_type, &arg_value) == 0) return NULL;
+
+
+
+	city_change_production_type((struct city*)arg_pCity, arg_type, arg_value);
+	return Py_BuildValue("i", 0);
+}
 // int get_playable_nation_count()
 int get_playable_nation_count();
 
@@ -809,13 +841,99 @@ static PyObject* python_set_nation_settings(PyObject* self, PyObject* args) {
 	set_nation_settings(arg_nation, arg_leader_name, arg_sex, arg_city_style);
 	return Py_BuildValue("i", 0);
 }
-// void disconnect_from_server(void);
-void disconnect_from_server(void);;
+// void disconnect_from_server(void)
+void disconnect_from_server(void);
 
 static PyObject* python_disconnect_from_server(PyObject* self, PyObject* args) {
 	if(PyArg_ParseTuple(args, "") == 0) return NULL;
 	disconnect_from_server();
 	return Py_BuildValue("i", 0);
+}
+// PyObject* get_buildable_improvements_in_city(struct city* pcity)
+PyObject* get_buildable_improvements_in_city(struct city* pcity);
+
+static PyObject* python_get_buildable_improvements_in_city(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	PyObject* retval = get_buildable_improvements_in_city((struct city*)arg_pcity);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// PyObject* get_buildable_units_in_city(struct city* pCity)
+PyObject* get_buildable_units_in_city(struct city* pCity);
+
+static PyObject* python_get_buildable_units_in_city(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	PyObject* retval = get_buildable_units_in_city((struct city*)arg_pCity);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// void set_tax_values(int tax, int luxury, int science)
+void set_tax_values(int tax, int luxury, int science);
+
+static PyObject* python_set_tax_values(PyObject* self, PyObject* args) {
+	int arg_tax;
+	int arg_luxury;
+	int arg_science;
+	if(PyArg_ParseTuple(args, "iii", &arg_tax, &arg_luxury, &arg_science) == 0) return NULL;
+
+
+
+	set_tax_values(arg_tax, arg_luxury, arg_science);
+	return Py_BuildValue("i", 0);
+}
+// int get_tax_value(bool luxury)
+int get_tax_value(bool luxury);
+
+static PyObject* python_get_tax_value(PyObject* self, PyObject* args) {
+	int arg_luxury;
+	if(PyArg_ParseTuple(args, "i", &arg_luxury) == 0) return NULL;
+
+	int retval = get_tax_value((bool)arg_luxury);
+	return Py_BuildValue("i", retval);
+}
+// int get_gold_amount()
+int get_gold_amount();
+
+static PyObject* python_get_gold_amount(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	int retval = get_gold_amount();
+	return Py_BuildValue("i", retval);
+}
+// int get_gold_income()
+int get_gold_income();
+
+static PyObject* python_get_gold_income(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	int retval = get_gold_income();
+	return Py_BuildValue("i", retval);
+}
+// PyObject* get_techs()
+PyObject* get_techs();
+
+static PyObject* python_get_techs(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	PyObject* retval = get_techs();
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// void set_tech_goal(int index)
+void set_tech_goal(int index);
+
+static PyObject* python_set_tech_goal(PyObject* self, PyObject* args) {
+	int arg_index;
+	if(PyArg_ParseTuple(args, "i", &arg_index) == 0) return NULL;
+
+	set_tech_goal(arg_index);
+	return Py_BuildValue("i", 0);
+}
+// PyObject* get_current_tech()
+PyObject* get_current_tech();
+
+static PyObject* python_get_current_tech(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	PyObject* retval = get_current_tech();
+	return Py_BuildValue("O", py_get_pyobject(retval));
 }
 void py_setup_callglue() {
 void* ptr;
@@ -895,6 +1013,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "key_unit_wait", (int)ptr);
 	ptr = python_key_unit_done;
 	PY_CALL("ssi", "add_function", "key_unit_done", (int)ptr);
+	ptr = python_key_unit_disband;
+	PY_CALL("ssi", "add_function", "key_unit_disband", (int)ptr);
 	ptr = python_action_button_pressed;
 	PY_CALL("ssi", "add_function", "action_button_pressed", (int)ptr);
 	ptr = python_free_ref;
@@ -961,6 +1081,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_production_turns_to_build", (int)ptr);
 	ptr = python_city_get_shield_stock;
 	PY_CALL("ssi", "add_function", "city_get_shield_stock", (int)ptr);
+	ptr = python_city_name;
+	PY_CALL("ssi", "add_function", "city_name", (int)ptr);
 	ptr = python_city_get_production_image;
 	PY_CALL("ssi", "add_function", "city_get_production_image", (int)ptr);
 	ptr = python_city_get_production_cost;
@@ -973,6 +1095,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_rotate_specialist", (int)ptr);
 	ptr = python_city_map_click;
 	PY_CALL("ssi", "add_function", "city_map_click", (int)ptr);
+	ptr = python_city_change_production_type;
+	PY_CALL("ssi", "add_function", "city_change_production_type", (int)ptr);
 	ptr = python_get_playable_nation_count;
 	PY_CALL("ssi", "add_function", "get_playable_nation_count", (int)ptr);
 	ptr = python_city_style_of_nation_id;
@@ -983,4 +1107,22 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "set_nation_settings", (int)ptr);
 	ptr = python_disconnect_from_server;
 	PY_CALL("ssi", "add_function", "disconnect_from_server", (int)ptr);
+	ptr = python_get_buildable_improvements_in_city;
+	PY_CALL("ssi", "add_function", "get_buildable_improvements_in_city", (int)ptr);
+	ptr = python_get_buildable_units_in_city;
+	PY_CALL("ssi", "add_function", "get_buildable_units_in_city", (int)ptr);
+	ptr = python_set_tax_values;
+	PY_CALL("ssi", "add_function", "set_tax_values", (int)ptr);
+	ptr = python_get_tax_value;
+	PY_CALL("ssi", "add_function", "get_tax_value", (int)ptr);
+	ptr = python_get_gold_amount;
+	PY_CALL("ssi", "add_function", "get_gold_amount", (int)ptr);
+	ptr = python_get_gold_income;
+	PY_CALL("ssi", "add_function", "get_gold_income", (int)ptr);
+	ptr = python_get_techs;
+	PY_CALL("ssi", "add_function", "get_techs", (int)ptr);
+	ptr = python_set_tech_goal;
+	PY_CALL("ssi", "add_function", "set_tech_goal", (int)ptr);
+	ptr = python_get_current_tech;
+	PY_CALL("ssi", "add_function", "get_current_tech", (int)ptr);
 }

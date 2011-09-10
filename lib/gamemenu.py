@@ -71,6 +71,7 @@ class Button(object):
             y -= self.image.get_height()
             x -= self.image.get_width() / 2
             self.tooltip = ui.Tooltip(self.action_name, (x, y), color=(0, 255, 255))
+            return ui.LOCK_MOUSE_EVENT
         if ev.type == pygame.MOUSEBUTTONUP:
             if self.tooltip:
                 self.tooltip.remove()
@@ -141,6 +142,9 @@ class Joystick(object):
                 self.do_action(dir)
             else:
                 return False
+    
+    def unfocus(self):
+        self.current = None
     
     def do_action(self, dir):
         freeciv.func.key_unit_move_direction(self.consts[dir])
