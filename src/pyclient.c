@@ -414,6 +414,14 @@ void set_tech_goal(int index) {
     dsend_packet_player_tech_goal(&client.conn, index);
 }
 
+struct unit_list* get_units_present_in_city(struct city* pCity) {
+    if (city_owner(pCity) != client.conn.playing) {
+        return pCity->info_units_present;
+    } else {
+        return pCity->tile->units;
+    }
+}
+
 // get_nation_leaders
 
 PyObject* get_buildable_improvements_in_city(struct city* pCity) {

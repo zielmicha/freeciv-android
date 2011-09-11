@@ -797,6 +797,16 @@ static PyObject* python_city_change_production_type(PyObject* self, PyObject* ar
 	city_change_production_type((struct city*)arg_pCity, arg_type, arg_value);
 	return Py_BuildValue("i", 0);
 }
+// struct unit_list* get_units_present_in_city(struct city* pCity)
+struct unit_list* get_units_present_in_city(struct city* pCity);
+
+static PyObject* python_get_units_present_in_city(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	struct unit_list* retval = get_units_present_in_city((struct city*)arg_pCity);
+	return Py_BuildValue("O", py_mapper_unit_list(retval));
+}
 // int get_playable_nation_count()
 int get_playable_nation_count();
 
@@ -1097,6 +1107,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_map_click", (int)ptr);
 	ptr = python_city_change_production_type;
 	PY_CALL("ssi", "add_function", "city_change_production_type", (int)ptr);
+	ptr = python_get_units_present_in_city;
+	PY_CALL("ssi", "add_function", "get_units_present_in_city", (int)ptr);
 	ptr = python_get_playable_nation_count;
 	PY_CALL("ssi", "add_function", "get_playable_nation_count", (int)ptr);
 	ptr = python_city_style_of_nation_id;
