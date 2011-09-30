@@ -26,9 +26,7 @@ cd ..
 
 == BUILD ==
 Change ANDROID_PATH in android/info.sh to point
-your Android SDK.
-Put NDK in $PATH or create file ~/setup-ndk
-which will be included.
+your Android SDK and Android NDK.
 
 Build zlib:
     android/zlib.sh

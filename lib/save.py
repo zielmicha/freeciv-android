@@ -15,6 +15,7 @@ import ui
 import uidialog
 import osutil
 import client
+import sync
 
 import functools
 import time
@@ -34,9 +35,14 @@ class ServerGUI(ui.LinearLayoutWidget):
         sc_client = gamescreen.ScreenClient()
         sc_client.connect_to_server('player', 'localhost', port)
         self.has_ui = False
+        self.setup_loading_ui()
+    
+    def setup_loading_ui(self):
+        self.add(ui.Label('Loading...'))
     
     def setup_ui(self):
         self.has_ui = True
+        self.items = []
         
         client.client.chat('/set nettimeout 0')
         client.client.chat('/set pingtimeout 1800')
@@ -128,9 +134,10 @@ def server_command_dialog():
 def load_dialog():
     menu = ui.LinearLayoutWidget()
     was_any = False
+    menu.add(ui.Button('Show CivSync saves', sync.show_load))
     for name, path in get_saves():
         callback = functools.partial(load_game, path)
-        menu.add(ui.Button(name, callback, font=ui.consolefont))
+        menu.add(ui.Button(name, callback))
         was_any = True
     if not was_any:
         menu.add(ui.Label('No saved games yet...'))
@@ -160,16 +167,27 @@ def get_save_username(path):
     return 'player'
 
 def load_game(path):
+    def out_callback(line):
+        if 'Established control over the server. You have command access level' in line:
+            ui.back(anim=False)
+            ui.set_dialog(ui.Button('Touch to start game', callback))
+            sc_client.out_window_callback = None
+    
     port = random.randint(1500, 12000)
     start_server(port, "-f '%s'" % path)
     
     sc_client = gamescreen.ScreenClient()
-    sc_client.connect_to_server('player', 'localhost', port)
+    sc_client.out_window_callback = out_callback
+    try:
+        sc_client.connect_to_server('player', 'localhost', port)
+    except client.ConnectionError:
+        ui.message('Failed to connect to game server', type='error')
+        return
     
     callback = lambda: load_game_now(port, get_save_username(path))
     
     ui.replace(client.client.ui)
-    ui.set_dialog(ui.Button('Touch to start game', callback))
+    ui.message('Loading...')
     
 def load_game_now(port, username):
     client.client.chat('/take "%s"' % username)
@@ -180,8 +198,8 @@ def start_client():
     client.client.chat('/start')
     ui.replace_anim(client.client.ui)
 
-def start_server(port, args=''):
-    thread.start_new_thread(server_loop, (port, args))
+def start_server(port, args='', line_callback=None):
+    thread.start_new_thread(server_loop, (port, args, line_callback))
     time.sleep(0.3)
 
 def get_save_dir():
@@ -190,7 +208,7 @@ def get_save_dir():
     else:
         return os.path.expanduser('~/.freeciv/android-saves')
 
-def server_loop(port, args=''):
+def server_loop(port, args='', line_callback=None):
     if osutil.is_android:
         serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
     else:
@@ -206,5 +224,7 @@ def server_loop(port, args=''):
         line = stream.readline()
         if not line:
             break
+        if line_callback:
+            line_callback(line)
         print '[server]', line.rstrip()
 

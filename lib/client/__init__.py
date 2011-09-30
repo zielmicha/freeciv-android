@@ -77,6 +77,7 @@ class Client(object):
         self.next_time = time.time()
         self.cursor_pos = (0, 0)
         self.draw_patrol_lines = False
+        self.out_window_callback = None
     
     def tick(self):
         if self.next_time >= time.time():
@@ -94,6 +95,8 @@ class Client(object):
         #window.draw_cursor(cursor_pos)
     
     def console_line(self, text):
+        if self.out_window_callback:
+            self.out_window_callback(text)
         print '[OutWindow]', text
     
     def end_turn(self):

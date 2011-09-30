@@ -14,6 +14,8 @@ import pygame
 import pygame.gfxdraw
 import time
 
+import uidialog
+
 history = []
 screen = None
 overlays = []
@@ -45,6 +47,9 @@ def set_dialog(new_screen, scroll=False):
     else:
         item = new_screen
     set(Dialog(screen, item), anim=False)
+
+def message(msg, type=None):
+    set_dialog(Label(msg))
 
 class Dialog(object):
     def __init__(self, screen, item):
@@ -389,10 +394,14 @@ def maybe_set_autoscale(surf):
         autoscale_enabled = False
         autoscale_scale = 1
         return surf
-    
+
+import threading
+
+execute_later = []
+execute_later_lock = threading.Lock()
 
 def main():
-    global screen_width, screen_height, screen_size
+    global screen_width, screen_height, screen_size, execute_later
     lost_time = 0.0
     per_frame = 1./FPS
     frame_last = 0
@@ -432,6 +441,13 @@ def main():
         
         for overlay in overlays:
             overlay.draw(surf, overlay.pos)
+        
+        with execute_later_lock:
+            execute_later_list = list(execute_later)
+            execute_later[:] = []
+        
+        for func in execute_later_list:
+            func()
         
         frame_last = time.time() - frame_start
         sleep = per_frame - frame_last
@@ -501,6 +517,25 @@ class Button(WithText):
             self.active = False
             if self.callback:
                 self.callback()
+
+class EditField(Button):
+    def __init__(self, label='', font=None, color=None):
+        Button.__init__(self, label, self.callback, font, color)
+        self.was_changed = False
+        if not label:
+            self.set_text('<touch to change>')
+    
+    def callback(self):
+        data = uidialog.inputbox('')
+        if data != None:
+            self.set_text(data)
+            self.was_changed = True
+    
+    def get_value(self):
+        if self.was_changed:
+            return self.label
+        else:
+            return ''
 
 class Label(WithText):
     def __init__(self, label, callback=None, font=None, color=None):

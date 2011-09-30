@@ -1,0 +1,167 @@
+import threading
+import time
+import os
+import traceback
+import functools
+
+import civsync
+import ui
+import save
+
+try:
+    import lzma
+except:
+    import pyjni
+    
+    class lzma:
+        def decompress(self, data):
+            return pyjni.encode_or_decode_xz(1, data)
+        
+        def compress(self, data):
+            return pyjni.encode_or_decode_xz(0, data)
+    lzma = lzma()
+
+session = None
+
+def show_load():
+    request(show_list, 'list')
+
+def show_list(entries):
+    panel = ui.LinearLayoutWidget()
+    panel.add(ui.Label('Saves from %s' % civsync.HOST))
+    for entry in entries:
+        panel.add(ui.Button('%s - %dkB' % (entry.name, entry.size/1024), functools.partial(download_sync, entry.sha1)))
+    if not entries:
+        panel.add(ui.Label('You have not synced any saves...'))
+        panel.add(ui.Label('Install Freeciv Sync for Desktop'))
+        panel.add(ui.Label('from %s' % civsync.HOST))
+    panel.add(ui.Button('Logout', logout))
+    ui.set(ui.ScrollWrapper(panel))
+
+def save_and_sync(client):
+    old_set = set(os.listdir(save.get_save_dir()))
+    client.chat('/save')
+    ui.back()
+    threading.Thread(target=save_and_sync_next_step, args=(old_set, )).start()
+
+def save_and_sync_next_step(old_set):
+    name_set = None
+    while not name_set:
+        new_set = set(os.listdir(save.get_save_dir()))
+        name_set = new_set - old_set
+        time.sleep(1)
+    name = iter(name_set).next()
+    print 'found save', name
+    ui.execute_later.append(lambda: upload_save(save.get_save_dir() + '/' + name, name))
+
+def upload_save(path, name):
+    data = save.open_save(path).read()
+    compressed = lzma.compress(data)
+    if name.endswith('.gz'):
+        name = name[:-3]
+    request(uploaded_save, 'upload_content', 'android', name, compressed, banner='Uploading save... (%dkB)' % (len(compressed)/1024))
+
+def uploaded_save(result):
+    ui.set_dialog(ui.Label('Save uploaded.', ui.back))
+
+def logout():
+    request(lambda d: ui.back(), 'logout')
+
+def download_sync(sha1):
+    print 'downloading', sha1
+    request(downloaded, 'download_content', sha1, banner='Downloading save...')
+
+def downloaded(data):
+    ui.set_dialog(ui.Label('Loading save...'))
+    uncompressed = lzma.decompress(data)
+    print 'Uncompressed size', len(uncompressed)
+    dl_path = save.get_save_dir() + '/downloaded_save'
+    try:
+        os.remove(dl_path)
+    except OSError:
+        print 'not removed...'
+    with open(dl_path, 'wb') as f:
+        f.write(uncompressed)
+    ui.back(anim=False)
+    save.load_game(dl_path)
+
+def show_login_form(callback):
+    def logged(result):
+        print 'Login successful'
+        with open(save.get_save_dir() + '/civsync.sessid.txt', 'w') as f:
+            f.write(session.sessid)
+        ui.back(anim=False)
+        callback()
+    
+    def do_login():
+        request(logged, 'login', login_field.get_value(), passwd_field.get_value())
+    
+    def no_account():
+        ui.message('Download Freeciv Sync for Desktop\nfrom freeciv.zielinscy.org.pl')
+    
+    panel = ui.LinearLayoutWidget()
+    
+    login = ui.HorizontalLayoutWidget()
+    login.add(ui.Label('Login:'))
+    login_field = ui.EditField()
+    login.add(login_field)
+    panel.add(login)
+    
+    passwd = ui.HorizontalLayoutWidget()
+    passwd.add(ui.Label('Password:'))
+    passwd_field = ui.EditField()
+    passwd.add(passwd_field)
+    panel.add(passwd)
+    
+    butts = ui.HorizontalLayoutWidget(spacing=10)
+    butts.add(ui.Button('Login', do_login))
+    butts.add(ui.Button('No account?', no_account))
+    butts.add(ui.Button('Cancel', ui.back))
+    panel.add(butts)
+    
+    ui.set(panel)
+
+def client():
+    global session
+    
+    if not session:
+        try:
+            sessid = open(save.get_save_dir() + '/civsync.sessid.txt').read().strip()
+        except IOError:
+            sessid = None
+        session = civsync.Session(sessid)
+    
+    return session
+
+def request(callback, name, *args, **kwargs):
+    if 'banner' in kwargs:
+        banner = kwargs['banner']
+        del kwargs['banner']
+    else:
+        banner = 'Contacting server...'
+    loading = ui.Label(banner)
+    ui.set_dialog(loading)
+    threading.Thread(target=sync_request, args=(callback, name, args, kwargs)).start()
+
+def sync_request(callback, name, args, kwargs):
+    func = getattr(client(), name)
+    try:
+        try:
+            result = func(*args, **kwargs)
+        except civsync.LoginError as err:
+            print 'Login failed:', err
+            ui.back(anim=False)
+            self = lambda: request(callback, name, *args, **kwargs)
+            ui.execute_later.append(lambda: show_login_form(self))
+            return
+    except Exception as err:
+        traceback.print_exc()
+        ui.back(anim=False)
+        ui.execute_later.append(lambda: ui.message('Failed to connect to the internet'))
+        return
+    ui.back(anim=False)
+    with ui.execute_later_lock:
+        ui.execute_later.append(lambda: callback(result))
+
+#ui.execute_later.append()
+    

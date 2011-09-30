@@ -21,6 +21,7 @@ import random
 import tarfile
 import copy
 import functools
+import traceback
 import progress
 
 import save
@@ -28,6 +29,8 @@ import uidialog
 import gamescreen
 import ui
 import client
+
+from sync import lzma
 
 def new_game():
     save.new_game()
@@ -53,10 +56,36 @@ def debug_menu():
             menu.add(str(size), functools.partial(fake_screen_size, size))
         ui.set_dialog(menu, scroll=True)
     
+    def test_lzma():
+        data = '23423424'
+        try:
+            print 'compressing...'
+            cmpr = lzma.compress(data)
+            print 'ok'
+            print 'compressed data', repr(cmpr)
+        except:
+            traceback.print_exc()
+            string = 'Nothing works!'
+        else:
+            try:
+                print 'decompressing...'
+                got = lzma.decompress(cmpr)
+                print 'ok'
+            except:
+                traceback.print_exc()
+                string = 'Decompressing doesn\'t work!'
+            else:
+                if got == data:    
+                    string = 'Everything works!'
+                else:
+                    string = 'Invalid result...'
+        ui.set_dialog(ui.Label(string))
+    
     menu = ui.Menu()
     
     menu.add('Fake screen size', fake_screen_size_menu)
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
+    menu.add('Test LZMA', test_lzma)
     
     ui.set(menu)
 

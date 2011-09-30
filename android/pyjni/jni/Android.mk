@@ -1,4 +1,4 @@
-# client makefile
+# pyjni makefile
 
 LOCAL_PATH := $(call my-dir)
 

@@ -21,6 +21,7 @@ from client import freeciv
 import citydlg
 import gamemenu
 import icons
+import sync
 
 SELECT_POPUP = 0
 
@@ -76,9 +77,13 @@ class ScreenClient(client.Client):
             self.chat('/save')
             ui.back()
         
+        def save_and_sync():
+            sync.save_and_sync(self)
+        
         menu = ui.Menu(center=False)
         menu.add('Quit', quit)
         menu.add('Save', save)
+        menu.add('Save & sync', save_and_sync)
         ui.set_dialog(menu, scroll=True)
     
     def city_dialog_is_open(self, city):

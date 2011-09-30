@@ -36,18 +36,24 @@ class AssetExtract {
     private ProgressDialog dialog = null;
     
     
-    public void _recursiveDelete(File f) {
+    public void _recursiveDelete(File f, int root) {
+        boolean willNotDelete = (root <= 2) && (f.getName().equals("saves") ||  f.getName().equals("config"));
+        //if(root <= 2) Log.i("python", "delete " + willNotDelete + " " + root + " " + f.getName() + "\n");
+        if(willNotDelete)
+            // do not remove saves and config
+            return;
         if (f.isDirectory()) {
             for (File r : f.listFiles()) {
-                recursiveDelete(r);
+                _recursiveDelete(r, root+1);
             }
         }
         f.delete();
     }
     
     public void recursiveDelete(File f) {
+        Log.i("python", "recursive delete " + f.getPath());
         if (f.isDirectory()) {
-            _recursiveDelete(f);
+            _recursiveDelete(f, 0);
         }
     }
     

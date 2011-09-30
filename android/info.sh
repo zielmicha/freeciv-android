@@ -6,4 +6,4 @@ PKG_ARG="--orientation landscape --permission INTERNET --icon $BASE/freeciv-clie
 # --presplash $GFX/splashscreen.png --icon $GFX/logo.png 
 RELEASE_VERSION="1.0.0"
 RELEASE_VERSION_ID="1000"
-ANDROID_PATH="$HOME/Apps/android-sdk-linux_x86/tools"
+ANDROID_PATH="$HOME/apps/android-sdk-linux_x86/tools:$HOME/apps/android-ndk-r6b"

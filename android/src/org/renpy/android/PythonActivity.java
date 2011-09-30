@@ -166,7 +166,7 @@ public class PythonActivity extends Activity implements Runnable {
         // If the disk data is out of date, extract it and write the
         // version file.
         if (! data_version.equals(disk_version)) {        
-            Log.v("python", "Extracting " + resource + " assets.");
+            Log.i("python", "Extracting " + resource + " assets.");
             
             AssetExtract ae = new AssetExtract(this);
             ae.showDialog();
