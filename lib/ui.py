@@ -58,15 +58,17 @@ class Dialog(object):
     
     def draw(self, surf, pos):
         self.screen.draw(surf, pos)
-        pygame.gfxdraw.box(surf, (0, 0) + screen_size, (255, 255, 255, 100))
+        #pygame.gfxdraw.box(surf, (0, 0) + screen_size, (255, 255, 255, 100))
         
         x, y = self.get_pos()
         size = self.item.size
-        rect = (x + pos[0], y + pos[1]) + size
+        spacing = 5
+        rect = (x + pos[0] - spacing, y + pos[1] - spacing, size[0] + spacing*2, size[1] + spacing*2)
         
-        pygame.draw.rect(surf, (255, 255, 255), rect)
+        #pygame.draw.rect(surf, (255, 255, 255), rect)
+        round_rect(surf, (255, 255, 255), (0, 0, 0), rect, 10)
         self.item.draw(surf, (x + pos[0], y + pos[1]))
-        pygame.draw.rect(surf, (0, 0, 0), rect, 1)
+        #pygame.draw.rect(surf, (0, 0, 0), rect, 1)
     
     def get_pos(self):
         size = self.item.size
@@ -143,11 +145,14 @@ def set_fill_image(image):
     global _fill_image, _fill_image_not_resized
     
     _fill_image_not_resized = image
-    _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
+    if image:
+        _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
+    else:
+        _fill_image = None
 
 def fill(surf, rect, screen=None):
     if not _fill_image:
-        surf.fill((255, 255, 255), rect + (screen_size or pygame.display.get_surface().get_size()))
+        surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else pygame.display.get_surface().get_size()))
     else:
         surf.blit(_fill_image, rect)
 
@@ -263,6 +268,19 @@ def render_text(font, text, color=(0, 0, 0)):
     else:
         return font.render(text, True, color)
 
+class Spacing(object):
+    def __init__(self, x, y):
+        self.size = (x, y)
+    
+    def tick(self):
+        pass
+    
+    def event(self, ev):
+        pass
+    
+    def draw(self, surf, pos):
+        pass
+
 class LinearLayoutWidget(LayoutWidget):
     def __init__(self, spacing=10, marginleft=0, center=False, force_full=False):
         LayoutWidget.__init__(self)
@@ -282,9 +300,10 @@ class LinearLayoutWidget(LayoutWidget):
     def get_positions(self):
         y = 0
         w = screen_width if self.force_full else max([ item.size[0] for item in self.items ] + [0])
+        center_at = w*self.center if isinstance(self.center, (int, float)) else w
         for item in self.items:
             y += self.spacing
-            centerx = (w - item.size[0])/2 if self.center else 0
+            centerx = (center_at - item.size[0])/2 if self.center else 0
             yield (self.marginleft + centerx, y)
             y += item.size[1]
         self._size = (w + self.marginleft, y)
@@ -465,12 +484,13 @@ class Event(object):
             setattr(self, k, v)
 
 class WithText(object):
-    def __init__(self, label, callback, font=None, color=None, padding=0):
+    def __init__(self, label, callback, font=None, color=None, padding=0, force_width=None):
         self.callback = callback
         self.font = font or mediumfont
         self.color = color or (0, 0, 0)
         self.label = None
         self.padding = padding
+        self.force_width = force_width
         self.set_text(label)
     
     def set_text(self, label):
@@ -478,6 +498,8 @@ class WithText(object):
             self.label = label
             self.label_image = render_text(self.font, label, self.color)
             size = self.label_image.get_size()
+            if self.force_width:
+                size = self.force_width, size[1]
             self.size = size[0] + self.padding*2, size[1] + self.padding*2
             self.padding_left = (self.size[0] - self.label_image.get_size()[0])/2
             self.padding_top = (self.size[1] - self.label_image.get_size()[1])/2
@@ -493,18 +515,69 @@ class WithText(object):
     def draw(self, surf, pos):
         surf.blit(self.label_image, (pos[0] + self.padding_left, pos[1] + self.padding_top))
 
+def gfx_ellipse(surf, color, rect, width):
+    if width == 0:
+        f = pygame.gfxdraw.filled_ellipse
+    else:
+        f = pygame.gfxdraw.aaellipse
+    f(surf, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
+
+def gfx_rect(surf, color, rect, width):
+    if width == 0:
+        pygame.gfxdraw.box(surf, rect, color)
+    else:
+        pygame.gfxdraw.rectangle(surf, rect, color)
+
+def _round_rect(surface, color, rect, width, xr, yr):
+    clip = surface.get_clip()
+    
+    # left and right
+    surface.set_clip(clip.clip(rect.inflate(0, 5-yr*2)))
+    gfx_rect(surface, color, rect.inflate(1-width,0), width)
+
+    # top and bottom, without center
+    surface.set_clip(clip.clip(rect.inflate(5-xr*2, 0)))
+    if width != 0:
+        gfx_rect(surface, color, rect.inflate(0, 1-width), width)
+    else:
+        x, y, w, h = rect
+        gfx_rect(surface, color, (x, y, w, yr - 2), width)
+        gfx_rect(surface, color, (x, y + h - yr + 1, w, yr - 1), width)
+
+    # top left corner
+    surface.set_clip(clip.clip(rect.left, rect.top, xr, yr))
+    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
+
+    # top right corner
+    surface.set_clip(clip.clip(rect.right-xr, rect.top, xr, yr))
+    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
+
+    # bottom left
+    surface.set_clip(clip.clip(rect.left, rect.bottom-yr, xr, yr))
+    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
+
+    # bottom right
+    surface.set_clip(clip.clip(rect.right-xr, rect.bottom-yr, xr, yr))
+    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.bottom-2*yr, 2*xr, 2*yr), width)
+    
+    surface.set_clip(clip)
+
+def round_rect(surf, bg, fg, rect, round=10):
+    rect = pygame.Rect(rect)
+    _round_rect(surf, bg, rect, 0, round, round)
+    _round_rect(surf, fg, rect, 1, round, round)
+
 class Button(WithText):
-    def __init__(self, label, callback, font=None, color=None):
-        WithText.__init__(self, label, callback, font, color, padding=4)
+    def __init__(self, label, callback, font=None, color=None, force_width=None):
+        WithText.__init__(self, label, callback, font, color, padding=4, force_width=force_width)
         self.active = False
     
     def draw(self, surf, pos):
-        pygame.draw.rect(surf, (255, 255, 255), pos + self.size, 1)
         if self.active:
-            color = (255, 255, 255)
+            color = (255, 255, 200, 50)
         else:
             color = (255, 255, 0, 50)
-        pygame.gfxdraw.box(surf, pos + self.size, color)
+        round_rect(surf, color, (240, 240, 150), pos + self.size)
         WithText.draw(self, surf, pos)
     
     def unhover(self):
@@ -588,7 +661,8 @@ class Menu(LinearLayoutWidget):
         self.font = font or bigfont
     
     def add(self, label, callback, color=(0, 0, 0)):
-        self.items.append(Button(label, callback, self.font, color=color))
+        screen_width = pygame.display.get_surface().get_width()
+        self.items.append(Button(label, callback, self.font, color=color, force_width=0.5*screen_width))
     
     @staticmethod
     def yndialog(text, callback):
@@ -604,7 +678,7 @@ class Menu(LinearLayoutWidget):
 
 def load_font(name, size):
     path = 'ttf/%s.ttf' % name
-    return pygame.font.Font('Ubuntu-R.ttf', size)
+    return pygame.font.Font('LiberationSerif-Regular.ttf', size)
 
 def init():
     global font, smallfont, bigfont, mediumfont, consolefont

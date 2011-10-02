@@ -81,11 +81,21 @@ def debug_menu():
                     string = 'Invalid result...'
         ui.set_dialog(ui.Label(string))
     
+    def test_progress():
+        n = 30
+        img = ui._fill_image
+        ui._fill_image = None
+        for i in xrange(n+1):
+            progress.draw_frame("Test progress", "Task %d/%d" % (i,n), i/float(n))
+            time.sleep(0.1)
+        ui._fill_image = img
+    
     menu = ui.Menu()
     
     menu.add('Fake screen size', fake_screen_size_menu)
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
     menu.add('Test LZMA', test_lzma)
+    menu.add('Test progress', test_progress)
     
     ui.set(menu)
 
@@ -107,7 +117,7 @@ def unpack_data():
             
             if info.isdir():
                 info = copy.copy(info)
-                info.mode = 0700
+                info.mode = 0o700
             if osutil.is_android:
                 tar.extract(info, "")
         os.remove('data.tgz')
@@ -118,6 +128,7 @@ def main(size=None, init=True):
     osutil.init()
     
     ui.init()
+    ui.set_fill_image(None)
     unpack_data()
     ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
     client.window.init()

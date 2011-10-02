@@ -80,7 +80,7 @@ class ScreenClient(client.Client):
         def save_and_sync():
             sync.save_and_sync(self)
         
-        menu = ui.Menu(center=False)
+        menu = ui.Menu(center=0.7)
         menu.add('Quit', quit)
         menu.add('Save', save)
         menu.add('Save & sync', save_and_sync)
@@ -115,7 +115,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.set_research_button = ui.Button('Research', self.research_dialog)
         self.taxes_panel = TaxesPanel(client)
         
-        self.left_panel = ui.LinearLayoutWidget(spacing=0)
+        self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True)
         self.map_wrapper = ui.AbsoluteLayoutWidget()
         
         self.add(self.left_panel)
@@ -128,6 +128,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.left_panel.add(self.console.scroll)
         self.left_panel.add(self.end_turn_button)
         self.left_panel.add(self.taxes_panel)
+        self.left_panel.add(ui.Spacing(0, 10))
         self.left_panel.add(self.set_research_button)
         
         # key_end_turn()
@@ -243,7 +244,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
             line.add(ui.Label('%d%%' % tpl[type], font=font))
             if type != 0:
                 line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font))
-                line.add(ui.Button('+', functools.partial(change, type, +1), font=font))
+                line.add(ui.Button(' + ', functools.partial(change, type, +1), font=font))
             panel.add(line)
         
         add(0, tax_img)
@@ -322,6 +323,8 @@ class MapWidget(object):
         self.start_drag = None
         self.last_drag_pos = None
         self.was_dragged = False
+        
+        self.last_frame_updated = 0
     
     def tick(self):
         pass
@@ -330,7 +333,11 @@ class MapWidget(object):
         if self.size != self.last_size:
             self.client.set_map_size(self.size)
             self.last_size = self.size
-        
+            
+            #self.last_frame_updated += 1
+            #if self.last_frame_updated == 3:
+            #    self.last_frame_updated = 0
+            
             self.client.update_map_canvas_visible()
         
         self.client.draw_map(surf, pos)

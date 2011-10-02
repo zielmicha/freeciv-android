@@ -16,14 +16,22 @@ import ui
 def draw_frame(title, name, perc):
     frame = pygame.display.get_surface()
     w, h = frame.get_size()
-    frame.fill((255, 255, 255))
+    ui.fill(frame, (0, 0))
     text = ui.mediumfont.render(name, 1, (0, 0, 0))
     titletext = ui.mediumfont.render(title, 1, (0, 0, 0))
     frame.blit(text, ((w - text.get_width())/2, h - 60))
     frame.blit(titletext, ((w - titletext.get_width())/2, h - 120))
+    
     barheight = 20
-    barpos = (0, h - barheight)
-    pygame.draw.rect(frame, (200, 255, 200), barpos + (w, barheight))
-    pygame.draw.rect(frame, (0, 255, 0), barpos + (int(w * perc), barheight))
+    barwidth = w * 0.6
+    barpos = (w * 0.2, 100)
+    round = 8
+    ui.round_rect(frame, (200, 255, 200, 200), (0,0,0,0), barpos + (barwidth, barheight), round)
+    if perc > 0:
+        ui.round_rect(frame, (0, 255, 0, 200), (0,0,0,0), barpos + (int(barwidth * perc), barheight), round)
+    #pygame.draw.rect(frame, (200, 255, 200), barpos + (barwidth, barheight))
+    #pygame.draw.rect(frame, (0, 255, 0), barpos + (int(barwidth * perc), barheight))
+    
     pygame.display.flip()
+
     

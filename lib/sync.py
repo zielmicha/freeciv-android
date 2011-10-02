@@ -39,19 +39,37 @@ def show_list(entries):
     ui.set(ui.ScrollWrapper(panel))
 
 def save_and_sync(client):
-    old_set = set(os.listdir(save.get_save_dir()))
+    old_set = set(list_saves(save.get_save_dir()))
     client.chat('/save')
     ui.back()
     threading.Thread(target=save_and_sync_next_step, args=(old_set, )).start()
 
+def list_saves(d):
+    return [ n for n in os.listdir(d) if '.sav' in n ]
+
 def save_and_sync_next_step(old_set):
     name_set = None
-    while not name_set:
-        new_set = set(os.listdir(save.get_save_dir()))
+    start_time = time.time()
+    stop = False
+    while not stop:
+        print 'finding save...'
+        dir = save.get_save_dir()
+        listing = list_saves(dir)
+        new_set = set(listing)
         name_set = new_set - old_set
-        time.sleep(1)
-    name = iter(name_set).next()
+        if not name_set:
+            for name in listing:
+                mtime = os.path.getmtime(os.path.join(dir, name))
+                if mtime > start_time:
+                    stop = True
+                    break
+            time.sleep(0.5)
+        else:
+            stop = True
+            name = iter(name_set).next()
+            break
     print 'found save', name
+    time.sleep(0.5)
     ui.execute_later.append(lambda: upload_save(save.get_save_dir() + '/' + name, name))
 
 def upload_save(path, name):
