@@ -30,9 +30,7 @@ class LoginError(RequestError):
     pass
 
 class UpdateRequiredError(RequestError):
-    def __init__(self, url):
-        RequestError.__init__(self, url)
-        self.url = url
+    pass
 
 class Session(object):
     def __init__(self, sessid=None):

@@ -22,6 +22,7 @@ import citydlg
 import gamemenu
 import icons
 import sync
+import features
 
 SELECT_POPUP = 0
 
@@ -83,7 +84,8 @@ class ScreenClient(client.Client):
         menu = ui.Menu(center=0.7)
         menu.add('Quit', quit)
         menu.add('Save', save)
-        menu.add('Save & sync', save_and_sync)
+        if features.get('civsync.enable'):
+            menu.add('Save & sync', save_and_sync)
         ui.set_dialog(menu, scroll=True)
     
     def city_dialog_is_open(self, city):

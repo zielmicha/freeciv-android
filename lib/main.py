@@ -22,6 +22,7 @@ import tarfile
 import copy
 import functools
 import traceback
+import thread
 import progress
 
 import save
@@ -29,22 +30,63 @@ import uidialog
 import gamescreen
 import ui
 import client
+import sync
+import features
 
 from sync import lzma
 
 def new_game():
     save.new_game()
 
+features.add_feature('app.debug', default=True, type=bool)
+features.add_feature('app.autoupdate', default=True, type=bool)
+features.add_feature('app.forcesize')
+
+main_menu = None
+main_menu_update_shown = False
+
 def client_main():
-    menu = ui.Menu()
+    global main_menu
+    main_menu = menu = ui.Menu()
     
     menu.add('New game', new_game)
     menu.add('Load game', save.load_dialog)
-    menu.add('Debug', debug_menu)
+    if features.get('app.debug'):
+        menu.add('Debug', debug_menu)
     
     ui.set(menu)
     
     ui.main()
+
+def start_autoupdate():
+    thread.start_new_thread(run_autoupdate, ())
+
+def run_autoupdate():
+    install_time = get_install_time()
+    try:
+        sync.client().updates(install_time)
+    except sync.civsync.UpdateRequiredError as err:
+        with ui.execute_later_lock:
+            ui.execute_later.append(lambda: notify_update(err.url))
+
+def notify_update(url):
+    print 'update found at', url
+    
+    def callback():
+        button.set_text('Loading...')
+        button.callback = None
+        with ui.execute_later_lock:
+            ui.execute_later.append(lambda: uidialog.open_url(url))
+    
+    global main_menu_update_shown
+    if main_menu_update_shown:
+        return
+    main_menu_update_shown = True
+    panel = ui.LinearLayoutWidget()
+    panel.add(ui.Label('There is an update available!'))
+    button = ui.Button('Update', callback)
+    panel.add(button)
+    main_menu.items.append(panel)
 
 def debug_menu():
     def fake_screen_size(size):
@@ -57,7 +99,7 @@ def debug_menu():
         ui.set_dialog(menu, scroll=True)
     
     def test_lzma():
-        data = '23423424'
+        data = '23423424\023234'
         try:
             print 'compressing...'
             cmpr = lzma.compress(data)
@@ -83,12 +125,21 @@ def debug_menu():
     
     def test_progress():
         n = 30
-        img = ui._fill_image
-        ui._fill_image = None
         for i in xrange(n+1):
             progress.draw_frame("Test progress", "Task %d/%d" % (i,n), i/float(n))
             time.sleep(0.1)
-        ui._fill_image = img
+    
+    def change_feature():
+        arg = uidialog.inputbox('name=key')
+        try:
+            features._parse_arg(arg)
+        except Exception as e:
+            traceback.print_exc()
+            ui.message(str(e))
+    
+    def show_features():
+        s = '\n'.join( '%s=%s' % (k,v) for k, v in sorted(features.features.items()) )
+        ui.set_dialog(ui.Label(s), scroll=True)
     
     menu = ui.Menu()
     
@@ -96,8 +147,11 @@ def debug_menu():
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
     menu.add('Test LZMA', test_lzma)
     menu.add('Test progress', test_progress)
+    menu.add('Change feature', change_feature)
+    menu.add('Show features', show_features)
+    menu.add('Test open_url', lambda: uidialog.open_url('http://google.com'))
     
-    ui.set(menu)
+    ui.set(ui.ScrollWrapper(menu))
 
 client.main = client_main
 
@@ -123,7 +177,26 @@ def unpack_data():
         os.remove('data.tgz')
     progress.draw_frame('', 'starting...', 1)
 
+def get_install_time():
+    path = os.path.join(save.get_save_dir(), 'install_time')
+    try:
+        return int(open(path).read())
+    except (IOError, ValueError):
+        install_time = int(time.time() * 1000)
+        with open(path, 'w') as f:
+            f.write('%d' % install_time)
+    return install_time
+
+def check_force_size():
+    if features.get('app.forcesize'):
+        return map(int, features.get('app.forcesize').split(','))
+
 def main(size=None, init=True):
+    features.parse_options(sys.argv)
+    size = size or check_force_size()
+    
+    start_autoupdate()
+    
     client.window.init_screen(size)
     osutil.init()
     

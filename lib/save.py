@@ -23,6 +23,7 @@ import thread
 import random
 import os
 import gzip
+import features
 
 def new_game():
     port = random.randint(2000, 15000)
@@ -134,7 +135,8 @@ def server_command_dialog():
 def load_dialog():
     menu = ui.LinearLayoutWidget()
     was_any = False
-    menu.add(ui.Button('Show CivSync saves', sync.show_load))
+    if features.get('civsync.enable'):
+        menu.add(ui.Button('Show CivSync saves', sync.show_load))
     for name, path in get_saves():
         callback = functools.partial(load_game, path)
         menu.add(ui.Button(name, callback))

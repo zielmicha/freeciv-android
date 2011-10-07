@@ -2,7 +2,7 @@ android/build.sh
 
 cd android
 
-cp ../*.ttf build/public
+cp -r ../fonts build/public
 cp ../lib/*.py build/public
 mkdir build/public/client/
 cp ../lib/client/*.py build/public/client/

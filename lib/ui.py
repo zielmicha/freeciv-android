@@ -15,6 +15,7 @@ import pygame.gfxdraw
 import time
 
 import uidialog
+import features
 
 history = []
 screen = None
@@ -23,6 +24,14 @@ overlays = []
 screen_height = 0
 screen_width = 0
 screen_size = 0, 0
+
+show_fps = False
+
+def set_show_fps(val):
+    global show_fps
+    show_fps = val
+
+features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 
 def replace(new_screen):
     global screen
@@ -137,7 +146,13 @@ class Animation(object):
     
     def event(self, ev):
         pass
-
+    
+    def back(self):
+        if hasattr(self.dest, 'back'):
+            self.dest.back()
+        else:
+            back(allow_override=False)
+    
 _fill_image = None
 _fill_image_not_resized = None
 
@@ -421,6 +436,8 @@ execute_later_lock = threading.Lock()
 
 def main():
     global screen_width, screen_height, screen_size, execute_later
+    fps_label = None
+    fps_timeout = 0
     lost_time = 0.0
     per_frame = 1./FPS
     frame_last = 0
@@ -468,6 +485,11 @@ def main():
         for func in execute_later_list:
             func()
         
+        if show_fps and fps_label:
+            surf.blit(fps_label, (surf.get_width() - fps_label.get_width(), 0))
+        
+        flip(surf)
+        
         frame_last = time.time() - frame_start
         sleep = per_frame - frame_last
         if sleep > 0:
@@ -475,7 +497,13 @@ def main():
         else:
             lost_time += -sleep
         
-        flip(surf)
+        if show_fps:
+            if fps_timeout == 0:
+                fps_timeout = 10
+                fps_label = mediumfont.render(str(int(1/frame_last)), 1, (200, 150, 150))
+            else:
+                fps_timeout -= 1
+        
 
 class Event(object):
     def __init__(self, type, dict):
@@ -677,17 +705,16 @@ class Menu(LinearLayoutWidget):
         set(menu)
 
 def load_font(name, size):
-    path = 'ttf/%s.ttf' % name
-    return pygame.font.Font('LiberationSerif-Regular.ttf', size)
+    return pygame.font.Font('fonts/ProcionoTT.ttf', size)
 
 def init():
     global font, smallfont, bigfont, mediumfont, consolefont
     pygame.init()
     
-    consolefont = load_font('Cosmetica', 20)
-    smallfont = font = load_font('Cosmetica', 25)
-    mediumfont = load_font('Classic Robot', 32)
-    font = bigfont = load_font('Classic Robot', 50)
+    consolefont = load_font(None, 20)
+    smallfont = font = load_font(None, 25)
+    mediumfont = load_font(None, 32)
+    font = bigfont = load_font(None, 50)
     
 SCROLL_HEIGHT = 1
 SCROLL_WIDTH = 2

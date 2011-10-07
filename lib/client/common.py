@@ -170,7 +170,7 @@ def split_sprites(img, start, each, size, num):
 
 def init():
     global fonts
-    fonts = [ pygame.font.Font('Ubuntu-R.ttf', 15) for i in range(4) ]
+    fonts = [ pygame.font.Font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
 
 FONT_CITY_NAME, FONT_CITY_PROD, FONT_REQTREE_TEXT, FONT_COUNT = range(4)
 

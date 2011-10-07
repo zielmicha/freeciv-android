@@ -102,10 +102,33 @@ PyObject* encode_or_decode_xz(PyObject* self, PyObject* args) {
     return Py_BuildValue("s#", res, reslength);
 }
 
+
+PyObject* open_intent(PyObject* self, PyObject* args) {
+    char* url;
+    char* intent_type;
+    
+    if(!PyArg_ParseTuple(args, "ss", &intent_type, &url))
+        return NULL;
+    
+    JNIEnv* env = SDL_ANDROID_GetJNIEnv();
+    aassert(env);
+    
+    jclass cls = (*env)->FindClass(env, "org/renpy/android/MyHardware");
+    aassert(cls);
+    jmethodID mid = (*env)->GetStaticMethodID(env, cls, "open_intent", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;");
+    aassert(mid);
+    jstring uri_string = (*env)->NewStringUTF(env, url);
+    jstring type_string = (*env)->NewStringUTF(env, intent_type);
+    (*env)->CallStaticObjectMethod(env, cls, mid, type_string, uri_string);
+    
+    return Py_BuildValue("i", 0);
+}
+
 static PyMethodDef PyjniMethods[] = {
     {"make_input_dialog", make_input_dialog, METH_VARARGS, ""},
     {"get_dialog_retval", get_dialog_retval, METH_VARARGS, ""},
     {"encode_or_decode_xz", encode_or_decode_xz, METH_VARARGS, ""},
+    {"open_intent", open_intent, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

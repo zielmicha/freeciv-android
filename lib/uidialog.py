@@ -15,9 +15,14 @@ import time
 
 if osutil.is_desktop:
     import easygui
+    import webbrowser
     
     def inputbox(text, default=''):
         return easygui.enterbox(text, default=default)
+        
+    def open_url(url):
+        webbrowser.open_new_tab(url)
+    
 elif osutil.is_android:
     import pyjni
     
@@ -34,3 +39,6 @@ elif osutil.is_android:
                 else:
                     return None
             time.sleep(0.1)
+    
+    def open_url(url):
+        pyjni.open_intent("android.intent.action.VIEW", url)
