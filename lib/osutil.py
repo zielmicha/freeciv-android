@@ -13,6 +13,7 @@
 import os
 import sys
 import pygame
+import time
 
 try:
     import android
@@ -37,6 +38,40 @@ def get_android_data(append=''):
         chdir = chdir[:-1]
     id = chdir
     return '/data/data/%s/%s' % (id, append)
+
+def is_paused():
+    if is_android:
+        return android.check_pause()
+    else:
+        return sig_state == PAUSED
+
+def wait_for_resume():
+    if is_android:
+        android.wait_for_resume()
+    else:
+        while sig_state == PAUSED:
+            time.sleep(0.3)
+
+if is_desktop:
+    import signal
+    
+    print 'PID for pausing is', os.getpid()
+    
+    PAUSED = 1
+    NOT_PAUSED = 0
+    
+    sig_state = NOT_PAUSED
+    
+    def _sig_pause(a, b):
+        global sig_state
+        sig_state = PAUSED
+    
+    def _sig_unpause(a, b):
+        global sig_state
+        sig_state = NOT_PAUSED
+    
+    signal.signal(signal.SIGUSR1, _sig_pause)
+    signal.signal(signal.SIGUSR2, _sig_unpause)
 
 if is_android:
     logout = sys.stdout

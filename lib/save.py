@@ -206,7 +206,7 @@ def start_server(port, args='', line_callback=None):
 
 def get_save_dir():
     if osutil.is_android:
-        return 'saves'
+        return os.path.abspath('saves')
     else:
         return os.path.expanduser('~/.freeciv/android-saves')
 

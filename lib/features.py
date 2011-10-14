@@ -10,6 +10,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import sys
+
 features = {}
 appliers = {}
 feature_types = {}
@@ -34,13 +36,17 @@ def load_config():
     except IOError:
         print 'feature config not read'
 
-def parse_options(args):
+def parse_options():
     load_config()
-    args = args[1:]
+    args = sys.argv[1:]
+    unused = [sys.argv[0]]
     for arg in args:
         if arg.startswith('-f:'):
             arg = arg[len('-f:'):]
             _parse_arg(arg)
+        else:
+            unused.append(arg)
+    sys.argv = unused
 
 def _parse_arg(arg):
     if '=' in arg:

@@ -6,6 +6,7 @@
 
 #include "repodlgs_common.h"
 #include "fc_types.h"
+#include "government.h"
 
 enum city_get_mode {
     MODE_PROD,
@@ -507,6 +508,30 @@ int get_gold_income() {
 
 void set_tax_values(int tax, int luxury, int science) {
     dsend_packet_player_rates(&client.conn, tax, luxury, science);
+}
+
+char* get_current_year_name() {
+    return (char*)textyear(game.info.year);
+}
+
+PyObject* get_governments() {
+    
+    PyObject* list = PyList_New(0);
+    
+    government_iterate(pGov) {
+        
+        PyList_Append(list, Py_BuildValue(
+            "isi", (int)pGov, government_name_translation(pGov),
+                can_change_to_government(client.conn.playing, pGov)?1:0
+        ));
+        
+    } government_iterate_end;
+    
+    return list;
+}
+
+void change_government(int gov) {
+    set_government_choice((struct government *)gov);
 }
 
 static void py_setup_const() {

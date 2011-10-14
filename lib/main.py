@@ -26,6 +26,7 @@ import thread
 import progress
 
 import save
+import osutil
 import uidialog
 import gamescreen
 import ui
@@ -41,11 +42,28 @@ def new_game():
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
 features.add_feature('app.forcesize')
+features.add_feature('app.resume', default=True, type=bool)
 
 main_menu = None
 main_menu_update_shown = False
 
+pause_file = os.path.join(save.get_save_dir(), 'pause_options')
+
 def client_main():
+    action = sys.argv[1] if sys.argv[1:] else None
+    if try_resume():
+        ui.main()
+        return
+    
+    if action == 'load':
+        savename = sys.argv[2]
+        save.load_game(savename)
+    else:
+        show_main_menu()
+    
+    ui.main()
+
+def show_main_menu():
     global main_menu
     main_menu = menu = ui.Menu()
     
@@ -55,8 +73,6 @@ def client_main():
         menu.add('Debug', debug_menu)
     
     ui.set(menu)
-    
-    ui.main()
 
 def start_autoupdate():
     thread.start_new_thread(run_autoupdate, ())
@@ -71,6 +87,10 @@ def run_autoupdate():
 
 def notify_update(url):
     print 'update found at', url
+    
+    if not main_menu:
+        # game was started by "load" command
+        return
     
     def callback():
         button.set_text('Loading...')
@@ -98,37 +118,6 @@ def debug_menu():
             menu.add(str(size), functools.partial(fake_screen_size, size))
         ui.set_dialog(menu, scroll=True)
     
-    def test_lzma():
-        data = '23423424\023234'
-        try:
-            print 'compressing...'
-            cmpr = lzma.compress(data)
-            print 'ok'
-            print 'compressed data', repr(cmpr)
-        except:
-            traceback.print_exc()
-            string = 'Nothing works!'
-        else:
-            try:
-                print 'decompressing...'
-                got = lzma.decompress(cmpr)
-                print 'ok'
-            except:
-                traceback.print_exc()
-                string = 'Decompressing doesn\'t work!'
-            else:
-                if got == data:    
-                    string = 'Everything works!'
-                else:
-                    string = 'Invalid result...'
-        ui.set_dialog(ui.Label(string))
-    
-    def test_progress():
-        n = 30
-        for i in xrange(n+1):
-            progress.draw_frame("Test progress", "Task %d/%d" % (i,n), i/float(n))
-            time.sleep(0.1)
-    
     def change_feature():
         arg = uidialog.inputbox('name=key')
         try:
@@ -145,11 +134,8 @@ def debug_menu():
     
     menu.add('Fake screen size', fake_screen_size_menu)
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
-    menu.add('Test LZMA', test_lzma)
-    menu.add('Test progress', test_progress)
     menu.add('Change feature', change_feature)
     menu.add('Show features', show_features)
-    menu.add('Test open_url', lambda: uidialog.open_url('http://google.com'))
     
     ui.set(ui.ScrollWrapper(menu))
 
@@ -191,8 +177,59 @@ def check_force_size():
     if features.get('app.forcesize'):
         return map(int, features.get('app.forcesize').split(','))
 
+def pause():
+    if client.client:
+        print 'pause occured'
+        print 'saving game'
+        client.client.chat('/save %s/pause_save.sav.gz' % save.get_save_dir())
+        with open(pause_file, 'w') as f:
+            f.write('version=1\n')
+        time.sleep(6)
+        if not osutil.is_paused():
+            remove_pause_file()
+            return
+        print 'turning off server'
+        client.client.disconnect()
+        osutil.wait_for_resume()
+        resume()
+    else:
+        osutil.wait_for_resume()
+
+ui.pause_callback = pause
+
+def try_resume():
+    if features.get('app.resume'):
+        return resume()
+
+def resume():
+    name = get_resume_data()
+    if name:
+        remove_pause_file()
+        try:
+            save.load_game(name)
+        except IOError:
+            # loading save failed
+            return False
+        return True
+    else:
+        return False
+
+def get_resume_data():
+    try:
+        content = open(pause_file).read()
+    except IOError:
+        return None
+    else:
+        return os.path.join(save.get_save_dir(), 'pause_save.sav.gz')
+
+def remove_pause_file():
+    try:
+        os.remove(pause_file)
+    except OSError:
+        print 'Failed to remove pause file'
+
 def main(size=None, init=True):
-    features.parse_options(sys.argv)
+    features.parse_options()
     size = size or check_force_size()
     
     start_autoupdate()

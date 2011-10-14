@@ -16,6 +16,7 @@ import time
 
 import uidialog
 import features
+import osutil
 
 history = []
 screen = None
@@ -490,6 +491,8 @@ def main():
         
         flip(surf)
         
+        check_pause()
+        
         frame_last = time.time() - frame_start
         sleep = per_frame - frame_last
         if sleep > 0:
@@ -503,7 +506,18 @@ def main():
                 fps_label = mediumfont.render(str(int(1/frame_last)), 1, (200, 150, 150))
             else:
                 fps_timeout -= 1
-        
+
+pause_callback = None
+
+def check_pause():
+    if osutil.is_paused():
+        print 'got pause signal'
+        if pause_callback:
+            pause_callback()
+        else:
+            print 'wait for resume'
+            osutil.wait_for_resume()
+            print 'resumed'
 
 class Event(object):
     def __init__(self, type, dict):

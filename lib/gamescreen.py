@@ -172,6 +172,7 @@ class TaxesPanel(ui.LinearLayoutWidget):
     def update(self):
         self.items = []
         
+        self.update_year()
         self.update_gold_label()
         self.update_tax()
         self.update_layout()
@@ -203,6 +204,10 @@ class TaxesPanel(ui.LinearLayoutWidget):
         
         self.add(panel)
     
+    def update_year(self):
+        year = self.client.get_current_year_name()
+        self.add(ui.Label('Year: ' + year, font=ui.consolefont))
+    
     def event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN:
             self.callback()
@@ -219,6 +224,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
     def update(self):
         self.items = []
         self.update_tax()
+        self.update_buttons()
         self.update_layout()
         
     def update_tax(self):
@@ -240,13 +246,22 @@ class TaxesDialog(ui.LinearLayoutWidget):
             self.update()
         
         def add(type, img):
-            img = pygame.transform.smoothscale(img, (30, 50))
+            # spacing here are hard-coded so the layout breaks when font is changed
+            img = pygame.transform.smoothscale(img, (30, 45))
             line = ui.HorizontalLayoutWidget()
-            line.add(ui.Image(img))
-            line.add(ui.Label('%d%%' % tpl[type], font=font))
+            img_l = ui.LinearLayoutWidget()
+            img_l.add(ui.Image(img))
+            img_l.add(ui.Spacing(0, 6))
+            line.add(img_l)
             if type != 0:
+                line.add(ui.Spacing(10, 0))
                 line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font))
+                line.add(ui.Spacing(10, 0))
                 line.add(ui.Button(' + ', functools.partial(change, type, +1), font=font))
+            else:
+                line.add(ui.Spacing(123, 0))
+            line.add(ui.Spacing(10, 0))
+            line.add(ui.Label('%d%%' % tpl[type], font=font))
             panel.add(line)
         
         add(0, tax_img)
@@ -254,6 +269,19 @@ class TaxesDialog(ui.LinearLayoutWidget):
         add(2, science_img)
         
         self.add(panel)
+    
+    def update_buttons(self):
+        self.add(ui.Button('Change government', self.change_goverment))
+    
+    def change_goverment(self):
+        def commit_government_change(gov):
+            gov.change_to()
+            ui.back()
+        
+        panel = ui.LinearLayoutWidget()
+        for gov in self.client.get_governments():
+            panel.add(ui.Label(gov.name, functools.partial(commit_government_change, gov)))
+        ui.set_dialog(panel, scroll=True)
 
 class OverviewWidget(object):
     def __init__(self, client):

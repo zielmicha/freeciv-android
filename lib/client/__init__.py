@@ -167,6 +167,9 @@ class Client(object):
     def disconnect(self):
         self.chat('/quit')
         freeciv.func.disconnect_from_server()
+        
+        global client
+        client = None
     
     def get_tax_values(self):
         lux = freeciv.func.get_tax_value(True)
@@ -188,6 +191,21 @@ class Client(object):
     
     def get_techs(self):
         return map(Tech, freeciv.func.get_techs())
+    
+    def get_current_year_name(self):
+        return freeciv.func.get_current_year_name()
+    
+    def get_governments(self):
+        return map(Gov, freeciv.func.get_governments())
+
+class Gov(object):
+    def __init__(self, (index, name, changable)):
+        self.name = name
+        self.index = index
+        self.changable = changable
+    
+    def change_to(self):
+        freeciv.func.change_government(self.index)
 
 class Tech(object):
     def __init__(self, (index, name, steps)):
@@ -197,7 +215,6 @@ class Tech(object):
     
     def set_as_goal(self):
         freeciv.func.set_tech_goal(self.index)
-
 
 def get_nations():
     return [

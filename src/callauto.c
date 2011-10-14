@@ -945,6 +945,32 @@ static PyObject* python_get_current_tech(PyObject* self, PyObject* args) {
 	PyObject* retval = get_current_tech();
 	return Py_BuildValue("O", py_get_pyobject(retval));
 }
+// char* get_current_year_name()
+char* get_current_year_name();
+
+static PyObject* python_get_current_year_name(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	char* retval = get_current_year_name();
+	return Py_BuildValue("s", retval);
+}
+// PyObject* get_governments()
+PyObject* get_governments();
+
+static PyObject* python_get_governments(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	PyObject* retval = get_governments();
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// void change_government(int gov)
+void change_government(int gov);
+
+static PyObject* python_change_government(PyObject* self, PyObject* args) {
+	int arg_gov;
+	if(PyArg_ParseTuple(args, "i", &arg_gov) == 0) return NULL;
+
+	change_government(arg_gov);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1137,4 +1163,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "set_tech_goal", (int)ptr);
 	ptr = python_get_current_tech;
 	PY_CALL("ssi", "add_function", "get_current_tech", (int)ptr);
+	ptr = python_get_current_year_name;
+	PY_CALL("ssi", "add_function", "get_current_year_name", (int)ptr);
+	ptr = python_get_governments;
+	PY_CALL("ssi", "add_function", "get_governments", (int)ptr);
+	ptr = python_change_government;
+	PY_CALL("ssi", "add_function", "change_government", (int)ptr);
 }

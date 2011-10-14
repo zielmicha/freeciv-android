@@ -107,3 +107,7 @@ int get_gold_income()
 PyObject* get_techs()
 void set_tech_goal(int index)
 PyObject* get_current_tech()
+
+char* get_current_year_name()
+PyObject* get_governments()
+void change_government(int gov)
