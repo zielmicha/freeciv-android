@@ -16,6 +16,17 @@ import window
 import sys
 import progress
 import time
+import features
+
+def set_debug(flag):
+    if flag:
+        realsurf = pygame.Surface
+        def make_surf(size, *args):
+            print 'make_surf', size
+            return realsurf(size, *args)
+        pygame.Surface = make_surf
+
+features.set_applier('debug.makesurf', set_debug, type=bool, default=False)
 
 DO_MASK = False
 
@@ -90,22 +101,13 @@ def py_mask_sprite(surf, mask, mx, my):
 def canvas_create(w, h):
     return pygame.Surface((w, h))
 
+
 def nulldebug(*a):
-    #for arg in a:
-    #    print arg,
-    #print
-    return
-
-drawn = set()
-
-def drawdebug(c, src, *a):
-    nulldebug(c, src, *a)
-    #drawn.add(src)
+    pass
 
 @freeciv.register
 def canvas_copy(canvas, src, sx, sy, x, y, w, h):
     if canvas:
-        drawdebug(canvas, src, (x, y), (sx, sy, w, h))
         canvas.blit(src, (x, y), (sx, sy, w, h))
     else:
         nulldebug('canvas_copy: canvas == NULL')
@@ -124,7 +126,6 @@ def canvas_put_line(canvas, color, ltype, x, y, dx, dy):
 @freeciv.register
 def canvas_put_sprite(canvas, x, y, sprite, ox, oy, w, h):
     if canvas and sprite:
-        drawdebug(canvas, sprite, (x, y), (ox, oy, w, h))
         canvas.blit(sprite, (x, y), (ox, oy, w, h))
     if not canvas:
         nulldebug('canvas_put_sprite: canvas == NULL')
@@ -133,7 +134,6 @@ def canvas_put_sprite(canvas, x, y, sprite, ox, oy, w, h):
 
 @freeciv.register
 def canvas_put_sprite_full(canvas, x, y, sprite):
-    drawdebug(canvas, sprite, (x, y))
     canvas.blit(sprite, (x, y))
 
 @freeciv.register

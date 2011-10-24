@@ -971,6 +971,36 @@ static PyObject* python_change_government(PyObject* self, PyObject* args) {
 	change_government(arg_gov);
 	return Py_BuildValue("i", 0);
 }
+// void py_accept_treaty(int counterpart)
+void py_accept_treaty(int counterpart);
+
+static PyObject* python_py_accept_treaty(PyObject* self, PyObject* args) {
+	int arg_counterpart;
+	if(PyArg_ParseTuple(args, "i", &arg_counterpart) == 0) return NULL;
+
+	py_accept_treaty(arg_counterpart);
+	return Py_BuildValue("i", 0);
+}
+// void py_cancel_treaty(int counterpart)
+void py_cancel_treaty(int counterpart);
+
+static PyObject* python_py_cancel_treaty(PyObject* self, PyObject* args) {
+	int arg_counterpart;
+	if(PyArg_ParseTuple(args, "i", &arg_counterpart) == 0) return NULL;
+
+	py_cancel_treaty(arg_counterpart);
+	return Py_BuildValue("i", 0);
+}
+// int call_callback(int val)
+int call_callback(int val);
+
+static PyObject* python_call_callback(PyObject* self, PyObject* args) {
+	int arg_val;
+	if(PyArg_ParseTuple(args, "i", &arg_val) == 0) return NULL;
+
+	int retval = call_callback(arg_val);
+	return Py_BuildValue("i", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1169,4 +1199,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_governments", (int)ptr);
 	ptr = python_change_government;
 	PY_CALL("ssi", "add_function", "change_government", (int)ptr);
+	ptr = python_py_accept_treaty;
+	PY_CALL("ssi", "add_function", "py_accept_treaty", (int)ptr);
+	ptr = python_py_cancel_treaty;
+	PY_CALL("ssi", "add_function", "py_cancel_treaty", (int)ptr);
+	ptr = python_call_callback;
+	PY_CALL("ssi", "add_function", "call_callback", (int)ptr);
 }

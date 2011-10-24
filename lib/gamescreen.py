@@ -23,6 +23,7 @@ import gamemenu
 import icons
 import sync
 import features
+import diplodialog
 
 SELECT_POPUP = 0
 
@@ -103,6 +104,9 @@ class ScreenClient(client.Client):
     
     def update_taxes(self):
         return self.ui.taxes_panel.update()
+    
+    def create_meeting(self, counterpart):
+        return diplodialog.Meeting(self, counterpart)
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):
@@ -310,6 +314,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
         self.client = client
         self.width = 0
         self.scroll = ConsoleScrollWrapper(self)
+        self.shown = False
     
     @property
     def size(self):
@@ -322,17 +327,25 @@ class ConsoleWidget(ui.LinearLayoutWidget):
         self.items = []
     
     def draw(self, surf, pos):
-        #clip = surf.get_clip()
-        #surf.set_clip(pos + self._size)
-        pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
+        if self.shown:
+            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
         super(ConsoleWidget, self).draw(surf, pos)
-        #surf.set_clip(clip)
+    
+    def draw_clipped(self, surf, pos, clip):
+        old_clip = surf.get_clip()
+        surf.set_clip(clip)
+        
+        self.draw(surf, pos)
+        
+        surf.set_clip(old_clip)
     
     def event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN:
             myabspos = ui._subpoints(ev.abs_pos, ev.pos)
+            self.shown = True
             ui.add_overlay(self.scroll, myabspos)
         elif ev.type == pygame.MOUSEBUTTONUP:
+            self.shown = False
             if self.scroll in ui.overlays:
                 ui.overlays.remove(self.scroll)
 

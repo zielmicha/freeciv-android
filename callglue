@@ -111,3 +111,8 @@ PyObject* get_current_tech()
 char* get_current_year_name()
 PyObject* get_governments()
 void change_government(int gov)
+
+void py_accept_treaty(int counterpart)
+void py_cancel_treaty(int counterpart)
+
+int call_callback(int val)

@@ -72,14 +72,3 @@ if is_desktop:
     
     signal.signal(signal.SIGUSR1, _sig_pause)
     signal.signal(signal.SIGUSR2, _sig_unpause)
-
-if is_android:
-    logout = sys.stdout
-    true_err = os.fdopen(2, 'w', 1)
-    
-    class MyStdout(object):
-        def write(self, s):
-            true_err.write(str(s))
-            logout.write(str(s))
-    
-    sys.stdout = sys.stderr = MyStdout()

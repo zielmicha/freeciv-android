@@ -120,7 +120,12 @@ for line in open('gui-stub').readlines() + open('gui-manual').readlines():
             print '\t%s retval;' % mrettype
             val = '\tif(PyArg_ParseTuple(ret, "%s", &retval) == 0) fprintf(stderr, "TypeError: bad return value from %s (expected %r)\\n");' % (retcode, fname, retcode)
             print val
+            if retcode == 'O':
+                print '\tPy_INCREF(retval);'
+            print '\tPy_DECREF(ret);'
             print '\t%s' % retproc
+        else:
+            print '\tPy_DECREF(ret);'
         print '}'
         
         if rettype != 'void':

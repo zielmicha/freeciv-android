@@ -99,8 +99,8 @@ class Unit(object):
         
         
         standard_activities = [
-            ACTIVITY_ROAD,
             ACTIVITY_RAILROAD,
+            ACTIVITY_ROAD,
             ACTIVITY_IRRIGATE,
             ACTIVITY_MINE,
             ACTIVITY_TRANSFORM,
@@ -152,6 +152,8 @@ class Unit(object):
             freeciv.func.key_unit_goto()
         elif ident == ACTIVITY_ROAD:
             freeciv.func.key_unit_road()
+        elif ident == ACTIVITY_RAILROAD:
+            freeciv.func.key_unit_road()
         elif ident == ACTIVITY_BUILD_CITY:
             freeciv.func.key_unit_build_city()
         #elif ident == ACTIVITY_:
@@ -188,6 +190,8 @@ class Unit(object):
             freeciv.func.key_unit_done()
         elif ident == ACTIVITY_DISBAND:
             freeciv.func.key_unit_disband()
+        else:
+            print 'Unsupported action ', ident
 
 def get_unit_in_focus():
     units = freeciv.func.get_units_in_focus()

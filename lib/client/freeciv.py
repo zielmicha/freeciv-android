@@ -19,8 +19,15 @@ import functools
 import traceback
 import glob
 import os
-
 from freecivclient import mask_sprite, get_overview_size
+import features
+
+def set_debug(flag):
+    global debug
+    debug = flag
+    
+debug = False
+features.set_applier('debug.freeciv', set_debug, type=bool, default=False)
 
 class _obj: pass
 
@@ -28,10 +35,13 @@ func = _obj()
 callback = _obj()
 const = _obj()
 
+hard_exit = True
+
 def _callback(funname, *args):
+    if debug:
+        print 'callback', funname
     try:
         args = tuple(args)
-        g = globals()
         name = funname
         if hasattr(callback, name):
             ret = getattr(callback, name)(*args)
@@ -43,7 +53,10 @@ def _callback(funname, *args):
     except:
         traceback.print_exc()
         print 'Abort.'
-        os._exit(1)
+        if hard_exit:
+            os._exit(1)
+        else:
+            sys.exit(1)
 
 def register(name_or_func):
     if isinstance(name_or_func, str):    
@@ -64,13 +77,16 @@ def _callback_test():
 @register('add_function')
 def _add_function(name, id):
     functions[name] = id
-    setattr(func, name, functools.partial(_call, id))
+    setattr(func, name, functools.partial(_call, name, id))
 
 @register('set_const')
 def _set_const(name, val):
     setattr(const, name, val)
-
-def _call(id, *args):
+    
+def _call(name, id, *args):
+    if debug:
+        if name not in ('call_idle_callbacks', 'get_mapview_store'):
+            print name
     return freecivclient.call_f(id, args)
 
 def call(name, *args):

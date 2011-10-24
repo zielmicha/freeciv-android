@@ -33,6 +33,7 @@ import ui
 import client
 import sync
 import features
+import monitor
 
 from sync import lzma
 
@@ -43,6 +44,12 @@ features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
 features.add_feature('app.forcesize')
 features.add_feature('app.resume', default=True, type=bool)
+features.add_feature('app.profile', default=False, type=bool)
+
+def apply_hardexit(t):
+    client.freeciv.hard_exit = t
+
+features.set_applier('app.hardexit', apply_hardexit, type=bool, default=True)
 
 main_menu = None
 main_menu_update_shown = False
@@ -61,7 +68,17 @@ def client_main():
     else:
         show_main_menu()
     
-    ui.main()
+    if features.get('app.profile'):
+        profile_main()
+    else:
+        ui.main()
+
+def profile_main():
+    import cProfile
+    cProfile.run('import ui; ui.main()', 'profileout')
+    import pstats
+    p = pstats.Stats('profileout')
+    p.strip_dirs().sort_stats('time').print_stats()
 
 def show_main_menu():
     global main_menu
@@ -69,10 +86,18 @@ def show_main_menu():
     
     menu.add('New game', new_game)
     menu.add('Load game', save.load_dialog)
+    menu.add('Feedback', feedback)
     if features.get('app.debug'):
         menu.add('Debug', debug_menu)
     
     ui.set(menu)
+
+def feedback():
+    panel = ui.LinearLayoutWidget()
+    panel.add(ui.Label('Leaving comment with log will help me diagnose\npotential problems with game speed and\nunexpected behaviour.'))
+    panel.add(ui.Button('Leave comment with log (preferred)', lambda: sync.comment(get_install_time(), True)))
+    panel.add(ui.Button('Leave comment without log', lambda: sync.comment(get_install_time(), False)))
+    ui.set(panel)
 
 def start_autoupdate():
     thread.start_new_thread(run_autoupdate, ())
@@ -190,6 +215,7 @@ def pause():
             return
         print 'turning off server'
         client.client.disconnect()
+        ui.back(allow_override=False)
         osutil.wait_for_resume()
         resume()
     else:
@@ -206,6 +232,7 @@ def resume():
     if name:
         remove_pause_file()
         try:
+            show_main_menu()
             save.load_game(name)
         except IOError:
             # loading save failed
@@ -233,6 +260,7 @@ def main(size=None, init=True):
     size = size or check_force_size()
     
     start_autoupdate()
+    monitor.start()
     
     client.window.init_screen(size)
     osutil.init()

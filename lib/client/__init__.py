@@ -78,6 +78,7 @@ class Client(object):
         self.cursor_pos = (0, 0)
         self.draw_patrol_lines = False
         self.out_window_callback = None
+        self.meetings = {}
     
     def tick(self):
         if self.next_time >= time.time():

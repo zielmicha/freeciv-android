@@ -25,6 +25,8 @@ import os
 import gzip
 import features
 
+from monitor import get_save_dir
+
 def new_game():
     port = random.randint(2000, 15000)
     start_server(port)
@@ -204,12 +206,6 @@ def start_server(port, args='', line_callback=None):
     thread.start_new_thread(server_loop, (port, args, line_callback))
     time.sleep(0.3)
 
-def get_save_dir():
-    if osutil.is_android:
-        return os.path.abspath('saves')
-    else:
-        return os.path.expanduser('~/.freeciv/android-saves')
-
 def server_loop(port, args='', line_callback=None):
     if osutil.is_android:
         serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
@@ -217,10 +213,14 @@ def server_loop(port, args='', line_callback=None):
         serverpath = 'server/freeciv-server'
     args = "--Ppm -p %d -s '%s' %s" % (port, get_save_dir(), args)
     print 'starting server - executable at', serverpath
-    print 'args', args
     stat = os.stat(serverpath)
     os.chmod(serverpath, 0o744) # octal!!!!
-    stream = os.popen('%s %s 2>&1' % (serverpath, args), 'r', 1) # line buffering
+    piddir = get_save_dir()
+    cmd = '%s %s 2>&1 & echo $!>%s/serverpid' % (serverpath, args, piddir)
+    if osutil.is_desktop:
+        os.environ['LD_PRELOAD'] = ''
+    print cmd
+    stream = os.popen(cmd, 'r', 1) # line buffering
     
     while True:
         line = stream.readline()

@@ -7,6 +7,7 @@ import features
 
 import civsync
 import ui
+import uidialog
 import save
 
 try:
@@ -152,6 +153,19 @@ def show_login_form(callback):
     panel.add(butts)
     
     ui.set(panel)
+
+def comment(install_time, upload_log):
+    if upload_log:
+        content = lzma.compress(open(save.get_save_dir() + '/more.log').read())
+        request(lambda result: comment_next(install_time), 'upload_log', content, install_time,
+                banner="Uploading log (%dkB)" % (len(content)/1024))
+    else:
+        comment_next(install_time)
+
+def comment_next(install_time):
+    ui.back()
+    uidialog.open_url('http://%s/comment?install_time=%s&sid=%s&ua=%s'
+                      % (civsync.HOST, install_time, client()._sessid, civsync.USER_AGENT))
 
 def client():
     global session

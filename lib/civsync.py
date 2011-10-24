@@ -69,6 +69,12 @@ class Session(object):
     def upload_content(self, source, name, content):
         self.upload(source, name, content).send_all_console()
     
+    def upload_log(self, content, install_time):
+        url = '/sync/log_upload?time=%s' % install_time
+        upload =  _Upload(url, content, 'fcsession=' + self._sessid)
+        upload.header()
+        upload.send_all_console()
+    
     def download(self, sha1):
         return self._request('/sync/download?sha1=%s' % sha1)
     

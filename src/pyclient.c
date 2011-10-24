@@ -281,13 +281,16 @@ static PyObject* call_freeciv(PyObject* self, PyObject* args) {
     return func(NULL, fargs);
 }
 
-void free_ref(struct sprite* ref) {
+void free_ref(struct sprite* cref) {
+    PyObject* ref = (PyObject*)cref;
     if(ref == NULL) {
         errlog("free_ref: ref == NULL\n");
     } else {
         // py_alloc_struct increfs so decref twice
-        Py_DECREF((PyObject*)ref);
-        Py_DECREF((PyObject*)ref);
+        //if(ref->ob_refcnt != 2)
+        //    errlog("free_ref: ref->refcnt == %d\n", ref->ob_refcnt);
+        Py_DECREF(ref);
+        Py_DECREF(ref);
     }
 }
 
@@ -530,8 +533,20 @@ PyObject* get_governments() {
     return list;
 }
 
+void py_accept_treaty(int counterpart) {
+    dsend_packet_diplomacy_accept_treaty_req(&client.conn, counterpart);
+}
+
+void py_cancel_treaty(int counterpart) {
+    dsend_packet_diplomacy_cancel_meeting_req(&client.conn, counterpart);
+}
+
 void change_government(int gov) {
     set_government_choice((struct government *)gov);
+}
+
+int call_callback(int val) {
+    return test_glue(val);
 }
 
 static void py_setup_const() {

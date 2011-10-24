@@ -61,6 +61,9 @@ def set_dialog(new_screen, scroll=False):
 def message(msg, type=None):
     set_dialog(Label(msg))
 
+def not_implemented():
+    message('Sorry. This feature is not implemented.\nCheck freeciv.zielinscy.org.pl for updates.')
+
 class Dialog(object):
     def __init__(self, screen, item):
         self.item = item
@@ -262,6 +265,18 @@ class LayoutWidget(object):
         
         for itempos, item in zip(self.positions, self.items):
             item.draw(surf, _addpoints(pos, itempos))
+    
+    def draw_clipped(self, surf, pos, rect):
+        last_clip = surf.get_clip()
+        rect = pygame.Rect(rect)
+        surf.set_clip(rect)
+        self.positions = list(self.get_positions())
+        
+        for itempos, item in zip(self.positions, self.items):    
+            bpos = itempos[0] + pos[0], itempos[1] + pos[1]
+            if rect.colliderect((bpos, item.size)):
+                item.draw(surf, _addpoints(pos, itempos))
+        surf.set_clip(last_clip)
 
 def _addpoints(a, b):
     return a[0] + b[0], a[1] + b[1]
@@ -374,6 +389,23 @@ class AbsoluteLayoutWidget(LayoutWidget):
             yield pos
         
         self.size = sw, sh
+
+class Bordered(LinearLayoutWidget):
+    def __init__(self, item, force_width=None):
+        LinearLayoutWidget.__init__(self)
+        self.force_width = force_width
+        self.add(item)
+    
+    @property
+    def size(self):
+        if self.force_width:
+            return self.force_width, self._size[1]
+        else:
+            return self._size
+    
+    def draw(self, surf, pos):
+        pygame.draw.rect(surf, (0, 0, 0), pos + self.size, 1)
+        LinearLayoutWidget.draw(self, surf, pos)
 
 def back(allow_override=True, anim=True):
     if allow_override and hasattr(screen, 'back'):
@@ -745,6 +777,8 @@ class ScrollWrapper(object):
         self.width = width or screen_width
         self.use_y = ways & SCROLL_HEIGHT
         self.use_x = ways & SCROLL_WIDTH
+        self.vx = 0
+        self.vy = 0
     
     @property
     def size(self):
@@ -759,28 +793,43 @@ class ScrollWrapper(object):
             fy -= self.y
         
         last = surf.get_clip()
-        surf.set_clip(self.get_clip(pos))
-        self.item.draw(surf, (fx, fy))
-        surf.set_clip(last)
+        if hasattr(self.item, 'draw_clipped'):
+            self.item.draw_clipped(surf, (fx, fy), self.get_clip(pos))
+        else:
+            surf.set_clip(self.get_clip(pos))
+            self.item.draw(surf, (fx, fy))
+            surf.set_clip(last)
     
     def get_clip(self, pos):
         return pos + self.size
     
     def tick(self):
+        self.x += self.vx
+        self.y += self.vy
+        
         if self.y > self.item.size[1] - self.height:
             self.y = self.item.size[1] - self.height
+            self.vy = 0
         if self.y < 0:
             self.y = 0
+            self.vy = 0
         
         if self.x > self.item.size[0] - self.width:
             self.x = self.item.size[0] - self.width
+            self.vx = 0
         if self.x < 0:
             self.x = 0
+            self.vx = 0
+        
+        self.vx -= _sgn(self.vx)
+        self.vy -= _sgn(self.vy)
         
         self.item.tick()
     
     def event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
+            self.vx = 0
+            self.vy = 0
             self.start_dragging = event.pos
             self.start_dragging_abs = event.abs_pos
             self.was_dragged = False
@@ -797,6 +846,8 @@ class ScrollWrapper(object):
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.was_dragged:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
+                self.vx += _scroll_speed_func(dx)
+                self.vy += _scroll_speed_func(dy)
                 self.y += dy
                 self.x += dx
             else:
@@ -817,3 +868,9 @@ class ScrollWrapper(object):
         ev.pos = (pos[0], pos[1] + self.y)
         self.item.event(ev)
         ev.pos = pos
+
+def _scroll_speed_func(k):
+    return min(k * 10, 30)
+
+def _sgn(f):
+    return 1 if f>0 else (0 if f==0 else -1)
