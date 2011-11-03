@@ -30,7 +30,7 @@ echo "all: freeciv-server" > client.mk
 echo "objectfiles.a: $ev
 	ar r objectfiles.a objectfiles/*.o" >> client.mk
 echo "freeciv-server: objectfiles.a
-	gcc -o freeciv-server -lm -lz objectfiles/*.o" >> client.mk
+	gcc -o freeciv-server objectfiles/*.o -lm -lz" >> client.mk
 cat Makefile.tmp >> client.mk
 mv client.mk Makefile
 rm Makefile.tmp

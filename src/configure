@@ -26,12 +26,10 @@ for name in common/*.c common/aicore/*.c client/*.c *.c client/agents/*.c utilit
     output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
 done
 
-echo "all: freeciv-client freecivclient.so" > client.mk
+echo "all: freecivclient.so" > client.mk
 echo "objectfiles.a: $ev
 	ar r objectfiles.a objectfiles/*.o
 " >> client.mk
-echo "freeciv-client: objectfiles.a
-	gcc -o freeciv-client -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
 echo "freecivclient.so: objectfiles.a
 	gcc -shared -o freecivclient.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
 echo "callauto.c: ../callglue
