@@ -97,9 +97,9 @@ def show_main_menu():
 
 def feedback():
     panel = ui.LinearLayoutWidget()
-    panel.add(ui.Label('Leaving comment with log will help me diagnose\npotential problems with game speed and\nunexpected behaviour.'))
-    panel.add(ui.Button('Leave comment with log (preferred)', lambda: sync.comment(get_install_time(), True)))
-    panel.add(ui.Button('Leave comment without log', lambda: sync.comment(get_install_time(), False)))
+    panel.add(ui.Label('Leaving comments with logs will help me diagnose\npotential problems with game speed and\nunexpected behaviour.'))
+    panel.add(ui.Button('Leave a comment with a log (preferred)', lambda: sync.comment(get_install_time(), True)))
+    panel.add(ui.Button('Leave a comment without a log', lambda: sync.comment(get_install_time(), False)))
     ui.set(panel)
 
 def start_autoupdate():
