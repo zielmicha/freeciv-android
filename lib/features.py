@@ -15,6 +15,7 @@ import sys
 features = {}
 appliers = {}
 feature_types = {}
+pernaments = {}
 
 def get(name):
     return features[name]
@@ -32,7 +33,8 @@ def add_feature(name, default=None, type=str):
 def load_config():
     try:
         for line in open('features'):
-            _parse_arg(line.rstrip())
+            k, v = _parse_arg(line.rstrip())
+            pernaments[k] = v
     except IOError:
         print 'feature config not read'
 
@@ -53,8 +55,9 @@ def _parse_arg(arg):
         key, val = arg.split('=', 1)
     else:
         key = arg
-        val = True
+        val = 'true'
     set_feature(key, val)
+    return key, val
 
 def parse_type(t, v):
     if t == bool:
@@ -64,6 +67,8 @@ def parse_type(t, v):
             return v.lower() in ('true', 't', 'y', 'yes')
     elif t == str:
         return v
+    elif t == int:
+        return int(v)
     else:
         raise TypeError(t)
 
@@ -73,5 +78,16 @@ def set(name, value):
     features[name] = parse_type(feature_types[name], value)
     if appliers[name]:
         appliers[name](features[name])
+
+def set_perm(name, value):
+    assert '=' not in name and '\n' not in name and '\r' not in name
+    
+    set(name, value)
+    pernaments[name] = value
+    _store_pernaments()
+
+def _store_pernaments():
+    with open('features', 'w') as features_conf:
+        features_conf.write('\n'.join([ '%s=%s' % (k, v) for k, v in pernaments.items() ]) + '\n+')
 
 set_feature = set

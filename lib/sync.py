@@ -1,4 +1,4 @@
-import threading
+import threading, thread
 import time
 import os
 import traceback
@@ -154,11 +154,21 @@ def show_login_form(callback):
     
     ui.set(panel)
 
+def comment_upload(install_time):
+    with ui.execute_later_lock:
+        ui.execute_later.append(lambda: ui.message('Compressing log...'))
+    
+    content = lzma.compress(open(save.get_save_dir() + '/more.log').read())
+    
+    with ui.execute_later_lock:
+        ui.execute_later.append(lambda: ui.back())
+    
+    request(lambda result: comment_next(install_time), 'upload_log', content, install_time,
+            banner="Uploading log (%dkB)" % (len(content)/1024))
+
 def comment(install_time, upload_log):
     if upload_log:
-        content = lzma.compress(open(save.get_save_dir() + '/more.log').read())
-        request(lambda result: comment_next(install_time), 'upload_log', content, install_time,
-                banner="Uploading log (%dkB)" % (len(content)/1024))
+        thread.start_new_thread(comment_upload, (install_time, ))
     else:
         comment_next(install_time)
 

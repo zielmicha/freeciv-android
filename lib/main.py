@@ -23,8 +23,8 @@ import copy
 import functools
 import traceback
 import thread
-import progress
 
+import progress
 import save
 import osutil
 import uidialog
@@ -34,6 +34,7 @@ import client
 import sync
 import features
 import monitor
+import options
 
 from sync import lzma
 
@@ -45,6 +46,7 @@ features.add_feature('app.autoupdate', default=True, type=bool)
 features.add_feature('app.forcesize')
 features.add_feature('app.resume', default=True, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
+features.add_feature('app.shutdown', default=10, type=int)
 
 def apply_hardexit(t):
     client.freeciv.hard_exit = t
@@ -87,6 +89,7 @@ def show_main_menu():
     menu.add('New game', new_game)
     menu.add('Load game', save.load_dialog)
     menu.add('Feedback', feedback)
+    menu.add('Options', options.show_options)
     if features.get('app.debug'):
         menu.add('Debug', debug_menu)
     
@@ -151,6 +154,15 @@ def debug_menu():
             traceback.print_exc()
             ui.message(str(e))
     
+    def pernament_feature():
+        arg = uidialog.inputbox('name=key')
+        try:
+            k, v = arg.split('=', 1)
+            features.set_perm(k, v)
+        except Exception as e:
+            traceback.print_exc()
+            ui.message(str(e))
+    
     def show_features():
         s = '\n'.join( '%s=%s' % (k,v) for k, v in sorted(features.features.items()) )
         ui.set_dialog(ui.Label(s), scroll=True)
@@ -160,6 +172,7 @@ def debug_menu():
     menu.add('Fake screen size', fake_screen_size_menu)
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
     menu.add('Change feature', change_feature)
+    menu.add('Pernament feature', pernament_feature)
     menu.add('Show features', show_features)
     
     ui.set(ui.ScrollWrapper(menu))
@@ -209,7 +222,7 @@ def pause():
         client.client.chat('/save %s/pause_save.sav.gz' % save.get_save_dir())
         with open(pause_file, 'w') as f:
             f.write('version=1\n')
-        time.sleep(6)
+        time.sleep(featues.get('app.shutdown'))
         if not osutil.is_paused():
             remove_pause_file()
             return
