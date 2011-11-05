@@ -67,7 +67,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.add(self.mapsize_button)
         
         self.nation_id = 1 #random.choice(client.get_nations())[2]
-        self.leader_name = 'Me'
+        self.leader_name = 'Player'
         self.city_style = 1
         self.leader_sex = 2
         
