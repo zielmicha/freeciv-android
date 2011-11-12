@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Can execute program as root - Amiga */
-/* #undef ALWAYS_ROOT */
+#define ALWAYS_ROOT
 
 /* SDL_Mixer support */
 /* #undef AUDIO_SDL */
