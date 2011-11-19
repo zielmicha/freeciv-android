@@ -52,9 +52,10 @@ class Dialog(ui.HorizontalLayoutWidget):
         if cost != 999:
             self.prodpanel.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns), font=ui.smallfont))
         self.prodpanel.add(self.unit_img)
-        prodbuttons = ui.HorizontalLayoutWidget()
+        prodbuttons = ui.HorizontalLayoutWidget(spacing=10)
         prodbuttons.add(ui.Label('Prod: '))
         prodbuttons.add(ui.Button('Change', lambda: self.change_prod(add=False)))
+        prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
         #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
         self.prodpanel.add(prodbuttons)
         self.prodpanel.add(ui.Button('Units in city', self.show_units))
@@ -95,6 +96,19 @@ class Dialog(ui.HorizontalLayoutWidget):
             add(handle, type, name, turns, stock, cost, ops or '')
         
         ui.set_dialog(panel, scroll=True)
+    
+    def buy_prod(self):
+        def buy():
+            self.city.buy()
+            self.make_ui()
+        
+        price = self.city.get_buy_price()
+        if not price:
+            ui.message('Cannot buy')
+        elif price > self.client.get_gold():
+            ui.message('Too expensive - %d' % price)
+        else:
+            ui.ask('Buy %s for %d?' % (self.city.get_production_name(), price), buy)
     
     def get_citizen_icons(self):
         def rotate_specialist(i):

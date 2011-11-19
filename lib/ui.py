@@ -61,6 +61,19 @@ def set_dialog(new_screen, scroll=False):
 def message(msg, type=None):
     set_dialog(Label(msg))
 
+def ask(msg, callback):
+    def call_callback():
+        callback()
+        back()
+    
+    ui = LinearLayoutWidget()
+    ui.add(Label(msg))
+    hor = HorizontalLayoutWidget(spacing=10)
+    hor.add(Button('Yes', call_callback))
+    hor.add(Button('No', back))
+    ui.add(hor)
+    set_dialog(ui)
+
 def not_implemented():
     message('Sorry. This feature is not implemented.\nCheck freeciv.zielinscy.org.pl for updates.')
 

@@ -1001,6 +1001,36 @@ static PyObject* python_call_callback(PyObject* self, PyObject* args) {
 	int retval = call_callback(arg_val);
 	return Py_BuildValue("i", retval);
 }
+// int city_production_buy_gold_cost(const struct city *pcity)
+int city_production_buy_gold_cost(const struct city *pcity);
+
+static PyObject* python_city_production_buy_gold_cost(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	int retval = city_production_buy_gold_cost((struct city*)arg_pcity);
+	return Py_BuildValue("i", retval);
+}
+// bool city_can_buy(const struct city *pcity)
+bool city_can_buy(const struct city *pcity);
+
+static PyObject* python_city_can_buy(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	bool retval = city_can_buy((struct city*)arg_pcity);
+	return Py_BuildValue("i", (int)retval);
+}
+// int city_buy_production(struct city *pcity)
+int city_buy_production(struct city *pcity);
+
+static PyObject* python_city_buy_production(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	if(PyArg_ParseTuple(args, "i", &arg_pcity) == 0) return NULL;
+
+	int retval = city_buy_production((struct city*)arg_pcity);
+	return Py_BuildValue("i", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1205,4 +1235,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_cancel_treaty", (int)ptr);
 	ptr = python_call_callback;
 	PY_CALL("ssi", "add_function", "call_callback", (int)ptr);
+	ptr = python_city_production_buy_gold_cost;
+	PY_CALL("ssi", "add_function", "city_production_buy_gold_cost", (int)ptr);
+	ptr = python_city_can_buy;
+	PY_CALL("ssi", "add_function", "city_can_buy", (int)ptr);
+	ptr = python_city_buy_production;
+	PY_CALL("ssi", "add_function", "city_buy_production", (int)ptr);
 }

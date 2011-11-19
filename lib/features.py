@@ -85,9 +85,11 @@ def set_perm(name, value):
     set(name, value)
     pernaments[name] = value
     _store_pernaments()
+    
+    print 'changed pernament feature %s to %r' % (name, value)
 
 def _store_pernaments():
     with open('features', 'w') as features_conf:
-        features_conf.write('\n'.join([ '%s=%s' % (k, v) for k, v in pernaments.items() ]) + '\n+')
+        features_conf.write('\n'.join([ '%s=%s' % (k, v) for k, v in pernaments.items() ]) + '\n')
 
 set_feature = set

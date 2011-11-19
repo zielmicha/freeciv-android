@@ -133,3 +133,15 @@ class City(object):
     def get_units(self):
         return [ actions.Unit(unit) for unit in freeciv.func.get_units_present_in_city(self.handle) ]
     
+    def get_buy_price(self):
+        if freeciv.func.city_can_buy(self.handle):
+            return freeciv.func.city_production_buy_gold_cost(self.handle)
+        else:
+            return None
+    
+    def buy(self):
+        freeciv.func.city_buy_production(self.handle)
+
+
+    
+    
