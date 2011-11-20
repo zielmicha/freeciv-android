@@ -17,6 +17,8 @@ appliers = {}
 feature_types = {}
 pernaments = {}
 
+FEATURE_FILE_PATH = None
+
 def get(name):
     return features[name]
 
@@ -32,7 +34,7 @@ def add_feature(name, default=None, type=str):
 
 def load_config():
     try:
-        for line in open('features'):
+        for line in open(FEATURE_FILE_PATH):
             k, v = _parse_arg(line.rstrip())
             pernaments[k] = v
     except IOError:
@@ -89,7 +91,7 @@ def set_perm(name, value):
     print 'changed pernament feature %s to %r' % (name, value)
 
 def _store_pernaments():
-    with open('features', 'w') as features_conf:
+    with open(FEATURE_FILE_PATH, 'w') as features_conf:
         features_conf.write('\n'.join([ '%s=%s' % (k, v) for k, v in pernaments.items() ]) + '\n')
 
 set_feature = set

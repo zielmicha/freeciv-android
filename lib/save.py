@@ -27,9 +27,12 @@ import features
 
 from monitor import get_save_dir
 
+features.add_feature('app.ruleset', default='default')
+
 def new_game():
     port = random.randint(2000, 15000)
-    start_server(port)
+    args = '-r ./data/%s.serv' % features.get('app.ruleset')
+    start_server(port, args=args)
     ui.set(ServerGUI(port))
 
 class ServerGUI(ui.LinearLayoutWidget):

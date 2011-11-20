@@ -269,6 +269,7 @@ def remove_pause_file():
         print 'Failed to remove pause file'
 
 def main(size=None, init=True):
+    features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     size = size or check_force_size()
     
