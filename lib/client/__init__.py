@@ -70,6 +70,26 @@ def real_update_meswin_dialog():
 def economy_report_dialog_update():
     client.update_taxes()
 
+@freeciv.register
+def update_info_label():
+    pass
+
+@freeciv.register
+def update_intel_dialog(id):
+    pass
+
+@freeciv.register
+def activeunits_report_dialog_update():
+    pass
+
+@freeciv.register
+def city_report_dialog_update():
+    pass
+
+@freeciv.register
+def update_turn_done_button(restore):
+    client._set_turn_button_state(restore)
+
 class Client(object):
     def __init__(self):
         global client
@@ -78,6 +98,7 @@ class Client(object):
         self.cursor_pos = (0, 0)
         self.draw_patrol_lines = False
         self.out_window_callback = None
+        self.turn_button_flip = False
         self.meetings = {}
     
     def tick(self):
@@ -198,6 +219,21 @@ class Client(object):
     
     def get_governments(self):
         return map(Gov, freeciv.func.get_governments())
+    
+    def get_clients(self):
+        return map(city.City, freeciv.func.get_cities())
+        
+    def _set_turn_button_state(self, restore):
+        if not freeciv.func.get_turn_done_button_state():
+            return
+        
+        if (restore and self.turn_button_flip) or not restore:
+            self.turn_button_flip = not self.turn_button_flip
+        
+        self.set_turn_button_state(not self.turn_button_flip)
+    
+    def set_turn_button_state(self, enabled):
+        print 'set_turn_button_state default', enabled
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

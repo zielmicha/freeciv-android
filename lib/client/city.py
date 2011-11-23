@@ -36,6 +36,10 @@ def refresh_city_dialog(city):
     return client.client.refresh_city_dialog(City(city))
 
 @freeciv.register
+def city_report_dialog_update_city(city):
+    return client.client.refresh_city_dialog(City(city))
+
+@freeciv.register
 def diplomat_handled_in_diplomat_dialog():
     return -1
 

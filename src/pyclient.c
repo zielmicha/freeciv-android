@@ -549,6 +549,14 @@ int call_callback(int val) {
     return test_glue(val);
 }
 
+PyObject* get_cities() {
+    PyObject* list = PyList_New(0);
+    city_list_iterate(client.conn.playing->cities, pcity) {
+	PyList_Append(list, Py_BuildValue("i", pcity));
+    } city_list_iterate_end;
+    
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);

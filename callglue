@@ -121,4 +121,4 @@ int city_production_buy_gold_cost(const struct city *pcity)
 bool city_can_buy(const struct city *pcity)
 int city_buy_production(struct city *pcity)
 
-
+bool get_turn_done_button_state(void)

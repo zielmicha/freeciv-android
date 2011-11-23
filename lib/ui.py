@@ -56,7 +56,9 @@ def set_dialog(new_screen, scroll=False):
         item = ScrollWrapper(new_screen, height=screen_height*0.7, width=screen_width*0.7, ways=SCROLL_HEIGHT|SCROLL_WIDTH)
     else:
         item = new_screen
-    set(Dialog(screen, item), anim=False)
+    dialog = Dialog(screen, item)
+    set(dialog, anim=False)
+    return dialog
 
 def message(msg, type=None):
     set_dialog(Label(msg))
@@ -118,6 +120,13 @@ class Dialog(object):
             return result
         else:
             self.item.event(ev)
+    
+    def is_opened(self):
+        return screen == self
+    
+    def close(self):
+        if self.is_opened():
+            ui.back()
 
 class Animation(object):
     spacing = 0.2

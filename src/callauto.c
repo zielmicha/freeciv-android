@@ -1031,6 +1031,14 @@ static PyObject* python_city_buy_production(PyObject* self, PyObject* args) {
 	int retval = city_buy_production((struct city*)arg_pcity);
 	return Py_BuildValue("i", retval);
 }
+// bool get_turn_done_button_state(void)
+bool get_turn_done_button_state(void);
+
+static PyObject* python_get_turn_done_button_state(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	bool retval = get_turn_done_button_state();
+	return Py_BuildValue("i", (int)retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1241,4 +1249,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_can_buy", (int)ptr);
 	ptr = python_city_buy_production;
 	PY_CALL("ssi", "add_function", "city_buy_production", (int)ptr);
+	ptr = python_get_turn_done_button_state;
+	PY_CALL("ssi", "add_function", "get_turn_done_button_state", (int)ptr);
 }
