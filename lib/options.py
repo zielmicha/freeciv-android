@@ -2,6 +2,7 @@ import ui
 import uidialog
 import features
 import functools
+import traceback
 
 class OptionsButton(ui.Button):
     def __init__(self, label, key):
@@ -33,7 +34,52 @@ def show_options():
     options.add(ui.Label('Touch an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
+    if features.get('app.debug'):
+        options.add(ui.Button('Debug', debug_menu))
     ui.set(options)
+
+def debug_menu():
+    def fake_screen_size(size):
+        import main
+        main.main(size, init=False)
+    
+    def fake_screen_size_menu():
+        menu = ui.Menu(center=False)
+        for size in [(320, 240), (480, 320), (640, 480)]:
+            menu.add(str(size), functools.partial(fake_screen_size, size))
+        ui.set_dialog(menu, scroll=True)
+    
+    def change_feature():
+        arg = uidialog.inputbox('name=key')
+        try:
+            features._parse_arg(arg)
+        except Exception as e:
+            traceback.print_exc()
+            ui.message(str(e))
+    
+    def pernament_feature():
+        arg = uidialog.inputbox('name=key')
+        try:
+            k, v = arg.split('=', 1)
+            features.set_perm(k, v)
+        except Exception as e:
+            traceback.print_exc()
+            ui.message(str(e))
+    
+    def show_features():
+        s = '\n'.join( '%s=%s' % (k,v) for k, v in sorted(features.features.items()) )
+        ui.set_dialog(ui.Label(s), scroll=True)
+    
+    menu = ui.Menu()
+    
+    menu.add('Fake screen size', fake_screen_size_menu)
+    menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
+    menu.add('Change feature', change_feature)
+    menu.add('Pernament feature', pernament_feature)
+    menu.add('Show features', show_features)
+    
+    ui.set(ui.ScrollWrapper(menu))
+
 
 def change_ruleset():
     def set_ruleset(name):

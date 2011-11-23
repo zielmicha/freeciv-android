@@ -90,8 +90,6 @@ def show_main_menu():
     menu.add('Load game', save.load_dialog)
     menu.add('Feedback', feedback)
     menu.add('Options', options.show_options)
-    if features.get('app.debug'):
-        menu.add('Debug', debug_menu)
     
     ui.set(menu)
 
@@ -135,47 +133,6 @@ def notify_update(url):
     button = ui.Button('Update', callback)
     panel.add(button)
     main_menu.items.append(panel)
-
-def debug_menu():
-    def fake_screen_size(size):
-        main(size, init=False)
-    
-    def fake_screen_size_menu():
-        menu = ui.Menu(center=False)
-        for size in [(320, 240), (480, 320), (640, 480)]:
-            menu.add(str(size), functools.partial(fake_screen_size, size))
-        ui.set_dialog(menu, scroll=True)
-    
-    def change_feature():
-        arg = uidialog.inputbox('name=key')
-        try:
-            features._parse_arg(arg)
-        except Exception as e:
-            traceback.print_exc()
-            ui.message(str(e))
-    
-    def pernament_feature():
-        arg = uidialog.inputbox('name=key')
-        try:
-            k, v = arg.split('=', 1)
-            features.set_perm(k, v)
-        except Exception as e:
-            traceback.print_exc()
-            ui.message(str(e))
-    
-    def show_features():
-        s = '\n'.join( '%s=%s' % (k,v) for k, v in sorted(features.features.items()) )
-        ui.set_dialog(ui.Label(s), scroll=True)
-    
-    menu = ui.Menu()
-    
-    menu.add('Fake screen size', fake_screen_size_menu)
-    menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
-    menu.add('Change feature', change_feature)
-    menu.add('Pernament feature', pernament_feature)
-    menu.add('Show features', show_features)
-    
-    ui.set(ui.ScrollWrapper(menu))
 
 client.main = client_main
 
