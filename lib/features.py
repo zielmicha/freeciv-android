@@ -19,6 +19,18 @@ pernaments = {}
 
 FEATURE_FILE_PATH = None
 
+monitor = None
+
+def log(str):
+    global monitor
+    if not monitor:
+        try:
+            import monitor
+        except ImportError:
+            print str
+            return
+    monitor.log('features', str)
+
 def get(name):
     return features[name]
 
@@ -77,6 +89,9 @@ def parse_type(t, v):
 def set(name, value):
     if name not in appliers:
         raise ValueError('Unknown feature %r.' % name)
+    
+    log('set_feature %s %r' % (name, value))
+    
     features[name] = parse_type(feature_types[name], value)
     if appliers[name]:
         appliers[name](features[name])
