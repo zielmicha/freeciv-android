@@ -62,7 +62,7 @@ class Session(object):
     
     def upload(self, source, name, content):
         url = '/sync/upload?source=%s&name=%s' % (source, name)
-        upload =  _Upload(url, content, 'fcsession=' + self.sessid)
+        upload =  _Upload(url, content, 'fcsession=%s' % self.sessid)
         upload.header()
         return upload
     
@@ -71,7 +71,7 @@ class Session(object):
     
     def upload_log(self, content, install_time):
         url = '/sync/log_upload?time=%s' % install_time
-        upload =  _Upload(url, content, 'fcsession=' + self._sessid)
+        upload =  _Upload(url, content, 'fcsession=%s' % self._sessid)
         upload.header()
         upload.send_all_console()
     
