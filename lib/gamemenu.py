@@ -13,8 +13,13 @@
 import ui
 import pygame
 import client
+import math
+import time
+import features
 
 from client import freeciv
+
+features.add_feature('app.new_joystick', default=True, type=bool)
 
 order_sprites_names = ('auto attack,auto connect,auto explore,'
     'auto settlers,build city,cutdown forest,plant forest,'
@@ -42,8 +47,12 @@ class Menu(ui.LinearLayoutWidget):
         self.items = [self.panel]
         if actions:
             joystick_layout = ui.LinearLayoutWidget()
-            joystick = Joystick(client)
-            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
+            if features.get('app.new_joystick'):
+                joystick = NewJoystick(client)
+                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
+            else:
+                joystick = Joystick(client)
+                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
             joystick_layout.add(joystick)
             self.items.insert(0, joystick_layout)
             for action_ident, action_name, action_length in actions:
@@ -57,6 +66,7 @@ class Button(object):
         self.action_ident = action_ident
         self.action_name = action_name
         
+        self.click_at = None
         self.image = get_order_sprite(action_name)
         self.size = self.image.get_size()
         self.tooltip = None
@@ -67,14 +77,17 @@ class Button(object):
     
     def event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN:
+            self.click_at = time.time()
             x, y = ev.abs_pos
             y -= self.image.get_height()
             x -= self.image.get_width() / 2
-            self.tooltip = ui.Tooltip(self.action_name, (x, y), color=(0, 255, 255))
+            self.tooltip = ui.Tooltip(self.action_name, (x, y-40), color=(0, 255, 255))
             return ui.LOCK_MOUSE_EVENT
         if ev.type == pygame.MOUSEBUTTONUP:
             if self.tooltip:
                 self.tooltip.remove()
+            if time.time() - 0.5 > self.click_at:
+                return
             x, y = ev.pos
             if x < 0 or y < 0 or x > self.size[0] or y > self.size[1]:
                 return
@@ -85,6 +98,79 @@ class Button(object):
     
     def click(self):
         self.client.get_unit_in_focus().perform_activity(self.action_ident)
+
+class NewJoystick(object):
+    small_radius = 35
+    
+    consts = {
+        0: freeciv.const.DIR8_EAST,
+        45: freeciv.const.DIR8_SOUTHEAST,
+        90: freeciv.const.DIR8_SOUTH,
+        135: freeciv.const.DIR8_SOUTHWEST,
+        180: freeciv.const.DIR8_WEST,
+        225: freeciv.const.DIR8_NORTHWEST,
+        270: freeciv.const.DIR8_NORTH,
+        315: freeciv.const.DIR8_NORTHEAST,
+    }
+    
+    @staticmethod
+    def init():
+        pass
+    
+    def __init__(self, client):
+        self.client = client
+        self.size = (180, 180)
+        self.current = None
+        self.clicked = False
+    
+    def draw(self, surf, pos):
+        px, py = pos
+        cx, cy = px + self.size[0]/2, py + self.size[1]/2
+        self._ellipse(surf, (230, 230, 255, 120), (cx-self.small_radius, cy-self.small_radius, 2*self.small_radius, 2*self.small_radius))
+        if self.current is not None:
+            self._ellipse(surf, (255, 255, 255, 70), pos + self.size)
+            size = self.size[0]/2
+            angle = math.radians(self.current)
+            x, y = size*math.cos(angle), size*math.sin(angle)
+            pygame.draw.line(surf, (255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
+    
+    def _ellipse(self, surf, color, rect):
+        pygame.gfxdraw.filled_ellipse(surf, rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2, color)
+    
+    def event(self, ev):
+        if hasattr(ev, 'pos'):
+            relpos = (ev.pos[0] - self.size[0]/2, ev.pos[1] - self.size[1]/2)
+        if ev.type == pygame.MOUSEBUTTONDOWN:
+            if abs(relpos[0]) <= self.small_radius and abs(relpos[1]) <= self.small_radius:
+                self.clicked = True
+            else:
+                return True
+        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+            if self.clicked:
+                if abs(relpos[0]) > self.small_radius or abs(relpos[1]) > self.small_radius:
+                    dir = self.get_direction(relpos)
+                    self.current = dir
+                else:
+                    self.current = None
+            return ui.LOCK_MOUSE_EVENT
+        elif ev.type == pygame.MOUSEBUTTONUP:
+            if self.current is not None:
+                self.do_action(self.current)
+            self.clicked = False
+            self.current = None
+    
+    def unfocus(self):
+        self.current = None
+    
+    def do_action(self, dir):
+        freeciv.func.key_unit_move_direction(self.consts[dir])
+    
+    def get_direction(self, pos):
+        angle = math.atan2(pos[0], pos[1])
+        return (90 - int((math.degrees(angle)%360+22.5)/45) * 45) % 360
+    
+    def tick(self):
+        pass
 
 class Joystick(object):
     colors = {
@@ -160,6 +246,7 @@ class Joystick(object):
         pass
 
 def init():
+    NewJoystick.init()
     Joystick.init()
     init_orders()
 
