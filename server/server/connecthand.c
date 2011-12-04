@@ -378,8 +378,12 @@ bool handle_login_request(struct connection *pconn,
 void lost_connection_to_client(struct connection *pconn)
 {
   freelog(LOG_NORMAL, _("Freeciv Android: Lost connection to player!"));
-  freelog(LOG_NORMAL, _("Freeciv Android: Server quit."));
-  exit(3);
+  if(getenv("FREECIV_QUIT_ON_DISCONNECT")) {
+    freelog(LOG_NORMAL, _("Freeciv Android: Server quit."));
+    exit(3);
+  } else {
+    freelog(LOG_NORMAL, _("Freeciv Android: Not quiting."));
+  }
   const char *desc = conn_description(pconn);
 
   freelog(LOG_NORMAL, _("Lost connection: %s."), desc);

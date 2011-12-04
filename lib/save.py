@@ -38,12 +38,15 @@ def new_game():
 def connect_dialog():
     host = uidialog.inputbox('Server host')
     port = int(uidialog.inputbox('Server port'))
-    ui.set(ServerGUI(host=host, port=port))
+    connect(host, port)
+
+def connect(host, port):
+    ui.set(ServerGUI(host=host, port=port, no_quit=True))
 
 class ServerGUI(ui.LinearLayoutWidget):
-    def __init__(self, port, host='localhost'):
+    def __init__(self, port, host='localhost', no_quit=False):
         super(ServerGUI, self).__init__()
-        sc_client = gamescreen.ScreenClient()
+        sc_client = gamescreen.ScreenClient(no_quit=no_quit)
         sc_client.connect_to_server('player', host, port)
         self.has_ui = False
         self.setup_loading_ui()
@@ -210,11 +213,11 @@ def start_client():
     client.client.chat('/start')
     ui.replace_anim(client.client.ui)
 
-def start_server(port, args='', line_callback=None):
-    thread.start_new_thread(server_loop, (port, args, line_callback))
+def start_server(port, args='', line_callback=None, quit_on_disconnect=True):
+    thread.start_new_thread(server_loop, (port, args, line_callback, quit_on_disconnect))
     time.sleep(0.3)
 
-def server_loop(port, args='', line_callback=None):
+def server_loop(port, args='', line_callback=None, quit_on_disconnect=True):
     if osutil.is_android:
         serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
     else:
@@ -227,6 +230,10 @@ def server_loop(port, args='', line_callback=None):
     cmd = '%s %s 2>&1 & echo $!>%s/serverpid' % (serverpath, args, piddir)
     if osutil.is_desktop:
         os.environ['LD_PRELOAD'] = ''
+    if quit_on_disconnect:
+        os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
+    else:
+        del os.environ['FREECIV_QUIT_ON_DISCONNECT']
     print cmd
     stream = os.popen(cmd, 'r', 1) # line buffering
     

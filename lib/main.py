@@ -70,7 +70,7 @@ def client_main():
         save.load_game(savename)
     elif action == 'connect':
         host, port = sys.argv[2:]
-        ui.set(save.ServerGUI(host=host, port=int(port)))
+        save.connect(host, int(port))
     else:
         show_main_menu()
     

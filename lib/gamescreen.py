@@ -28,8 +28,8 @@ import diplodialog
 SELECT_POPUP = 0
 
 class ScreenClient(client.Client):
-    def __init__(self):
-        client.Client.__init__(self)
+    def __init__(self, **kwargs):
+        client.Client.__init__(self, **kwargs)
         self.turn_loading_dialog = None
         self.init_ui()
     

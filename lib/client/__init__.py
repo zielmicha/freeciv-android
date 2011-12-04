@@ -91,9 +91,10 @@ def update_turn_done_button(restore):
     client._set_turn_button_state(restore)
 
 class Client(object):
-    def __init__(self):
+    def __init__(self, no_quit=False):
         global client
         client = self
+        self.no_quit = no_quit
         self.next_time = time.time()
         self.cursor_pos = (0, 0)
         self.draw_patrol_lines = False
@@ -187,7 +188,8 @@ class Client(object):
             return None
     
     def disconnect(self):
-        self.chat('/quit')
+        if not self.no_quit:
+            self.chat('/quit')
         freeciv.func.disconnect_from_server()
         
         global client
