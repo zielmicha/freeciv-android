@@ -21,12 +21,22 @@ import glob
 import os
 from freecivclient import mask_sprite, get_overview_size
 import features
+import collections
+import time
 
 def set_debug(flag):
     global debug
     debug = flag
     
 debug = False
+
+def make_init_profiling_tuple():
+    return [0, 0.0]
+
+_profiling_callback = collections.defaultdict(make_init_profiling_tuple)
+_profiling_calls = collections.defaultdict(make_init_profiling_tuple)
+
+features.add_feature('debug.freeciv.print_callbacks', type=bool, default=False)
 features.set_applier('debug.freeciv', set_debug, type=bool, default=False)
 
 class _obj: pass
@@ -37,9 +47,16 @@ const = _obj()
 
 hard_exit = True
 
+callback_num = 0
+
 def _callback(funname, *args):
     if debug:
-        print 'callback', funname
+        start_time = time.time()
+        if features.get('debug.freeciv.print_callbacks'):
+            global callback_num
+            callback_num += 1
+            if not funname.startswith(('canvas_', 'update_mouse_cursor')):
+                print '[callback % 7d]' % callback_num, funname
     try:
         args = tuple(args)
         name = funname
@@ -53,10 +70,29 @@ def _callback(funname, *args):
     except:
         traceback.print_exc()
         print 'Abort.'
+        _end_callbacks()
         if hard_exit:
             os._exit(1)
         else:
             sys.exit(1)
+    finally:
+        if debug:
+            tpl = _profiling_callback[funname]
+            tpl[0] += 1
+            tpl[1] += time.time() - start_time
+
+def _end_callbacks():
+    if debug:
+        print 'Calls stat'
+        _show_profileinfo(_profiling_calls)
+        print 'Callback stat'
+        _show_profileinfo(_profiling_callback)
+
+def _show_profileinfo(l):
+    items = l.items()
+    items.sort(key=lambda (k, (a, b)): b, reverse=True)
+    for funname, (calln, calltime) in items:
+        print '% 7.1f  % 7d %s' % (calltime, calln, funname)
 
 def register(name_or_func):
     if isinstance(name_or_func, str):    
@@ -85,9 +121,14 @@ def _set_const(name, val):
     
 def _call(name, id, *args):
     if debug:
-        if name not in ('call_idle_callbacks', 'get_mapview_store'):
-            print name
-    return freecivclient.call_f(id, args)
+        start_time  = time.time()
+    try:
+        return freecivclient.call_f(id, args)
+    finally:
+        if debug:
+            tpl = _profiling_calls[name]
+            tpl[0] += 1
+            tpl[1] += time.time() - start_time
 
 def call(name, *args):
     return freecivclient.call_f(functions[name], args)

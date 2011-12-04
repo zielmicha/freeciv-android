@@ -30,6 +30,7 @@ SELECT_POPUP = 0
 class ScreenClient(client.Client):
     def __init__(self):
         client.Client.__init__(self)
+        self.turn_loading_dialog = None
         self.init_ui()
     
     def init_ui(self):
@@ -107,6 +108,14 @@ class ScreenClient(client.Client):
     
     def create_meeting(self, counterpart):
         return diplodialog.Meeting(self, counterpart)
+    
+    def set_turn_button_enable(self, enabled):
+        print 'set_turn_button_state+', enabled
+        dialog_state = self.turn_loading_dialog.is_opened() if self.turn_loading_dialog else False
+        if not enabled and not dialog_state:
+            self.turn_loading_dialog = ui.set_dialog(ui.Label('ending turn...'))
+        elif dialog_state and enabled:
+            self.turn_loading_dialog.close()
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):

@@ -47,6 +47,7 @@ features.add_feature('app.forcesize')
 features.add_feature('app.resume', default=True, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
+features.add_feature('app.multiplayer', default=False, type=bool)
 
 def apply_hardexit(t):
     client.freeciv.hard_exit = t
@@ -67,6 +68,9 @@ def client_main():
     if action == 'load':
         savename = sys.argv[2]
         save.load_game(savename)
+    elif action == 'connect':
+        host, port = sys.argv[2:]
+        ui.set(save.ServerGUI(host=host, port=int(port)))
     else:
         show_main_menu()
     
@@ -90,6 +94,8 @@ def show_main_menu():
     menu.add('Load game', save.load_dialog)
     menu.add('Feedback', feedback)
     menu.add('Options', options.show_options)
+    if features.get('app.multiplayer'):
+        menu.add('Connect', save.connect_dialog)
     
     ui.set(menu)
 
