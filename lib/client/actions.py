@@ -190,6 +190,8 @@ class Unit(object):
             freeciv.func.key_unit_done()
         elif ident == ACTIVITY_DISBAND:
             freeciv.func.key_unit_disband()
+        elif ident == ACTIVITY_CHANGE_HOMECITY:
+            freeciv.func.key_unit_homecity()
         else:
             print 'Unsupported action ', ident
 
