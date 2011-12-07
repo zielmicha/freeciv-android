@@ -25,14 +25,40 @@ class OptionsButton(ui.Button):
             ui.message(str(e), type='error')
         self.make_button()
 
+class BoolOptionsButton(ui.Button):
+    def __init__(self, label_t, label_f, key):
+        self.label_t = label_t
+        self.label_f = label_f
+        self.feature_key = key
+        
+        ui.Button.__init__(self, '', self._callback)
+        
+        self.make_button()
+    
+    def make_button(self):
+        text = self.label_t if features.get(self.feature_key) else self.label_f
+        self.set_text(text)
+    
+    def _callback(self):
+        try:
+            val = features.get(self.feature_key)
+            features.set_perm(self.feature_key, not val)
+        except ValueError as e:
+            ui.message(str(e), type='error')
+        self.make_button()
+
 class OptionsPanel(ui.LinearLayoutWidget):
     def add_feature(self, label, key):
         self.add(OptionsButton(label, key))
+    
+    def add_feature_bool(self, label_t, label_f, key):
+        self.add(BoolOptionsButton(label_t, label_f, key))
 
 def show_options():
     options = OptionsPanel()
     options.add(ui.Label('Touch an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
+    options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
