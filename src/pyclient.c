@@ -181,14 +181,10 @@ void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases b
 
 void init_things() {
     //tilespec_try_read("amplio", true);
-    errlog("tileset_init: before\n");
     if(tileset == NULL) errlog("tileset is NULL\n");
     tileset_init(tileset);
-    errlog("tileset_init\n");
     tileset_load_tiles(tileset);
-    errlog("tileset_load_tile\n");
     tileset_use_prefered_theme(tileset);
-    errlog("tileset_use_prefered_theme\n");
 }
 
 struct canvas* get_mapview_store() {
@@ -613,7 +609,6 @@ static PyObject* set_callback(PyObject* self, PyObject* args) {
 }
 
 static PyObject* run_main(PyObject* self, PyObject* args) {
-    errlog("run_main\n");
     PyObject* pyargv;
     if(PyArg_ParseTuple(args, "O", &pyargv) == 0)
         return NULL;
@@ -643,7 +638,6 @@ PyMODINIT_FUNC initfreecivclient(void)
     freopen("error.log", "w", stderr);
     setvbuf(stderr, NULL, _IOLBF, 50);
 #endif
-    errlog("initfreecivclient\n");
     (void) Py_InitModule("freecivclient", FreecivClientMethods);
 }
 
