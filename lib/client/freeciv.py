@@ -68,7 +68,7 @@ def _callback(funname, *args):
         else:
             print 'no function named %s %s' % (name, args)
     except:
-        traceback.print_exc()
+        traceback.print_exc(limit=200)
         print 'Abort.'
         _end_callbacks()
         if hard_exit:

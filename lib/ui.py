@@ -33,13 +33,17 @@ def set_show_fps(val):
     show_fps = val
 
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
+features.add_feature('ui.enable_anim', type=bool, default=True)
 
 def replace(new_screen):
     global screen
     screen = new_screen
 
 def replace_anim(new_screen, direction=1):
-    replace(Animation(screen, new_screen, direction))
+    if features.get('ui.enable_anim'):
+        replace(Animation(screen, new_screen, direction))
+    else:
+        replace(new_screen)
 
 def set(new_screen, anim=True):
     if screen:
@@ -262,6 +266,17 @@ class LayoutWidget(object):
                 self.focus.event(event)
             elif self.items:
                 self.items[0].event(event)
+    
+    def get_position_of(self, item):
+        if item in self.items:
+            return self.positions[self.items.index(item)]
+        for child in self.items:
+            if hasattr(child, 'get_position_of'):
+                child_pos = self.positions[self.items.index(child)]
+                rel_pos = child.get_position_of(item)
+                if rel_pos:
+                    return rel_pos[0] + child_pos[0], rel_pos[1] + child_pos[1]
+        return None
     
     def get_items_at(self, evpos, yield_this=None):
         if yield_this:
@@ -626,6 +641,7 @@ def gfx_rect(surf, color, rect, width):
 
 def _round_rect(surface, color, rect, width, xr, yr):
     clip = surface.get_clip()
+    rect = pygame.Rect(rect)
     
     # left and right
     surface.set_clip(clip.clip(rect.inflate(0, 5-yr*2)))
@@ -635,26 +651,26 @@ def _round_rect(surface, color, rect, width, xr, yr):
     surface.set_clip(clip.clip(rect.inflate(5-xr*2, 0)))
     if width != 0:
         gfx_rect(surface, color, rect.inflate(0, 1-width), width)
-    else:
+    else: # fill
         x, y, w, h = rect
-        gfx_rect(surface, color, (x, y, w, yr - 2), width)
-        gfx_rect(surface, color, (x, y + h - yr + 1, w, yr - 1), width)
+        gfx_rect(surface, color, (x, y, w, yr - 3), width)
+        gfx_rect(surface, color, (x, y + h - yr + 2, w, yr - 1), width)
 
     # top left corner
-    surface.set_clip(clip.clip(rect.left, rect.top, xr, yr))
+    surface.set_clip(clip.clip(rect.left, rect.top, xr-3, yr-3))
     gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
 
     # top right corner
-    surface.set_clip(clip.clip(rect.right-xr, rect.top, xr, yr))
+    surface.set_clip(clip.clip(rect.right-xr+2, rect.top, xr, yr-3))
     gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
 
     # bottom left
-    surface.set_clip(clip.clip(rect.left, rect.bottom-yr, xr, yr))
+    surface.set_clip(clip.clip(rect.left, rect.bottom-yr+2, xr-3, yr))
     gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
 
     # bottom right
-    surface.set_clip(clip.clip(rect.right-xr, rect.bottom-yr, xr, yr))
-    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.bottom-2*yr, 2*xr, 2*yr), width)
+    surface.set_clip(clip.clip(rect.right-xr+2, rect.bottom-yr+2, xr, yr))
+    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
     
     surface.set_clip(clip)
 
@@ -664,16 +680,20 @@ def round_rect(surf, bg, fg, rect, round=10):
     _round_rect(surf, fg, rect, 1, round, round)
 
 class Button(WithText):
-    def __init__(self, label, callback, font=None, color=None, force_width=None):
+    active_bg = (255, 255, 200, 150)
+    bg = (130, 100, 0, 90)
+    fg = (150, 150, 50)
+    
+    def __init__(self, label, callback, font=None, color=None, force_width=None, force_height=None):
         WithText.__init__(self, label, callback, font, color, padding=4, force_width=force_width)
         self.active = False
     
     def draw(self, surf, pos):
         if self.active:
-            color = (255, 255, 200, 20)
+            color = self.active_bg
         else:
-            color = (150, 150, 50, 20)
-        round_rect(surf, color, (150, 150, 50), pos + self.size)
+            color = self.bg
+        round_rect(surf, color, self.fg, pos + self.size)
         WithText.draw(self, surf, pos)
     
     def unhover(self):
@@ -774,6 +794,9 @@ class Menu(LinearLayoutWidget):
 
 def load_font(name, size):
     return pygame.font.Font('fonts/ProcionoTT.ttf', size)
+
+def load_image(name):
+    return pygame.image.load(name).convert_alpha()
 
 def init():
     global font, smallfont, bigfont, mediumfont, consolefont

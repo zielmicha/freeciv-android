@@ -35,11 +35,9 @@ import sync
 import features
 import monitor
 import options
+import menus
 
 from sync import lzma
-
-def new_game():
-    save.new_game()
 
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
@@ -60,10 +58,20 @@ main_menu_update_shown = False
 pause_file = os.path.join(save.get_save_dir(), 'pause_options')
 
 def client_main():
-    action = sys.argv[1] if sys.argv[1:] else None
     if try_resume():
         ui.main()
         return
+    
+    ui.set(ui.Label('loading...'))
+    ui.execute_later.append(app_main)
+    
+    if features.get('app.profile'):
+        profile_main()
+    else:
+        ui.main()
+
+def app_main():
+    action = sys.argv[1] if sys.argv[1:] else None
     
     if action == 'load':
         savename = sys.argv[2]
@@ -71,13 +79,10 @@ def client_main():
     elif action == 'connect':
         host, port = sys.argv[2:]
         save.connect(host, int(port))
+    elif action == 'eval':
+        exec sys.argv[2]
     else:
-        show_main_menu()
-    
-    if features.get('app.profile'):
-        profile_main()
-    else:
-        ui.main()
+        menus.main_menu()
 
 def profile_main():
     import cProfile
@@ -86,36 +91,18 @@ def profile_main():
     p = pstats.Stats('profileout')
     p.strip_dirs().sort_stats('time').print_stats()
 
-def show_main_menu():
-    global main_menu
-    main_menu = menu = ui.Menu()
-    
-    menu.add('New game', new_game)
-    menu.add('Load game', save.load_dialog)
-    menu.add('Feedback', feedback)
-    menu.add('Options', options.show_options)
-    if features.get('app.multiplayer'):
-        menu.add('Connect', save.connect_dialog)
-    
-    ui.set(menu)
-
-def feedback():
-    panel = ui.LinearLayoutWidget()
-    panel.add(ui.Label('Leaving comments with logs will help me diagnose\npotential problems with game speed and\nunexpected behaviour.'))
-    panel.add(ui.Button('Leave a comment with a log (preferred)', lambda: sync.comment(get_install_time(), True)))
-    panel.add(ui.Button('Leave a comment without a log', lambda: sync.comment(get_install_time(), False)))
-    ui.set(panel)
-
 def start_autoupdate():
     thread.start_new_thread(run_autoupdate, ())
 
 def run_autoupdate():
-    install_time = get_install_time()
+    install_time = sync.get_install_time()
     try:
         sync.client().updates(install_time)
     except sync.civsync.UpdateRequiredError as err:
         with ui.execute_later_lock:
             ui.execute_later.append(lambda: notify_update(err.url))
+    except Exception as err:
+        print 'Failed to autoupdate:', err
 
 def notify_update(url):
     print 'update found at', url
@@ -163,16 +150,6 @@ def unpack_data():
                 tar.extract(info, "")
         os.remove('data.tgz')
     progress.draw_frame('', 'starting...', 1)
-
-def get_install_time():
-    path = os.path.join(save.get_save_dir(), 'install_time')
-    try:
-        return int(open(path).read())
-    except (IOError, ValueError):
-        install_time = int(time.time() * 1000)
-        with open(path, 'w') as f:
-            f.write('%d' % install_time)
-    return install_time
 
 def check_force_size():
     if features.get('app.forcesize'):

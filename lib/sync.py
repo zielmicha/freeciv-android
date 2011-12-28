@@ -33,7 +33,7 @@ def apply_user_agent_change(ua):
     civsync.USER_AGENT = ua
 
 features.set_applier('civsync.ua', apply_user_agent_change)
-features.set('civsync.ua', 'CivSyncAndroid/1004')
+features.set('civsync.ua', 'CivSyncAndroid/1005')
 features.add_feature('civsync.enable', False, type=bool)
 
 session = None
@@ -219,5 +219,14 @@ def sync_request(callback, name, args, kwargs):
     with ui.execute_later_lock:
         ui.execute_later.append(lambda: callback(result))
 
-#ui.execute_later.append()
+
+def get_install_time():
+    path = os.path.join(save.get_save_dir(), 'install_time')
+    try:
+        return int(open(path).read())
+    except (IOError, ValueError):
+        install_time = int(time.time() * 1000)
+        with open(path, 'w') as f:
+            f.write('%d' % install_time)
+    return install_time
     

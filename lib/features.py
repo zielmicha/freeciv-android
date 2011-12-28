@@ -57,12 +57,19 @@ def parse_options():
     args = sys.argv[1:]
     unused = [sys.argv[0]]
     for arg in args:
+        if arg == '-f:_list':
+            show_feature_list()
+            sys.exit(1)
         if arg.startswith('-f:'):
             arg = arg[len('-f:'):]
             _parse_arg(arg)
         else:
             unused.append(arg)
     sys.argv = unused
+
+def show_feature_list():
+    for key in sorted(feature_types):
+        print '%s = [%s] %s' % (key.rjust(35), feature_types[key].__name__, str(features[key]).ljust(35))
 
 def _parse_arg(arg):
     if '=' in arg:
