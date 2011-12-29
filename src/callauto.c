@@ -1039,6 +1039,16 @@ static PyObject* python_get_turn_done_button_state(PyObject* self, PyObject* arg
 	bool retval = get_turn_done_button_state();
 	return Py_BuildValue("i", (int)retval);
 }
+// PyObject* get_built_improvements_in_city(struct city* pCity)
+PyObject* get_built_improvements_in_city(struct city* pCity);
+
+static PyObject* python_get_built_improvements_in_city(PyObject* self, PyObject* args) {
+	int arg_pCity;
+	if(PyArg_ParseTuple(args, "i", &arg_pCity) == 0) return NULL;
+
+	PyObject* retval = get_built_improvements_in_city((struct city*)arg_pCity);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1251,4 +1261,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_buy_production", (int)ptr);
 	ptr = python_get_turn_done_button_state;
 	PY_CALL("ssi", "add_function", "get_turn_done_button_state", (int)ptr);
+	ptr = python_get_built_improvements_in_city;
+	PY_CALL("ssi", "add_function", "get_built_improvements_in_city", (int)ptr);
 }

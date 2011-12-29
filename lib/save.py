@@ -196,7 +196,7 @@ def load_game(path):
     try:
         sc_client.connect_to_server('player', 'localhost', port)
     except client.ConnectionError:
-        ui.message('Failed to connect to game server', type='error')
+        ui.message('Failed to connect to game server, try again', type='error')
         return
     
     callback = lambda: load_game_now(port, get_save_username(path))

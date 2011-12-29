@@ -144,7 +144,7 @@ class NewJoystick(object):
             if abs(relpos[0]) <= self.small_radius and abs(relpos[1]) <= self.small_radius:
                 self.clicked = True
             else:
-                return True
+                return False
         if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
             if self.clicked:
                 if abs(relpos[0]) > self.small_radius or abs(relpos[1]) > self.small_radius:
@@ -152,7 +152,9 @@ class NewJoystick(object):
                     self.current = dir
                 else:
                     self.current = None
-            return ui.LOCK_MOUSE_EVENT
+                return ui.LOCK_MOUSE_EVENT
+            else:
+                return False
         elif ev.type == pygame.MOUSEBUTTONUP:
             if self.current is not None:
                 self.do_action(self.current)

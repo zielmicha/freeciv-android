@@ -134,6 +134,9 @@ class City(object):
     def set_production(self, type, handle):
         freeciv.func.city_change_production_type(self.handle, type, handle)
     
+    def get_built_improvements(self):
+        return freeciv.func.get_built_improvements_in_city(self.handle)
+    
     def get_units(self):
         return [ actions.Unit(unit) for unit in freeciv.func.get_units_present_in_city(self.handle) ]
     

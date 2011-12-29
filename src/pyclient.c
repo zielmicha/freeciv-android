@@ -447,6 +447,21 @@ PyObject* get_buildable_improvements_in_city(struct city* pCity) {
     return list;
 }
 
+PyObject* get_built_improvements_in_city(struct city* pCity) {
+    PyObject* list = PyList_New(0);
+    
+    city_built_iterate(pCity, pImprove) {
+        const char* name = improvement_name_translation(pImprove);
+        
+        PyList_Append(list, Py_BuildValue(
+            "is", (int)pImprove, name
+        ));
+    } city_built_iterate_end;
+    
+    return list;
+}
+
+
 PyObject* get_buildable_units_in_city(struct city* pCity) {
     PyObject* list = PyList_New(0);
     bool can_build;

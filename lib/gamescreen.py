@@ -24,6 +24,7 @@ import icons
 import sync
 import features
 import diplodialog
+import empiredlg
 
 SELECT_POPUP = 0
 
@@ -110,7 +111,6 @@ class ScreenClient(client.Client):
         return diplodialog.Meeting(self, counterpart)
     
     def set_turn_button_enable(self, enabled):
-        print 'set_turn_button_state+', enabled
         dialog_state = self.turn_loading_dialog.is_opened() if self.turn_loading_dialog else False
         if not enabled and not dialog_state:
             self.turn_loading_dialog = ui.set_dialog(ui.Label('ending turn...'))
@@ -127,7 +127,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client)
         self.end_turn_button = ui.Button('End turn', self.client.end_turn)
-        self.set_research_button = ui.Button('Research', self.research_dialog)
+        self.empire_button = ui.Button('Empire', self.research_dialog)
         self.taxes_panel = TaxesPanel(client)
         
         self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True)
@@ -144,7 +144,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.left_panel.add(self.end_turn_button)
         self.left_panel.add(self.taxes_panel)
         self.left_panel.add(ui.Spacing(0, 10))
-        self.left_panel.add(self.set_research_button)
+        self.left_panel.add(self.empire_button)
         
         # key_end_turn()
         

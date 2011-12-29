@@ -122,3 +122,7 @@ bool city_can_buy(const struct city *pcity)
 int city_buy_production(struct city *pcity)
 
 bool get_turn_done_button_state(void)
+
+PyObject* get_built_improvements_in_city(struct city* pCity)
+int impr_sell_gold(const struct impr_type *pimprove)
+bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove)

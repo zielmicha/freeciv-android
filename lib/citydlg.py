@@ -59,6 +59,7 @@ class Dialog(ui.HorizontalLayoutWidget):
         #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
         self.prodpanel.add(prodbuttons)
         self.prodpanel.add(ui.Button('Units in city', self.show_units))
+        self.prodpanel.add(ui.Button('Buildings in city', self.show_buildings))
         
         #print self.city.get_buildable_improvements()
         #print self.city.get_buildable_units()
@@ -78,6 +79,17 @@ class Dialog(ui.HorizontalLayoutWidget):
             callback = functools.partial(focus, unit)
             panel.add(ui.Button(name, callback))
         ui.set_dialog(panel, scroll=True)
+    
+    def show_buildings(self):
+        buildings = self.city.get_built_improvements()
+        
+        panel = ui.LinearLayoutWidget()
+        for handle, name in buildings:
+            callback = functools.partial(lambda u: None, handle)
+            panel.add(ui.Button(name, callback))
+        ui.set_dialog(panel, scroll=True)
+        
+        #ui.not_implemented()
     
     def change_prod(self, add=True):
         panel = ui.LinearLayoutWidget()

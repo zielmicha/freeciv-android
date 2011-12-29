@@ -222,9 +222,9 @@ class Client(object):
     def get_governments(self):
         return map(Gov, freeciv.func.get_governments())
     
-    def get_clients(self):
+    def get_cities(self):
         return map(city.City, freeciv.func.get_cities())
-        
+    
     def _set_turn_button_state(self, restore):
         if not freeciv.func.get_turn_done_button_state():
             return
@@ -235,7 +235,7 @@ class Client(object):
         self.set_turn_button_state(not self.turn_button_flip)
     
     def set_turn_button_state(self, enabled):
-        print 'set_turn_button_state default', enabled
+        pass
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

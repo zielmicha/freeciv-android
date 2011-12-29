@@ -81,7 +81,7 @@ def ask(msg, callback):
     set_dialog(ui)
 
 def not_implemented():
-    message('Sorry. This feature is not implemented.\nCheck freeciv.zielinscy.org.pl for updates.')
+    message('Sorry. This feature is not implemented.\nCheck civ.zielm.com for updates.')
 
 class Dialog(object):
     def __init__(self, screen, item):
