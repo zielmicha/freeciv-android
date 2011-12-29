@@ -185,7 +185,9 @@ def load_game(path):
     def out_callback(line):
         if 'Established control over the server. You have command access level' in line:
             ui.back(anim=False)
-            ui.set_dialog(ui.Button('Touch to start game', callback))
+            start_button = ui.Dialog(ui.screen, ui.Button('Touch to start game', callback))
+            start_button.back = callback
+            ui.set(start_button, anim=False)
             sc_client.out_window_callback = None
     
     port = random.randint(1500, 12000)
@@ -207,7 +209,7 @@ def load_game(path):
 def load_game_now(port, username):
     client.client.chat('/take "%s"' % username)
     client.client.chat('/start')
-    ui.back()
+    ui.back(allow_override=False)
 
 def start_client():
     client.client.chat('/start')
