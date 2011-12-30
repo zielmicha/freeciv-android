@@ -278,6 +278,8 @@ char *convert_string(const char *text,
 #endif /* HAVE_ICONV */
 }
 
+char* transliteration_string = "";
+
 #define CONV_FUNC_MALLOC(src, dst)                                          \
 char *src ## _to_ ## dst ## _string_malloc(const char *text)                \
 {                                                                           \

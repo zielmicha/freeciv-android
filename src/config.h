@@ -134,7 +134,7 @@
 #define HAVE_GETTIMEOFDAY 1
 
 /* Define if you have the iconv() function and it works. */
-#define HAVE_ICONV 1
+/* #define HAVE_ICONV 1 */
 
 /* Define to 1 if you have the `inet_aton' function. */
 #define HAVE_INET_ATON 1

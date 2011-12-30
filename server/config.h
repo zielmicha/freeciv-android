@@ -134,7 +134,7 @@
 #define HAVE_GETTIMEOFDAY 1
 
 /* Define if you have the iconv() function and it works. */
-#define HAVE_ICONV 1
+/* #define HAVE_ICONV 1 */
 
 /* Define to 1 if you have the `inet_aton' function. */
 #define HAVE_INET_ATON 1
@@ -182,7 +182,7 @@
 /* #undef HAVE_LIBPNG12 */
 
 /* Readline support */
-#define HAVE_LIBREADLINE 1
+/*#define HAVE_LIBREADLINE 1*/
 
 /* Define if the X11 lib is available */
 /* #undef HAVE_LIBX11 */

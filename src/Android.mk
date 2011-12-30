@@ -20,7 +20,7 @@ LOCAL_SRC_FILES := common/ai.c common/base.c common/borders.c common/capstr.c co
     pyclient.c uistub.c client/agents/agents.c client/agents/cma_core.c client/agents/cma_fec.c client/agents/sha.c utility/astring.c \
     utility/capability.c utility/distribute.c utility/fciconv.c utility/fcintl.c utility/genlist.c utility/hash.c utility/inputfile.c \
     utility/ioz.c utility/iterator.c utility/log.c utility/md5.c utility/mem.c utility/netintf.c utility/pqueue.c utility/rand.c \
-    utility/registry.c utility/sbuffer.c utility/shared.c utility/string_vector.c utility/support.c utility/timing.c
+    utility/registry.c utility/sbuffer.c utility/shared.c utility/string_vector.c utility/support.c utility/timing.c 
 LOCAL_CFLAGS    := -Ijni/client -Ijni/client/include -Ijni/client/agents -Ijni/common -Ijni/common/aicore -Ijni/utility -Ijni/python-include -I. -DHAVE_CONFIG_H -DANDROID
 LOCAL_LDLIBS    := -L../.. -L.. -lpython2.7 -lz -lm
 
