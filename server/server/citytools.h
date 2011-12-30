@@ -41,10 +41,12 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
 void transfer_city(struct player *ptaker, struct city *pcity,
 		   int kill_outside, bool transfer_unit_verbose,
 		   bool resolve_stack, bool raze);
-struct city *find_closest_owned_city(const struct player *pplayer,
-                                     const struct tile *ptile,
-                                     bool sea_required,
-                                     const struct city *pexclcity);
+struct city *find_closest_city(const struct tile *ptile,
+                               const struct city *pexclcity,
+                               const struct player *pplayer,
+                               bool only_ocean, bool only_continent,
+                               bool only_known, bool only_player,
+                               bool only_enemy);
 void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger);
 
 bool send_city_suppression(bool now);
@@ -83,7 +85,7 @@ void change_build_target(struct player *pplayer, struct city *pcity,
 
 bool is_allowed_city_name(struct player *pplayer, const char *cityname,
 			  char *error_buf, size_t bufsz);
-char *city_name_suggestion(struct player *pplayer, struct tile *ptile);
+const char *city_name_suggestion(struct player *pplayer, struct tile *ptile);
 
 void city_freeze_workers(struct city *pcity);
 void city_thaw_workers(struct city *pcity);
@@ -91,18 +93,16 @@ void city_freeze_workers_queue(struct city *pcity);
 void city_thaw_workers_queue(void);
 
 /* city map functions */
-enum city_tile_type city_map_status(const struct city *pcity, int city_x,
-				    int city_y);
-void city_map_update_empty(struct city *pcity, struct tile *ptile,
-			   int city_x, int city_y);
-void city_map_update_worker(struct city *pcity, struct tile *ptile,
-			    int city_x, int city_y);
+void city_map_update_empty(struct city *pcity, struct tile *ptile);
+void city_map_update_worker(struct city *pcity, struct tile *ptile);
 
 bool city_map_update_tile_frozen(struct tile *ptile);
 bool city_map_update_tile_now(struct tile *ptile);
 
 void city_map_update_all(struct city *pcity);
 void city_map_update_all_cities_for_player(struct player *pplayer);
+
+bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers);
 
 void city_landlocked_sell_coastal_improvements(struct tile *ptile);
 void city_refresh_vision(struct city *pcity);

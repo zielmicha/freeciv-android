@@ -60,6 +60,12 @@ PyObject* py_mapper_packet_endgame_report(struct packet_endgame_report* s) {
 PyObject* py_mapper_message(struct message* s) {
     return Py_BuildValue("(s(iii)i)", s->descr, B2I(s->location_ok), B2I(s->city_ok), B2I(s->visited), (int)s->tile);
 }
+PyObject* py_mapper_option(struct message* s) {
+    return Py_BuildValue("");
+}
+PyObject* py_mapper_option_set(struct message* s) {
+    return Py_BuildValue("");
+}
 
 void recenter_at_tile_int(int tile) {
     if(tile == 0)
@@ -354,7 +360,7 @@ char* city_get_production_name(struct city* pCity) {
 
 void city_map_click(struct city* pCity, int canvas_x, int canvas_y) {
     int city_x, city_y;
-    if (canvas_to_city_pos(&city_x, &city_y, canvas_x, canvas_y)) {
+    if (canvas_to_city_pos(&city_x, &city_y, city_map_radius_sq_get(pCity), canvas_x, canvas_y)) {
         city_toggle_worker(pCity, city_x, city_y);
     }
 }
@@ -392,10 +398,10 @@ PyObject* get_techs() {
     
     int num, i;
     advance_index_iterate(A_FIRST, i) {
-        if (player_invention_reachable(client.conn.playing, i)
+        if (player_invention_reachable(client.conn.playing, i, FALSE)
             && TECH_KNOWN != player_invention_state(client.conn.playing, i)
             && (11 > (num = num_unknown_techs_for_goal(client.conn.playing, i))
-                || i == get_player_research(client.conn.playing)->tech_goal)) {
+                /*|| player_research_get(client.conn.playing) == research->tech_goal*/)) {
             
             PyList_Append(list, Py_BuildValue("isi", i, advance_name_translation(advance_by_number(i)), num));
         }
@@ -416,7 +422,7 @@ void set_tech_goal(int index) {
 
 struct unit_list* get_units_present_in_city(struct city* pCity) {
     if (city_owner(pCity) != client.conn.playing) {
-        return pCity->info_units_present;
+        return pCity->client.info_units_present;
     } else {
         return pCity->tile->units;
     }
@@ -532,14 +538,14 @@ PyObject* get_governments() {
     
     PyObject* list = PyList_New(0);
     
-    government_iterate(pGov) {
+    governments_iterate(pGov) {
         
         PyList_Append(list, Py_BuildValue(
             "isi", (int)pGov, government_name_translation(pGov),
                 can_change_to_government(client.conn.playing, pGov)?1:0
         ));
         
-    } government_iterate_end;
+    } governments_iterate_end;
     
     return list;
 }

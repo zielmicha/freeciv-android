@@ -12,11 +12,12 @@
 #include <config.h>
 #endif
 
+/* common */
 #include "packets.h"
 
 #include "packhand_gen.h"
     
-bool client_handle_packet(enum packet_type type, void *packet)
+bool client_handle_packet(enum packet_type type, const void *packet)
 {
   switch(type) {
   case PACKET_PROCESSING_STARTED:
@@ -27,27 +28,19 @@ bool client_handle_packet(enum packet_type type, void *packet)
     handle_processing_finished();
     return TRUE;
 
-  case PACKET_FREEZE_HINT:
-    handle_freeze_hint();
-    return TRUE;
-
-  case PACKET_THAW_HINT:
-    handle_thaw_hint();
-    return TRUE;
-
   case PACKET_SERVER_JOIN_REPLY:
     handle_server_join_reply(
-      ((struct packet_server_join_reply *)packet)->you_can_join,
-      ((struct packet_server_join_reply *)packet)->message,
-      ((struct packet_server_join_reply *)packet)->capability,
-      ((struct packet_server_join_reply *)packet)->challenge_file,
-      ((struct packet_server_join_reply *)packet)->conn_id);
+      ((const struct packet_server_join_reply *)packet)->you_can_join,
+      ((const struct packet_server_join_reply *)packet)->message,
+      ((const struct packet_server_join_reply *)packet)->capability,
+      ((const struct packet_server_join_reply *)packet)->challenge_file,
+      ((const struct packet_server_join_reply *)packet)->conn_id);
     return TRUE;
 
   case PACKET_AUTHENTICATION_REQ:
     handle_authentication_req(
-      ((struct packet_authentication_req *)packet)->type,
-      ((struct packet_authentication_req *)packet)->message);
+      ((const struct packet_authentication_req *)packet)->type,
+      ((const struct packet_authentication_req *)packet)->message);
     return TRUE;
 
   case PACKET_SERVER_SHUTDOWN:
@@ -68,34 +61,38 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_MAP_INFO:
     handle_map_info(
-      ((struct packet_map_info *)packet)->xsize,
-      ((struct packet_map_info *)packet)->ysize,
-      ((struct packet_map_info *)packet)->topology_id);
+      ((const struct packet_map_info *)packet)->xsize,
+      ((const struct packet_map_info *)packet)->ysize,
+      ((const struct packet_map_info *)packet)->topology_id);
     return TRUE;
 
   case PACKET_NUKE_TILE_INFO:
     handle_nuke_tile_info(
-      ((struct packet_nuke_tile_info *)packet)->x,
-      ((struct packet_nuke_tile_info *)packet)->y);
+      ((const struct packet_nuke_tile_info *)packet)->tile);
+    return TRUE;
+
+  case PACKET_TEAM_NAME_INFO:
+    handle_team_name_info(
+      ((const struct packet_team_name_info *)packet)->team_id,
+      ((const struct packet_team_name_info *)packet)->team_name);
     return TRUE;
 
   case PACKET_CHAT_MSG:
     handle_chat_msg(
-      ((struct packet_chat_msg *)packet)->message,
-      ((struct packet_chat_msg *)packet)->x,
-      ((struct packet_chat_msg *)packet)->y,
-      ((struct packet_chat_msg *)packet)->event,
-      ((struct packet_chat_msg *)packet)->conn_id);
+      ((const struct packet_chat_msg *)packet)->message,
+      ((const struct packet_chat_msg *)packet)->tile,
+      ((const struct packet_chat_msg *)packet)->event,
+      ((const struct packet_chat_msg *)packet)->conn_id);
     return TRUE;
 
   case PACKET_CONNECT_MSG:
     handle_connect_msg(
-      ((struct packet_connect_msg *)packet)->message);
+      ((const struct packet_connect_msg *)packet)->message);
     return TRUE;
 
   case PACKET_CITY_REMOVE:
     handle_city_remove(
-      ((struct packet_city_remove *)packet)->city_id);
+      ((const struct packet_city_remove *)packet)->city_id);
     return TRUE;
 
   case PACKET_CITY_INFO:
@@ -108,20 +105,20 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_CITY_NAME_SUGGESTION_INFO:
     handle_city_name_suggestion_info(
-      ((struct packet_city_name_suggestion_info *)packet)->unit_id,
-      ((struct packet_city_name_suggestion_info *)packet)->name);
+      ((const struct packet_city_name_suggestion_info *)packet)->unit_id,
+      ((const struct packet_city_name_suggestion_info *)packet)->name);
     return TRUE;
 
   case PACKET_CITY_SABOTAGE_LIST:
     handle_city_sabotage_list(
-      ((struct packet_city_sabotage_list *)packet)->diplomat_id,
-      ((struct packet_city_sabotage_list *)packet)->city_id,
-      ((struct packet_city_sabotage_list *)packet)->improvements);
+      ((const struct packet_city_sabotage_list *)packet)->diplomat_id,
+      ((const struct packet_city_sabotage_list *)packet)->city_id,
+      ((const struct packet_city_sabotage_list *)packet)->improvements);
     return TRUE;
 
   case PACKET_PLAYER_REMOVE:
     handle_player_remove(
-      ((struct packet_player_remove *)packet)->playerno);
+      ((const struct packet_player_remove *)packet)->playerno);
     return TRUE;
 
   case PACKET_PLAYER_INFO:
@@ -132,9 +129,13 @@ bool client_handle_packet(enum packet_type type, void *packet)
     handle_player_attribute_chunk(packet);
     return TRUE;
 
+  case PACKET_PLAYER_DIPLSTATE:
+    handle_player_diplstate(packet);
+    return TRUE;
+
   case PACKET_UNIT_REMOVE:
     handle_unit_remove(
-      ((struct packet_unit_remove *)packet)->unit_id);
+      ((const struct packet_unit_remove *)packet)->unit_id);
     return TRUE;
 
   case PACKET_UNIT_INFO:
@@ -147,60 +148,62 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_UNIT_COMBAT_INFO:
     handle_unit_combat_info(
-      ((struct packet_unit_combat_info *)packet)->attacker_unit_id,
-      ((struct packet_unit_combat_info *)packet)->defender_unit_id,
-      ((struct packet_unit_combat_info *)packet)->attacker_hp,
-      ((struct packet_unit_combat_info *)packet)->defender_hp,
-      ((struct packet_unit_combat_info *)packet)->make_winner_veteran);
+      ((const struct packet_unit_combat_info *)packet)->attacker_unit_id,
+      ((const struct packet_unit_combat_info *)packet)->defender_unit_id,
+      ((const struct packet_unit_combat_info *)packet)->attacker_hp,
+      ((const struct packet_unit_combat_info *)packet)->defender_hp,
+      ((const struct packet_unit_combat_info *)packet)->make_winner_veteran);
     return TRUE;
 
   case PACKET_UNIT_DIPLOMAT_ANSWER:
     handle_unit_diplomat_answer(
-      ((struct packet_unit_diplomat_answer *)packet)->diplomat_id,
-      ((struct packet_unit_diplomat_answer *)packet)->target_id,
-      ((struct packet_unit_diplomat_answer *)packet)->cost,
-      ((struct packet_unit_diplomat_answer *)packet)->action_type);
+      ((const struct packet_unit_diplomat_answer *)packet)->diplomat_id,
+      ((const struct packet_unit_diplomat_answer *)packet)->target_id,
+      ((const struct packet_unit_diplomat_answer *)packet)->cost,
+      ((const struct packet_unit_diplomat_answer *)packet)->action_type);
     return TRUE;
 
   case PACKET_DIPLOMACY_INIT_MEETING:
     handle_diplomacy_init_meeting(
-      ((struct packet_diplomacy_init_meeting *)packet)->counterpart,
-      ((struct packet_diplomacy_init_meeting *)packet)->initiated_from);
+      ((const struct packet_diplomacy_init_meeting *)packet)->counterpart,
+      ((const struct packet_diplomacy_init_meeting *)packet)->initiated_from);
     return TRUE;
 
   case PACKET_DIPLOMACY_CANCEL_MEETING:
     handle_diplomacy_cancel_meeting(
-      ((struct packet_diplomacy_cancel_meeting *)packet)->counterpart,
-      ((struct packet_diplomacy_cancel_meeting *)packet)->initiated_from);
+      ((const struct packet_diplomacy_cancel_meeting *)packet)->counterpart,
+      ((const struct packet_diplomacy_cancel_meeting *)packet)->initiated_from);
     return TRUE;
 
   case PACKET_DIPLOMACY_CREATE_CLAUSE:
     handle_diplomacy_create_clause(
-      ((struct packet_diplomacy_create_clause *)packet)->counterpart,
-      ((struct packet_diplomacy_create_clause *)packet)->giver,
-      ((struct packet_diplomacy_create_clause *)packet)->type,
-      ((struct packet_diplomacy_create_clause *)packet)->value);
+      ((const struct packet_diplomacy_create_clause *)packet)->counterpart,
+      ((const struct packet_diplomacy_create_clause *)packet)->giver,
+      ((const struct packet_diplomacy_create_clause *)packet)->type,
+      ((const struct packet_diplomacy_create_clause *)packet)->value);
     return TRUE;
 
   case PACKET_DIPLOMACY_REMOVE_CLAUSE:
     handle_diplomacy_remove_clause(
-      ((struct packet_diplomacy_remove_clause *)packet)->counterpart,
-      ((struct packet_diplomacy_remove_clause *)packet)->giver,
-      ((struct packet_diplomacy_remove_clause *)packet)->type,
-      ((struct packet_diplomacy_remove_clause *)packet)->value);
+      ((const struct packet_diplomacy_remove_clause *)packet)->counterpart,
+      ((const struct packet_diplomacy_remove_clause *)packet)->giver,
+      ((const struct packet_diplomacy_remove_clause *)packet)->type,
+      ((const struct packet_diplomacy_remove_clause *)packet)->value);
     return TRUE;
 
   case PACKET_DIPLOMACY_ACCEPT_TREATY:
     handle_diplomacy_accept_treaty(
-      ((struct packet_diplomacy_accept_treaty *)packet)->counterpart,
-      ((struct packet_diplomacy_accept_treaty *)packet)->I_accepted,
-      ((struct packet_diplomacy_accept_treaty *)packet)->other_accepted);
+      ((const struct packet_diplomacy_accept_treaty *)packet)->counterpart,
+      ((const struct packet_diplomacy_accept_treaty *)packet)->I_accepted,
+      ((const struct packet_diplomacy_accept_treaty *)packet)->other_accepted);
     return TRUE;
 
   case PACKET_PAGE_MSG:
     handle_page_msg(
-      ((struct packet_page_msg *)packet)->message,
-      ((struct packet_page_msg *)packet)->event);
+      ((const struct packet_page_msg *)packet)->caption,
+      ((const struct packet_page_msg *)packet)->headline,
+      ((const struct packet_page_msg *)packet)->lines,
+      ((const struct packet_page_msg *)packet)->event);
     return TRUE;
 
   case PACKET_CONN_INFO:
@@ -209,9 +212,9 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_CONN_PING_INFO:
     handle_conn_ping_info(
-      ((struct packet_conn_ping_info *)packet)->connections,
-      ((struct packet_conn_ping_info *)packet)->conn_id,
-      ((struct packet_conn_ping_info *)packet)->ping_time);
+      ((const struct packet_conn_ping_info *)packet)->connections,
+      ((const struct packet_conn_ping_info *)packet)->conn_id,
+      ((const struct packet_conn_ping_info *)packet)->ping_time);
     return TRUE;
 
   case PACKET_CONN_PING:
@@ -224,13 +227,13 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_START_PHASE:
     handle_start_phase(
-      ((struct packet_start_phase *)packet)->phase);
+      ((const struct packet_start_phase *)packet)->phase);
     return TRUE;
 
   case PACKET_NEW_YEAR:
     handle_new_year(
-      ((struct packet_new_year *)packet)->year,
-      ((struct packet_new_year *)packet)->turn);
+      ((const struct packet_new_year *)packet)->year,
+      ((const struct packet_new_year *)packet)->turn);
     return TRUE;
 
   case PACKET_BEGIN_TURN:
@@ -315,7 +318,7 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_SINGLE_WANT_HACK_REPLY:
     handle_single_want_hack_reply(
-      ((struct packet_single_want_hack_reply *)packet)->you_have_hack);
+      ((const struct packet_single_want_hack_reply *)packet)->you_have_hack);
     return TRUE;
 
   case PACKET_RULESET_CHOICES:
@@ -323,15 +326,37 @@ bool client_handle_packet(enum packet_type type, void *packet)
     return TRUE;
 
   case PACKET_GAME_LOAD:
-    handle_game_load(packet);
+    handle_game_load(
+      ((const struct packet_game_load *)packet)->load_successful,
+      ((const struct packet_game_load *)packet)->load_filename);
     return TRUE;
 
-  case PACKET_OPTIONS_SETTABLE_CONTROL:
-    handle_options_settable_control(packet);
+  case PACKET_SERVER_SETTING_CONTROL:
+    handle_server_setting_control(packet);
     return TRUE;
 
-  case PACKET_OPTIONS_SETTABLE:
-    handle_options_settable(packet);
+  case PACKET_SERVER_SETTING_CONST:
+    handle_server_setting_const(packet);
+    return TRUE;
+
+  case PACKET_SERVER_SETTING_BOOL:
+    handle_server_setting_bool(packet);
+    return TRUE;
+
+  case PACKET_SERVER_SETTING_INT:
+    handle_server_setting_int(packet);
+    return TRUE;
+
+  case PACKET_SERVER_SETTING_STR:
+    handle_server_setting_str(packet);
+    return TRUE;
+
+  case PACKET_SERVER_SETTING_ENUM:
+    handle_server_setting_enum(packet);
+    return TRUE;
+
+  case PACKET_SERVER_SETTING_BITWISE:
+    handle_server_setting_bitwise(packet);
     return TRUE;
 
   case PACKET_RULESET_EFFECT:
@@ -356,28 +381,36 @@ bool client_handle_packet(enum packet_type type, void *packet)
 
   case PACKET_VOTE_UPDATE:
     handle_vote_update(
-      ((struct packet_vote_update *)packet)->vote_no,
-      ((struct packet_vote_update *)packet)->yes,
-      ((struct packet_vote_update *)packet)->no,
-      ((struct packet_vote_update *)packet)->abstain,
-      ((struct packet_vote_update *)packet)->num_voters);
+      ((const struct packet_vote_update *)packet)->vote_no,
+      ((const struct packet_vote_update *)packet)->yes,
+      ((const struct packet_vote_update *)packet)->no,
+      ((const struct packet_vote_update *)packet)->abstain,
+      ((const struct packet_vote_update *)packet)->num_voters);
     return TRUE;
 
   case PACKET_VOTE_REMOVE:
     handle_vote_remove(
-      ((struct packet_vote_remove *)packet)->vote_no);
+      ((const struct packet_vote_remove *)packet)->vote_no);
     return TRUE;
 
   case PACKET_VOTE_RESOLVE:
     handle_vote_resolve(
-      ((struct packet_vote_resolve *)packet)->vote_no,
-      ((struct packet_vote_resolve *)packet)->passed);
+      ((const struct packet_vote_resolve *)packet)->vote_no,
+      ((const struct packet_vote_resolve *)packet)->passed);
+    return TRUE;
+
+  case PACKET_EDIT_STARTPOS:
+    handle_edit_startpos(packet);
+    return TRUE;
+
+  case PACKET_EDIT_STARTPOS_FULL:
+    handle_edit_startpos_full(packet);
     return TRUE;
 
   case PACKET_EDIT_OBJECT_CREATED:
     handle_edit_object_created(
-      ((struct packet_edit_object_created *)packet)->tag,
-      ((struct packet_edit_object_created *)packet)->id);
+      ((const struct packet_edit_object_created *)packet)->tag,
+      ((const struct packet_edit_object_created *)packet)->id);
     return TRUE;
 
   default:

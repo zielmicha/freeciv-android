@@ -27,8 +27,9 @@ LOCAL_SRC_FILES := common/ai.c common/base.c common/borders.c common/capstr.c co
     lua/lauxlib.c lua/lbaselib.c lua/lcode.c lua/ldblib.c lua/ldebug.c lua/ldo.c lua/ldump.c lua/lfunc.c lua/lgc.c lua/linit.c lua/liolib.c lua/llex.c \
     lua/lmathlib.c lua/lmem.c lua/loadlib.c lua/lobject.c lua/lopcodes.c lua/loslib.c lua/lparser.c lua/lstate.c lua/lstring.c lua/lstrlib.c lua/ltable.c \
     lua/ltablib.c lua/ltm.c lua/lundump.c lua/lvm.c lua/lzio.c lua/print.c tolua/tolua_event.c tolua/tolua_is.c tolua/tolua_map.c tolua/tolua_push.c \
-    tolua/tolua_to.c
-LOCAL_CFLAGS    := -Ijni/server -Ijni/server/generator -Ijni/server/scripting -Ijni/common -Ijni/common/aicore -Ijni/utility -Ijni/ai \
+    tolua/tolua_to.c server/advisors/advbuilding.c server/advisors/advdata.c server/advisors/advgoto.c server/advisors/advtools.c \
+    server/advisors/autoexplorer.c server/advisors/autosettlers.c server/advisors/infracache.c
+LOCAL_CFLAGS    := -Ijni/server -Ijni/server/generator -Ijni/server/advisors -Ijni/server/scripting -Ijni/common -Ijni/common/aicore -Ijni/utility -Ijni/ai \
     -Ijni/lua -Ijni/tolua -Ijni -DHAVE_CONFIG_H
 LOCAL_LDLIBS    := -lz -lm
 

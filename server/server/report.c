@@ -15,10 +15,11 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
+/* utility */
+#include "bitvector.h"
 #include "fciconv.h"
 #include "fcintl.h"
 #include "log.h"
@@ -26,19 +27,44 @@
 #include "rand.h"
 #include "support.h"
 
+/* common */
 #include "events.h"
 #include "game.h"
 #include "government.h"
 #include "packets.h"
 #include "player.h"
+#include "research.h"
 #include "specialist.h"
 #include "unitlist.h"
 #include "version.h"
 
+/* server */
 #include "citytools.h"
-#include "report.h"
+#include "plrhand.h"
 #include "score.h"
 #include "srv_main.h"
+
+#include "report.h"
+
+
+/* data needed for logging civ score */
+struct plrdata_slot {
+  char *name;
+};
+
+struct logging_civ_score {
+  FILE *fp;
+  int last_turn;
+  struct plrdata_slot *plrdata;
+};
+
+static struct logging_civ_score *score_log = NULL;
+
+static void plrdata_slot_init(struct plrdata_slot *plrdata,
+                              const char *name);
+static void plrdata_slot_replace(struct plrdata_slot *plrdata,
+                                 const char *name);
+static void plrdata_slot_free(struct plrdata_slot *plrdata);
 
 static void page_conn_etype(struct conn_list *dest, const char *caption,
 			    const char *headline, const char *lines,
@@ -88,7 +114,7 @@ static const char *historian_name[]={
 static const char scorelog_magic[] = "#FREECIV SCORELOG2 ";
 
 struct player_score_entry {
-  struct player *player;
+  const struct player *player;
   int value;
 };
 
@@ -97,15 +123,16 @@ struct city_score_entry {
   int value;
 };
 
-static int get_population(struct player *pplayer);
-static int get_landarea(struct player *pplayer);
-static int get_settledarea(struct player *pplayer);
-static int get_research(struct player *pplayer);
-static int get_literacy(struct player *pplayer);
-static int get_production(struct player *pplayer);
-static int get_economics(struct player *pplayer);
-static int get_pollution(struct player *pplayer);
-static int get_mil_service(struct player *pplayer);
+static int get_population(const struct player *pplayer);
+static int get_landarea(const struct player *pplayer);
+static int get_settledarea(const struct player *pplayer);
+static int get_research(const struct player *pplayer);
+static int get_literacy(const struct player *pplayer);
+static int get_production(const struct player *pplayer);
+static int get_economics(const struct player *pplayer);
+static int get_pollution(const struct player *pplayer);
+static int get_mil_service(const 
+                           struct player *pplayer);
 
 static const char *area_to_text(int value);
 static const char *percent_to_text(int value);
@@ -123,7 +150,7 @@ static const char *pollution_to_text(int value);
 static struct dem_row {
   const char key;
   const char *name;
-  int (*get_value) (struct player *);
+  int (*get_value) (const struct player *);
   const char *(*to_text) (int);
   bool greater_values_are_better;
 } rowtable[] = {
@@ -211,7 +238,7 @@ static void historian_generic(enum historian_type which_news)
 	break;
       case HISTORIAN_ADVANCED:
 	size[j].value
-	  = pplayer->score.techs + get_player_research(pplayer)->future_tech;
+	  = pplayer->score.techs + player_research_get(pplayer)->future_tech;
 	break;
       case HISTORIAN_MILITARY:
 	size[j].value = pplayer->score.units;
@@ -245,11 +272,11 @@ static void historian_generic(enum historian_type which_news)
 		 _(ranking[rank]),
 		 i + 1,
 		 nation_plural_for_player(size[i].player));
-    mystrlcat(buffer, "\n", sizeof(buffer));
+    fc_strlcat(buffer, "\n", sizeof(buffer));
   }
-  my_snprintf(title, sizeof(title), _(historian_message[which_news]),
+  fc_snprintf(title, sizeof(title), _(historian_message[which_news]),
               textyear(game.info.year),
-              _(historian_name[myrand(ARRAY_SIZE(historian_name))]));
+              _(historian_name[fc_rand(ARRAY_SIZE(historian_name))]));
   page_conn_etype(game.est_connections, _("Historian Publishes!"),
 		  title, buffer, E_BROADCAST_REPORT);
 }
@@ -287,17 +314,17 @@ void report_top_five_cities(struct conn_list *dest)
     size[i].city = NULL;
   }
 
-  players_iterate(pplayer) {
+  shuffled_players_iterate(pplayer) {
     city_list_iterate(pplayer->cities, pcity) {
       int value_of_pcity = pcity->size + nr_wonders(pcity) * WONDER_FACTOR;
 
       if (value_of_pcity > size[NUM_BEST_CITIES - 1].value) {
-	size[NUM_BEST_CITIES - 1].value = value_of_pcity;
-	size[NUM_BEST_CITIES - 1].city = pcity;
-	qsort(size, NUM_BEST_CITIES, sizeof(size[0]), secompare);
+        size[NUM_BEST_CITIES - 1].value = value_of_pcity;
+        size[NUM_BEST_CITIES - 1].city = pcity;
+        qsort(size, NUM_BEST_CITIES, sizeof(size[0]), secompare);
       }
     } city_list_iterate_end;
-  } players_iterate_end;
+  } shuffled_players_iterate_end;
 
   buffer[0] = '\0';
   for (i = 0; i < NUM_BEST_CITIES; i++) {
@@ -311,11 +338,23 @@ void report_top_five_cities(struct conn_list *dest)
       break;
     }
 
-    cat_snprintf(buffer, sizeof(buffer),
-		 _("%2d: The %s City of %s of size %d, "), i + 1,
-		 nation_adjective_for_player(city_owner(size[i].city)),
-		 city_name(size[i].city),
-		 size[i].city->size);
+    if (player_count() > team_count()) {
+      /* There exists a team with more than one member. */
+      char team_name[2 * MAX_LEN_NAME];
+
+      team_pretty_name(city_owner(size[i].city)->team, team_name,
+                       sizeof(team_name));
+      cat_snprintf(buffer, sizeof(buffer),
+                   /* TRANS:"The French City of Lyon (team 3) of size 18". */
+                   _("%2d: The %s City of %s (%s) of size %d, "), i + 1,
+                   nation_adjective_for_player(city_owner(size[i].city)),
+                   city_name(size[i].city), team_name, size[i].city->size);
+    } else {
+      cat_snprintf(buffer, sizeof(buffer),
+                   _("%2d: The %s City of %s of size %d, "), i + 1,
+                   nation_adjective_for_player(city_owner(size[i].city)),
+                   city_name(size[i].city), size[i].city->size);
+    }
 
     wonders = nr_wonders(size[i].city);
     if (wonders == 0) {
@@ -341,16 +380,31 @@ void report_wonders_of_the_world(struct conn_list *dest)
 
   improvement_iterate(i) {
     if (is_great_wonder(i)) {
-      struct city *pcity = find_city_from_great_wonder(i);
+      struct city *pcity = city_from_great_wonder(i);
 
       if (pcity) {
-	cat_snprintf(buffer, sizeof(buffer), _("%s in %s (%s)\n"),
-		     city_improvement_name_translation(pcity, i),
-		     city_name(pcity),
-		     nation_adjective_for_player(city_owner(pcity)));
+        if (player_count() > team_count()) {
+          /* There exists a team with more than one member. */
+          char team_name[2 * MAX_LEN_NAME];
+
+          team_pretty_name(city_owner(pcity)->team, team_name,
+                           sizeof(team_name));
+          cat_snprintf(buffer, sizeof(buffer),
+                       /* TRANS: "Colossus in Rhodes (Greek, team 2)". */
+                       _("%s in %s (%s, %s)\n"),
+                       city_improvement_name_translation(pcity, i),
+                       city_name(pcity),
+                       nation_adjective_for_player(city_owner(pcity)),
+                       team_name);
+        } else {
+          cat_snprintf(buffer, sizeof(buffer), _("%s in %s (%s)\n"),
+                       city_improvement_name_translation(pcity, i),
+                       city_name(pcity),
+                       nation_adjective_for_player(city_owner(pcity)));
+        }
       } else if (great_wonder_is_destroyed(i)) {
-	cat_snprintf(buffer, sizeof(buffer), _("%s has been DESTROYED\n"),
-		     improvement_name_translation(i));
+        cat_snprintf(buffer, sizeof(buffer), _("%s has been DESTROYED\n"),
+                     improvement_name_translation(i));
       }
     }
   } improvement_iterate_end;
@@ -358,53 +412,92 @@ void report_wonders_of_the_world(struct conn_list *dest)
   improvement_iterate(i) {
     if (is_great_wonder(i)) {
       players_iterate(pplayer) {
-	city_list_iterate(pplayer->cities, pcity) {
-	  if (VUT_IMPROVEMENT == pcity->production.kind
-	   && pcity->production.value.building == i) {
-	    cat_snprintf(buffer, sizeof(buffer),
-			 _("(building %s in %s (%s))\n"),
-			 improvement_name_translation(i),
-			 city_name(pcity),
-			 nation_adjective_for_player(pplayer));
-	  }
-	} city_list_iterate_end;
+        city_list_iterate(pplayer->cities, pcity) {
+          if (VUT_IMPROVEMENT == pcity->production.kind
+           && pcity->production.value.building == i) {
+            if (player_count() > team_count()) {
+              /* There exists a team with more than one member. */
+              char team_name[2 * MAX_LEN_NAME];
+
+              team_pretty_name(city_owner(pcity)->team, team_name,
+                               sizeof(team_name));
+              cat_snprintf(buffer, sizeof(buffer),
+                           /* TRANS: "([...] (Roman, team 4))". */
+                           _("(building %s in %s (%s, %s))\n"),
+                           improvement_name_translation(i), city_name(pcity),
+                           nation_adjective_for_player(pplayer), team_name);
+            } else {
+              cat_snprintf(buffer, sizeof(buffer),
+                           _("(building %s in %s (%s))\n"),
+                           improvement_name_translation(i), city_name(pcity),
+                           nation_adjective_for_player(pplayer));
+            }
+          }
+        } city_list_iterate_end;
       } players_iterate_end;
     }
   } improvement_iterate_end;
 
   page_conn(dest, _("Traveler's Report:"),
-	    _("Wonders of the World"), buffer);
+            _("Wonders of the World"), buffer);
 }
 
-/**************************************************************************
+/****************************************************************************
  Helper functions which return the value for the given player.
-**************************************************************************/
-static int get_population(struct player *pplayer)
+****************************************************************************/
+
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_population(const struct player *pplayer)
 {
   return pplayer->score.population;
 }
 
-static int get_pop(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_pop(const struct player *pplayer)
 {
   return total_player_citizens(pplayer);
 }
 
-static int get_landarea(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_real_pop(const struct player *pplayer)
+{
+  return 1000 * get_pop(pplayer);
+}
+
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_landarea(const struct player *pplayer)
 {
     return pplayer->score.landarea;
 }
 
-static int get_settledarea(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_settledarea(const struct player *pplayer)
 {
   return pplayer->score.settledarea;
 }
 
-static int get_research(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_research(const struct player *pplayer)
 {
   return pplayer->score.techout;
 }
 
-static int get_literacy(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_literacy(const struct player *pplayer)
 {
   int pop = civ_population(pplayer);
 
@@ -417,37 +510,58 @@ static int get_literacy(struct player *pplayer)
   }
 }
 
-static int get_production(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_production(const struct player *pplayer)
 {
   return pplayer->score.mfg;
 }
 
-static int get_economics(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_economics(const struct player *pplayer)
 {
   return pplayer->score.bnp;
 }
 
-static int get_pollution(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_pollution(const struct player *pplayer)
 {
   return pplayer->score.pollution;
 }
 
-static int get_mil_service(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_mil_service(const struct player *pplayer)
 {
   return (pplayer->score.units * 5000) / (10 + civ_population(pplayer));
 }
 
-static int get_cities(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_cities(const struct player *pplayer)
 {
   return pplayer->score.cities;
 }
 
-static int get_techs(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_techs(const struct player *pplayer)
 {
   return pplayer->score.techs;
 }
 
-static int get_munits(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_munits(const struct player *pplayer)
 {
   int result = 0;
 
@@ -461,7 +575,10 @@ static int get_munits(struct player *pplayer)
   return result;
 }
 
-static int get_settlers(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_settlers(const struct player *pplayer)
 {
   int result = 0;
 
@@ -475,47 +592,98 @@ static int get_settlers(struct player *pplayer)
   return result;
 }
 
-static int get_wonders(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_wonders(const struct player *pplayer)
 {
   return pplayer->score.wonders;
 }
 
-static int get_techout(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_techout(const struct player *pplayer)
 {
   return pplayer->score.techout;
 }
 
-static int get_literacy2(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_literacy2(const struct player *pplayer)
 {
   return pplayer->score.literacy;
 }
 
-static int get_spaceship(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_spaceship(const struct player *pplayer)
 {
   return pplayer->score.spaceship;
 }
 
-static int get_gold(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_units_built(const struct player *pplayer)
+{
+  return pplayer->score.units_built;
+}
+
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_units_killed(const struct player *pplayer)
+{
+  return pplayer->score.units_killed;
+}
+
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_units_lost(const struct player *pplayer)
+{
+  return pplayer->score.units_lost;
+}
+
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_gold(const struct player *pplayer)
 {
   return pplayer->economic.gold;
 }
 
-static int get_taxrate(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_taxrate(const struct player *pplayer)
 {
   return pplayer->economic.tax;
 }
 
-static int get_scirate(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_scirate(const struct player *pplayer)
 {
   return pplayer->economic.science;
 }
 
-static int get_luxrate(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_luxrate(const struct player *pplayer)
 {
   return pplayer->economic.luxury;
 }
 
-static int get_riots(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_riots(const struct player *pplayer)
 {
   int result = 0;
 
@@ -528,22 +696,34 @@ static int get_riots(struct player *pplayer)
   return result;
 }
 
-static int get_happypop(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_happypop(const struct player *pplayer)
 {
   return pplayer->score.happy;
 }
 
-static int get_contentpop(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_contentpop(const struct player *pplayer)
 {
   return pplayer->score.content;
 }
 
-static int get_unhappypop(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_unhappypop(const struct player *pplayer)
 {
   return pplayer->score.unhappy;
 }
 
-static int get_specialists(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_specialists(const struct player *pplayer)
 {
   int count = 0;
 
@@ -554,12 +734,18 @@ static int get_specialists(struct player *pplayer)
   return count;
 }
 
-static int get_gov(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_gov(const struct player *pplayer)
 {
   return government_number(government_of_player(pplayer));
 }
 
-static int get_corruption(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_corruption(const struct player *pplayer)
 {
   int result = 0;
 
@@ -570,7 +756,10 @@ static int get_corruption(struct player *pplayer)
   return result;
 }
 
-static int get_total_score(struct player *pplayer)
+/****************************************************************************
+  ...
+****************************************************************************/
+static int get_total_score(const struct player *pplayer)
 {
   return pplayer->score.game;
 }
@@ -582,8 +771,8 @@ static const char *value_units(int val, const char *uni)
 {
   static char buf[64];
 
-  if (my_snprintf(buf, sizeof(buf), "%s%s", int_to_text(val), uni) == -1) {
-    die("String truncated in value_units()!");
+  if (fc_snprintf(buf, sizeof(buf), "%s%s", int_to_text(val), uni) == -1) {
+    log_error("String truncated in value_units()!");
   }
 
   return buf;
@@ -635,34 +824,11 @@ static const char *pollution_to_text(int value)
 /**************************************************************************
 ...
 **************************************************************************/
-static const char *number_to_ordinal_string(int num)
-{
-  static char buf[16];
-  char fmt[] = "(%d%s)";
-
-  assert(num > 0);
-
-  if ((num % 10) == 1 && num != 11) {
-    my_snprintf(buf, sizeof(buf), fmt, num, _("st"));
-  } else if ((num % 10) == 2 && num != 12) {
-    my_snprintf(buf, sizeof(buf), fmt, num, _("nd"));
-  } else if ((num % 10) == 3 && num != 13) {
-    my_snprintf(buf, sizeof(buf), fmt, num, _("rd"));
-  } else {
-    my_snprintf(buf, sizeof(buf), fmt, num, _("th"));
-  }
-
-  return buf;
-}
-
-/**************************************************************************
-...
-**************************************************************************/
 static void dem_line_item(char *outptr, size_t out_size,
-			  struct player *pplayer, struct dem_row *prow,
-			  bv_cols selcols)
+                          struct player *pplayer, struct dem_row *prow,
+                          bv_cols selcols)
 {
-  if (BV_ISSET(selcols, DEM_COL_QUANTITY)) {
+  if (NULL != pplayer && BV_ISSET(selcols, DEM_COL_QUANTITY)) {
     const char *text = prow->to_text(prow->get_value(pplayer));
 
     cat_snprintf(outptr, out_size, " %s", text);
@@ -670,7 +836,7 @@ static void dem_line_item(char *outptr, size_t out_size,
                  18 - (int) get_internal_string_length(text), "");
   }
 
-  if (BV_ISSET(selcols, DEM_COL_RANK)) {
+  if (NULL != pplayer && BV_ISSET(selcols, DEM_COL_RANK)) {
     int basis = prow->get_value(pplayer);
     int place = 1;
 
@@ -684,26 +850,29 @@ static void dem_line_item(char *outptr, size_t out_size,
       }
     } players_iterate_end;
 
-    cat_snprintf(outptr, out_size, " %6s", number_to_ordinal_string(place));
+    cat_snprintf(outptr, out_size, _("(ranked %d)"), place);
   }
-
-  if (BV_ISSET(selcols, DEM_COL_BEST)) {
+   
+  if (NULL == pplayer || BV_ISSET(selcols, DEM_COL_BEST)) {
     struct player *best_player = pplayer;
-    int best_value = prow->get_value(pplayer);
+    int best_value = NULL != pplayer ? prow->get_value(pplayer) : 0;
 
     players_iterate(other) {
       if (GOOD_PLAYER(other)) {
-	int value = prow->get_value(other);
+        int value = prow->get_value(other);
 
-	if ((prow->greater_values_are_better && value > best_value)
-	    || (!prow->greater_values_are_better && value < best_value)) {
-	  best_player = other;
-	  best_value = value;
-	}
+        if (!best_player
+            || (prow->greater_values_are_better && value > best_value)
+            || (!prow->greater_values_are_better && value < best_value)) {
+          best_player = other;
+          best_value = value;
+        }
       }
     } players_iterate_end;
 
-    if(player_has_embassy(pplayer, best_player) && (pplayer != best_player)) {
+    if (NULL == pplayer
+        || (player_has_embassy(pplayer, best_player)
+            && (pplayer != best_player))) {
       cat_snprintf(outptr, out_size, "   %s: %s",
 		   nation_plural_for_player(best_player),
 		   prow->to_text(prow->get_value(best_player)));
@@ -713,14 +882,13 @@ static void dem_line_item(char *outptr, size_t out_size,
 
 /*************************************************************************
   Verify that a given demography string is valid.  See
-  game.demography.
+  game.demography. If the string is not valid the index of the _first_
+  invalid character is return as 'error'.
 
   Other settings callback functions are in settings.c, but this one uses
   static values from this file so it's done separately.
 *************************************************************************/
-bool is_valid_demography(const char *demography,
-                         struct connection *caller,
-                         const char **error_string)
+bool is_valid_demography(const char *demography, int *error)
 {
   int len = strlen(demography), i;
 
@@ -751,15 +919,15 @@ bool is_valid_demography(const char *demography,
     }
 
     if (!found) {
+      if (error != NULL) {
+        (*error) = i;
+      }
       /* The character is invalid. */
-      *error_string = _("Demography string contains invalid characters. "
-			"Try \"help demography\".");
       return FALSE;
     }
   }
 
   /* Looks like all characters were valid. */
-  *error_string = NULL;
   return TRUE;
 }
 
@@ -778,7 +946,7 @@ void report_demographics(struct connection *pconn)
   struct player *pplayer = pconn->playing;
 
   BV_CLR_ALL(selcols);
-  assert(ARRAY_SIZE(coltable) == DEM_COL_LAST);
+  fc_assert_ret(ARRAY_SIZE(coltable) == DEM_COL_LAST);
   for (i = 0; i < DEM_COL_LAST; i++) {
     if (strchr(game.server.demography, coltable[i].key)) {
       BV_SET(selcols, i);
@@ -794,18 +962,23 @@ void report_demographics(struct connection *pconn)
     }
   }
 
-  if (!pplayer || !pplayer->is_alive || !anyrows || numcols == 0) {
+  if ((!pconn->observer && !pplayer)
+      || (pplayer && !pplayer->is_alive)
+      || !anyrows
+      || numcols == 0) {
     page_conn(pconn->self, _("Demographics Report:"),
-	      _("Sorry, the Demographics report is unavailable."), "");
+              _("Sorry, the Demographics report is unavailable."), "");
     return;
   }
 
-  /* TRANS: <nation adjective> <government name> (<year>).
-   * E.g. "Polish Despotism (200 AD)". */
-  my_snprintf(civbuf, sizeof(civbuf), _("%s %s (%s)"),
-              nation_adjective_for_player(pplayer),
-              government_name_for_player(pplayer),
-              textyear(game.info.year));
+  if (pplayer) {
+    fc_snprintf(civbuf, sizeof(civbuf), _("%s %s (%s)"),
+                nation_adjective_for_player(pplayer),
+                government_name_for_player(pplayer),
+                textyear(game.info.year));
+  } else {
+    civbuf[0] = '\0';
+  }
 
   buffer[0] = '\0';
   for (i = 0; i < ARRAY_SIZE(rowtable); i++) {
@@ -824,108 +997,183 @@ void report_demographics(struct connection *pconn)
 }
 
 /**************************************************************************
+  ...
+**************************************************************************/
+static void plrdata_slot_init(struct plrdata_slot *plrdata,
+                              const char *name)
+{
+  fc_assert_ret(plrdata->name == NULL);
+
+  plrdata->name = fc_calloc(MAX_LEN_NAME, sizeof(plrdata->name));
+  plrdata_slot_replace(plrdata, name);
+}
+
+/**************************************************************************
+  ...
+**************************************************************************/
+static void plrdata_slot_replace(struct plrdata_slot *plrdata,
+                                 const char *name)
+{
+  fc_assert_ret(plrdata->name != NULL);
+
+  fc_strlcpy(plrdata->name, name, MAX_LEN_NAME);
+}
+
+/**************************************************************************
+  ...
+**************************************************************************/
+static void plrdata_slot_free(struct plrdata_slot *plrdata)
+{
+  if (plrdata->name != NULL) {
+    free(plrdata->name);
+    plrdata->name = NULL;
+  }
+}
+
+/**************************************************************************
   Reads the whole file denoted by fp. Sets last_turn and id to the
   values contained in the file. Returns the player_names indexed by
   player_no at the end of the log file.
 
   Returns TRUE iff the file had read successfully.
 **************************************************************************/
-static bool scan_score_log(FILE * fp, int *last_turn, char *id,
-			   char **player_names)
+static bool scan_score_log(char *id)
 {
-  int line_nr;
-  char line[80];
-  char *ptr;
+  int line_nr, turn, plr_no, spaces;
+  struct plrdata_slot *plrdata;
+  char plr_name[MAX_LEN_NAME], line[80], *ptr;
 
-  *last_turn = -1;
+  fc_assert_ret_val(score_log != NULL, FALSE);
+  fc_assert_ret_val(score_log->fp != NULL, FALSE);
+
+  score_log->last_turn = -1;
   id[0] = '\0';
 
   for (line_nr = 1;; line_nr++) {
-    if (!fgets(line, sizeof(line), fp)) {
-      if (feof(fp) != 0) {
-	break;
+    if (!fgets(line, sizeof(line), score_log->fp)) {
+      if (feof(score_log->fp) != 0) {
+        break;
       }
-      freelog(LOG_ERROR, "Can't read scorelog file header!");
+      log_error("[%s:-] Can't read scorelog file header!",
+                game.server.scorefile);
       return FALSE;
     }
 
     ptr = strchr(line, '\n');
     if (!ptr) {
-      freelog(LOG_ERROR, "Scorelog file line is too long!");
+      log_error("[%s:%d] Line too long!", game.server.scorefile, line_nr);
       return FALSE;
     }
     *ptr = '\0';
 
     if (line_nr == 1) {
       if (strncmp(line, scorelog_magic, strlen(scorelog_magic)) != 0) {
-	freelog(LOG_ERROR, "Bad magic in file line %d!", line_nr);
-	return FALSE;
+        log_error("[%s:%d] Bad file magic!", game.server.scorefile, line_nr);
+        return FALSE;
       }
     }
 
     if (strncmp(line, "id ", strlen("id ")) == 0) {
       if (strlen(id) > 0) {
-	freelog(LOG_ERROR, "Multiple ID entries!");
-	return FALSE;
+        log_error("[%s:%d] Multiple ID entries!", game.server.scorefile,
+                  line_nr);
+        return FALSE;
       }
-      mystrlcpy(id, line + strlen("id "), MAX_LEN_GAME_IDENTIFIER);
+      fc_strlcpy(id, line + strlen("id "), MAX_LEN_GAME_IDENTIFIER);
       if (strcmp(id, server.game_identifier) != 0) {
-	freelog(LOG_ERROR, "IDs don't match! game='%s' scorelog='%s'",
-		server.game_identifier, id);
-	return FALSE;
+        log_error("[%s:%d] IDs don't match! game='%s' scorelog='%s'",
+                  game.server.scorefile, line_nr, server.game_identifier,
+                  id);
+        return FALSE;
       }
     }
 
     if (strncmp(line, "turn ", strlen("turn ")) == 0) {
-      int turn;
-
       if (sscanf(line + strlen("turn "), "%d", &turn) != 1) {
-	freelog(LOG_ERROR, "Scorelog file line is bad!");
-	return FALSE;
+        log_error("[%s:%d] Bad line (turn)!", game.server.scorefile,
+                  line_nr);
+        return FALSE;
       }
 
-      assert(turn > *last_turn);
-      *last_turn = turn;
+      fc_assert_ret_val(turn > score_log->last_turn, FALSE);
+      score_log->last_turn = turn;
     }
 
     if (strncmp(line, "addplayer ", strlen("addplayer ")) == 0) {
-      int turn, plr_no;
-      char plr_name[MAX_LEN_NAME];
-
-      if (sscanf
-	  (line + strlen("addplayer "), "%d %d %s", &turn, &plr_no,
-	   plr_name) != 3) {
-	freelog(LOG_ERROR, "Scorelog file line is bad!");
-	return FALSE;
+      if (3 != sscanf(line + strlen("addplayer "), "%d %d %s",
+                      &turn, &plr_no, plr_name)) {
+        log_error("[%s:%d] Bad line (addplayer)!",
+                  game.server.scorefile, line_nr);
+        return FALSE;
       }
 
-      mystrlcpy(player_names[plr_no], plr_name, MAX_LEN_NAME);
+      /* Now get the complete player name if there are several parts. */
+      ptr = line + strlen("addplayer ");
+      spaces = 0;
+      while (*ptr != '\0' && spaces < 2) {
+        if (*ptr == ' ') {
+          spaces++;
+        }
+        ptr++;
+      }
+      fc_snprintf(plr_name, sizeof(plr_name), "%s", ptr);
+      log_debug("add player '%s' (from line %d: '%s')", plr_name, line_nr,
+                line);
+
+      if (0 > plr_no || plr_no >= player_slot_count()) {
+        log_error("[%s:%d] Invalid player number: %d!",
+                  game.server.scorefile, line_nr, plr_no);
+        return FALSE;
+      }
+
+      plrdata = score_log->plrdata + plr_no;
+      if (plrdata->name != NULL) {
+        log_error("[%s:%d] Two names for one player (id %d)!",
+                  game.server.scorefile, line_nr, plr_no);
+        return FALSE;
+      }
+
+      plrdata_slot_init(plrdata, plr_name);
     }
 
     if (strncmp(line, "delplayer ", strlen("delplayer ")) == 0) {
-      int turn, plr_no;
-
-      if (sscanf(line + strlen("delplayer "), "%d %d", &turn, &plr_no) != 2) {
-	freelog(LOG_ERROR, "Scorelog file line is bad!");
-	return FALSE;
+      if (2 != sscanf(line + strlen("delplayer "), "%d %d",
+                      &turn, &plr_no)) {
+        log_error("[%s:%d] Bad line (delplayer)!",
+                  game.server.scorefile, line_nr);
+        return FALSE;
       }
 
-      player_names[plr_no][0] = '\0';
+      if (!(plr_no >= 0 && plr_no < player_slot_count())) {
+        log_error("[%s:%d] Invalid player number: %d!",
+                  game.server.scorefile, line_nr, plr_no);
+        return FALSE;
+      }
+
+      plrdata = score_log->plrdata + plr_no;
+      if (plrdata->name == NULL) {
+        log_error("[%s:%d] Trying to remove undefined player (id %d)!",
+                  game.server.scorefile, line_nr, plr_no);
+        return FALSE;
+      }
+
+      plrdata_slot_free(plrdata);
     }
   }
 
-  if (*last_turn == -1) {
-    freelog(LOG_ERROR, "Scorelog contains no turn!");
+  if (score_log->last_turn == -1) {
+    log_error("[%s:-] Scorelog contains no turn!", game.server.scorefile);
     return FALSE;
   }
 
   if (strlen(id) == 0) {
-    freelog(LOG_ERROR, "Scorelog contains no ID!");
+    log_error("[%s:-] Scorelog contains no ID!", game.server.scorefile);
     return FALSE;
   }
 
-  if (*last_turn + 1 != game.info.turn) {
-    freelog(LOG_ERROR, "Scorelog doesn't match savegame!");
+  if (score_log->last_turn + 1 != game.info.turn) {
+    log_error("[%s:-] Scorelog doesn't match savegame!",
+              game.server.scorefile);
     return FALSE;
   }
 
@@ -933,25 +1181,68 @@ static bool scan_score_log(FILE * fp, int *last_turn, char *id,
 }
 
 /**************************************************************************
+  ...
+**************************************************************************/
+void log_civ_score_init(void)
+{
+  fc_assert_ret(score_log == NULL);
+
+  score_log = fc_calloc(1, sizeof(*score_log));
+  score_log->fp = NULL;
+  score_log->last_turn = -1;
+  score_log->plrdata = fc_calloc(player_slot_count(),
+                                 sizeof(*score_log->plrdata));
+  player_slots_iterate(pslot) {
+    struct plrdata_slot *plrdata = score_log->plrdata
+                                   + player_slot_index(pslot);
+    plrdata->name = NULL;
+  } player_slots_iterate_end;
+}
+
+/**************************************************************************
+  ...
+**************************************************************************/
+void log_civ_score_free(void)
+{
+  if (!score_log) {
+    /* nothing to do */
+    return;
+  }
+
+  if (score_log->fp) {
+    fclose(score_log->fp);
+    score_log->fp = NULL;
+  }
+
+  if (score_log->plrdata) {
+    player_slots_iterate(pslot) {
+      struct plrdata_slot *plrdata = score_log->plrdata
+                                     + player_slot_index(pslot);
+      if (plrdata->name != NULL) {
+        free(plrdata->name);
+      }
+    } player_slots_iterate_end;
+    free(score_log->plrdata);
+  }
+
+  free(score_log);
+  score_log = NULL;
+}
+
+/**************************************************************************
   Create a log file of the civilizations so you can see what was happening.
 **************************************************************************/
-void log_civ_score(void)
+void log_civ_score_now(void)
 {
-  static const char logname[] = "civscore.log";
-  static FILE *fp = NULL;
-  static bool disabled = FALSE;
-  static char player_names[MAX_NUM_PLAYERS +
-			   MAX_NUM_BARBARIANS][MAX_LEN_NAME];
-  static char *player_name_ptrs[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS];
-  static int last_turn = -1;
+  enum { SL_CREATE, SL_APPEND, SL_UNSPEC } oper = SL_UNSPEC;
+  char id[MAX_LEN_GAME_IDENTIFIER];
+  int i = 0;
 
-  /* 
-   * Add new tags only at end of this list. Maintaining the order of
-   * old tags is critical.
-   */
+  /* Add new tags only at end of this list. Maintaining the order of
+   * old tags is critical. */
   static const struct {
     char *name;
-    int (*get_value) (struct player *);
+    int (*get_value) (const struct player *);
   } score_tags[] = {
     {"pop",             get_pop},
     {"bnp",             get_economics},
@@ -981,139 +1272,132 @@ void log_civ_score(void)
     {"gov",             get_gov},
     {"corruption",      get_corruption}, /* new 1.11.5 tags end here */
 
-    {"score",           get_total_score} /* New 2.1.10 tag */
-  };
+    {"score",           get_total_score}, /* New 2.1.10 tag end here. */
 
-  enum { SL_CREATE, SL_APPEND, SL_UNSPEC } oper = SL_UNSPEC;
-  int i;
-  char id[MAX_LEN_GAME_IDENTIFIER];
+    {"unitsbuilt",      get_units_built}, /* New tags since 2.3.0. */
+    {"unitskilled",     get_units_killed},
+    {"unitslost",       get_units_lost},
+  };
 
   if (!game.server.scorelog) {
     return;
   }
 
-  if (!player_name_ptrs[0]) {
-    int i;
-
-    for (i = 0; i < ARRAY_SIZE(player_names); i++) {
-      player_name_ptrs[i] = player_names[i];
-      player_names[i][0] = '\0';
-    }
-  }
-
-  if (disabled) {
+  if (!score_log) {
     return;
   }
 
-  if (!fp) {
+  if (!score_log->fp) {
     if (game.info.year == GAME_START_YEAR) {
       oper = SL_CREATE;
     } else {
-      fp = fc_fopen(logname, "r");
-      if (!fp) {
-	oper = SL_CREATE;
+      score_log->fp = fc_fopen(game.server.scorefile, "r");
+      if (!score_log->fp) {
+        oper = SL_CREATE;
       } else {
-	if (!scan_score_log(fp, &last_turn, id, player_name_ptrs)) {
-	  goto log_civ_score_disable;
-	}
-	oper = SL_APPEND;
+        if (!scan_score_log(id)) {
+          goto log_civ_score_disable;
+        }
+        oper = SL_APPEND;
 
-	fclose(fp);
-	fp = NULL;
+        fclose(score_log->fp);
+        score_log->fp = NULL;
       }
     }
 
     switch (oper) {
     case SL_CREATE:
-      fp = fc_fopen(logname, "w");
-      if (!fp) {
-	freelog(LOG_ERROR, "Can't open scorelog file for creation!");
-	goto log_civ_score_disable;
+      score_log->fp = fc_fopen(game.server.scorefile, "w");
+      if (!score_log->fp) {
+        log_error("Can't open scorelog file '%s' for creation!",
+                  game.server.scorefile);
+        goto log_civ_score_disable;
       }
-      fprintf(fp, "%s%s\n", scorelog_magic, VERSION_STRING);
-      fprintf(fp, 
-	      "\n"
-	      "# For a specification of the format of this see doc/README.scorelog or \n"
-	      "# <http://svn.gna.org/viewcvs/freeciv/trunk/doc/README.scorelog?view=auto>.\n"
-	      "\n");
+      fprintf(score_log->fp, "%s%s\n", scorelog_magic, VERSION_STRING);
+      fprintf(score_log->fp,
+              "\n"
+              "# For a specification of the format of this see doc/README.scorelog or \n"
+              "# <http://svn.gna.org/viewcvs/freeciv/trunk/doc/README.scorelog?view=auto>.\n"
+              "\n");
 
-      fprintf(fp, "id %s\n", server.game_identifier);
-      for (i = 0; i<ARRAY_SIZE(score_tags); i++) {
-	fprintf(fp, "tag %d %s\n", i, score_tags[i].name);
+      fprintf(score_log->fp, "id %s\n", server.game_identifier);
+      for (i = 0; i < ARRAY_SIZE(score_tags); i++) {
+        fprintf(score_log->fp, "tag %d %s\n", i, score_tags[i].name);
       }
       break;
     case SL_APPEND:
-      fp = fc_fopen(logname, "a");
-      if (!fp) {
-	freelog(LOG_ERROR, "Can't open scorelog file for appending!");
-	goto log_civ_score_disable;
+      score_log->fp = fc_fopen(game.server.scorefile, "a");
+      if (!score_log->fp) {
+        log_error("Can't open scorelog file '%s' for appending!",
+                  game.server.scorefile);
+        goto log_civ_score_disable;
       }
       break;
     default:
-      freelog(LOG_ERROR, "log_civ_score: bad operation %d", (int) oper);
+      log_error("[%s] bad operation %d", __FUNCTION__, (int) oper);
       goto log_civ_score_disable;
     }
   }
 
-  if (game.info.turn > last_turn) {
-    fprintf(fp, "turn %d %d %s\n", game.info.turn, game.info.year, 
+  if (game.info.turn > score_log->last_turn) {
+    fprintf(score_log->fp, "turn %d %d %s\n", game.info.turn, game.info.year,
             textyear(game.info.year));
-    last_turn = game.info.turn;
+    score_log->last_turn = game.info.turn;
   }
 
-  for (i = 0; i < ARRAY_SIZE(player_names); i++) {
-    if (strlen(player_names[i]) > 0 && !GOOD_PLAYER(player_by_number(i))) {
-      fprintf(fp, "delplayer %d %d\n", game.info.turn - 1, i);
-      player_names[i][0] = '\0';
+  player_slots_iterate(pslot) {
+    struct plrdata_slot *plrdata = score_log->plrdata
+                                   + player_slot_index(pslot);
+    if (plrdata->name != NULL
+        && player_slot_is_used(pslot)
+        && !GOOD_PLAYER(player_slot_get_player(pslot))) {
+      fprintf(score_log->fp, "delplayer %d %d\n", game.info.turn - 1, i);
+      plrdata_slot_free(plrdata);
     }
-  }
+  } player_slots_iterate_end;
 
   players_iterate(pplayer) {
-    if (GOOD_PLAYER(pplayer)
-	&& strlen(player_names[player_index(pplayer)]) == 0) {
-      fprintf(fp, "addplayer %d %d %s\n", game.info.turn,
-	      player_number(pplayer),
-	      player_name(pplayer));
-      mystrlcpy(player_name_ptrs[player_index(pplayer)], player_name(pplayer),
-		MAX_LEN_NAME);
+    struct plrdata_slot *plrdata = score_log->plrdata + player_index(pplayer);
+    if (plrdata->name == NULL && GOOD_PLAYER(pplayer)) {
+      fprintf(score_log->fp, "addplayer %d %d %s\n", game.info.turn,
+              player_number(pplayer), player_name(pplayer));
+      plrdata_slot_init(plrdata, player_name(pplayer));
     }
   } players_iterate_end;
 
   players_iterate(pplayer) {
+    struct plrdata_slot *plrdata = score_log->plrdata + player_index(pplayer);
+
     if (GOOD_PLAYER(pplayer)
-	&& strcmp(player_names[player_index(pplayer)], player_name(pplayer)) != 0) {
-      fprintf(fp, "delplayer %d %d\n", game.info.turn - 1, player_number(pplayer));
-      fprintf(fp, "addplayer %d %d %s\n", game.info.turn,
-	      player_number(pplayer),
-	      player_name(pplayer));
-      mystrlcpy(player_names[player_index(pplayer)], player_name(pplayer),
-		MAX_LEN_NAME);
+        && strcmp(plrdata->name, player_name(pplayer)) != 0) {
+      log_debug("player names does not match '%s' != '%s'", plrdata->name,
+                player_name(pplayer));
+      fprintf(score_log->fp, "delplayer %d %d\n", game.info.turn - 1,
+              player_number(pplayer));
+      fprintf(score_log->fp, "addplayer %d %d %s\n", game.info.turn,
+              player_number(pplayer), player_name(pplayer));
+      plrdata_slot_replace(plrdata, player_name(pplayer));
     }
   } players_iterate_end;
 
-  for (i = 0; i<ARRAY_SIZE(score_tags); i++) {
+  for (i = 0; i < ARRAY_SIZE(score_tags); i++) {
     players_iterate(pplayer) {
       if (!GOOD_PLAYER(pplayer)) {
-	continue;
+        continue;
       }
 
-      fprintf(fp, "data %d %d %d %d\n", game.info.turn, i,
-	      player_number(pplayer), score_tags[i].get_value(pplayer));
+      fprintf(score_log->fp, "data %d %d %d %d\n", game.info.turn, i,
+              player_number(pplayer), score_tags[i].get_value(pplayer));
     } players_iterate_end;
   }
 
-  fflush(fp);
+  fflush(score_log->fp);
 
   return;
 
 log_civ_score_disable:
 
-  if (fp) {
-    fclose(fp);
-    fp = NULL;
-  }
-
-  disabled = TRUE;
+  log_civ_score_free();
 }
 
 /**************************************************************************
@@ -1130,7 +1414,7 @@ void make_history_report(void)
   }
 
   game.server.scoreturn = (game.info.turn + GAME_DEFAULT_SCORETURN
-                           + myrand(GAME_DEFAULT_SCORETURN));
+                           + fc_rand(GAME_DEFAULT_SCORETURN));
 
   historian_generic(game.server.scoreturn % HISTORIAN_LAST);
 }
@@ -1141,44 +1425,71 @@ void make_history_report(void)
 **************************************************************************/
 void report_final_scores(struct conn_list *dest)
 {
-  int i, j = 0;
+  static const struct {
+    const char *name;
+    int (*score) (const struct player *);
+  } score_categories[] = {
+    { N_("Population\n"),               get_real_pop },
+    /* TRANS: "M goods" = million goods */
+    { N_("Trade\n(M goods)"),           get_economics },
+    /* TRANS: "M tons" = million tons */
+    { N_("Production\n(M tons)"),       get_production },
+    { N_("Cities\n"),                   get_cities },
+    { N_("Technologies\n"),             get_techs },
+    { N_("Military Service\n(months)"), get_mil_service },
+    { N_("Wonders\n"),                  get_wonders },
+    { N_("Research Speed\n(%)"),        get_research },
+    /* TRANS: "sq. mi." is abbreviation for "square miles" */
+    { N_("Land Area\n(sq. mi.)"),       get_landarea },
+    /* TRANS: "sq. mi." is abbreviation for "square miles" */
+    { N_("Settled Area\n(sq. mi.)"),    get_settledarea },
+    { N_("Literacy\n(%)"),              get_literacy },
+    { N_("Spaceship\n"),                get_spaceship },
+    { N_("Built Units\n"),              get_units_built },
+    { N_("Killed Units\n"),             get_units_killed },
+    { N_("Unit Losses\n"),              get_units_lost },
+  };
+  const size_t score_categories_num = ARRAY_SIZE(score_categories);
+
+  int i, j;
   struct player_score_entry size[player_count()];
   struct packet_endgame_report packet;
+
+  fc_assert(score_categories_num <= ARRAY_SIZE(packet.category_name));
 
   if (!dest) {
     dest = game.est_connections;
   }
 
+  packet.category_num = score_categories_num;
+  for (j = 0; j < score_categories_num; j++) {
+    sz_strlcpy(packet.category_name[j], score_categories[j].name);
+  }
+
+  i = 0;
   players_iterate(pplayer) {
     if (GOOD_PLAYER(pplayer)) {
-      size[j].value = pplayer->score.game;
-      size[j].player = pplayer;
-      j++;
+      size[i].value = pplayer->score.game;
+      size[i].player = pplayer;
+      i++;
     }
   } players_iterate_end;
 
-  qsort(size, j, sizeof(size[0]), secompare);
+  qsort(size, i, sizeof(size[0]), secompare);
 
-  packet.nscores = j;
-  for (i = 0; i < j; i++) {
-    packet.id[i] = player_number(size[i].player);
+  packet.player_num = i;
+  for (i = 0; i < packet.player_num; i++) {
+    const struct player *pplayer = size[i].player;
+
+    packet.player_id[i] = player_number(pplayer);
     packet.score[i] = size[i].value;
-    packet.pop[i] = get_pop(size[i].player) * 1000; 
-    packet.bnp[i] = get_economics(size[i].player); 
-    packet.mfg[i] = get_production(size[i].player); 
-    packet.cities[i] = get_cities(size[i].player); 
-    packet.techs[i] = get_techs(size[i].player);
-    packet.mil_service[i] = get_mil_service(size[i].player); 
-    packet.wonders[i] = get_wonders(size[i].player); 
-    packet.research[i] = get_research(size[i].player); 
-    packet.landarea[i] = get_landarea(size[i].player); 
-    packet.settledarea[i] = get_settledarea(size[i].player); 
-    packet.literacy[i] = get_literacy(size[i].player); 
-    packet.spaceship[i] = get_spaceship(size[i].player); 
-  }  
+    for (j = 0; j < score_categories_num; j++) {
+      packet.category_score[j][i] = score_categories[j].score(pplayer);
+    }
+  }
 
   lsend_packet_endgame_report(dest, &packet);
-}	
+}
 
 /**************************************************************************
 This function pops up a non-modal message dialog on the player's desktop
@@ -1189,30 +1500,27 @@ void page_conn(struct conn_list *dest, const char *caption,
 }
 
 
-/**************************************************************************
-This function pops up a non-modal message dialog on the player's desktop
+/****************************************************************************
+  This function pops up a non-modal message dialog on the player's desktop
 
-event == E_REPORT: message should not be ignored by clients watching
-                   AI players with ai_popup_windows off.  Example:
-                   Server Options, Demographics Report, etc.
+  event == E_REPORT: message should not be ignored by clients watching
+                     AI players with ai_popup_windows off. Example:
+                     Server Options, Demographics Report, etc.
 
-event == E_BROADCAST_REPORT: message can safely be ignored by clients
-                   watching AI players with ai_popup_windows off.  For
-                   example: Herodot's report... and similar messages.
-**************************************************************************/
+  event == E_BROADCAST_REPORT: message can safely be ignored by clients
+                     watching AI players with ai_popup_windows off. For
+                     example: Herodot's report... and similar messages.
+****************************************************************************/
 static void page_conn_etype(struct conn_list *dest, const char *caption,
-			    const char *headline, const char *lines,
-			    enum event_type event)
+                            const char *headline, const char *lines,
+                            enum event_type event)
 {
-  int len;
-  struct packet_page_msg genmsg;
+  struct packet_page_msg packet;
 
-  len = my_snprintf(genmsg.message, sizeof(genmsg.message),
-		    "%s\n%s\n%s", caption, headline, lines);
-  if (len == -1) {
-    freelog(LOG_ERROR, "Message truncated in page_conn_etype()!");
-  }
-  genmsg.event = event;
-  
-  lsend_packet_page_msg(dest, &genmsg);
+  sz_strlcpy(packet.caption, caption);
+  sz_strlcpy(packet.headline, headline);
+  sz_strlcpy(packet.lines, lines);
+  packet.event = event;
+
+  lsend_packet_page_msg(dest, &packet);
 }

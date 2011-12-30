@@ -43,5 +43,13 @@ typedef struct terrain Terrain;
 
 typedef void Nonexistent;
 
+/* List Classes.
+ * NOTE: These should not to be exposed since the pointers
+ * are not safe. They are only used by the API internally.
+ * Separate types makes use from lua type safe.
+ */
+typedef const struct unit_list_link Unit_List_Link;
+typedef const struct city_list_link City_List_Link;
+
 #endif
 

@@ -13,7 +13,7 @@
 #ifndef FC__CONNECTHAND_H
 #define FC__CONNECTHAND_H
 
-#include "shared.h"		/* bool type */
+#include "support.h"            /* bool type */
 
 #include "fc_types.h"
 
@@ -23,7 +23,7 @@ struct packet_authentication_reply;
 struct packet_login_request;
 struct packet_server_join_req;
 
-void conn_set_access(struct connection *pconn, enum cmdlevel_id new_level,
+void conn_set_access(struct connection *pconn, enum cmdlevel new_level,
                      bool granted);
 
 void establish_new_connection(struct connection *pconn);

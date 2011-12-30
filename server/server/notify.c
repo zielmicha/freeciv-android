@@ -18,6 +18,7 @@
 #include <stdarg.h>
 
 /* utility */
+#include "bitvector.h"
 #include "log.h"
 #include "registry.h"
 
@@ -26,6 +27,7 @@
 #include "events.h"
 #include "featured_text.h"
 #include "game.h"
+#include "research.h"
 #include "packets.h"
 #include "player.h"
 #include "tile.h"
@@ -57,15 +59,9 @@ static void package_event_full(struct packet_chat_msg *packet,
                                const struct ft_color color,
                                const char *format, va_list vargs)
 {
-  RETURN_IF_FAIL(NULL != packet);
+  fc_assert_ret(NULL != packet);
 
-  if (ptile) {
-    packet->x = ptile->x;
-    packet->y = ptile->y;
-  } else {
-    packet->x = -1;
-    packet->y = -1;
-  }
+  packet->tile = (NULL != ptile ? tile_index(ptile) : -1);
   packet->event = event;
   packet->conn_id = pconn ? pconn->id : -1;
 
@@ -73,12 +69,12 @@ static void package_event_full(struct packet_chat_msg *packet,
     /* A color is requested. */
     char buf[MAX_LEN_MSG];
 
-    my_vsnprintf(buf, sizeof(buf), format, vargs);
+    fc_vsnprintf(buf, sizeof(buf), format, vargs);
     featured_text_apply_tag(buf, packet->message, sizeof(packet->message),
                             TTT_COLOR, 0, FT_OFFSET_UNSET, color);
   } else {
     /* Simple case */
-    my_vsnprintf(packet->message, sizeof(packet->message), format, vargs);
+    fc_vsnprintf(packet->message, sizeof(packet->message), format, vargs);
   }
 }
 
@@ -186,16 +182,11 @@ static void notify_conn_packet(struct conn_list *dest,
                                const struct packet_chat_msg *packet)
 {
   struct packet_chat_msg real_packet = *packet;
-  struct tile *ptile;
+  int tile = packet->tile;
+  struct tile *ptile = index_to_tile(tile);
 
   if (!dest) {
     dest = game.est_connections;
-  }
-
-  if (is_normal_map_pos(packet->x, packet->y)) {
-    ptile = map_pos_to_tile(packet->x, packet->y);
-  } else {
-    ptile = NULL;
   }
 
   conn_list_iterate(dest, pconn) {
@@ -212,14 +203,13 @@ static void notify_conn_packet(struct conn_list *dest,
         && ((NULL == pconn->playing && pconn->observer)
             || (NULL != pconn->playing
                 && map_is_known(ptile, pconn->playing)))) {
-      /* coordinates are OK; see above */
-      real_packet.x = ptile->x;
-      real_packet.y = ptile->y;
+      /* tile info is OK; see above. */
+      /* FIXME: in the case this is a city event, we should check if the
+       * city is really known. */
+      real_packet.tile = tile;
     } else {
-      /* no coordinates */
-      assert(S_S_RUNNING > server_state() || !is_normal_map_pos(-1, -1));
-      real_packet.x = -1;
-      real_packet.y = -1;
+      /* No tile info. */
+      real_packet.tile = -1;
     }
 
     send_packet_chat_msg(pconn, &real_packet);
@@ -351,7 +341,7 @@ void notify_team(const struct player *pplayer,
   notify_conn_packet(dest, &genmsg);
 
   if (pplayer) {
-    conn_list_free(dest);
+    conn_list_destroy(dest);
   }
 }
 
@@ -370,14 +360,14 @@ void notify_research(const struct player *pplayer,
   struct packet_chat_msg genmsg;
   struct event_cache_players *players = NULL;
   va_list args;
-  struct player_research *research = get_player_research(pplayer);
+  struct player_research *research = player_research_get(pplayer);
 
   va_start(args, format);
   vpackage_event(&genmsg, NULL, event, color, format, args);
   va_end(args);
 
   players_iterate(other_player) {
-    if (get_player_research(other_player) == research) {
+    if (player_research_get(other_player) == research) {
       lsend_packet_chat_msg(other_player->connections, &genmsg);
       players = event_cache_player_add(players, other_player);
     }
@@ -430,10 +420,10 @@ static bool event_cache_status = FALSE;
 **************************************************************************/
 static void event_cache_data_destroy(struct event_cache_data *pdata)
 {
-  RETURN_IF_FAIL(NULL != event_cache);
-  RETURN_IF_FAIL(NULL != pdata);
+  fc_assert_ret(NULL != event_cache);
+  fc_assert_ret(NULL != pdata);
 
-  event_cache_data_list_unlink(event_cache, pdata);
+  event_cache_data_list_remove(event_cache, pdata);
   free(pdata);
 }
 
@@ -455,7 +445,7 @@ event_cache_data_new(const struct packet_chat_msg *packet, int turn,
      * recursion. */
     return NULL;
   }
-  RETURN_VAL_IF_FAIL(NULL != packet, NULL);
+  fc_assert_ret_val(NULL != packet, NULL);
 
   if (packet->event == E_MESSAGE_WALL) {
     /* No popups at save game load. */
@@ -516,7 +506,7 @@ void event_cache_free(void)
     event_cache_iterate(pdata) {
       event_cache_data_destroy(pdata);
     } event_cache_iterate_end;
-    event_cache_data_list_free(event_cache);
+    event_cache_data_list_destroy(event_cache);
     event_cache = NULL;
   }
   event_cache_status = FALSE;
@@ -587,7 +577,7 @@ void event_cache_add_for_player(const struct packet_chat_msg *packet,
 
     pdata = event_cache_data_new(packet, game.info.turn, time(NULL),
                                  server_state(), ECT_PLAYERS, NULL);
-    RETURN_IF_FAIL(NULL != pdata);
+    fc_assert_ret(NULL != pdata);
     BV_SET(pdata->target, player_index(pplayer));
   }
 }
@@ -696,7 +686,7 @@ void send_pending_events(struct connection *pconn, bool include_public)
         strftime(timestr, sizeof(timestr), "%H:%M:%S",
                  localtime(&pdata->timestamp));
         pcm = pdata->packet;
-        my_snprintf(pcm.message, sizeof(pcm.message), "(T%d - %s) %s",
+        fc_snprintf(pcm.message, sizeof(pcm.message), "(T%d - %s) %s",
                     pdata->turn, timestr, pdata->packet.message);
         notify_conn_packet(pconn->self, &pcm);
       } else {
@@ -715,12 +705,12 @@ void event_cache_load(struct section_file *file, const char *section)
   enum event_cache_target target_type;
   enum server_states server_status;
   struct event_cache_players *players = NULL;
-  int i, turn, event_count;
+  int i, x, y, turn, event_count;
   time_t timestamp, now;
   const char *p, *q;
 
   event_count = secfile_lookup_int_default(file, 0, "%s.count", section);
-  freelog(LOG_VERBOSE, "Saved events: %d.", event_count);
+  log_verbose("Saved events: %d.", event_count);
 
   if (0 >= event_count) {
     return;
@@ -729,27 +719,25 @@ void event_cache_load(struct section_file *file, const char *section)
   now = time(NULL);
   for (i = 0; i < event_count; i++) {
     /* restore packet */
-    packet.x = secfile_lookup_int_default(file, -1, "%s.events%d.x",
-                                          section, i);
-    packet.y = secfile_lookup_int_default(file, -1, "%s.events%d.y",
-                                          section, i);
+    x = secfile_lookup_int_default(file, -1, "%s.events%d.x", section, i);
+    y = secfile_lookup_int_default(file, -1, "%s.events%d.y", section, i);
+    packet.tile = (is_normal_map_pos(x, y) ? map_pos_to_index(x, y) : -1);
     packet.conn_id = -1;
 
     p = secfile_lookup_str(file, "%s.events%d.event", section, i);
     if (NULL == p) {
-      freelog(LOG_ERROR, "[Event cache %4d] Missing event type.", i);
+      log_verbose("[Event cache %4d] Missing event type.", i);
       continue;
     }
-    packet.event = event_type_by_name(p, mystrcasecmp);
+    packet.event = event_type_by_name(p, fc_strcasecmp);
     if (!event_type_is_valid(packet.event)) {
-      freelog(LOG_ERROR, "[Event cache %4d] Not supported event type: %s",
-              i, p);
+      log_verbose("[Event cache %4d] Not supported event type: %s", i, p);
       continue;
     }
 
     p = secfile_lookup_str(file, "%s.events%d.message", section, i);
     if (NULL == p) {
-      freelog(LOG_ERROR, "[Event cache %4d] Missing message.", i);
+      log_verbose("[Event cache %4d] Missing message.", i);
       continue;
     }
     sz_strlcpy(packet.message, p);
@@ -763,23 +751,22 @@ void event_cache_load(struct section_file *file, const char *section)
 
     p = secfile_lookup_str(file, "%s.events%d.server_state", section, i);
     if (NULL == p) {
-      freelog(LOG_ERROR, "[Event cache %4d] Missing server state info.", i);
+      log_verbose("[Event cache %4d] Missing server state info.", i);
       continue;
     }
-    server_status = server_states_by_name(p, mystrcasecmp);
+    server_status = server_states_by_name(p, fc_strcasecmp);
     if (!server_states_is_valid(server_status)) {
-      freelog(LOG_ERROR, "[Event cache %4d] Server state no supported: %s",
-              i, p);
+      log_verbose("[Event cache %4d] Server state no supported: %s", i, p);
       continue;
     }
 
     p = secfile_lookup_str(file, "%s.events%d.target", section, i);
     if (NULL == p) {
-      freelog(LOG_ERROR, "[Event cache %4d] Missing target info.", i);
+      log_verbose("[Event cache %4d] Missing target info.", i);
       continue;
-    } else if (0 == mystrcasecmp(p, "All")) {
+    } else if (0 == fc_strcasecmp(p, "All")) {
       target_type = ECT_ALL;
-    } else if (0 == mystrcasecmp(p, "Global Observers")) {
+    } else if (0 == fc_strcasecmp(p, "Global Observers")) {
       target_type = ECT_GLOBAL_OBSERVERS;
     } else {
       bool valid = TRUE;
@@ -799,8 +786,7 @@ void event_cache_load(struct section_file *file, const char *section)
       } players_iterate_end;
 
       if (!valid && NULL == players) {
-        freelog(LOG_ERROR, "[Event cache %4d] invalid target bitmap: %s",
-                i, p);
+        log_verbose("[Event cache %4d] invalid target bitmap: %s", i, p);
         if (NULL != players) {
           FC_FREE(players);
         }
@@ -816,7 +802,7 @@ void event_cache_load(struct section_file *file, const char *section)
       FC_FREE(players);
     }
 
-    freelog(LOG_VERBOSE, "Event %4d loaded.", i);
+    log_verbose("Event %4d loaded.", i);
   }
 }
 
@@ -825,30 +811,32 @@ void event_cache_load(struct section_file *file, const char *section)
 ***************************************************************/
 void event_cache_save(struct section_file *file, const char *section)
 {
+  struct tile *ptile;
   int event_count = 0;
-  char target[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS + 1];
+  char target[MAX_NUM_PLAYER_SLOTS + 1];
   char *p;
 
-  /* stop event logging; this way events from freelog() will not be added
+  /* stop event logging; this way events from log_*() will not be added
    * to the event list while saving the event list */
   event_cache_status = FALSE;
 
   event_cache_iterate(pdata) {
+    ptile = index_to_tile(pdata->packet.tile);
     secfile_insert_int(file, pdata->turn, "%s.events%d.turn",
                        section, event_count);
     secfile_insert_int(file, pdata->timestamp, "%s.events%d.timestamp",
                        section, event_count);
-    secfile_insert_int(file, pdata->packet.x, "%s.events%d.x",
-                       section, event_count);
-    secfile_insert_int(file, pdata->packet.y, "%s.events%d.y",
-                       section, event_count);
+    secfile_insert_int(file, NULL != ptile ? ptile->x : -1,
+                       "%s.events%d.x", section, event_count);
+    secfile_insert_int(file, NULL != ptile ? ptile->y : -1,
+                       "%s.events%d.y", section, event_count);
     secfile_insert_str(file, server_states_name(pdata->server_state),
                        "%s.events%d.server_state", section, event_count);
     secfile_insert_str(file, event_type_name(pdata->packet.event),
                        "%s.events%d.event", section, event_count);
     switch (pdata->target_type) {
     case ECT_ALL:
-      my_snprintf(target, sizeof(target), "All");
+      fc_snprintf(target, sizeof(target), "All");
       break;
     case ECT_PLAYERS:
       p = target;
@@ -858,7 +846,7 @@ void event_cache_save(struct section_file *file, const char *section)
       *p = '\0';
     break;
     case ECT_GLOBAL_OBSERVERS:
-      my_snprintf(target, sizeof(target), "Global Observers");
+      fc_snprintf(target, sizeof(target), "Global Observers");
       break;
     }
     secfile_insert_str(file, target, "%s.events%d.target",
@@ -866,7 +854,7 @@ void event_cache_save(struct section_file *file, const char *section)
     secfile_insert_str(file, pdata->packet.message, "%s.events%d.message",
                        section, event_count);
 
-    freelog(LOG_VERBOSE, "Event %4d saved.", event_count);
+    log_verbose("Event %4d saved.", event_count);
 
     event_count++;
   } event_cache_iterate_end;
@@ -874,7 +862,7 @@ void event_cache_save(struct section_file *file, const char *section)
   /* save the number of events in the event cache */
   secfile_insert_int(file, event_count, "%s.count", section);
 
-  freelog(LOG_VERBOSE, "Events saved: %d.", event_count);
+  log_verbose("Events saved: %d.", event_count);
 
   event_cache_status = TRUE;
 }

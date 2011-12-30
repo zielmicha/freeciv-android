@@ -12,11 +12,13 @@
 
 [datafile]
 description="Default governments data for Freeciv (as Civ2, minus fundamentalism)"
-options="1.9"
+options="+Freeciv-2.3-ruleset"
 
 [governments]
 during_revolution="Anarchy"
 
+; /* <-- avoid gettext warnings
+;
 ; Below: The individual government types, one per section.
 ;
 ; The actual tag used (the * in [government_*]) does not matter, except 
@@ -30,7 +32,11 @@ during_revolution="Anarchy"
 ;
 ; Notes on fields:
 
-; name        = name of this government form as seen by user 
+; name        = translatable name as seen by user
+; rule_name   = (optional) name for savegames, rulesets etc; if not
+;               present, 'name' is used. Since the name used in savegames
+;               must not change, use this when renaming a government after a
+;               ruleset has been released.
 ; reqs        = requirements for this government (see README.effects)
 ; graphic     = tag specifing preferred graphic
 ; graphic_alt = alternate graphics tag if preferred is not found;
@@ -44,6 +50,8 @@ during_revolution="Anarchy"
 
 ; helptext = optional help text string; should escape all raw newlines 
 ;	     so that xgettext parsing works
+;
+; */ <-- avoid gettext warnings
 
 ;------------------------------------------------------------------------
 [government_anarchy]
@@ -53,15 +61,15 @@ name        = _("Anarchy")
 graphic     = "gov.anarchy"
 graphic_alt = "-"
 
-ruler_male_title = _("Usurper")
-ruler_female_title = _("?female:Usurper")
+ruler_male_title = _("Warlord %s")
+ruler_female_title = _("Warlady %s")
 
 helptext = _("\
 Anarchy is simply the absence of any recognizable government.\
  Citizens are disorganized and unproductive, and will spend all\
  income as quickly as possible, rather than paying taxes or\
  conducting research.\
-\n\n\
+"), _("\
 Anarchy offers slightly less corruption than Despotism,\
  but slightly more unhappiness.\
 ")
@@ -75,13 +83,13 @@ graphic     = "gov.despotism"
 graphic_alt = "-"
 ai_better   = "Monarchy"
 
-ruler_male_title = _("Chief")
-ruler_female_title = _("?female:Chief")
+ruler_male_title = _("Chief %s")
+ruler_female_title = _("?female:Chief %s")
 
 helptext = _("\
 Under Despotism, you are the absolute ruler of your people.  Your\
  control over your citizens is maintained largely by martial law.\
-\n\n\
+"), _("\
 Despotism suffers the highest level of corruption of all\
  forms of government.\
 ")
@@ -97,13 +105,13 @@ graphic     = "gov.monarchy"
 graphic_alt = "-"
 ai_better   = "Communism"
 
-ruler_male_title = _("King")
-ruler_female_title = _("Queen")
+ruler_male_title = _("King %s")
+ruler_female_title = _("Queen %s")
 
 helptext = _("\
 Under Monarchy, a king or queen serves as a hereditary figurehead\
  for your government.\
-\n\n\
+"), _("\
 Monarchy suffers the same small amount of corruption that\
  the Republic does.\
 ")
@@ -118,15 +126,15 @@ reqs = { "type", "name", "range"
 graphic     = "gov.communism"
 graphic_alt = "-"
 
-ruler_male_title = _("Comrade")
-ruler_female_title = _("?female:Comrade")
+ruler_male_title = _("Comrade %s")
+ruler_female_title = _("?female:Comrade %s")
 
 helptext = _("\
 A Communist government is based on the ideal that all people are\
  equal.  All goods are owned by the state, rather than by private\
  citizens.  Communism gives a balance between military and commercial\
  styles of government.\
-\n\n\
+"), _("\
 Under Communism, corruption does not vary by distance from\
  the capital; all cities (including the capital) have a modest amount\
  of corruption.\
@@ -142,8 +150,8 @@ reqs = { "type", "name", "range"
 graphic     = "gov.republic"
 graphic_alt = "-"
 
-ruler_male_title = _("Consul")
-ruler_female_title = _("?female:Consul")
+ruler_male_title = _("Consul %s")
+ruler_female_title = _("?female:Consul %s")
 
 helptext = _("\
 Under a Republican government, citizens hold an election to select a\
@@ -164,8 +172,8 @@ reqs = { "type", "name", "range"
 graphic     = "gov.democracy"
 graphic_alt = "-"
 
-ruler_male_title = _("President")
-ruler_female_title = _("?female:President")
+ruler_male_title = _("President %s")
+ruler_female_title = _("?female:President %s")
 
 helptext = _("\
 Under Democracy, citizens govern directly by voting on issues.\

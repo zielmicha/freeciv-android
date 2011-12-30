@@ -42,23 +42,29 @@ am__aclocal_m4_deps = $(top_srcdir)/dependencies/m4/mkstemp.m4 \
 	$(top_srcdir)/m4/codeset.m4 $(top_srcdir)/m4/compiler.m4 \
 	$(top_srcdir)/m4/debug.m4 $(top_srcdir)/m4/freetype2.m4 \
 	$(top_srcdir)/m4/gettimeofday.m4 $(top_srcdir)/m4/ggz.m4 \
-	$(top_srcdir)/m4/glib-gettext.m4 $(top_srcdir)/m4/gtk-2.0.m4 \
-	$(top_srcdir)/m4/gtk2-client.m4 $(top_srcdir)/m4/iconv.m4 \
-	$(top_srcdir)/m4/lib-ld.m4 $(top_srcdir)/m4/lib-link.m4 \
-	$(top_srcdir)/m4/lib-prefix.m4 $(top_srcdir)/m4/locale.m4 \
-	$(top_srcdir)/m4/ngettext.m4 $(top_srcdir)/m4/no-client.m4 \
-	$(top_srcdir)/m4/pkg.m4 $(top_srcdir)/m4/readline.m4 \
-	$(top_srcdir)/m4/sdl-client.m4 $(top_srcdir)/m4/sdl.m4 \
-	$(top_srcdir)/m4/sound.m4 $(top_srcdir)/m4/vsnprintf.m4 \
-	$(top_srcdir)/m4/win32-client.m4 $(top_srcdir)/m4/x.m4 \
-	$(top_srcdir)/m4/xaw-client.m4 $(top_srcdir)/version.in \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/glib-gettext.m4 $(top_srcdir)/m4/gprof.m4 \
+	$(top_srcdir)/m4/gtk-2.0.m4 $(top_srcdir)/m4/gtk2-client.m4 \
+	$(top_srcdir)/m4/iconv.m4 $(top_srcdir)/m4/lib-ld.m4 \
+	$(top_srcdir)/m4/lib-link.m4 $(top_srcdir)/m4/lib-prefix.m4 \
+	$(top_srcdir)/m4/locale.m4 $(top_srcdir)/m4/ngettext.m4 \
+	$(top_srcdir)/m4/no-client.m4 $(top_srcdir)/m4/pkg.m4 \
+	$(top_srcdir)/m4/readline.m4 $(top_srcdir)/m4/sdl-client.m4 \
+	$(top_srcdir)/m4/sdl.m4 $(top_srcdir)/m4/sound.m4 \
+	$(top_srcdir)/m4/vsnprintf.m4 $(top_srcdir)/m4/win32-client.m4 \
+	$(top_srcdir)/m4/x.m4 $(top_srcdir)/m4/xaw-client.m4 \
+	$(top_srcdir)/fc_version $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(SHELL) $(top_srcdir)/bootstrap/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
+AM_V_GEN = $(am__v_GEN_$(V))
+am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
+am__v_GEN_0 = @echo "  GEN   " $@;
+AM_V_at = $(am__v_at_$(V))
+am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
+am__v_at_0 = @
 SOURCES =
 DIST_SOURCES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -88,6 +94,7 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 pkgdatadir = $(datadir)/$(PACKAGE)/default
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 AUTH_CFLAGS = @AUTH_CFLAGS@
 AUTH_LIBS = @AUTH_LIBS@
@@ -96,6 +103,7 @@ AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AUTO_DEPS = @AUTO_DEPS@
 AWK = @AWK@
+BUG_URL = @BUG_URL@
 CAIRO_CFLAGS = @CAIRO_CFLAGS@
 CAIRO_LIBS = @CAIRO_LIBS@
 CATALOGS = @CATALOGS@
@@ -108,12 +116,9 @@ COMMON_LIBS = @COMMON_LIBS@
 CONFIGURE_DEPENDENCIES = @CONFIGURE_DEPENDENCIES@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CXX = @CXX@
-CXXCPP = @CXXCPP@
-CXXDEPMODE = @CXXDEPMODE@
-CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DATADIRNAME = @DATADIRNAME@
+DATASUBDIR = @DATASUBDIR@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DSYMUTIL = @DSYMUTIL@
@@ -149,34 +154,29 @@ GNULIB_SETENV = @GNULIB_SETENV@
 GNULIB_STRTOD = @GNULIB_STRTOD@
 GNULIB_UNSETENV = @GNULIB_UNSETENV@
 GREP = @GREP@
+GTHREAD_CFLAGS = @GTHREAD_CFLAGS@
+GTHREAD_LIBS = @GTHREAD_LIBS@
 GTK_CFLAGS = @GTK_CFLAGS@
 GTK_LIBS = @GTK_LIBS@
 GUI_beos_CFLAGS = @GUI_beos_CFLAGS@
-GUI_beos_CXXFLAGS = @GUI_beos_CXXFLAGS@
 GUI_beos_LDFLAGS = @GUI_beos_LDFLAGS@
 GUI_beos_LIBS = @GUI_beos_LIBS@
 GUI_ftwl_CFLAGS = @GUI_ftwl_CFLAGS@
-GUI_ftwl_CXXFLAGS = @GUI_ftwl_CXXFLAGS@
 GUI_ftwl_LDFLAGS = @GUI_ftwl_LDFLAGS@
 GUI_ftwl_LIBS = @GUI_ftwl_LIBS@
 GUI_gtk2_CFLAGS = @GUI_gtk2_CFLAGS@
-GUI_gtk2_CXXFLAGS = @GUI_gtk2_CXXFLAGS@
 GUI_gtk2_LDFLAGS = @GUI_gtk2_LDFLAGS@
 GUI_gtk2_LIBS = @GUI_gtk2_LIBS@
 GUI_sdl_CFLAGS = @GUI_sdl_CFLAGS@
-GUI_sdl_CXXFLAGS = @GUI_sdl_CXXFLAGS@
 GUI_sdl_LDFLAGS = @GUI_sdl_LDFLAGS@
 GUI_sdl_LIBS = @GUI_sdl_LIBS@
 GUI_stub_CFLAGS = @GUI_stub_CFLAGS@
-GUI_stub_CXXFLAGS = @GUI_stub_CXXFLAGS@
 GUI_stub_LDFLAGS = @GUI_stub_LDFLAGS@
 GUI_stub_LIBS = @GUI_stub_LIBS@
 GUI_win32_CFLAGS = @GUI_win32_CFLAGS@
-GUI_win32_CXXFLAGS = @GUI_win32_CXXFLAGS@
 GUI_win32_LDFLAGS = @GUI_win32_LDFLAGS@
 GUI_win32_LIBS = @GUI_win32_LIBS@
 GUI_xaw_CFLAGS = @GUI_xaw_CFLAGS@
-GUI_xaw_CXXFLAGS = @GUI_xaw_CXXFLAGS@
 GUI_xaw_LDFLAGS = @GUI_xaw_LDFLAGS@
 GUI_xaw_LIBS = @GUI_xaw_LIBS@
 GZIP = @GZIP@
@@ -216,11 +216,15 @@ LTLIBOBJS = @LTLIBOBJS@
 LUA_AS_DEPENDENCY = @LUA_AS_DEPENDENCY@
 LUA_CFLAGS = @LUA_CFLAGS@
 LUA_LIBS = @LUA_LIBS@
+MAIL_ADDRESS = @MAIL_ADDRESS@
 MAJOR_VERSION = @MAJOR_VERSION@
 MAKEINFO = @MAKEINFO@
 MINOR_VERSION = @MINOR_VERSION@
 MKDIR_P = @MKDIR_P@
 MKINSTALLDIRS = @MKINSTALLDIRS@
+MP_gtk2_CFLAGS = @MP_gtk2_CFLAGS@
+MP_gtk2_LDFLAGS = @MP_gtk2_LDFLAGS@
+MP_gtk2_LIBS = @MP_gtk2_LIBS@
 MSGFMT = @MSGFMT@
 MSGFMT_OPTS = @MSGFMT_OPTS@
 NETWORK_CAPSTRING_MANDATORY = @NETWORK_CAPSTRING_MANDATORY@
@@ -271,6 +275,7 @@ VERSION = @VERSION@
 VERSION_LABEL = @VERSION_LABEL@
 VERSION_WITHOUT_LABEL = @VERSION_WITHOUT_LABEL@
 VOID_UNSETENV = @VOID_UNSETENV@
+WIKI_URL = @WIKI_URL@
 WINDRES = @WINDRES@
 XGETTEXT = @XGETTEXT@
 XMKMF = @XMKMF@
@@ -283,7 +288,6 @@ abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
-ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@

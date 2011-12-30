@@ -15,7 +15,6 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <string.h>
 
 /* utility */
@@ -53,9 +52,9 @@ void spaceship_calc_derived(struct player_spaceship *ship)
   int life_support=0;
   int solar_panels=0;
 
-  assert(ship->structurals <= NUM_SS_STRUCTURALS);
-  assert(ship->components <= NUM_SS_COMPONENTS);
-  assert(ship->modules <= NUM_SS_MODULES);
+  fc_assert_ret(ship->structurals <= NUM_SS_STRUCTURALS);
+  fc_assert_ret(ship->components <= NUM_SS_COMPONENTS);
+  fc_assert_ret(ship->modules <= NUM_SS_MODULES);
   
   ship->mass = 0;
   ship->support_rate = ship->energy_rate =
@@ -165,7 +164,7 @@ void handle_spaceship_launch(struct player *pplayer)
   struct player_spaceship *ship = &pplayer->spaceship;
   int arrival;
 
-  if (!find_palace(pplayer)) {
+  if (!player_palace(pplayer)) {
     notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
                   _("You need to have a capital in order to launch "
                     "your spaceship."));
@@ -189,7 +188,7 @@ void handle_spaceship_launch(struct player *pplayer)
 
   notify_player(NULL, NULL, E_SPACESHIP, ftc_server,
                 _("The %s have launched a spaceship!  "
-                  "It is estimated to arrive on Alpha Centauri in %s."),
+                  "It is estimated to arrive at Alpha Centauri in %s."),
                 nation_plural_for_player(pplayer),
                 textyear(arrival));
 
@@ -338,8 +337,8 @@ void handle_spaceship_place(struct player *pplayer,
     send_spaceship_info(pplayer, NULL);
     return;
   }
-  freelog(LOG_ERROR, "Received unknown spaceship place type %d from %s",
-       type, player_name(pplayer));
+  log_error("Received unknown spaceship place type %d from %s",
+            type, player_name(pplayer));
 }
 
 /**************************************************************************

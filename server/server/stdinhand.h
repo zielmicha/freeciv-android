@@ -13,7 +13,7 @@
 #ifndef FC__STDINHAND_H
 #define FC__STDINHAND_H
 
-#include "connection.h"		/* enum cmdlevel_id */
+#include "connection.h"         /* enum cmdlevel */
 #include "fc_types.h"
 
 #define SERVER_COMMAND_PREFIX '/'
@@ -23,12 +23,21 @@ void stdinhand_init(void);
 void stdinhand_turn(void);
 void stdinhand_free(void);
 
-bool handle_stdin_input(struct connection *caller, char *str, bool check);
+bool handle_stdin_input(struct connection *caller, const char *str,
+                        bool check);
 void set_ai_level_direct(struct player *pplayer, enum ai_level level);
 void set_ai_level_directer(struct player *pplayer, enum ai_level level);
 bool read_init_script(struct connection *caller, char *script_filename,
                       bool from_cmdline, bool check);
 void show_players(struct connection *caller);
+
+enum rfc_status create_command_newcomer(const char *name, bool check,
+                                        struct nation_type *pnation,
+                                        struct player **newplayer,
+                                        char *buf, size_t buflen);
+enum rfc_status create_command_pregame(const char *name, bool check,
+                                       struct player **newplayer,
+                                       char *buf, size_t buflen);
 
 bool load_command(struct connection *caller,
 		  const char *filename, bool check);
@@ -38,9 +47,11 @@ void toggle_ai_player_direct(struct connection *caller,
 			     struct player *pplayer);
 
 /* for sernet.c in initing a new connection */
-enum cmdlevel_id access_level_for_next_connection(void);
+enum cmdlevel access_level_for_next_connection(void);
 
 void notify_if_first_access_level_is_available(void);
+
+bool conn_is_kicked(struct connection *pconn, int *time_remaining);
 
 #ifdef HAVE_LIBREADLINE
 #ifdef HAVE_NEWLIBREADLINE

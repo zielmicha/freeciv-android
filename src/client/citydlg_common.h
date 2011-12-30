@@ -16,7 +16,7 @@
 
 #include <stddef.h>		/* size_t */
 
-#include "shared.h"		/* bool type */
+#include "support.h"            /* bool type */
 #include "fc_types.h"
 
 #include "city.h"
@@ -28,13 +28,14 @@ int get_citydlg_canvas_width(void);
 int get_citydlg_canvas_height(void);
 void generate_citydlg_dimensions(void);
 
-bool city_to_canvas_pos(int *canvas_x, int *canvas_y,
-                        int city_x, int city_y);
-bool canvas_to_city_pos(int *city_x, int *city_y,
+bool city_to_canvas_pos(int *canvas_x, int *canvas_y, int city_x,
+                        int city_y, int city_radius_sq);
+bool canvas_to_city_pos(int *city_x, int *city_y, int city_radius_sq,
                         int canvas_x, int canvas_y);
 void city_dialog_redraw_map(struct city *pcity,
                             struct canvas *pcanvas);
 
+char *city_production_cost_str(const struct city *pcity);
 void get_city_dialog_production(struct city *pcity,
                                 char *buffer, size_t buffer_len);
 void get_city_dialog_production_full(char *buffer, size_t buffer_len,

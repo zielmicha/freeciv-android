@@ -14,7 +14,6 @@ Freeciv - Copyright (C) 2004 - The Freeciv Project
 #include <config.h>
 #endif
 
-#include <assert.h>  
 #include <fcntl.h>
 #include <stdio.h>
 #include <signal.h>             /* SIGTERM and kill */
@@ -175,8 +174,6 @@ void client_kill_server(bool force)
 /**************************************************************** 
 forks a server if it can. returns FALSE is we find we couldn't start
 the server.
-This is so system-intensive that it's *nix only.  VMS and Windows 
-code will come later 
 *****************************************************************/ 
 bool client_start_server(void)
 {
@@ -191,13 +188,16 @@ bool client_start_server(void)
   PROCESS_INFORMATION pi;
 
   char savesdir[MAX_LEN_PATH];
+  char scensdir[MAX_LEN_PATH];
   char options[512];
   char cmdline1[512];
   char cmdline2[512];
   char cmdline3[512];
+  char cmdline4[512];
   char logcmdline[512];
   char scriptcmdline[512];
   char savescmdline[512];
+  char scenscmdline[512];
 # endif /* WIN32_NATIVE */
 
   /* only one server (forked from this client) shall be running at a time */
@@ -214,13 +214,13 @@ bool client_start_server(void)
   
   if (server_pid == 0) {
     int fd, argc = 0;
-    const int max_nargs = 13;
+    const int max_nargs = 16;
     char *argv[max_nargs + 1], port_buf[32];
 
     /* inside the child */
 
     /* Set up the command-line parameters. */
-    my_snprintf(port_buf, sizeof(port_buf), "%d", internal_server_port);
+    fc_snprintf(port_buf, sizeof(port_buf), "%d", internal_server_port);
     argv[argc++] = "freeciv-server";
     argv[argc++] = "-p";
     argv[argc++] = port_buf;
@@ -242,7 +242,7 @@ bool client_start_server(void)
       argv[argc++] = scriptfile;
     }
     argv[argc] = NULL;
-    assert(argc <= max_nargs);
+    fc_assert(argc <= max_nargs);
 
     /* avoid terminal spam, but still make server output available */ 
     fclose(stdout);
@@ -269,11 +269,17 @@ bool client_start_server(void)
       dup2(fd, 0);
     }
 
-    /* these won't return on success */ 
+    /* these won't return on success */
+#ifdef DEBUG
+    /* Search under current directory (what ever that happens to be)
+     * only in debug builds. This allows running freeciv directly from build
+     * tree, but could be considered security risk in release builds. */
     execvp("./ser", argv);
     execvp("./server/freeciv-server", argv);
+#endif /* DEBUG */
+    execvp(BINDIR "/freeciv-server", argv);
     execvp("freeciv-server", argv);
-    
+
     /* This line is only reached if freeciv-server cannot be started, 
      * so we kill the forked process.
      * Calling exit here is dangerous due to X11 problems (async replies) */ 
@@ -301,44 +307,62 @@ bool client_start_server(void)
 
   /* the server expects command line arguments to be in local encoding */ 
   if (logfile) {
-    char *logfile_in_local_encoding = internal_to_local_string_malloc(logfile);
-    my_snprintf(logcmdline, sizeof(logcmdline), " --debug 3 --log %s",
-		logfile_in_local_encoding);
+    char *logfile_in_local_encoding =
+        internal_to_local_string_malloc(logfile);
+
+    fc_snprintf(logcmdline, sizeof(logcmdline), " --debug 3 --log %s",
+                logfile_in_local_encoding);
     free(logfile_in_local_encoding);
   }
   if (scriptfile) {
-    char *scriptfile_in_local_encoding = internal_to_local_string_malloc(scriptfile);
-    my_snprintf(scriptcmdline, sizeof(scriptcmdline),  " --read %s",
-		scriptfile_in_local_encoding);
+    char *scriptfile_in_local_encoding =
+        internal_to_local_string_malloc(scriptfile);
+
+    fc_snprintf(scriptcmdline, sizeof(scriptcmdline),  " --read %s",
+                scriptfile_in_local_encoding);
     free(scriptfile_in_local_encoding);
   }
 
   interpret_tilde(savesdir, sizeof(savesdir), "~/.freeciv/saves");
   internal_to_local_string_buffer(savesdir, savescmdline, sizeof(savescmdline));
 
-  my_snprintf(options, sizeof(options), "-p %d -q 1 -e%s%s --saves \"%s\"",
-	      internal_server_port, logcmdline, scriptcmdline, savescmdline);
-  my_snprintf(cmdline1, sizeof(cmdline1), "./ser %s", options);
-  my_snprintf(cmdline2, sizeof(cmdline2),
+  interpret_tilde(scensdir, sizeof(scensdir), "~/.freeciv/scenarios");
+  internal_to_local_string_buffer(scensdir, scenscmdline, sizeof(scenscmdline));
+
+  fc_snprintf(options, sizeof(options),
+              "-p %d -q 1 -e%s%s --saves \"%s\" --scenarios \"%s\"",
+              internal_server_port, logcmdline, scriptcmdline, savescmdline,
+              scenscmdline);
+  fc_snprintf(cmdline1, sizeof(cmdline1), "./ser %s", options);
+  fc_snprintf(cmdline2, sizeof(cmdline2),
               "./server/freeciv-server %s", options);
-  my_snprintf(cmdline3, sizeof(cmdline3),
+  fc_snprintf(cmdline3, sizeof(cmdline3),
+              BINDIR "/freeciv-server %s", options);
+  fc_snprintf(cmdline4, sizeof(cmdline4),
               "freeciv-server %s", options);
 
-  if (!CreateProcess(NULL, cmdline1, NULL, NULL, TRUE,
-		     DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
-		     NULL, NULL, &si, &pi) 
+  if (
+#ifdef DEBUG
+      !CreateProcess(NULL, cmdline1, NULL, NULL, TRUE,
+                     DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
+                     NULL, NULL, &si, &pi)
       && !CreateProcess(NULL, cmdline2, NULL, NULL, TRUE,
-			DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
-			NULL, NULL, &si, &pi) 
-      && !CreateProcess(NULL, cmdline3, NULL, NULL, TRUE,
-			DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
-			NULL, NULL, &si, &pi)) {
+                        DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
+                        NULL, NULL, &si, &pi)
+      &&
+#endif /* DEBUG */
+      !CreateProcess(NULL, cmdline3, NULL, NULL, TRUE,
+                     DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
+                     NULL, NULL, &si, &pi)
+      && !CreateProcess(NULL, cmdline4, NULL, NULL, TRUE,
+                        DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
+                        NULL, NULL, &si, &pi)) {
     output_window_append(ftc_client, _("Couldn't start the server."));
     output_window_append(ftc_client,
                          _("You'll have to start one manually. Sorry..."));
     return FALSE;
   }
-  
+
   server_process = pi.hProcess;
 
 #  endif /* WIN32_NATIVE */
@@ -347,7 +371,7 @@ bool client_start_server(void)
   /* a reasonable number of tries */ 
   while (connect_to_server(user_name, "localhost", internal_server_port, 
                            buf, sizeof(buf)) == -1) {
-    myusleep(WAIT_BETWEEN_TRIES);
+    fc_usleep(WAIT_BETWEEN_TRIES);
 #ifdef HAVE_WORKING_FORK
 #ifndef WIN32_NATIVE
     if (waitpid(server_pid, NULL, WNOHANG) != 0) {
@@ -396,12 +420,13 @@ bool client_start_server(void)
   {
     char buf[16];
 
-    my_snprintf(buf, sizeof(buf), "%d",
-                (TF_WRAPX
-                 | ((tileset_is_isometric(tileset)
-                    && tileset_hex_height(tileset) == 0) ? TF_ISO : 0)
-                 | ((tileset_hex_width(tileset) != 0
-                    || tileset_hex_height(tileset) != 0) ? TF_HEX : 0)));
+    fc_strlcpy(buf, "WRAPX", sizeof(buf));
+    if (tileset_is_isometric(tileset) && 0 == tileset_hex_height(tileset)) {
+      fc_strlcat(buf, "|ISO", sizeof(buf));
+    }
+    if (0 < tileset_hex_width(tileset) || 0 < tileset_hex_height(tileset)) {
+      fc_strlcat(buf, "|HEX", sizeof(buf));
+    }
     desired_settable_option_update("topology", buf, FALSE);
   }
 
@@ -419,7 +444,7 @@ static void randomize_string(char *str, size_t n)
   int i;
 
   for (i = 0; i < n - 1; i++) {
-    str[i] = chars[myrand(sizeof(chars) - 1)];
+    str[i] = chars[fc_rand(sizeof(chars) - 1)];
   }
   str[i] = '\0';
 }
@@ -452,7 +477,7 @@ void send_client_wants_hack(const char *filename)
 {
   if (filename[0] != '\0') {
     struct packet_single_want_hack_req req;
-    struct section_file file;
+    struct section_file *file;
 
     if (!is_filename_safe(filename)) {
       return;
@@ -468,13 +493,13 @@ void send_client_wants_hack(const char *filename)
     /* generate an authentication token */ 
     randomize_string(req.token, sizeof(req.token));
 
-    section_file_init(&file);
-    secfile_insert_str(&file, req.token, "challenge.token");
-    if (!section_file_save(&file, challenge_fullname, 0, FZ_PLAIN)) {
-      freelog(LOG_ERROR, "Couldn't write token to temporary file: %s",
-	      challenge_fullname);
+    file = secfile_new(FALSE);
+    secfile_insert_str(file, req.token, "challenge.token");
+    if (!secfile_save(file, challenge_fullname, 0, FZ_PLAIN)) {
+      log_error("Couldn't write token to temporary file: %s",
+                challenge_fullname);
     }
-    section_file_free(&file);
+    secfile_destroy(file);
 
     /* tell the server what we put into the file */ 
     send_packet_single_want_hack_req(&client.conn, &req);
@@ -489,8 +514,7 @@ void handle_single_want_hack_reply(bool you_have_hack)
   /* remove challenge file */
   if (challenge_fullname[0] != '\0') {
     if (fc_remove(challenge_fullname) == -1) {
-      freelog(LOG_ERROR, "Couldn't remove temporary file: %s",
-	      challenge_fullname);
+      log_error("Couldn't remove temporary file: %s", challenge_fullname);
     }
     challenge_fullname[0] = '\0';
   }
@@ -525,7 +549,7 @@ void send_save_game(char *filename)
 /**************************************************************************
   Handle the list of rulesets sent by the server.
 **************************************************************************/
-void handle_ruleset_choices(struct packet_ruleset_choices *packet)
+void handle_ruleset_choices(const struct packet_ruleset_choices *packet)
 {
   char *rulesets[packet->ruleset_count];
   int i;
@@ -534,7 +558,7 @@ void handle_ruleset_choices(struct packet_ruleset_choices *packet)
   for (i = 0; i < packet->ruleset_count; i++) {
     size_t len = strlen(packet->rulesets[i]);
 
-    rulesets[i] = mystrdup(packet->rulesets[i]);
+    rulesets[i] = fc_strdup(packet->rulesets[i]);
 
     if (len > suf_len
 	&& strcmp(rulesets[i] + len - suf_len, RULESET_SUFFIX) == 0) {
@@ -556,8 +580,7 @@ void set_ruleset(const char *ruleset)
 {
   char buf[4096];
 
-  my_snprintf(buf, sizeof(buf), "/read %s%s",
-	      ruleset, RULESET_SUFFIX);
-  freelog(LOG_DEBUG, "Executing '%s'", buf);
+  fc_snprintf(buf, sizeof(buf), "/read %s%s", ruleset, RULESET_SUFFIX);
+  log_debug("Executing '%s'", buf);
   send_chat(buf);
 }

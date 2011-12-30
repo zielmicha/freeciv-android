@@ -15,7 +15,7 @@
 #define FC__MAPVIEW_COMMON_H
 
 /* utility */
-#include "shared.h"             /* bool type */
+#include "support.h"            /* bool type */
 
 /* common */
 #include "fc_types.h"
@@ -121,8 +121,8 @@ extern bool can_slide;
     const int _t##_count = (_t##_x1 - _t##_x0) * (_t##_y1 - _t##_y0);	\
     int _t##_index = 0;							\
 									\
-    freelog(LOG_DEBUG, "Iterating over %d-%d x %d-%d rectangle.",	\
-	    _t##_x1, _t##_x0, _t##_y1, _t##_y0);			\
+    log_debug("Iterating over %d-%d x %d-%d rectangle.",		\
+	      _t##_x1, _t##_x0, _t##_y1, _t##_y0);			\
     for (; _t##_index < _t##_count; _t##_index++) {			\
       struct tile *_t = NULL;						\
       struct tile_edge *_e = NULL;					\
@@ -270,12 +270,12 @@ void toggle_unit_color(struct unit *punit);
 void put_nuke_mushroom_pixmaps(struct tile *ptile);
 
 void put_one_element(struct canvas *pcanvas, enum mapview_layer layer,
-		     struct tile *ptile,
-		     const struct tile_edge *pedge,
-		     const struct tile_corner *pcorner,
-		     const struct unit *punit, struct city *pcity,
-		     int canvas_x, int canvas_y,
-		     const struct city *citymode);
+                     const struct tile *ptile,
+                     const struct tile_edge *pedge,
+                     const struct tile_corner *pcorner,
+                     const struct unit *punit, const struct city *pcity,
+                     int canvas_x, int canvas_y,
+                     const struct city *citymode);
 
 void put_drawn_sprites(struct canvas *pcanvas,
                        int canvas_x, int canvas_y,
@@ -317,6 +317,7 @@ void get_city_mapview_trade_routes(struct city *pcity,
 
 bool map_canvas_resized(int width, int height);
 void init_mapcanvas_and_overview(void);
+void free_mapcanvas_and_overview(void);
 
 void get_spaceship_dimensions(int *width, int *height);
 void put_spaceship(struct canvas *pcanvas, int canvas_x, int canvas_y,

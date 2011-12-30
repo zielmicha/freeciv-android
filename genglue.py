@@ -11,7 +11,7 @@ ignore = 'get_overview_area_dimensions gfx_fileextensions get_sprite_dimensions 
          'caravan_dialog_is_open popup_pillage_dialog color_alloc get_gui_specific_themes_directories ' \
          'get_useable_themes_in_directory ui_main'.split()
 
-mappers = 'city player unit tile packet_game_load text_tag_list unit_list color packet_endgame_report'.split()
+mappers = 'city player unit tile packet_game_load text_tag_list unit_list color packet_endgame_report option option_set'.split()
 
 def proc(type, name):
     type = type.strip()
@@ -76,7 +76,7 @@ import sys
 sys.stdout = open("src/clientauto.c", 'w')
 print '#include "pyclient.h"'
 for line in open('gui-stub').readlines() + open('gui-manual').readlines():
-    if line.startswith('File') or not line.strip():
+    if line.startswith('File') or not line.strip() or line.startswith('#'):
         continue
     print '// %s' % line.strip()
     start, rest = line.strip().split('(', 1)

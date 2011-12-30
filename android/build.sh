@@ -20,15 +20,15 @@ skip ln -sf $PWD/pyjni build/pyjni
 export PATH="$PATH:$ANDROID_PATH"
 
 cd build/server
-ndk-build
+ndk-build -j5 || exit 1
 cd ../..
 
 cd build/client
-ndk-build
+ndk-build -j5 || exit 1
 cd ../..
 
 cd build/pyjni
-ndk-build
+ndk-build -j5 || exit 1
 cd ../..
 
 cp -p build/client/libs/armeabi/* .

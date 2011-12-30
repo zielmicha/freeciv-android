@@ -6,6 +6,7 @@ pkgdatadir = $(datadir)/$(PACKAGE)/misc
 pkgdata_DATA =          \
 	buildings.png	\
 	buildings.spec	\
+	buildings-large.spec	\
 	chiefs.png	\
 	chiefs.spec	\
 	citybar.png	\
@@ -19,12 +20,15 @@ pkgdata_DATA =          \
 	cursors.spec	\
 	editor.png	\
 	editor.spec	\
+	flags-large.spec	\
 	flags.spec	\
 	icons.spec	\
 	intro.png	\
+	mpicon.png	\
 	overlays.png	\
 	overlays.spec	\
 	radar.png	\
+	shields-large.spec	\
 	shields.spec	\
 	small.png	\
 	small.spec	\
@@ -33,6 +37,7 @@ pkgdata_DATA =          \
 	techs.png	\
 	techs.spec	\
 	treaty.png	\
-	treaty.spec
+	treaty.spec	\
+	wonders-large.spec
 
 EXTRA_DIST = $(pkgdata_DATA)

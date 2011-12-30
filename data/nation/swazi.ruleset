@@ -3,27 +3,29 @@
 name=_("Swazi")
 plural=_("?plural:Swazis")
 groups="Modern", "African"
-legend=_("The Swazis is a Bantu people of southern Africa. Under the\
+legend=_("The Swazi are a Bantu people of southern Africa. Under the\
  leadership of Mswati II (1820 - 1868), the Swazis expanded their territory\
  and stabilized the southern frontier with the Zulus.")
-leader=
- "Dlamini I",
- "Sobhuza I",
- "Mswati II",
- "Labotsibeni",
- "Sobhuza II",
- "Ntombi"
-leader_sex="Male", "Male", "Male", "Female", "Male", "Female"
+
+leaders = {
+ "name",        "sex"
+ "Dlamini I",   "Male"
+ "Sobhuza I",   "Male"
+ "Mswati II",   "Male"
+ "Labotsibeni", "Female"
+ "Sobhuza II",  "Male"
+ "Ntombi",      "Female"
+}
+
+ruler_titles = {
+ "government",     "male_title",            "female_title"
+ "Republic",       _("Spokesman %s"),       _("Spokeswoman %s")
+ "Democracy",      _("Principal Chief %s"), _("?female:Principal Chief %s")
+}
+
 flag="swaziland"
 flag_alt = "rwanda"
 city_style = "Tropical"
-
-ruler_titles = { "government",     "male_title",        "female_title"
-		 ; /* TRANS: Ngwenyama/Indovuzaki = Lion/Elephant cow */
-                 "Monarchy",       _("Ngwenyama"),      _("Indovuzaki")
-                 "Republic",        _("Spokesman"),    _("Spokeswoman")
-                "Democracy",_("Principal Chief"),_("?female:Principal Chief")
-               }
 
 init_techs=""
 init_buildings=""

@@ -14,31 +14,34 @@ legend=_("The Inca were an Amerind people of the Northern Andes who\
  Spanish conquest and was maintained through a complex, hierarchical\
  and pragmatic administrative system. They were, however, wracked as\
  many kingdoms have been by crises of succession. When the Spanish\
- arrived, the Inca were in the middle of one such crisis-- the war\
+ arrived, the Inca were in the middle of one such crisis - the war\
  between Atawallpa and Waskhar. They were the sons of the late ruler\
  Wayna Qhapaq, who had died from disease - likely smallpox - that was\
  sweeping through the land.")
 
-leader=
- "Túpaq Amaru",
- "Manqo Qhapaq",
- "Atawallpa",
- "Pachakuti Inka Yupanki",
- "Thupa Inka Yupanki"
-leader_sex="Male", "Male", "Male", "Male", "Male"
+leaders = {
+ "name",                        "sex"
+ "Túpaq Amaru",                 "Male"
+ "Manqo Qhapaq",                "Male"
+ "Atawallpa",                   "Male"
+ "Pachakuti Inka Yupanki",      "Male"
+ "Thupa Inka Yupanki",          "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Monarchy",        _("Sapa Inka %s"), _("Qoya %s")
+}
+
 flag="inca"
 flag_alt = "peru"	; Used previously
 city_style = "Tropical"
-
-ruler_titles = { "government",      "male_title",      "female_title"
-                 "Monarchy",        _("Sapa Inka"),    _("Qoya")
-               }
 
 init_techs=""
 init_buildings=""
 init_government="Despotism"
 init_units=""
-civilwar_nations="aztec", "mayan"
+civilwar_nations="aymara", "chimu"
 
 cities =
  "Qosqo",

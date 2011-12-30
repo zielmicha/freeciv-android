@@ -15,8 +15,11 @@
 #include <config.h>
 #endif
 
+/* common */
 #include "idex.h"
+#include "movement.h"
 
+/* server/scripting */
 #include "api_find.h"
 #include "script.h"
 
@@ -26,7 +29,7 @@
 **************************************************************************/
 Player *api_find_player(int player_id)
 {
-  return valid_player_by_number(player_id);
+  return player_by_number(player_id);
 }
 
 /**************************************************************************
@@ -35,7 +38,7 @@ Player *api_find_player(int player_id)
 City *api_find_city(Player *pplayer, int city_id)
 {
   if (pplayer) {
-    return player_find_city_by_id(pplayer, city_id);
+    return player_city_by_number(pplayer, city_id);
   } else {
     return idex_lookup_city(city_id);
   }
@@ -47,9 +50,30 @@ City *api_find_city(Player *pplayer, int city_id)
 Unit *api_find_unit(Player *pplayer, int unit_id)
 {
   if (pplayer) {
-    return player_find_unit_by_id(pplayer, unit_id);
+    return player_unit_by_number(pplayer, unit_id);
   } else {
     return idex_lookup_unit(unit_id);
+  }
+}
+
+/**************************************************************************
+  Return a unit that can transport ptype at a given ptile.
+**************************************************************************/
+Unit *api_find_transport_unit(Player *pplayer, Unit_Type *ptype,
+                              Tile *ptile)
+{
+  SCRIPT_CHECK_ARG_NIL(pplayer, 1, Player, NULL);
+  SCRIPT_CHECK_ARG_NIL(ptype, 2, Unit_Type, NULL);
+  SCRIPT_CHECK_ARG_NIL(ptile, 3, Tile, NULL);
+
+  {
+    struct unit *ptransport;
+    struct unit *pvirt = create_unit_virtual(pplayer, NULL, ptype, 0);
+    pvirt->tile = ptile;
+    pvirt->homecity = 0;
+    ptransport = transport_from_tile(pvirt, ptile);
+    destroy_unit_virtual(pvirt);
+    return ptransport;
   }
 }
 
@@ -58,22 +82,21 @@ Unit *api_find_unit(Player *pplayer, int unit_id)
 **************************************************************************/
 Unit_Type *api_find_role_unit_type(const char *role_name, Player *pplayer)
 {
-  SCRIPT_ASSERT(NULL != role_name, NULL);
+  enum unit_role_id role;
+  SCRIPT_CHECK_ARG_NIL(role_name, 1, string, NULL);
 
-  {
-    enum unit_role_id role = find_unit_role_by_rule_name(role_name);
+  role = unit_role_by_rule_name(role_name);
 
-    if (role == L_LAST) {
-      return NULL;
-    }
+  if (role == L_LAST) {
+    return NULL;
+  }
 
-    if (pplayer) {
-      return best_role_unit_for_player(pplayer, role);
-    } else if (num_role_units(role) > 0) {
-      return get_role_unit(role, 0);
-    } else {
-      return NULL;
-    }
+  if (pplayer) {
+    return best_role_unit_for_player(pplayer, role);
+  } else if (num_role_units(role) > 0) {
+    return get_role_unit(role, 0);
+  } else {
+    return NULL;
   }
 }
 
@@ -106,8 +129,8 @@ Government *api_find_government(int government_id)
 **************************************************************************/
 Government *api_find_government_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_government_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return government_by_rule_name(name_orig);
 }
 
 /**************************************************************************
@@ -123,8 +146,8 @@ Nation_Type *api_find_nation_type(int nation_type_id)
 **************************************************************************/
 Nation_Type *api_find_nation_type_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_nation_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return nation_by_rule_name(name_orig);
 }
 
 /**************************************************************************
@@ -140,8 +163,8 @@ Building_Type *api_find_building_type(int building_type_id)
 **************************************************************************/
 Building_Type *api_find_building_type_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_improvement_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return improvement_by_rule_name(name_orig);
 }
 
 /**************************************************************************
@@ -157,8 +180,8 @@ Unit_Type *api_find_unit_type(int unit_type_id)
 **************************************************************************/
 Unit_Type *api_find_unit_type_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_unit_type_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return unit_type_by_rule_name(name_orig);
 }
 
 /**************************************************************************
@@ -174,8 +197,8 @@ Tech_Type *api_find_tech_type(int tech_type_id)
 **************************************************************************/
 Tech_Type *api_find_tech_type_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_advance_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return advance_by_rule_name(name_orig);
 }
 
 /**************************************************************************
@@ -191,8 +214,8 @@ Terrain *api_find_terrain(int terrain_id)
 **************************************************************************/
 Terrain *api_find_terrain_by_name(const char *name_orig)
 {
-  SCRIPT_ASSERT(NULL != name_orig, NULL);
-  return find_terrain_by_rule_name(name_orig);
+  SCRIPT_CHECK_ARG_NIL(name_orig, 1, string, NULL);
+  return terrain_by_rule_name(name_orig);
 }
 
 /**************************************************************************

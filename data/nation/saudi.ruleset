@@ -1,0 +1,99 @@
+[nation_saudi]
+
+name=_("Saudi")
+plural=_("?plural:Saudis")
+groups="Asian", "Early Modern", "Modern"
+legend=_("Saudi Arabia is located on the Arabian Peninsula and includes\
+ Mecca and Medina, the holiest sites of Islam. The First Saudi state was\
+ established in 1744. Current Saudi Arabia dates from the union of Hejaz\
+ and Nejd in 1925. Named after its ruling dynasty, the house of Saud,\
+ Saudi Arabia is one of the last countries retaining an absolute\
+ monarchy. It has the largest proven oil reserves of the world.")
+
+leaders = {
+ "name",                        "sex"
+ "Muhammad ibn Saud",           "Male"
+ "Turki ibn Abdallah",          "Male"
+ "Abdul Rahman ibn Faisal",     "Male"
+ "Ibn Saud",                    "Male"
+ "Faisal",                      "Male"
+ "Fahd",                        "Male"
+ "Abdullah",                    "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Fundamentalism",  _("Caliph %s"),    _("Calipha %s")
+}
+
+flag="saudi_arabia"
+flag_alt = "arab"
+city_style = "Babylonian"
+
+init_techs=""
+init_buildings=""
+init_government="Despotism"
+init_units=""
+
+civilwar_nations = "emirati", "iraqi"
+cities =
+ "ar-Riyad",	;Riyadh
+ "Makkah",	;Mecca
+ "al-Madinah",	;Medina
+ "Jiddah",	;Jeddah
+ "ad-Dammam",
+ "at-Taif",
+ "Tabuk",
+ "Hamis Mushayt",
+ "Buraydah",
+ "al-Hufuf",
+ "al-Mubarraz",
+ "Najran",
+ "Hail",
+ "al-Jubayl",
+ "Hafar al-Batin",
+ "Yanbu",
+ "Abha",
+ "al-Harj",
+ "Taqbah",
+ "al-Hubar",
+ "Araar",
+ "Sakakah",
+ "al-Hawiyah",
+ "Unayzah",
+ "Jizan",
+ "al-Qurayyat",
+ "az-Zahran",
+ "Tarut",
+ "al-Bahah",
+ "al-Qatif",
+ "Bishah",
+ "ar-Rass",
+ "Wadi ad-Dawasir",
+ "Sharurah",
+ "Sayhat",
+ "Bahrah",
+ "Sabya",
+ "ad-Dawadimi",
+ "az-Zulfi",
+ "al-Hafji",
+ "Ahad Rafidah",
+ "Abu Aris",
+ "Muhail",
+ "Rafhah",
+ "Safwa",
+ "Afif",
+ "Rabig",
+ "al-Majma'ah",
+ "Turayf",
+ "Tubarjal",
+ "Baljurshi",
+ "al-Badai",
+ "Rahimah",
+ "ad-Diriyah",
+ "ad-Dilam",
+ "Umm Lajj",
+ "al-Ula",
+ "al-Laila",
+ "al-Uyun",
+ "Tayma"

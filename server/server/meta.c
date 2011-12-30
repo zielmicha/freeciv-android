@@ -40,21 +40,25 @@
 #include <winsock.h>
 #endif
 
-#include "capstr.h"
-#include "connection.h"
-#include "dataio.h"
+/* utility */
 #include "fcintl.h"
-#include "game.h"
 #include "log.h"
 #include "mem.h"
 #include "netintf.h"
 #include "support.h"
 #include "timing.h"
+
+/* common */
+#include "capstr.h"
+#include "connection.h"
+#include "dataio.h"
+#include "game.h"
 #include "version.h"
 
 /* server */
 #include "console.h"
 #include "plrhand.h"
+#include "settings.h"
 #include "srv_main.h"
 
 #include "meta.h"
@@ -197,6 +201,23 @@ static void metaserver_failed(void)
   server_close_meta();
 }
 
+/****************************************************************************
+  Insert a setting in the metaserver message. Return TRUE if it succeded.
+****************************************************************************/
+static inline bool meta_insert_setting(char *s, size_t rest,
+                                       const char *set_name)
+{
+  const struct setting *pset = setting_by_name(set_name);
+  char buf[256];
+
+  fc_assert_ret_val_msg(NULL != pset, FALSE,
+                        "Setting \"%s\" not found!", set_name);
+  fc_snprintf(s, rest, "vn[]=%s&vv[]=%s&",
+              fc_url_encode(setting_name(pset)),
+              setting_value_name(pset, FALSE, buf, sizeof(buf)));
+  return TRUE;
+}
+
 /*************************************************************************
  construct the POST message and send info to metaserver.
 *************************************************************************/
@@ -206,7 +227,9 @@ static bool send_to_metaserver(enum meta_flag flag)
   static char str[8192];
   int rest = sizeof(str);
   int i;
-  int n = 0;
+  int players = 0;
+  int humans = 0;
+  int len;
   int sock = -1;
   char *s = str;
   char host[512];
@@ -235,7 +258,7 @@ static bool send_to_metaserver(enum meta_flag flag)
   }
 
   if (sock == -1) {
-    freelog(LOG_ERROR, "Metaserver: %s", fc_strerror(fc_get_errno()));
+    log_error("Metaserver: %s", fc_strerror(fc_get_errno()));
     metaserver_failed();
     return FALSE;
   }
@@ -250,81 +273,80 @@ static bool send_to_metaserver(enum meta_flag flag)
   case S_S_OVER:
     sz_strlcpy(state, "Game Ended");
     break;
-  case S_S_GENERATING_WAITING:
-    sz_strlcpy(state, "Generating");
-    break;
   }
 
   /* get hostname */
   if (srvarg.metaserver_name[0] != '\0') {
     sz_strlcpy(host, srvarg.metaserver_name);
-  } else if (my_gethostname(host, sizeof(host)) != 0) {
+  } else if (fc_gethostname(host, sizeof(host)) != 0) {
     sz_strlcpy(host, "unknown");
   }
 
-  my_snprintf(s, rest, "host=%s&port=%d&state=%s&", host, srvarg.port, state);
+  fc_snprintf(s, rest, "host=%s&port=%d&state=%s&",
+              host, srvarg.port, state);
   s = end_of_strn(s, &rest);
 
   if (flag == META_GOODBYE) {
-    mystrlcpy(s, "bye=1&", rest);
+    fc_strlcpy(s, "bye=1&", rest);
     s = end_of_strn(s, &rest);
   } else {
-    my_snprintf(s, rest, "version=%s&", fc_url_encode(VERSION_STRING));
+    fc_snprintf(s, rest, "version=%s&", fc_url_encode(VERSION_STRING));
     s = end_of_strn(s, &rest);
 
-    my_snprintf(s, rest, "patches=%s&", 
+    fc_snprintf(s, rest, "patches=%s&", 
                 fc_url_encode(get_meta_patches_string()));
     s = end_of_strn(s, &rest);
 
-    my_snprintf(s, rest, "capability=%s&", fc_url_encode(our_capability));
+    fc_snprintf(s, rest, "capability=%s&", fc_url_encode(our_capability));
     s = end_of_strn(s, &rest);
 
-    my_snprintf(s, rest, "serverid=%s&",
+    fc_snprintf(s, rest, "serverid=%s&",
                 fc_url_encode(srvarg.serverid));
     s = end_of_strn(s, &rest);
 
-    my_snprintf(s, rest, "message=%s&",
+    fc_snprintf(s, rest, "message=%s&",
                 fc_url_encode(get_meta_message_string()));
     s = end_of_strn(s, &rest);
 
     /* NOTE: send info for ALL players or none at all. */
     if (normal_player_count() == 0) {
-      mystrlcpy(s, "dropplrs=1&", rest);
+      fc_strlcpy(s, "dropplrs=1&", rest);
       s = end_of_strn(s, &rest);
     } else {
-      n = 0; /* a counter for players_available */
+      players = 0; /* a counter for players_available */
+      humans = 0;
 
       players_iterate(plr) {
         bool is_player_available = TRUE;
         char type[15];
-        struct connection *pconn = find_conn_by_user(plr->username);
+        struct connection *pconn = conn_by_user(plr->username);
 
         if (!plr->is_alive) {
           sz_strlcpy(type, "Dead");
         } else if (is_barbarian(plr)) {
           sz_strlcpy(type, "Barbarian");
-        } else if (plr->ai_data.control) {
+        } else if (plr->ai_controlled) {
           sz_strlcpy(type, "A.I.");
         } else {
           sz_strlcpy(type, "Human");
         }
 
-        my_snprintf(s, rest, "plu[]=%s&", fc_url_encode(plr->username));
+        fc_snprintf(s, rest, "plu[]=%s&", fc_url_encode(plr->username));
         s = end_of_strn(s, &rest);
 
-        my_snprintf(s, rest, "plt[]=%s&", type);
+        fc_snprintf(s, rest, "plt[]=%s&", type);
         s = end_of_strn(s, &rest);
 
-        my_snprintf(s, rest, "pll[]=%s&", fc_url_encode(player_name(plr)));
+        fc_snprintf(s, rest, "pll[]=%s&", fc_url_encode(player_name(plr)));
         s = end_of_strn(s, &rest);
 
-        my_snprintf(s, rest, "pln[]=%s&",
+        fc_snprintf(s, rest, "pln[]=%s&",
                     fc_url_encode(plr->nation != NO_NATION_SELECTED 
                                   ? nation_plural_for_player(plr)
                                   : "none"));
         s = end_of_strn(s, &rest);
 
-        my_snprintf(s, rest, "plh[]=%s&",
+        fc_snprintf(s, rest, "plh[]=%s&",
                     pconn ? fc_url_encode(pconn->addr) : "");
         s = end_of_strn(s, &rest);
 
@@ -335,11 +357,11 @@ static bool send_to_metaserver(enum meta_flag flag)
           is_player_available = FALSE;
         } else if (!plr->is_alive && !strchr(game.server.allow_take, 'd')) {
           is_player_available = FALSE;
-        } else if (plr->ai_data.control
+        } else if (plr->ai_controlled
                    && !strchr(game.server.allow_take,
                               (game.info.is_new_game ? 'A' : 'a'))) {
           is_player_available = FALSE;
-        } else if (!plr->ai_data.control
+        } else if (!plr->ai_controlled
                    && !strchr(game.server.allow_take,
                               (game.info.is_new_game ? 'H' : 'h'))) {
           is_player_available = FALSE;
@@ -350,55 +372,68 @@ static bool send_to_metaserver(enum meta_flag flag)
         }
 
         if (is_player_available) {
-          n++;
+          players++;
+        }
+          
+        if (!plr->ai_controlled && plr->is_alive) {
+          humans++;
         }
       } players_iterate_end;
 
       /* send the number of available players. */
-      my_snprintf(s, rest, "available=%d&", n);
+      fc_snprintf(s, rest, "available=%d&", players);
+      s = end_of_strn(s, &rest);
+      fc_snprintf(s, rest, "humans=%d&", humans);
       s = end_of_strn(s, &rest);
     }
 
-    /* send some variables: should be listed in inverted order
-     * FIXME: these should be input from the settings array */
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("timeout"), game.info.timeout);
-    s = end_of_strn(s, &rest);
+    /* Send some variables: should be listed in inverted order? */
+    {
+      static const char *settings[] = {
+        "timeout", "endturn", "minplayers", "maxplayers",
+        "aifill", "allowtake", "generator"
+      };
+      int i;
 
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("year"), game.info.year);
-    s = end_of_strn(s, &rest);
+      for (i = 0; i < ARRAY_SIZE(settings); i++) {
+        if (meta_insert_setting(s, rest, settings[i])) {
+          s = end_of_strn(s, &rest);
+        }
+      }
 
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
+      /* HACK: send the most determinant setting for the map size. */
+      switch (map.server.mapsize) {
+      case MAPSIZE_FULLSIZE:
+        if (meta_insert_setting(s, rest, "size")) {
+          s = end_of_strn(s, &rest);
+        }
+        break;
+      case MAPSIZE_PLAYER:
+        if (meta_insert_setting(s, rest, "tilesperplayer")) {
+          s = end_of_strn(s, &rest);
+        }
+        break;
+      case MAPSIZE_XYSIZE:
+        if (meta_insert_setting(s, rest, "xsize")) {
+          s = end_of_strn(s, &rest);
+        }
+        if (meta_insert_setting(s, rest, "ysize")) {
+          s = end_of_strn(s, &rest);
+        }
+        break;
+      }
+    }
+
+    /* Turn and year. */
+    fc_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
                 fc_url_encode("turn"), game.info.turn);
     s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("endturn"), game.info.end_turn);
-    s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("minplayers"), game.info.min_players);
-    s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("maxplayers"), game.info.max_players);
-    s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%s&",
-                fc_url_encode("allowtake"), game.server.allow_take);
-    s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("generator"), map.server.generator);
-    s = end_of_strn(s, &rest);
-
-    my_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
-                fc_url_encode("size"), map.server.size);
+    fc_snprintf(s, rest, "vn[]=%s&vv[]=%d&",
+                fc_url_encode("year"), game.info.year);
     s = end_of_strn(s, &rest);
   }
 
-  n = my_snprintf(msg, sizeof(msg),
+  len = fc_snprintf(msg, sizeof(msg),
     "POST %s HTTP/1.1\r\n"
     "Host: %s:%d\r\n"
     "Content-Type: application/x-www-form-urlencoded; charset=\"utf-8\"\r\n"
@@ -412,7 +447,7 @@ static bool send_to_metaserver(enum meta_flag flag)
     str
   );
 
-  fc_writesocket(sock, msg, n);
+  fc_writesocket(sock, msg, len);
 
   fc_closesocket(sock);
 
@@ -443,11 +478,10 @@ bool server_open_meta(void)
     return FALSE;
   }
   
-  metaserver_path = mystrdup(path);
+  metaserver_path = fc_strdup(path);
 
   if (!net_lookup_service(metaname, metaport, &names[0], FALSE)) {
-    freelog(LOG_ERROR, _("Metaserver: bad address: <%s %d>."),
-            metaname, metaport);
+    log_error(_("Metaserver: bad address: <%s %d>."), metaname, metaport);
     metaserver_failed();
     return FALSE;
   }

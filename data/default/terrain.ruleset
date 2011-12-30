@@ -12,7 +12,7 @@
 
 [datafile]
 description="Default tile_type data for Freeciv"
-options="1.9+2007.Oct.26"
+options="+Freeciv-2.3-ruleset"
 
 [options]
 may_road=1           ; 0 means no, 1 means yes
@@ -59,7 +59,7 @@ Any land terrain type may have a River on it.  A River adds 1\
  trade to the resources produced by that tile.  It also increases a tile's\
  defense factor by 50%.  Finally, land units may move along a River (but\
  not diagonally); movement along a River costs only 1/3 of a movement point.\
-\n\n\
+"), _("\
 Roads and railroads can only be built on River tiles if your\
  civilization has learned Bridge Building technology.\
 ")
@@ -94,6 +94,8 @@ fallout_shield_penalty=50
 ; percent subtracted from trade production if tile has fallout
 fallout_trade_penalty=50
 
+; /* <-- avoid gettext warnings
+;
 ; The individual terrain types, one per section.
 ; Roughly sorted by identifier.
 ; The actual tag used (the * in [terrain_*]) must be unique for each terrain,
@@ -103,8 +105,13 @@ fallout_trade_penalty=50
 ;
 ; Notes:
 ;
-; name                 = name as seen by user; if "unused", it is not used,
-;                        but is included for conversion and/or the editor.
+; name                 = translatable name as seen by user; if "unused", it is
+;                        not used, but is included for conversion and/or the
+;                        editor.
+; rule_name            = (optional) name for savegames, rulesets etc; if not
+;                        present, 'name' is used. Since the name used in
+;                        savegames must not change, use this when renaming a
+;                        terrain after a ruleset has been released.
 ; graphic              = preferred graphic [tile_*] in tilespec.
 ; graphic_alt          = alternate graphic [tile_*] when preferred is not found;
 ;                        otherwise may be "-"
@@ -136,7 +143,7 @@ fallout_trade_penalty=50
 ;                        terrain section -- transformation changes to that terrain
 ; transform_time       = time to transform; if 0, cannot transform
 ; warmer_wetter_result = result of global warming for wet terrains; one of:
-;                        "no"  -- no change; doesn't count for warming
+;                        "no"  -- no change; does not count for warming
 ;                        "yes" -- no change; counts for warming
 ;                        terrain section -- warming changes to that terrain
 ; warmer_drier_result  = result of global warming for dry terrains;
@@ -180,6 +187,8 @@ fallout_trade_penalty=50
 ;  - ocean_depth       = the depth of an ocean, as an average level
 ; helptext             = optional help text string; should escape all raw 
 ;                        newlines so that xgettext parsing works
+;
+; */ <-- avoid gettext warnings
 
 [terrain_lake]
 name                 = _("Lake")
@@ -206,9 +215,9 @@ rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
 warmer_wetter_result = "no"
-warmer_drier_result  = "no"
-cooler_wetter_result = "no"
-cooler_drier_result  = "no"
+warmer_drier_result  = "terrain_swamp"
+cooler_wetter_result = "terrain_glacier"
+cooler_drier_result  = "terrain_tundra"
 native_to            = "Sea", "Air", "Missile", "Helicopter", "Trireme"
 flags                = "Oceanic", "NoCities", "NoPollution", "FreshWater"
 property_ocean_depth = 0
@@ -241,9 +250,9 @@ rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
 warmer_wetter_result = "no"
-warmer_drier_result  = "no"
-cooler_wetter_result = "no"
-cooler_drier_result  = "no"
+warmer_drier_result  = "terrain_swamp"
+cooler_wetter_result = "terrain_glacier"
+cooler_drier_result  = "terrain_glacier"
 native_to            = "Sea", "Air", "Missile", "Helicopter", "Trireme"
 flags                = "Oceanic", "NoCities", "NoPollution", "UnsafeCoast"
 property_ocean_depth = 32
@@ -313,8 +322,8 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "no"
-warmer_drier_result  = "no"
+warmer_wetter_result = "terrain_tundra"
+warmer_drier_result  = "terrain_tundra"
 cooler_wetter_result = "no"
 cooler_drier_result  = "no"
 native_to            = "Land", "Air", "Missile", "Helicopter"
@@ -350,10 +359,10 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "terrain_swamp"
+warmer_wetter_result = "terrain_grassland"
 warmer_drier_result  = "no"
-cooler_wetter_result = "no"
-cooler_drier_result  = "no"
+cooler_wetter_result = "terrain_plains"
+cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "CanHaveRiver"
 property_dry         = 100
@@ -389,9 +398,9 @@ rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
 warmer_wetter_result = "terrain_jungle"
-warmer_drier_result  = "terrain_desert"
-cooler_wetter_result = "no"
-cooler_drier_result  = "no"
+warmer_drier_result  = "terrain_plains"
+cooler_wetter_result = "terrain_swamp"
+cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "Starter", "CanHaveRiver"
 property_cold        = 20
@@ -427,9 +436,9 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "terrain_swamp"
+warmer_wetter_result = "terrain_ocean"
 warmer_drier_result  = "terrain_desert"
-cooler_wetter_result = "terrain_desert"
+cooler_wetter_result = "terrain_glacier"
 cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "Starter", "CanHaveRiver"
@@ -500,9 +509,9 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "no"
-warmer_drier_result  = "no"
-cooler_wetter_result = "terrain_desert"
+warmer_wetter_result = "terrain_ocean"
+warmer_drier_result  = "terrain_desert"
+cooler_wetter_result = "terrain_swamp"
 cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "CanHaveRiver"
@@ -574,9 +583,9 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "terrain_swamp"
+warmer_wetter_result = "terrain_ocean"
 warmer_drier_result  = "terrain_desert"
-cooler_wetter_result = "terrain_desert"
+cooler_wetter_result = "terrain_glacier"
 cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "Starter", "CanHaveRiver"
@@ -611,9 +620,9 @@ transform_time       = 36
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "no"
+warmer_wetter_result = "terrain_ocean"
 warmer_drier_result  = "terrain_desert"
-cooler_wetter_result = "no"
+cooler_wetter_result = "terrain_glacier"
 cooler_drier_result  = "terrain_tundra"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "CanHaveRiver"
@@ -650,10 +659,10 @@ transform_time       = 24
 rail_time            = 3
 clean_pollution_time = 3
 clean_fallout_time   = 3
-warmer_wetter_result = "no"
-warmer_drier_result  = "no"
+warmer_wetter_result = "terrain_ocean"
+warmer_drier_result  = "terrain_desert"
 cooler_wetter_result = "terrain_glacier"
-cooler_drier_result  = "terrain_glacier"
+cooler_drier_result  = "no"
 native_to            = "Land", "Air", "Missile", "Helicopter"
 flags                = "Starter", "NoBarbs", "CanHaveRiver"
 property_cold        = 50
@@ -860,9 +869,15 @@ identifier  = "x"
 shield      = 3 ; glacier used to have 4
 # glacier, desert
 
+; /* <-- avoid gettext warnings
+;
 ; Base types:
 ;
-; name                    = Name of the base type.
+; name                    = translatable name as seen by user
+; rule_name               = (optional) name for savegames, rulesets etc; if not
+;                           present, 'name' is used. Since the name used in
+;                           savegames must not change, use this when renaming a
+;                           base after a ruleset has been released.
 ; buildable               = Can base be built? Defaults to true
 ; pillageable             = Can base be pillaged? Defaults to true
 ; graphic                 = tag specifing preferred graphic
@@ -881,12 +896,18 @@ shield      = 3 ; glacier used to have 4
 ; conflicts               = List of bases that cannot be on the same tile.
 ;                           Bases with non-zero border_sq automatically conflict
 ;                           with each other.
+; native_to               = List of unit classes that are considered to
+;                           be inside the base when they are on same tile
 ; flags
 ;   - "NoAggressive"      = Units inside are not considered aggressive
 ;   - "NoStackDeath"      = Units inside do not die all at once when attacked
 ;   - "DiplomatDefense"   = Diplomats inside get bonus to diplomatic defense
 ;   - "ParadropFrom"      = Paradrop can be initiated from base
 ;   - "NativeTile"        = Units consider tile native regardless of terrain
+; helptext                = optional help text string; should escape all raw 
+;                           newlines so that xgettext parsing works
+;
+; */ <-- avoid gettext warnings
 
 [base_fortress]
 name           = _("Fortress")
@@ -905,6 +926,12 @@ defense_bonus  = 100
 border_sq      = 5
 native_to      = "Land"
 flags          = "NoAggressive", "NoStackDeath", "DiplomatDefense"
+helptext       = _("\
+Fortresses improve defense for land units. Among other effects, a land \
+unit remaining in a fortress for a whole turn without moving recovers \
+a quarter of its hit points. With Invention, fortresses gain watchtowers \
+from which units can see further afield.\
+")
 
 [base_airbase]
 name           = _("Airbase")
@@ -920,7 +947,11 @@ reqs           =
 gui_type       = "Airbase"
 build_time     = 3
 native_to      = "Air", "Helicopter", "Missile"
-flags          = "NoStackDeath", "DiplomatDefense", "ParadropFrom"
+flags          = "NoStackDeath", "ParadropFrom"
+helptext       = _("\
+Airbases allow your air units to land and refuel. Air units in an \
+airbase may be attacked by land units.\
+")
 
 [base_buoy]
 name           = _("Buoy")
@@ -937,6 +968,9 @@ gui_type       = "Fortress"
 build_time     = 3
 border_sq      = 0
 vision_main_sq = 5
+helptext       = _("\
+Buoys may be built in the ocean (by units on a sea-going vessel).\
+")
 
 [base_ruins]
 name           = _("Ruins")
@@ -950,3 +984,7 @@ reqs           =
 buildable      = 0
 build_time     = 0
 gui_type       = "Other"
+helptext       = _("\
+Ruins mark the former site of a city that was destroyed or abandoned. \
+They have no effect on gameplay.\
+")

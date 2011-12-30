@@ -11,7 +11,7 @@
 
 [datafile]
 description="Default game rules for Freeciv"
-options="1.11.1"
+options="+Freeciv-2.3-ruleset"
 
 [about]
 ; Ruleset name
@@ -50,10 +50,13 @@ min_city_center_trade   = 0
 
 ; Minimum distance between cities (move distance).
 ; (Minimum value for this is 1, which means adjacent is okay.)
-min_dist_bw_cities      = 2
+min_dist_bw_cities	= 2
+
+; Square of initially city radius
+init_city_radius_sq     = 5
 
 ; Square of initially visible radius (true distance).
-init_vis_radius_sq      = 5
+init_vis_radius_sq	= 5
 
 ; The type of collateral contamination produced by a nuclear attack.
 ;   "Pollution" - Pollution (same as industrial/population-generated).
@@ -76,14 +79,14 @@ autoupgrade_veteran_loss = 0
 pillage_select           = 1
 
 ; Method of paying unit and improvement gold upkeep
-; 0 - The player's total gold must be non-negative after paying upkeep
-;     costs associated with each city. If for any city the player's gold
+; 0 - The player`s total gold must be non-negative after paying upkeep
+;     costs associated with each city. If for any city the player`s gold
 ;     is negative, random buildings in the city are sold off. If the gold
 ;     is still negative, then supported units with gold upkeep are
 ;     disbanded.
-; 1 - In the first step, the player's total gold must be non-negative after
+; 1 - In the first step, the player`s total gold must be non-negative after
 ;     paying upkeep for all buildings within a city. If for any city the
-;     player's gold is negative, random buildings in the city are sold off.
+;     player`s gold is negative, random buildings in the city are sold off.
 ;     In the second step, gold upkeep for all units is paid in a lump sum.
 ;     If the player does not have enough gold, random units with gold upkeep
 ;     are disbanded.
@@ -127,7 +130,7 @@ illness_base_factor = 25
 ; minimum city size for illness
 illness_min_size = 3
 
-; factor for how much trading with a plagued city increases our city's
+; factor for how much trading with a plagued city increases our city`s
 ; chance for plague (in percent)
 illness_trade_infection = 50
 
@@ -174,6 +177,16 @@ radius_sq_city = 17
 ; Border radius square increased by this amount / point of city size
 size_effect    = 1
 
+[research]
+; Method of paying tech upkeep
+; 0 - no upkeep
+; 1 - upkeep is calculated as:
+;     <Cost of technology> / tech_upkeep_divider + tech_upkeep_free
+tech_upkeep_style = 0
+
+; upkeep cost is divided by this value
+tech_upkeep_divider = 2000
+
 [calendar]
 ; Year in the beginning of the game
 start_year = -4000
@@ -186,36 +199,21 @@ positive_label = _("AD")
 negative_label = _("BC")
 
 [teams]
-names =
- _("Team 0"),
- _("Team 1"),
- _("Team 2"),
- _("Team 3"),
- _("Team 4"),
- _("Team 5"),
- _("Team 6"),
- _("Team 7"),
- _("Team 8"),
- _("Team 9"),
- _("Team 10"),
- _("Team 11"),
- _("Team 12"),
- _("Team 13"),
- _("Team 14"),
- _("Team 15"),
- _("Team 16"),
- _("Team 17"),
- _("Team 18"),
- _("Team 19"),
- _("Team 20"),
- _("Team 21"),
- _("Team 22"),
- _("Team 23"),
- _("Team 24"),
- _("Team 25"),
- _("Team 26"),
- _("Team 27"),
- _("Team 28"),
- _("Team 29"),
- _("Team 30"),
- _("Team 31")
+; freeciv optional team names definition.
+;
+; name =
+;  _("Team 0"),
+; _("Team 1"),
+; _("Team 2"),
+; _("Team 3"),
+; etc...
+
+[settings]
+; freeciv game settings for the default ruleset
+;
+; set =
+;     { "name", "value", "lock"
+;       "bool_set", TRUE, FALSE
+;       "int_set", 123, FALSE
+;       "str_set", "test", FALSE
+;     }

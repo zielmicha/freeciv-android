@@ -35,6 +35,7 @@
 /* server */
 #include "auth.h"
 #include "diplhand.h"
+#include "edithand.h"
 #include "gamehand.h"
 #include "maphand.h"
 #include "meta.h"
@@ -63,17 +64,18 @@ static bool connection_attach_real(struct connection *pconn,
   NB: This function does not send updated connection information to other
   clients, you need to do that yourself afterwards.
 **************************************************************************/
-void conn_set_access(struct connection *pconn, enum cmdlevel_id new_level,
+void conn_set_access(struct connection *pconn, enum cmdlevel new_level,
                      bool granted)
 {
-  enum cmdlevel_id old_level = conn_get_access(pconn);
+  enum cmdlevel old_level = conn_get_access(pconn);
 
   pconn->access_level = new_level;
   if (granted) {
     pconn->server.granted_access_level = new_level;
   }
 
-  if (ALLOW_HACK == old_level || ALLOW_HACK == new_level) {
+  if (old_level != new_level
+      && (ALLOW_HACK == old_level || ALLOW_HACK == new_level)) {
     send_server_hack_level_settings(pconn->self);
   }
 }
@@ -88,7 +90,7 @@ void conn_set_access(struct connection *pconn, enum cmdlevel_id new_level,
 static void restore_access_level(struct connection *pconn)
 {
   /* Restore previous privileges. */
-  enum cmdlevel_id level = pconn->server.granted_access_level;
+  enum cmdlevel level = pconn->server.granted_access_level;
 
   /* Detached connections must have at most the same privileges
    * as observers, unless they were granted something higher than
@@ -132,7 +134,7 @@ void establish_new_connection(struct connection *pconn)
   /* send join_reply packet */
   packet.you_can_join = TRUE;
   sz_strlcpy(packet.capability, our_capability);
-  my_snprintf(packet.message, sizeof(packet.message), _("%s Welcome"),
+  fc_snprintf(packet.message, sizeof(packet.message), _("%s Welcome"),
               pconn->username);
   sz_strlcpy(packet.challenge_file, new_challenge_filename(pconn));
   packet.conn_id = pconn->id;
@@ -151,7 +153,7 @@ void establish_new_connection(struct connection *pconn)
   }
 
   /* introduce the server to the connection */
-  if (my_gethostname(hostname, sizeof(hostname)) == 0) {
+  if (fc_gethostname(hostname, sizeof(hostname)) == 0) {
     notify_conn(dest, NULL, E_CONNECTION, ftc_any,
                 _("Welcome to the %s Server running at %s port %d."),
                 freeciv_name_version(), hostname, srvarg.port);
@@ -165,13 +167,16 @@ void establish_new_connection(struct connection *pconn)
    * message option for the client with event */
 
   /* Notify the console that you're here. */
+  log_normal(_("%s has connected from %s."), pconn->username, pconn->addr);
 
+  conn_compression_freeze(pconn);
   send_rulesets(dest);
+  send_server_setting_control(pconn);
   send_server_settings(dest);
   send_scenario_info(dest);
   send_game_info(dest);
 
-  if ((pplayer = find_player_by_user(pconn->username))
+  if ((pplayer = player_by_user(pconn->username))
       && connection_attach_real(pconn, pplayer, FALSE, TRUE)) {
     /* a player has already been created for this user, reconnect */
 
@@ -181,12 +186,11 @@ void establish_new_connection(struct connection *pconn)
     send_conn_info(game.est_connections, dest);
 
   } else {
-    if (S_S_INITIAL == server_state() && game.info.is_new_game) {
+    if (!game_was_started()) {
       if (!connection_attach(pconn, NULL, FALSE)) {
         notify_conn(dest, NULL, E_CONNECTION, ftc_server,
                     _("Couldn't attach your connection to new player."));
-        freelog(LOG_VERBOSE, "%s is not attached to a player",
-                pconn->username);
+        log_verbose("%s is not attached to a player", pconn->username);
       }
     }
     send_player_info_c(NULL, dest);
@@ -223,9 +227,16 @@ void establish_new_connection(struct connection *pconn)
    * add the info for all in event cache. Note we must to do it after we
    * sent the pending events to pconn (from this function and also
    * connection_attach()), otherwise pconn will receive it too. */
-  package_event(&connect_info, NULL, E_CONNECTION, ftc_server,
-                _("%s has connected from %s."),
-                pconn->username, pconn->addr);
+  if (conn_controls_player(pconn)) {
+    package_event(&connect_info, NULL, E_CONNECTION, ftc_server,
+                  _("%s has connected from %s (player %s)."),
+                  pconn->username, pconn->addr,
+                  player_name(conn_get_player(pconn)));
+  } else {
+    package_event(&connect_info, NULL, E_CONNECTION, ftc_server,
+                  _("%s has connected from %s."),
+                  pconn->username, pconn->addr);
+  }
   conn_list_iterate(game.est_connections, aconn) {
     if (aconn != pconn) {
       send_packet_chat_msg(aconn, &connect_info);
@@ -234,10 +245,10 @@ void establish_new_connection(struct connection *pconn)
   event_cache_add_for_all(&connect_info);
 
   /* if need be, tell who we're waiting on to end the game.info.turn */
-  if (S_S_RUNNING == server_state() && game.info.turnblock) {
+  if (S_S_RUNNING == server_state() && game.server.turnblock) {
     players_iterate(cplayer) {
       if (cplayer->is_alive
-          && !cplayer->ai_data.control
+          && !cplayer->ai_controlled
           && !cplayer->phase_done
           && cplayer != pconn->playing) {  /* skip current player */
         notify_conn(dest, NULL, E_CONNECTION, ftc_any,
@@ -258,6 +269,7 @@ void establish_new_connection(struct connection *pconn)
     reset_all_start_commands();
     (void) send_server_info_to_metaserver(META_INFO);
   }
+  conn_compression_thaw(pconn);
 }
 
 /**************************************************************************
@@ -276,7 +288,7 @@ void reject_new_connection(const char *msg, struct connection *pconn)
   packet.challenge_file[0] = '\0';
   packet.conn_id = -1;
   send_packet_server_join_reply(pconn, &packet);
-  freelog(LOG_NORMAL, _("Client rejected: %s."), conn_description(pconn));
+  log_normal(_("Client rejected: %s."), conn_description(pconn));
   flush_connection_send_buffer_all(pconn);
 }
 
@@ -288,21 +300,22 @@ bool handle_login_request(struct connection *pconn,
                           struct packet_server_join_req *req)
 {
   char msg[MAX_LEN_MSG];
-  
-  freelog(LOG_NORMAL, _("Connection request from %s from %s"),
-          req->username, pconn->addr);
-  
+  int kick_time_remaining;
+
+  log_normal(_("Connection request from %s from %s"),
+             req->username, pconn->addr);
+
   /* print server and client capabilities to console */
-  freelog(LOG_NORMAL, _("%s has client version %d.%d.%d%s"),
-          pconn->username, req->major_version, req->minor_version,
-          req->patch_version, req->version_label);
-  freelog(LOG_VERBOSE, "Client caps: %s", req->capability);
-  freelog(LOG_VERBOSE, "Server caps: %s", our_capability);
+  log_normal(_("%s has client version %d.%d.%d%s"),
+             pconn->username, req->major_version, req->minor_version,
+             req->patch_version, req->version_label);
+  log_verbose("Client caps: %s", req->capability);
+  log_verbose("Server caps: %s", our_capability);
   sz_strlcpy(pconn->capability, req->capability);
   
   /* Make sure the server has every capability the client needs */
   if (!has_capabilities(our_capability, req->capability)) {
-    my_snprintf(msg, sizeof(msg),
+    fc_snprintf(msg, sizeof(msg),
                 _("The client is missing a capability that this server needs.\n"
                    "Server version: %d.%d.%d%s Client version: %d.%d.%d%s."
                    "  Upgrading may help!"),
@@ -310,14 +323,14 @@ bool handle_login_request(struct connection *pconn,
                 req->major_version, req->minor_version,
                 req->patch_version, req->version_label);
     reject_new_connection(msg, pconn);
-    freelog(LOG_NORMAL, _("%s was rejected: Mismatched capabilities."),
-            req->username);
+    log_normal(_("%s was rejected: Mismatched capabilities."),
+               req->username);
     return FALSE;
   }
 
   /* Make sure the client has every capability the server needs */
   if (!has_capabilities(req->capability, our_capability)) {
-    my_snprintf(msg, sizeof(msg),
+    fc_snprintf(msg, sizeof(msg),
                 _("The server is missing a capability that the client needs.\n"
                    "Server version: %d.%d.%d%s Client version: %d.%d.%d%s."
                    "  Upgrading may help!"),
@@ -325,8 +338,8 @@ bool handle_login_request(struct connection *pconn,
                 req->major_version, req->minor_version,
                 req->patch_version, req->version_label);
     reject_new_connection(msg, pconn);
-    freelog(LOG_NORMAL, _("%s was rejected: Mismatched capabilities."),
-            req->username);
+    log_normal(_("%s was rejected: Mismatched capabilities."),
+               req->username);
     return FALSE;
   }
 
@@ -334,27 +347,38 @@ bool handle_login_request(struct connection *pconn,
 
   /* Name-sanity check: could add more checks? */
   if (!is_valid_username(req->username)) {
-    my_snprintf(msg, sizeof(msg), _("Invalid username '%s'"), req->username);
+    fc_snprintf(msg, sizeof(msg), _("Invalid username '%s'"), req->username);
     reject_new_connection(msg, pconn);
-    freelog(LOG_NORMAL, _("%s was rejected: Invalid name [%s]."),
-            req->username, pconn->addr);
+    log_normal(_("%s was rejected: Invalid name [%s]."),
+               req->username, pconn->addr);
     return FALSE;
-  } 
+  }
+
+  if (conn_is_kicked(pconn, &kick_time_remaining)) {
+    fc_snprintf(msg, sizeof(msg), _("You have been kicked from this server "
+                                    "and cannot reconnect for %d seconds."),
+                kick_time_remaining);
+    reject_new_connection(msg, pconn);
+    log_normal(_("%s was rejected: Connection kicked "
+                 "(%d seconds remaining)."),
+               req->username, kick_time_remaining);
+    return FALSE;
+  }
 
   /* don't allow duplicate logins */
   conn_list_iterate(game.all_connections, aconn) {
-    if (mystrcasecmp(req->username, aconn->username) == 0) { 
-      my_snprintf(msg, sizeof(msg), _("'%s' already connected."), 
+    if (fc_strcasecmp(req->username, aconn->username) == 0) { 
+      fc_snprintf(msg, sizeof(msg), _("'%s' already connected."), 
                   req->username);
       reject_new_connection(msg, pconn);
-      freelog(LOG_NORMAL, _("%s was rejected: Duplicate login name [%s]."),
-              req->username, pconn->addr);
+      log_normal(_("%s was rejected: Duplicate login name [%s]."),
+                 req->username, pconn->addr);
       return FALSE;
     }
   } conn_list_iterate_end;
 
   if (game.server.connectmsg[0] != '\0') {
-    freelog(LOG_DEBUG, "Sending connectmsg: %s", game.server.connectmsg);
+    log_debug("Sending connectmsg: %s", game.server.connectmsg);
     dsend_packet_connect_msg(pconn, game.server.connectmsg);
   }
 
@@ -367,33 +391,22 @@ bool handle_login_request(struct connection *pconn,
   }
 }
 
-/**************************************************************************
+/****************************************************************************
   High-level server stuff when connection to client is closed or lost.
   Reports loss to log, and to other players if the connection was a
-  player.  Also removes player in pregame, applies auto_toggle, and
+  player. Also removes player in pregame, applies auto_toggle, and
   does check for turn done (since can depend on connection/ai status).
-  Note caller should also call close_connection() after this, to do
-  lower-level close stuff.
-**************************************************************************/
+  Note you shouldn't this function directly. You should use
+  server_break_connection() if you want to close the connection.
+****************************************************************************/
 void lost_connection_to_client(struct connection *pconn)
 {
-  freelog(LOG_NORMAL, _("Freeciv Android: Lost connection to player!"));
-  if(getenv("FREECIV_QUIT_ON_DISCONNECT")) {
-    freelog(LOG_NORMAL, _("Freeciv Android: Server quit."));
-    exit(3);
-  } else {
-    freelog(LOG_NORMAL, _("Freeciv Android: Not quiting."));
-  }
   const char *desc = conn_description(pconn);
 
-  freelog(LOG_NORMAL, _("Lost connection: %s."), desc);
+  fc_assert_ret(TRUE == pconn->server.is_closing);
 
-  /* _Must_ avoid sending to pconn, in case pconn connection is
-   * really lost (as opposed to server shutting it down) which would
-   * trigger an error on send and recurse back to here.
-   * Safe to unlink even if not in list: */
-  conn_list_unlink(game.est_connections, pconn);
-  delayed_disconnect++;
+  log_normal(_("Lost connection: %s."), desc);
+
   /* Special color (white on black) for player loss */
   notify_conn(game.est_connections, NULL, E_CONNECTION,
               conn_controls_player(pconn) ? ftc_player_lost : ftc_server,
@@ -404,8 +417,6 @@ void lost_connection_to_client(struct connection *pconn)
   notify_if_first_access_level_is_available();
 
   check_for_full_turn_done();
-
-  delayed_disconnect--;
 }
 
 /**************************************************************************
@@ -441,15 +452,14 @@ static void send_conn_info_arg(struct conn_list *src,
   if (!dest) {
     dest = game.est_connections;
   }
-  
+
   conn_list_iterate(src, psrc) {
     package_conn_info(psrc, &packet);
     if (remove) {
       packet.used = FALSE;
     }
     lsend_packet_conn_info(dest, &packet);
-  }
-  conn_list_iterate_end;
+  } conn_list_iterate_end;
 }
 
 /**************************************************************************
@@ -504,10 +514,10 @@ static bool connection_attach_real(struct connection *pconn,
                                    struct player *pplayer,
                                    bool observing, bool connecting)
 {
-  RETURN_VAL_IF_FAIL(pconn != NULL, FALSE);
-  RETURN_VAL_IF_FAIL_MSG(!pconn->observer && pconn->playing == NULL, FALSE,
-                         "connections must be detached with "
-                         "connection_detach() before calling this!");
+  fc_assert_ret_val(pconn != NULL, FALSE);
+  fc_assert_ret_val_msg(!pconn->observer && pconn->playing == NULL, FALSE,
+                        "connections must be detached with "
+                        "connection_detach() before calling this!");
 
   if (!observing) {
     if (NULL == pplayer) {
@@ -516,12 +526,12 @@ static bool connection_attach_real(struct connection *pconn,
 
       if (NULL == pplayer) {
         /* no uncontrolled player found */
-        if (player_count() >= game.info.max_players
+        if (player_count() >= game.server.max_players
             || player_count() - server.nbarbarians >= server.playable_nations) {
           return FALSE;
         }
         /* add new player, or not */
-        pplayer = server_create_player();
+        pplayer = server_create_player(-1);
         if (!pplayer) {
           return FALSE;
         }
@@ -529,22 +539,22 @@ static bool connection_attach_real(struct connection *pconn,
       team_remove_player(pplayer);
       server_player_init(pplayer, FALSE, TRUE);
       /* Make it human! */
-      pplayer->ai_data.control = FALSE;
+      pplayer->ai_controlled = FALSE;
     }
 
     sz_strlcpy(pplayer->username, pconn->username);
     pplayer->user_turns = 0; /* reset for a new user */
     pplayer->is_connected = TRUE;
 
-    if (S_S_INITIAL == server_state() && game.info.is_new_game) {
+    if (!game_was_started()) {
       if (!pplayer->was_created && NULL == pplayer->nation) {
         /* Temporarily set player_name() to username. */
-        sz_strlcpy(pplayer->name, pconn->username);
+        server_player_set_name(pplayer, pconn->username);
       }
       aifill(game.info.aifill);
     }
 
-    if (game.info.auto_ai_toggle && pplayer->ai_data.control) {
+    if (game.server.auto_ai_toggle && pplayer->ai_controlled) {
       toggle_ai_player_direct(NULL, pplayer);
     }
 
@@ -570,15 +580,21 @@ static bool connection_attach_real(struct connection *pconn,
 
   /* Reset the delta-state. */
   send_conn_info(pconn->self, game.est_connections);    /* Client side. */
-  conn_clear_packet_cache(pconn);                       /* Server side. */
+  conn_reset_delta_state(pconn);                        /* Server side. */
 
   /* Initial packets don't need to be resent.  See comment for
    * connecthand.c::establish_new_connection(). */
   switch (server_state()) {
+  case S_S_INITIAL:
+    break;
+
   case S_S_RUNNING:
-    send_packet_freeze_hint(pconn);
-    send_all_info(pconn->self, TRUE);
-    send_packet_thaw_hint(pconn);
+    conn_compression_freeze(pconn);
+    send_all_info(pconn->self);
+    if (game.info.is_edit_mode && can_conn_edit(pconn)) {
+      edithand_send_initial_packets(pconn->self);
+    }
+    conn_compression_thaw(pconn);
     /* Enter C_S_RUNNING client state. */
     dsend_packet_start_phase(pconn, game.info.phase);
     /* Must be after C_S_RUNNING client state to be effective. */
@@ -591,19 +607,18 @@ static bool connection_attach_real(struct connection *pconn,
     break;
 
   case S_S_OVER:
-    send_packet_freeze_hint(pconn);
-    send_all_info(pconn->self, TRUE);
-    send_packet_thaw_hint(pconn);
+    conn_compression_freeze(pconn);
+    send_all_info(pconn->self);
+    if (game.info.is_edit_mode && can_conn_edit(pconn)) {
+      edithand_send_initial_packets(pconn->self);
+    }
+    conn_compression_thaw(pconn);
     report_final_scores(pconn->self);
     if (!connecting) {
       /* Those will be sent later in establish_new_connection(). */
       send_pending_events(pconn, FALSE);
       send_running_votes(pconn, TRUE);
     }
-    break;
-
-  case S_S_INITIAL:
-  case S_S_GENERATING_WAITING:
     break;
   }
 
@@ -632,18 +647,20 @@ void connection_detach(struct connection *pconn)
 {
   struct player *pplayer;
 
-  RETURN_IF_FAIL(pconn != NULL);
+  fc_assert_ret(pconn != NULL);
 
   if (NULL != (pplayer = pconn->playing)) {
     bool was_connected = pplayer->is_connected;
 
     send_remove_team_votes(pconn);
-    conn_list_unlink(pplayer->connections, pconn);
+    conn_list_remove(pplayer->connections, pconn);
+    pconn->playing = NULL;
+    pconn->observer = FALSE;
+    restore_access_level(pconn);
 
+    /* If any other (non-observing) conn is attached to  this player, the
+     * player is still connected. */
     pplayer->is_connected = FALSE;
-
-    /* If any other (non-observing) conn is attached to 
-     * this player, the player is still connected. */
     conn_list_iterate(pplayer->connections, aconn) {
       if (!aconn->observer) {
         pplayer->is_connected = TRUE;
@@ -652,51 +669,43 @@ void connection_detach(struct connection *pconn)
     } conn_list_iterate_end;
 
     if (was_connected && !pplayer->is_connected) {
-      if (!pplayer->was_created
-          && S_S_INITIAL == server_state()
-          && game.info.is_new_game) {
+      if (!pplayer->was_created && !game_was_started()) {
         /* Remove player. */
         conn_list_iterate(pplayer->connections, aconn) {
           /* Detach all. */
-          if (aconn != pconn) {
-            notify_conn(aconn->self, NULL, E_CONNECTION, ftc_server,
-                        _("detaching from %s."),
-                        player_name(pplayer));
-            /* Recursive... but shouldn't be problem. */
-            connection_detach(aconn);
-          }
+          fc_assert_action(aconn != pconn, continue);
+          notify_conn(aconn->self, NULL, E_CONNECTION, ftc_server,
+                      _("Detaching from %s."), player_name(pplayer));
+          /* Recursive... but shouldn't be problem. */
+          connection_detach(aconn);
         } conn_list_iterate_end;
 
         /* Actually do the removal. */
         server_remove_player(pplayer);
-        send_player_slot_info_c(pplayer, NULL);
         aifill(game.info.aifill);
         reset_all_start_commands();
       } else {
         /* Aitoggle the player if no longer connected. */
-        if (game.info.auto_ai_toggle && !pplayer->ai_data.control) {
+        if (game.server.auto_ai_toggle && !pplayer->ai_controlled) {
           toggle_ai_player_direct(NULL, pplayer);
-          /* send_player_info() was formerly updated by
+          /* send_player_info_c() was formerly updated by
            * toggle_ai_player_direct(), so it must be safe to send here now?
            *
            * At other times, data from send_conn_info() is used by the
            * client to display player information.
            * See establish_new_connection().
            */
-          freelog(LOG_VERBOSE,
-                  "connection_detach() calls send_player_slot_info_c()");
+          log_verbose("connection_detach() calls send_player_info_c()");
           send_player_info_c(pplayer, NULL);
 
           reset_all_start_commands();
         }
       }
     }
-
-    pconn->playing = NULL;
+  } else {
+    pconn->observer = FALSE;
+    restore_access_level(pconn);
   }
-
-  pconn->observer = FALSE;
-  restore_access_level(pconn);
 
   cancel_connection_votes(pconn);
   send_updated_vote_totals(NULL);

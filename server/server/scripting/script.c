@@ -29,6 +29,7 @@
 
 #include "api_gen.h"
 #include "api_types.h"
+#include "api_specenum.h"
 #include "script_signal.h"
 
 #include "script.h"
@@ -100,15 +101,13 @@ static luaL_Reg script_lualibs[] = {
 static int script_report(lua_State *L, int status, const char *code)
 {
   if (status) {
+    struct astring str = ASTRING_INIT;
     const char *msg;
-    static struct astring str = ASTRING_INIT;
     int lineno;
 
     if (!(msg = lua_tostring(L, -1))) {
       msg = "(error with no message)";
     }
-
-    astr_clear(&str);
 
     /* Add error message. */
     astr_add_line(&str, "lua error:");
@@ -155,7 +154,7 @@ static int script_report(lua_State *L, int status, const char *code)
       }
     }
 
-    freelog(LOG_ERROR, "%s", str.str);
+    log_error("%s", astr_str(&str));
 
     astr_free(&str);
 
@@ -282,6 +281,15 @@ static int script_dostring(lua_State *L, const char *str, const char *name)
 }
 
 /**************************************************************************
+  Parse and execute the script in str
+**************************************************************************/
+bool script_do_string(const char *str)
+{
+  int status = script_dostring(state, str, "cmd");
+  return (status == 0);
+}
+
+/**************************************************************************
   Parse and execute the script at filename.
 **************************************************************************/
 bool script_do_file(const char *filename)
@@ -314,6 +322,15 @@ int script_error(const char *fmt, ...)
   lua_concat(state, 2);
 
   return lua_error(state);
+}
+
+/**************************************************************************
+  Like script_error, but using a prefix identifying the called lua function:
+    bad argument #narg to '<func>': msg
+**************************************************************************/
+int script_arg_error(int narg, const char *msg)
+{
+  return luaL_argerror(state, narg, msg);
 }
 
 /**************************************************************************
@@ -359,10 +376,7 @@ static void script_callback_push_args(int nargs, va_list args)
 	  void *arg;
 
 	  name = get_api_type_name(type);
-	  if (!name) {
-	    assert(0);
-	    return;
-	  }
+          fc_assert_ret(NULL != name);
 
 	  arg = va_arg(args, void*);
 	  tolua_pushusertype(state, arg, name);
@@ -384,7 +398,7 @@ bool script_callback_invoke(const char *callback_name,
   lua_getglobal(state, callback_name);
 
   if (!lua_isfunction(state, -1)) {
-    freelog(LOG_ERROR, "lua error: Unknown callback '%s'", callback_name);
+    log_error("lua error: Unknown callback '%s'", callback_name);
     lua_pop(state, 1);
     return FALSE;
   }
@@ -414,7 +428,7 @@ void script_remove_exported_object(void *object)
 {
   if (state) {
     lua_State *L = state;
-    RETURN_IF_FAIL(object != NULL);
+    fc_assert_ret(object != NULL);
 
     /* The following is similar to
      * tolua_release(..) in src/lib/tolua_map.c
@@ -426,7 +440,7 @@ void script_remove_exported_object(void *object)
     lua_rawget(L, -2);                       /* stack: ubox ubox[u] */
 
     if (!lua_isnil(L, -1)) {
-      RETURN_IF_FAIL(object == tolua_tousertype(L, -1, NULL));
+      fc_assert(object == tolua_tousertype(L, -1, NULL));
       /* Change API type to 'Nonexistent' */
       tolua_getmetatable(L, "Nonexistent");  /* stack: ubox ubox[u] mt */
       lua_setmetatable(L, -2);
@@ -489,7 +503,7 @@ static void script_vars_save(struct section_file *file)
       }
     } else {
       /* _freeciv_state_dump in api.pkg is busted */
-      freelog(LOG_ERROR, "lua error: Failed to dump variables");
+      log_error("lua error: Failed to dump variables");
     }
   }
 }
@@ -523,7 +537,7 @@ static void script_code_load(struct section_file *file)
     const char *section = "script.code";
 
     code = secfile_lookup_str_default(file, "", "%s", section);
-    script_code = mystrdup(code);
+    script_code = fc_strdup(code);
     script_dostring(state, script_code, section);
   }
 }
@@ -579,6 +593,8 @@ bool script_init(void)
     script_blacklist(state, script_unsafe_symbols);
 
     tolua_api_open(state);
+
+    api_specenum_open(state);
 
     script_code_init();
     script_vars_init();

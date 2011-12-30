@@ -15,12 +15,11 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <limits.h> /* USHRT_MAX */
 
 /* utility */
+#include "bitvector.h"
 #include "fcintl.h"
-#include "hash.h"
 #include "log.h"
 #include "shared.h"
 #include "support.h"
@@ -33,6 +32,7 @@
 #include "movement.h"
 #include "nation.h"
 #include "terrain.h"
+#include "research.h"
 #include "unitlist.h"
 
 /* generator */
@@ -47,6 +47,7 @@
 #include "maphand.h"
 #include "plrhand.h"
 #include "notify.h"
+#include "sanitycheck.h"
 #include "srv_main.h"
 #include "stdinhand.h"
 #include "techtools.h"
@@ -54,10 +55,14 @@
 
 #include "edithand.h"
 
-/* This table holds pointers to tiles for which expensive
- * checks (e.g. assign_continent_numbers) have been left
- * until after a sequence of edits is complete. */
-static struct hash_table *unfixed_tile_table;
+/* Set if anything in a sequence of edits triggers the expensive
+ * assign_continent_numbers() check, which will be done once when the
+ * sequence is complete. */
+static bool need_continents_reassigned = FALSE;
+/* Hold pointers to tiles which were changed during the edit sequence,
+ * so that they can be sanity-checked when the sequence is complete
+ * and final global fix-ups have been done. */
+static struct tile_hash *modified_tile_table = NULL;
 
 /* Array of size player_slot_count() indexed by player
  * number to tell whether a given player has fog of war
@@ -69,10 +74,12 @@ static bool *unfogged_players;
 ****************************************************************************/
 void edithand_init(void)
 {
-  if (unfixed_tile_table != NULL) {
-    hash_free(unfixed_tile_table);
+  if (NULL != modified_tile_table) {
+    tile_hash_destroy(modified_tile_table);
   }
-  unfixed_tile_table = hash_new(hash_fval_keyval, hash_fcmp_keyval);
+  modified_tile_table = tile_hash_new();
+
+  need_continents_reassigned = FALSE;
 
   if (unfogged_players != NULL) {
     free(unfogged_players);
@@ -85,9 +92,9 @@ void edithand_init(void)
 ****************************************************************************/
 void edithand_free(void)
 {
-  if (unfixed_tile_table != NULL) {
-    hash_free(unfixed_tile_table);
-    unfixed_tile_table = NULL;
+  if (NULL != modified_tile_table) {
+    tile_hash_destroy(modified_tile_table);
+    modified_tile_table = NULL;
   }
 
   if (unfogged_players != NULL) {
@@ -97,21 +104,50 @@ void edithand_free(void)
 }
 
 /****************************************************************************
-  Do the potentially slow checks required after some tile's terrain changes.
+  Send the needed packets for connections entering in the editing mode.
+****************************************************************************/
+void edithand_send_initial_packets(struct conn_list *dest)
+{
+  struct packet_edit_startpos startpos;
+  struct packet_edit_startpos_full startpos_full;
+
+  if (NULL == dest) {
+    dest = game.est_connections;
+  }
+
+  /* Send map start positions. */
+  map_startpos_iterate(psp) {
+    startpos.id = tile_index(startpos_tile(psp));
+    startpos.remove = FALSE;
+    startpos.tag = 0;
+
+    startpos_pack(psp, &startpos_full);
+
+    conn_list_iterate(dest, pconn) {
+      if (can_conn_edit(pconn)) {
+        send_packet_edit_startpos(pconn, &startpos);
+        send_packet_edit_startpos_full(pconn, &startpos_full);
+      }
+    } conn_list_iterate_end;
+  } map_startpos_iterate_end;
+}
+
+/****************************************************************************
+  Do the potentially slow checks required after one or several tiles'
+  terrain has change.
 ****************************************************************************/
 static void check_edited_tile_terrains(void)
 {
-  if (hash_num_entries(unfixed_tile_table) < 1) {
-    return;
+  if (need_continents_reassigned) {
+    assign_continent_numbers();
+    send_all_known_tiles(NULL);
+    need_continents_reassigned = FALSE;
   }
 
-  hash_keys_iterate(unfixed_tile_table, ptile) {
-    fix_tile_on_terrain_change(ptile, FALSE);
-  } hash_keys_iterate_end;
-  hash_delete_all_entries(unfixed_tile_table);
-
-  assign_continent_numbers();
-  send_all_known_tiles(NULL, FALSE);
+  tile_hash_iterate(modified_tile_table, ptile) {
+    sanity_check_tile(ptile);
+  } tile_hash_iterate_end;
+  tile_hash_clear(modified_tile_table);
 }
 
 /****************************************************************************
@@ -157,7 +193,7 @@ void handle_edit_mode(struct connection *pc, bool is_edit_mode)
 
   if (game.info.is_edit_mode && !is_edit_mode) {
     notify_conn(NULL, NULL, E_SETTING, ftc_editor,
-                _(" *** Edit mode cancelled by %s. *** "),
+                _(" *** Edit mode canceled by %s. *** "),
                 conn_description(pc));
 
     check_leaving_edit_mode();
@@ -166,15 +202,8 @@ void handle_edit_mode(struct connection *pc, bool is_edit_mode)
   if (game.info.is_edit_mode != is_edit_mode) {
     game.info.is_edit_mode = is_edit_mode;
 
-    /* We make startpos information available to clients only when in edit
-     * mode. */
-    whole_map_iterate(ptile) {
-      if (map_has_startpos(ptile)) {
-        send_tile_info(NULL, ptile, TRUE, FALSE);
-      }
-    } whole_map_iterate_end;
-
     send_game_info(NULL);
+    edithand_send_initial_packets(NULL);
   }
 }
 
@@ -195,8 +224,10 @@ static bool edit_tile_terrain_handling(struct tile *ptile,
   }
 
   tile_change_terrain(ptile, pterrain);
-  if (need_to_fix_terrain_change(old_terrain, pterrain)) {
-    hash_insert(unfixed_tile_table, ptile, ptile);
+  fix_tile_on_terrain_change(ptile, old_terrain, FALSE);
+  tile_hash_insert(modified_tile_table, ptile, NULL);
+  if (need_to_reassign_continents(old_terrain, pterrain)) {
+    need_continents_reassigned = TRUE;
   }
 
   if (send_tile_info) {
@@ -303,17 +334,17 @@ static bool edit_tile_base_handling(struct tile *ptile,
   square of "radius" 'size' should be affected. So size=1 corresponds to
   the single tile case.
 ****************************************************************************/
-void handle_edit_tile_terrain(struct connection *pc, int x, int y,
+void handle_edit_tile_terrain(struct connection *pc, int tile,
                               Terrain_type_id terrain, int size)
 {
   struct terrain *pterrain;
   struct tile *ptile_center;
 
-  ptile_center = map_pos_to_tile(x, y);
+  ptile_center = index_to_tile(tile);
   if (!ptile_center) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot edit the tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -328,6 +359,8 @@ void handle_edit_tile_terrain(struct connection *pc, int x, int y,
   }
 
   conn_list_do_buffer(game.est_connections);
+  /* This iterates outward, which gives any units that can't survive on
+   * changed terrain the best chance of survival. */
   square_iterate(ptile_center, size - 1, ptile) {
     edit_tile_terrain_handling(ptile, pterrain, TRUE);
   } square_iterate_end;
@@ -337,17 +370,17 @@ void handle_edit_tile_terrain(struct connection *pc, int x, int y,
 /****************************************************************************
   Handle a request to change one or more tiles' resources.
 ****************************************************************************/
-void handle_edit_tile_resource(struct connection *pc, int x, int y,
+void handle_edit_tile_resource(struct connection *pc, int tile,
                                Resource_type_id resource, int size)
 {
   struct resource *presource;
   struct tile *ptile_center;
-  
-  ptile_center = map_pos_to_tile(x, y);
+
+  ptile_center = index_to_tile(tile);
   if (!ptile_center) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot edit the tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
   presource = resource_by_number(resource); /* May be NULL. */
@@ -364,17 +397,17 @@ void handle_edit_tile_resource(struct connection *pc, int x, int y,
   argument controls whether to remove or add the given special of type
   'special' from the tile.
 ****************************************************************************/
-void handle_edit_tile_special(struct connection *pc, int x, int y,
+void handle_edit_tile_special(struct connection *pc, int tile,
                               enum tile_special_type special,
                               bool remove, int size)
 {
   struct tile *ptile_center;
 
-  ptile_center = map_pos_to_tile(x, y);
+  ptile_center = index_to_tile(tile);
   if (!ptile_center) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot edit the tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -397,17 +430,17 @@ void handle_edit_tile_special(struct connection *pc, int x, int y,
 /****************************************************************************
   Handle a request to change the military base at one or more than one tile.
 ****************************************************************************/
-void handle_edit_tile_base(struct connection *pc, int x, int y,
+void handle_edit_tile_base(struct connection *pc, int tile,
                            Base_type_id id, bool remove, int size)
 {
   struct tile *ptile_center;
   struct base_type *pbase;
 
-  ptile_center = map_pos_to_tile(x, y);
+  ptile_center = index_to_tile(tile);
   if (!ptile_center) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot edit the tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -433,18 +466,16 @@ void handle_edit_tile_base(struct connection *pc, int x, int y,
   Handles tile information from the client, to make edits to tiles.
 ****************************************************************************/
 void handle_edit_tile(struct connection *pc,
-                      struct packet_edit_tile *packet)
+                      const struct packet_edit_tile *packet)
 {
   struct tile *ptile;
-  int id;
   bool changed = FALSE;
 
-  id = packet->id;
-  ptile = index_to_tile(id);
-
+  ptile = index_to_tile(packet->tile);
   if (!ptile) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("No such tile (ID %d)."), id);
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), packet->tile);
     return;
   }
 
@@ -473,7 +504,7 @@ void handle_edit_tile(struct connection *pc,
   /* Send the new state to all affected. */
   if (changed) {
     update_tile_knowledge(ptile);
-    send_tile_info(NULL, ptile, FALSE, FALSE);
+    send_tile_info(NULL, ptile, FALSE);
   }
 }
 
@@ -481,30 +512,22 @@ void handle_edit_tile(struct connection *pc,
   Handle a request to create 'count' units of type 'utid' at the tile given
   by the x, y coordinates and owned by player with number 'owner'.
 ****************************************************************************/
-void handle_edit_unit_create(struct connection *pc,
-                             struct packet_edit_unit_create *packet)
+void handle_edit_unit_create(struct connection *pc, int owner, int tile,
+                             Unit_type_id utid, int count, int tag)
 {
-  int owner, x, y, utid, count, tag;
   struct tile *ptile;
   struct unit_type *punittype;
   struct player *pplayer;
   struct city *homecity;
   struct unit *punit;
-  bool coastal;
+  bool only_ocean;
   int id, i;
 
-  owner = packet->owner;
-  x = packet->x;
-  y = packet->y;
-  utid = packet->type;
-  count = packet->count;
-  tag = packet->tag;
-
-  ptile = map_pos_to_tile(x, y);
+  ptile = index_to_tile(tile);
   if (!ptile) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot create units at tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot create units because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -518,7 +541,7 @@ void handle_edit_unit_create(struct connection *pc,
     return;
   }
 
-  pplayer = valid_player_by_number(owner);
+  pplayer = player_by_number(owner);
   if (!pplayer) {
     notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                 /* TRANS: ..." type <unit-type> at <tile-coordinates>"... */
@@ -553,13 +576,14 @@ void handle_edit_unit_create(struct connection *pc,
 
   if (count > 0 && !pplayer->is_alive) {
     pplayer->is_alive = TRUE;
-    send_player_info(pplayer, NULL);
+    send_player_info_c(pplayer, NULL);
   }
 
   /* FIXME: Make this more general? */
-  coastal = is_sailing_unittype(punittype);
+  only_ocean = is_sailing_unittype(punittype);
 
-  homecity = find_closest_owned_city(pplayer, ptile, coastal, NULL);
+  homecity = find_closest_city(ptile, NULL, pplayer, only_ocean, FALSE, FALSE,
+                               TRUE, FALSE);
   id = homecity ? homecity->id : 0;
 
   conn_list_do_buffer(game.est_connections);
@@ -580,18 +604,18 @@ void handle_edit_unit_create(struct connection *pc,
   tile (x, y).
 ****************************************************************************/
 void handle_edit_unit_remove(struct connection *pc, int owner,
-                             int x, int y, Unit_type_id utid, int count)
+                             int tile, Unit_type_id utid, int count)
 {
   struct tile *ptile;
   struct unit_type *punittype;
   struct player *pplayer;
   int i;
 
-  ptile = map_pos_to_tile(x, y);
+  ptile = index_to_tile(tile);
   if (!ptile) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot remove units at tile (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot remove units because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -605,7 +629,7 @@ void handle_edit_unit_remove(struct connection *pc, int owner,
     return;
   }
 
-  pplayer = valid_player_by_number(owner);
+  pplayer = player_by_number(owner);
   if (!pplayer) {
     notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                 /* TRANS: ..." type <unit-type> at <tile-coordinates>
@@ -638,7 +662,7 @@ void handle_edit_unit_remove_by_id(struct connection *pc, Unit_type_id id)
 {
   struct unit *punit;
 
-  punit = game_find_unit_by_number(id);
+  punit = game_unit_by_number(id);
   if (!punit) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("No such unit (ID %d)."), id);
@@ -652,7 +676,7 @@ void handle_edit_unit_remove_by_id(struct connection *pc, Unit_type_id id)
   Handles unit information from the client, to make edits to units.
 ****************************************************************************/
 void handle_edit_unit(struct connection *pc,
-                      struct packet_edit_unit *packet)
+                      const struct packet_edit_unit *packet)
 {
   struct tile *ptile;
   struct unit_type *putype;
@@ -663,7 +687,7 @@ void handle_edit_unit(struct connection *pc,
   int moves_left, fuel, hp;
 
   id = packet->id;
-  punit = game_find_unit_by_number(id);
+  punit = game_unit_by_number(id);
   if (!punit) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("No such unit (ID %d)."), id);
@@ -705,7 +729,7 @@ void handle_edit_unit(struct connection *pc,
   if (packet->veteran != punit->veteran
       && !unit_has_type_flag(punit, F_NO_VETERAN)) {
     int v = packet->veteran;
-    if (putype->veteran[v].name[0] == '\0') {
+    if (rule_name(&putype->veteran[v].name) == '\0') {
       notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                   _("Invalid veteran level %d for unit %d (%s)."),
                   v, id, unit_link(punit));
@@ -728,18 +752,18 @@ void handle_edit_unit(struct connection *pc,
   Allows the editing client to create a city at the given position and
   of size 'size'.
 ****************************************************************************/
-void handle_edit_city_create(struct connection *pc, int owner, int x, int y,
+void handle_edit_city_create(struct connection *pc, int owner, int tile,
                              int size, int tag)
 {
   struct tile *ptile;
   struct city *pcity;
   struct player *pplayer;
-  
-  ptile = map_pos_to_tile(x, y);
+
+  ptile = index_to_tile(tile);
   if (!ptile) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot create a city at (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot create a city because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
@@ -765,7 +789,7 @@ void handle_edit_city_create(struct connection *pc, int owner, int x, int y,
 
   if (!pplayer->is_alive) {
     pplayer->is_alive = TRUE;
-    send_player_info(pplayer, NULL);
+    send_player_info_c(pplayer, NULL);
   }
 
   conn_list_do_buffer(game.est_connections);
@@ -792,7 +816,7 @@ void handle_edit_city_create(struct connection *pc, int owner, int x, int y,
   Handle a request to change the internal state of a city.
 ****************************************************************************/
 void handle_edit_city(struct connection *pc,
-                      struct packet_edit_city *packet)
+                      const struct packet_edit_city *packet)
 {
   struct tile *ptile;
   struct city *pcity, *oldcity;
@@ -803,7 +827,7 @@ void handle_edit_city(struct connection *pc,
   bool need_game_info = FALSE;
   bv_player need_player_info;
 
-  pcity = game_find_city_by_number(packet->id);
+  pcity = game_city_by_number(packet->id);
   if (!pcity) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("Cannot edit city with invalid city ID %d."),
@@ -865,7 +889,7 @@ void handle_edit_city(struct connection *pc,
                && packet->built[id] >= 0) {
 
       if (is_great_wonder(pimprove)) {
-        oldcity = find_city_from_great_wonder(pimprove);
+        oldcity = city_from_great_wonder(pimprove);
         if (oldcity != pcity) {
           BV_SET(need_player_info, player_index(pplayer));
         }
@@ -875,7 +899,7 @@ void handle_edit_city(struct connection *pc,
           BV_SET(need_player_info, player_index(city_owner(oldcity)));
         }
       } else if (is_small_wonder(pimprove)) {
-        oldcity = find_city_from_small_wonder(pplayer, pimprove);
+        oldcity = city_from_small_wonder(pplayer, pimprove);
         if (oldcity != pcity) {
           BV_SET(need_player_info, player_index(pplayer));
         }
@@ -941,7 +965,7 @@ void handle_edit_city(struct connection *pc,
     players_iterate(aplayer) {
       if (BV_ISSET(need_player_info, player_index(aplayer))) {
         /* No need to send to detached connections. */
-        send_player_info(aplayer, NULL);
+        send_player_info_c(aplayer, NULL);
       }
     } players_iterate_end;
   }
@@ -980,21 +1004,20 @@ void handle_edit_player_create(struct connection *pc, int tag)
   }
 
 
-  pplayer = server_create_player();
+  pplayer = server_create_player(-1);
   if (!pplayer) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("Player creation failed."));
     return;
   }
 
-  player_map_free(pplayer);
   server_player_init(pplayer, TRUE, TRUE);
   player_set_nation(pplayer, pnation);
-  pick_random_player_name(pnation, pplayer->name);
+  server_player_set_name(pplayer, pick_random_player_name(pnation));
   sz_strlcpy(pplayer->username, ANON_USER_NAME);
   pplayer->is_connected = FALSE;
-  pplayer->government = pnation->init_government;
-  pplayer->capital = FALSE;
+  pplayer->government = pnation->server.init_government;
+  pplayer->server.capital = FALSE;
 
   pplayer->economic.gold = 0;
   pplayer->economic = player_limit_to_max_rates(pplayer);
@@ -1003,7 +1026,7 @@ void handle_edit_player_create(struct connection *pc, int tag)
   give_global_initial_techs(pplayer);
   give_nation_initial_techs(pplayer);
 
-  send_player_info(pplayer, NULL);
+  send_player_all_c(pplayer, NULL);
   if (tag > 0) {
     dsend_packet_edit_object_created(pc, tag, player_number(pplayer));
   }
@@ -1016,7 +1039,7 @@ void handle_edit_player_remove(struct connection *pc, int id)
 {
   struct player *pplayer;
 
-  pplayer = valid_player_by_number(id);
+  pplayer = player_by_number(id);
   if (pplayer == NULL) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("No such player (ID %d)."), id);
@@ -1034,14 +1057,13 @@ void handle_edit_player_remove(struct connection *pc, int id)
     map_clear_known(ptile, pplayer);
   } whole_map_iterate_end;
   server_remove_player(pplayer);
-  send_player_slot_info_c(pplayer, NULL);
 }
 
 /**************************************************************************
   Handle editing of any or all player properties.
 ***************************************************************************/
 void handle_edit_player(struct connection *pc, 
-                        struct packet_edit_player *packet)
+                        const struct packet_edit_player *packet)
 {
   struct player *pplayer;
   bool changed = FALSE, update_research = FALSE;
@@ -1049,7 +1071,7 @@ void handle_edit_player(struct connection *pc,
   struct player_research *research;
   enum tech_state known;
 
-  pplayer = valid_player_by_number(packet->id);
+  pplayer = player_by_number(packet->id);
   if (!pplayer) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("Cannot edit player with invalid player ID %d."),
@@ -1057,38 +1079,21 @@ void handle_edit_player(struct connection *pc,
     return;
   }
 
-  research = get_player_research(pplayer);
+  research = player_research_get(pplayer);
 
 
   /* Handle player name change. */
   if (0 != strcmp(packet->name, player_name(pplayer))) {
-    if (packet->name[0] == '\0') {
-      notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                  _("Cannot set empty name for player (%d) '%s'."),
-                  player_number(pplayer), player_name(pplayer));
+    char error_buf[256];
+
+    if (server_player_set_name_full(pc, pplayer, NULL, packet->name,
+                                    error_buf, sizeof(error_buf))) {
+      changed = TRUE;
     } else {
-      bool valid = TRUE;
-
-      players_iterate(other_player) {
-        if (other_player == pplayer) {
-          continue;
-        }
-        if (0 != mystrcasecmp(player_name(other_player), packet->name)) {
-          continue;
-        }
-        notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                    _("Cannot change name of player (%d) '%s' to '%s': "
-                      "another player (%d) already has that name."),
-                    player_number(pplayer), player_name(pplayer),
-                    packet->name, player_number(other_player));
-        valid = FALSE;
-        break;
-      } players_iterate_end;
-
-      if (valid) {
-        sz_strlcpy(pplayer->name, packet->name);
-        changed = TRUE;
-      }
+      notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
+                  _("Cannot change name of player (%d) '%s' to '%s': %s"),
+                  player_number(pplayer), player_name(pplayer),
+                  packet->name, error_buf);
     }
   }
 
@@ -1182,7 +1187,7 @@ void handle_edit_player(struct connection *pc,
   }
 
   if (changed) {
-    send_player_info(pplayer, NULL);
+    send_player_all_c(pplayer, NULL);
   }
 }
 
@@ -1190,20 +1195,20 @@ void handle_edit_player(struct connection *pc,
   Handles vision editing requests from client.
 ****************************************************************************/
 void handle_edit_player_vision(struct connection *pc, int plr_no,
-                               int x, int y, bool known, int size)
+                               int tile, bool known, int size)
 {
   struct player *pplayer;
   struct tile *ptile_center;
 
-  ptile_center = map_pos_to_tile(x, y);
+  ptile_center = index_to_tile(tile);
   if (!ptile_center) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot edit vision for the tile at (%d, %d) because "
-                  "it is not on the map!"), x, y);
+                _("Cannot edit vision because %d is not a valid "
+                  "tile index on this map!"), tile);
     return;
   }
 
-  pplayer = valid_player_by_number(plr_no);
+  pplayer = player_by_number(plr_no);
   if (!pplayer) {
     notify_conn(pc->self, ptile_center, E_BAD_COMMAND, ftc_editor,
                 /* TRANS: ..." at <tile-coordinates> because"... */
@@ -1277,7 +1282,7 @@ void handle_edit_city_remove(struct connection *pc, int id)
 {
   struct city *pcity;
 
-  pcity = game_find_city_by_number(id);
+  pcity = game_city_by_number(id);
   if (pcity == NULL) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("No such city (ID %d)."), id);
@@ -1311,7 +1316,7 @@ void handle_edit_toggle_fogofwar(struct connection *pc, int plr_no)
     return;
   }
 
-  pplayer = valid_player_by_number(plr_no);
+  pplayer = player_by_number(plr_no);
   if (!pplayer) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("Cannot toggle fog-of-war for invalid player ID %d."),
@@ -1331,41 +1336,78 @@ void handle_edit_toggle_fogofwar(struct connection *pc, int plr_no)
 }
 
 /****************************************************************************
-  Set the given position to be the start position for the given nation.
+  Create or remove a start position at a tile.
 ****************************************************************************/
-void handle_edit_startpos(struct connection *pc, int x, int y,
-                          Nation_type_id nation)
+void handle_edit_startpos(struct connection *pconn,
+                          const struct packet_edit_startpos *packet)
 {
-  struct tile *ptile;
-  const struct nation_type *pnation, *old;
-  bool removed = FALSE;
+  struct tile *ptile = index_to_tile(packet->id);
+  bool changed;
 
-  ptile = map_pos_to_tile(x, y);
-  if (!ptile) {
-    notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
-                _("Cannot place a start position at (%d, %d) because "
-                  "it is not on the map!"), x, y);
+  /* Check. */
+  if (NULL == ptile) {
+    notify_conn(pconn->self, NULL, E_BAD_COMMAND, ftc_editor,
+                _("Invalid tile index %d for start position."), packet->id);
     return;
   }
 
-  old = map_get_startpos(ptile);
-
-  if (nation == NATION_NONE) {
-    if (map_has_startpos(ptile)) {
-      map_clear_startpos(ptile);
-      removed = TRUE;
-    }
-    pnation = NULL;
-  } else if (nation == NATION_ANY) {
-    map_set_startpos(ptile, NULL);
-    pnation = NULL;
+  /* Handle. */
+  if (packet->remove) {
+    changed = map_startpos_remove(ptile);
   } else {
-    pnation = nation_by_number(nation);
-    map_set_startpos(ptile, pnation);
+    if (NULL != map_startpos_get(ptile)) {
+      changed = FALSE;
+    } else {
+      map_startpos_new(ptile);
+      changed = TRUE;
+    }
   }
 
-  if (old != pnation || removed) {
-    send_tile_info(NULL, ptile, FALSE, FALSE);
+  /* Notify. */
+  if (changed) {
+    conn_list_iterate(game.est_connections, aconn) {
+      if (can_conn_edit(aconn)) {
+        send_packet_edit_startpos(aconn, packet);
+      }
+    } conn_list_iterate_end;
+  }
+}
+
+/****************************************************************************
+  Setup which nations can start at a start position.
+****************************************************************************/
+void handle_edit_startpos_full(struct connection *pconn,
+                               const struct packet_edit_startpos_full *
+                               packet)
+{
+  struct tile *ptile = index_to_tile(packet->id);
+  struct startpos *psp;
+
+  /* Check. */
+  if (NULL == ptile) {
+    notify_conn(pconn->self, NULL, E_BAD_COMMAND, ftc_editor,
+                _("Invalid tile index %d for start position."),
+                packet->id);
+    return;
+  }
+
+  psp = map_startpos_get(ptile);
+  if (NULL == psp) {
+    notify_conn(pconn->self, ptile, E_BAD_COMMAND, ftc_editor,
+                _("Cannot edit start position nations at (%d, %d) "
+                  "because there is no start position there."),
+                TILE_XY(ptile));
+    return;
+  }
+
+  /* Handle. */
+  if (startpos_unpack(psp, packet)) {
+    /* Notify. */
+    conn_list_iterate(game.est_connections, aconn) {
+      if (can_conn_edit(aconn)) {
+        send_packet_edit_startpos_full(aconn, packet);
+      }
+    } conn_list_iterate_end;
   }
 }
 
@@ -1373,7 +1415,7 @@ void handle_edit_startpos(struct connection *pc, int x, int y,
   Handle edit requests to the main game data structure.
 ****************************************************************************/
 void handle_edit_game(struct connection *pc,
-                      struct packet_edit_game *packet)
+                      const struct packet_edit_game *packet)
 {
   bool changed = FALSE;
 
@@ -1423,7 +1465,7 @@ void handle_edit_game(struct connection *pc,
 /****************************************************************************
   Make scenario file out of current game.
 ****************************************************************************/
-void handle_save_scenario(struct connection *pc, char *name)
+void handle_save_scenario(struct connection *pc, const char *name)
 {
   if (pc->access_level != ALLOW_HACK) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
@@ -1445,7 +1487,7 @@ void handle_save_scenario(struct connection *pc, char *name)
   Handle scenario information packet
 ****************************************************************************/
 void handle_scenario_info(struct connection *pc,
-                          struct packet_scenario_info *packet)
+                          const struct packet_scenario_info *packet)
 {
   game.scenario.is_scenario = packet->is_scenario;
   sz_strlcpy(game.scenario.name, packet->name);

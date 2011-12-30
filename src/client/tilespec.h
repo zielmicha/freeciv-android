@@ -18,12 +18,16 @@
 #ifndef FC__TILESPEC_H
 #define FC__TILESPEC_H
 
+/* utility */
+#include "log.h"                /* enum log_level */
+
+/* common */
+#include "city.h"               /* enum citizen_category */
 #include "fc_types.h"
 
-#include "city.h"		/* enum citizen_category */
 #include "options.h"
 
-struct sprite;			/* opaque; gui-dep */
+struct sprite;                  /* opaque; gui-dep */
 
 struct base_type;
 struct resource;
@@ -126,7 +130,7 @@ void tileset_free_tiles(struct tileset *t);
 
 void tilespec_try_read(const char *tileset_name, bool verbose);
 void tilespec_reread(const char *tileset_name);
-void tilespec_reread_callback(struct client_option *option);
+void tilespec_reread_callback(struct option *poption);
 
 void tileset_setup_specialist_type(struct tileset *t, Specialist_type_id id);
 void tileset_setup_unit_type(struct tileset *t, struct unit_type *punittype);
@@ -292,9 +296,11 @@ struct sprite *get_basic_special_sprite(const struct tileset *t,
                                         enum tile_special_type special);
 struct sprite *get_basic_mine_sprite(const struct tileset *t);
 
-struct sprite* tiles_lookup_sprite_tag_alt(struct tileset *t, int loglevel,
-					   const char *tag, const char *alt,
-					   const char *what, const char *name);
+struct sprite *tiles_lookup_sprite_tag_alt(struct tileset *t,
+                                           enum log_level level,
+                                           const char *tag, const char *alt,
+                                           const char *what,
+                                           const char *name);
 
 struct color_system;
 struct color_system *get_color_system(const struct tileset *t);

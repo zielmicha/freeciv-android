@@ -2,7 +2,7 @@
 
 name=_("Ottoman")
 plural=_("?plural:Ottomans")
-groups="Medieval", "Asian", "European"
+groups="Medieval", "Early Modern", "Asian", "European"
 legend=_("In the beginning of the 14th century Osman, a leader of a\
  minor Turkish tribe in western Anatolia, conquered all his neighboring\
  tribes. A century later the Byzantine capital fell to\
@@ -11,24 +11,27 @@ legend=_("In the beginning of the 14th century Osman, a leader of a\
  Europe, the Islamic Arab world as well as\
  Egypt and much of North Africa, making it a regional superpower\
  until its dissolution in the aftermath of World War I.")
-leader=
- "Fâtih Sultân Mehmed",
- "Yavuz Sultân Selim",
- "Ertuğrul Gâzi",
- "Osman",
- "Orhan",
- "Kânûnî Sultân Süleyman"
-leader_sex="Male", "Male", "Male", "Male", "Male", "Male"
+
+leaders = {
+ "name",                        "sex"
+ "Fâtih Sultân Mehmed",         "Male"
+ "Yavuz Sultân Selim",          "Male"
+ "Ertuğrul Gâzi",               "Male"
+ "Osman",                       "Male"
+ "Orhan",                       "Male"
+ "Kânûnî Sultân Süleyman",      "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Monarchy" ,       _("%s Bey"),       _("?female:%s Bey")
+ "Republic",        _("Padishah %s"),  _("?female:Padishah %s")
+ "Democracy",       _("Imperator %s"), _("Imperatrix %s")
+}
+
 flag ="ottoman"
 flag_alt = "turkey"
 city_style = "Classical"
-
-ruler_titles = { "government",      "male_title",      "female_title"
-                 "Despotism",       _("Bey"),          _("?female:Bey")
-                 "Monarchy",        _("Hakan"),        _("?female:Hakan")
-                 "Republic",        _("Padishah"),     _("?female:Padishah")
-                 "Democracy",       _("Imperator"),    _("Imperatrix")
-               }
 
 init_techs=""
 init_buildings=""
@@ -36,7 +39,7 @@ init_government="Despotism"
 init_units=""
 
 conflicts_with="turkish"
-civilwar_nations="arab", "armenian", "hellenic"
+civilwar_nations="arab", "armenian", "hellenic", "crimean tatar"
 
 ; Cities from all over the empire
 cities =

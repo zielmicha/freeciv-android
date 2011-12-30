@@ -3,24 +3,32 @@
 name=_("Canadian")
 plural=_("?plural:Canadians")
 groups="Modern", "American"
-conflicts_with="quebecois", "inuit"
+conflicts_with="quebecois", "inuit", "acadian"
 legend=_("Geographically, Canada is the second largest country in world.\
  The magnetic north pole currently lies on Canadian territory.")
-leader=
- "Pierre Trudeau",
- "John A. MacDonald",
- "John Diefenbaker",
- "Mackenzie King",
- "Brian Mulroney",
- "Kim Campbell"
-leader_sex="Male", "Male", "Male", "Male", "Male", "Female"
-flag="canada"
-flag_alt = "united_kingdom"
-city_style = "Celtic"
 
-ruler_titles = { "government",      "male_title",         "female_title"
-                "Democracy", _("Prime Minister"), _("?female:Prime Minister")
-               }
+leaders = {
+ "name",                        "sex"
+ "Laura Secord",                "Female"
+ "John A. MacDonald",           "Male"
+ "Nellie McClung",              "Female"
+ "William Lyon Mackenzie King", "Male"
+ "John Diefenbaker",            "Male"
+ "Tommy Douglas",               "Male"
+ "Lester B. Pearson",           "Male"
+ "Pierre Trudeau",              "Male"
+ "Brian Mulroney",              "Male"
+ "Kim Campbell",                "Female"
+}
+
+ruler_titles = {
+ "government",      "male_title",           "female_title"
+ "Democracy",       _("Prime Minister %s"), _("?female:Prime Minister %s")
+}
+
+flag="canada"
+flag_alt = "canada_old"
+city_style = "Celtic"
 
 init_techs=""
 init_buildings=""
@@ -28,9 +36,9 @@ init_government="Despotism"
 init_units=""
 civilwar_nations=
 ; Sub-national nations
- "quebecois",
+ "quebecois", "acadian", "newfoundland",
 ; First Nations
- "inuit", "iroquois"
+ "inuit", "iroquois", "cree", "anishinaabe", "metis"
 
 ; Terrains:  desert, plains, grassland, river, forest, hills, mountains, tundra, swamp, jungle, ocean
 ; Capitals of provinces and territories are listed first in this list

@@ -2,36 +2,39 @@
 
 name=_("Mayan")
 plural=_("?plural:Mayas")
-groups="Ancient", "Medieval", "American"
+groups="Ancient", "Medieval", "Early Modern", "American"
 legend=_("The Mayans were a Mesoamerican civilization. They are\
  famous for building great pyramids and palaces in the jungle.")
-leader=
- "K'uk B'alam",
- "Sac K'uk'",
- "Pakal",
- "Jasaw Chan K'awiil I",
- "Yuknoom",
- "Itzamnaaj B'alam II",
- "Tekun Umam",
- "Kan Ek'",
- "Crescencio Poot",
- "Rigoberta Menchú Tum"
-leader_sex="Male", "Female", "Male", "Male", "Male", "Male", "Male", "Male",
- "Male", "Female"
+
+leaders = {
+ "name",                        "sex"
+ "K'uk B'alam",                 "Male"
+ "Sac K'uk'",                   "Female"
+ "Pakal",                       "Male"
+ "Jasaw Chan K'awiil I",        "Male"
+ "Yuknoom",                     "Male"
+ "Itzamnaaj B'alam II",         "Male"
+ "Tekun Umam",                  "Male"
+ "Kan Ek'",                     "Male"
+ "Crescencio Poot",             "Male"
+ "Rigoberta Menchú Tum",        "Female"
+}
+
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ ; /* TRANS: Ajaw = Lord */
+ "Monarchy",        _("Ajaw %s"),         _("?female:Ajaw %s")
+}
+
 flag = "maya"
 flag_alt = "-"
 city_style = "Tropical"
-
-ruler_titles = { "government",      "male_title",      "female_title"
-		 ; /* TRANS: Ajaw = Lord */
-                 "Monarchy",        _("Ajaw"),         _("?female:Ajaw")
-               }
 
 init_techs=""
 init_buildings=""
 init_government="Despotism"
 init_units=""
-civilwar_nations = "aztec", "mexican"
+civilwar_nations = "guatemalan", "yucatecan"
 
 ; Oldest names take precedence. Later/alternative names in comment.
 cities =

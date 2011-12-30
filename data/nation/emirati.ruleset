@@ -9,30 +9,34 @@ legend=_("The history of the United Arab Emirates goes back to the 7th\
  emirates joined in a federative state as the United\
  Arab Emirates. The following year, the seventh member emirate joined\
  them.")
-leader="Dhiyab bin Isa ibn Nahayan",
-       "Saeed II bin Maktoum",
-       "Zayed II bin Sultan Al Nahayan",
-       "Maktoum bin Rashid Al Maktoum",
-       "Rashid bin Saeed Al Maktoum"
-leader_sex="Male", "Male", "Male", "Male", "Male"
+
+leaders = {
+ "name",                                "sex"
+ "Dhiyab bin Isa ibn Nahayan",          "Male"
+ "Saeed II bin Maktoum",                "Male"
+ "Zayed II bin Sultan Al Nahayan",      "Male"
+ "Maktoum bin Rashid Al Maktoum",       "Male"
+ "Rashid bin Saeed Al Maktoum",         "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Despotism",       _("Sheikh %s"),    _("Shaykha %s")
+ "Monarchy",        _("Emir %s"),      _("Emira %s")
+ "Republic",        _("Sultan %s"),    _("Sultana %s")
+ "Communism",       _("Caliph %s"),    _("Calipha %s")
+}
 
 flag="uae"
 flag_alt = "-"
 city_style = "Babylonian"
-
-ruler_titles = { "government",      "male_title",      "female_title"
-                 "Despotism",       _("Sheikh"),	_("Shaykhah")
-                 "Monarchy",        _("Emir"),		_("Emira")
-                 "Republic",        _("Sultan"),	_("Sultana")
-                 "Communism",       _("Caliph"),	_("?female:Caliph")
-               }
 
 init_techs=""
 init_buildings=""
 init_government="Despotism"
 init_units=""
 
-civilwar_nations = "syrian" ;, "saudi", "omani", "qatari"
+civilwar_nations="Syrian", "Saudi", "Omani" ;, "Qatari"
 
 cities =
  "Abu Zaby",

@@ -1,0 +1,86 @@
+[nation_modernegyptian]
+
+name=_("Egyptian Arab")
+plural=_("?plural:Egyptian Arabs")
+groups="Modern", "African", "Asian"
+legend=_("Modern Egypt is the most populous Middle Eastern country as well\
+ as one of the most populous in Africa. It is located on the site of one\
+ of the world's most ancient civilizations.")
+
+leaders = {
+ "name",                "sex"
+ "Shajar al-Durr",      "Female"
+ "Al-Nasir Muhammad",   "Male"
+ "Barquq",              "Male"
+ "Abbas Hilmi Pasha",   "Male"
+ "Fuad I",              "Male"
+ "Farouk",              "Male"
+ "Gamal Abdel Nasser",  "Male"
+ "Anwar El Sadat",      "Male"
+ "Hosni Mubarak",       "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",           "female_title"
+ "Communism",       _("Chairman %s"),       _("Chairwoman %s")
+ "Despotism",       _("Sultan %s"),         _("Sultana %s")
+ "Fundamentalism",  _("Caliph %s"),         _("Calipha %s")
+ "Republic",        _("Prime Minister %s"), _("?female:Prime Minister %s")
+}
+
+flag="egypt"
+flag_alt = "egypt_ancient"
+city_style = "Babylonian"
+
+init_techs=""
+init_buildings=""
+init_government="Despotism"
+init_units=""
+
+conflicts_with="egyptian"
+civilwar_nations="palestinian", "sudanese", "libyan", "arab"
+
+cities =
+ "al-Qahira",			;Cairo
+ "Eskendereyya",		;Alexandria
+ "as-Suways",			;Suez
+ "al-Mansura",
+ "el-Giza",			;Gizeh
+ "Shubra el-Kheima",
+ "Bur Sa'id",			;Port Said
+ "al-Uqsur",			;Luxor
+ "el-Mahalla el-Kubra",
+ "Tanta",
+ "Asyut",
+ "al-Ismayliya",
+ "al-Fayyum",
+ "az-Zaqaziq",
+ "Dumyat",
+ "Aswan",
+ "al-Minya",
+ "Damanhur",
+ "Bani Suwayf",
+ "Qina",
+ "al-Gardaqa",
+ "Madinat Sitta Uktubar",
+ "Sawhaj",
+ "Shibin-al-Kawm",
+ "Banha",
+ "al-Asir mir-Ramadan",
+ "Kafr-as-Shayh",
+ "al-Arish",
+ "Matra",
+ "Mallawi",
+ "Bilbays",
+ "Idfu",
+ "Mit Gamr",
+ "al-Hawamidiya",
+ "Disuq",
+ "Qalyub",
+ "Abu Kabir",
+ "Ahmim",
+ "Jirja",
+ "al-Matariya",
+ "Rashid",
+ "Naj Hammadi",
+ "Sharm al-Shaykh"

@@ -15,16 +15,20 @@
 #include <config.h>
 #endif
 
+/* utility */
 #include "log.h"
 #include "support.h"
 
+/* common */
 #include "game.h"
 #include "map.h"
 #include "unitlist.h"
 
+/* client/agents */
 #include "agents.h"
 
 #include "sha.h"
+
 
 /**************************************************************************
 This is the simple historian agent.
@@ -42,8 +46,8 @@ static struct unit_list *previous_units;
 **************************************************************************/
 static void sha_tile_update(struct tile *ptile)
 {
-  freelog(LOG_DEBUG, "sha got tile: %d ~= (%d, %d)",
-	  tile_index(ptile), TILE_XY(ptile));
+  log_debug("sha got tile: %d ~= (%d, %d)",
+            tile_index(ptile), TILE_XY(ptile));
 
 #if 0
   previous_tiles[tile_index(ptile)] = *ptile;
@@ -55,12 +59,12 @@ static void sha_tile_update(struct tile *ptile)
 **************************************************************************/
 static void sha_unit_change(int id)
 {
-  struct unit *punit = game_find_unit_by_number(id);
+  struct unit *punit = game_unit_by_number(id);
   struct unit *pold_unit = unit_list_find(previous_units, id);
 
-  freelog(LOG_DEBUG, "sha got unit: %d", id);
+  log_debug("sha got unit: %d", id);
 
-  assert(pold_unit);
+  fc_assert_ret(NULL != pold_unit);
   *pold_unit = *punit;
 }
 
@@ -69,10 +73,10 @@ static void sha_unit_change(int id)
 **************************************************************************/
 static void sha_unit_new(int id)
 {
-  struct unit *punit = game_find_unit_by_number(id);
+  struct unit *punit = game_unit_by_number(id);
   struct unit *pold_unit = create_unit_virtual(unit_owner(punit), NULL, 0, 0);
 
-  freelog(LOG_DEBUG, "sha got unit: %d", id);
+  log_debug("sha got unit: %d", id);
 
   *pold_unit = *punit;
   unit_list_prepend(previous_units, pold_unit);
@@ -85,10 +89,10 @@ static void sha_unit_remove(int id)
 {
   struct unit *pold_unit = unit_list_find(previous_units, id);;
 
-  freelog(LOG_DEBUG, "sha got unit: %d", id);
+  log_debug("sha got unit: %d", id);
 
-  assert(pold_unit);
-  unit_list_unlink(previous_units, pold_unit);
+  fc_assert_ret(NULL != pold_unit);
+  unit_list_remove(previous_units, pold_unit);
   /* list pointers were struct copied, cannot destroy_unit_virtual() */
   memset(pold_unit, 0, sizeof(*pold_unit)); /* ensure no pointers remain */
   free(pold_unit);
@@ -125,7 +129,7 @@ void simple_historian_init(void)
 **************************************************************************/
 void simple_historian_done(void)
 {
-  unit_list_free(previous_units);
+  unit_list_destroy(previous_units);
 }
 
 /**************************************************************************

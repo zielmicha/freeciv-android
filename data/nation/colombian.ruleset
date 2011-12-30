@@ -7,33 +7,39 @@ legend=_("Colombia is a country in northern South America. The region was\
  an Amerindian cultural center in pre-European time. The Spanish began\
  settling Colombia's north coast around 1500. In 1819 the Republic of\
  Colombia gained independence.")
-leader=
- "G. Jiménez de Quesada",
- "Francisco de Paula Santander",
- "Simón Bolívar",
- "T. Cipriano de Mosquera",
- "Rafael Núñez",
- "Jorge Eliécer Gaitán",
- "Gustavo Rojas Pinilla",
- "Alberto Lleras Camargo",
- "Alfonso López Michelsen",
- "Álvaro Uribe"
-leader_sex="Male", "Male", "Male", "Male", "Male", "Male", "Male", "Male",
- "Male", "Male"
-flag="colombia"
-flag_alt = "columbia"	; For backward compatibility
-city_style = "Tropical"
 
-ruler_titles = { "government",      "male_title",        "female_title"
-                 "Communism",      _("Comandante"),      _("Comandanta")
-                 "Despotism",      _("General"),         _("?female:General")
-               }
+leaders = {
+ "name",                                "sex"
+ "G. Jiménez de Quesada",               "Male"
+ "Francisco de Paula Santander",        "Male"
+ "Simón Bolívar",                       "Male"
+ "T. Cipriano de Mosquera",             "Male"
+ "Rafael Núñez",                        "Male"
+ "Jorge Eliécer Gaitán",                "Male"
+ "Gustavo Rojas Pinilla",               "Male"
+ "Alberto Lleras Camargo",              "Male"
+ "Alfonso López Michelsen",             "Male"
+ "Álvaro Uribe",                        "Male"
+}
+
+ruler_titles = {
+ "government",      "male_title",        "female_title"
+ "Communism",      _("Comandante %s"),   _("Comandanta %s")
+ "Despotism",      _("General %s"),      _("?female:General %s")
+ "Monarchy",       _("Viceroy %s"),      _("Vicereine %s")
+}
+
+flag="colombia"
+flag_alt = "-"
+city_style = "Tropical"
 
 init_techs=""
 init_buildings=""
 init_government="Despotism"
 init_units=""
-civilwar_nations = "venezuelan", "brazilian"
+
+conflicts_with="Tairona"
+civilwar_nations="Venezuelan", "Ecuadorian", "Panamanian"
 
 cities =
  "Bogotá",

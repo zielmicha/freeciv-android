@@ -1,4 +1,4 @@
-android/build.sh
+android/build.sh || exit 1
 
 cd android
 

@@ -15,16 +15,60 @@
 #include <config.h>
 #endif
 
+/* common */
 #include "map.h"
 
+/* generator */
 #include "height_map.h"
 #include "temperature_map.h"
 #include "mapgen_topology.h"
-#include "utilities.h" 
+#include "utilities.h"
+
+/* utilities */
+#include "log.h"
 
 static int *temperature_map;
 
 #define tmap(_tile) (temperature_map[tile_index(_tile)])
+
+/**************************************************************************
+  Returns one line (given by the y coordinate) of the temperature map.
+**************************************************************************/
+#ifdef DEBUG
+static char *tmap_y2str(int ycoor)
+{
+  static char buf[MAP_MAX_LINEAR_SIZE + 1];
+  char *p = buf;
+  int i, index;
+
+  for (i = 0; i < map.xsize; i++) {
+    index = ycoor * map.xsize + i;
+
+    if (index > map.xsize * map.ysize) {
+      break;
+    }
+
+    switch (temperature_map[index]) {
+    case TT_TROPICAL:
+      *p++ = 't'; /* tropical */
+      break;
+    case TT_TEMPERATE:
+      *p++ = 'm'; /* medium */
+      break;
+    case TT_COLD:
+      *p++ = 'c'; /* cold */
+      break;
+    case TT_FROZEN:
+      *p++ = 'f'; /* frozen */
+      break;
+    }
+  }
+
+  *p = '\0';
+
+  return buf;
+}
+#endif /* DEBUG */
 
 /**************************************************************
   Return TRUE if temperateure_map is initialized
@@ -59,7 +103,7 @@ bool is_temperature_type_near(const struct tile *ptile, temperature_type tt)
  ****************************************************************************/
 void destroy_tmap(void)
 {
-  assert(temperature_map != NULL);
+  fc_assert_ret(NULL != temperature_map);
   free(temperature_map);
   temperature_map = NULL;
 }
@@ -75,14 +119,11 @@ void create_tmap(bool real)
 
   /* if map is defined this is not changed */
   /* TO DO load if from scenario game with tmap */
-  assert(temperature_map == NULL); /* to debug, never load a this time */
-  if (temperature_map != NULL) {
-    return;
-  }
+  /* to debug, never load a this time */
+  fc_assert_ret(NULL == temperature_map);
 
   temperature_map = fc_malloc(sizeof(*temperature_map) * MAP_INDEX_SIZE);
   whole_map_iterate(ptile) {
-  
      /* the base temperature is equal to base map_colatitude */
     int t = map_colatitude(ptile);
     if (!real) {
@@ -121,5 +162,11 @@ void create_tmap(bool real)
     } else {
       temperature_map[i] = TT_FROZEN;
     }
-  } 
+  }
+
+  log_debug("%stemperature map ({f}rozen, {c}old, {m}edium, {t}ropical):",
+            real ? "real " : "");
+  for (i = 0; i < map.ysize; i++) {
+    log_debug("%5d: %s", i, tmap_y2str(i));
+  }
 }

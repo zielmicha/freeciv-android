@@ -2,35 +2,38 @@
 
 name=_("Scottish")
 plural=_("?plural:Scots")
-groups="Medieval", "European"
+groups="Medieval", "Early Modern", "European"
 legend=_("Scotland, originally settled in late Roman times by Irish\
  raiders who displaced the native Picts, was an independent kingdom from\
  around 1034 AD to the Union of Crowns with England in 1701.")
-leader=
- "Henry McLeish",
- "Donald Dewar",
- "Charles II",
- "James IV",
- "Robert the Bruce",
- "William Wallace",
- "Mary Stuart"
-leader_sex="Male", "Male", "Male", "Male",
-           "Male", "Male", "Female"
+
+leaders = {
+ "name",                "sex"
+ "Henry McLeish",       "Male"
+ "Donald Dewar",        "Male"
+ "Charles II",          "Male"
+ "James IV",            "Male"
+ "Robert the Bruce",    "Male"
+ "William Wallace",     "Male"
+ "Mary Stuart",         "Female"
+}
+
+ruler_titles = {
+ "government",  "male_title",           "female_title"
+ "Despotism",   _("Chieftain %s"),      _("?female:Chieftain %s")
+ "Republic",    _("Speaker %s"),        _("?female:Speaker %s")
+ "Democracy",   _("First Minister %s"), _("?female:First Minister %s")
+}
+
 flag="scotland"
 flag_alt = "united_kingdom"
 city_style = "Celtic"
-
-ruler_titles = { "government",  "male_title",         "female_title"
-                 "Despotism",   _("Chieftain"),       _("?female:Chieftain")
-                 "Republic",    _("Speaker"),         _("?female:Speaker")
-                 "Democracy",_("First Minister"), _("?female:First Minister")
-               }
 
 init_techs=""
 init_buildings=""
 init_government="Despotism"
 init_units=""
-civilwar_nations = "welsh", "irish", "american"
+civilwar_nations = "gaelic", "irish", "american"
 
 cities =
 "Edinburgh", "Glasgow (river)", "Aberdeen (ocean, river)", 

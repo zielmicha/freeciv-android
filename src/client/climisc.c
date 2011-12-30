@@ -20,13 +20,13 @@ used throughout the client.
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* utility */
+#include "bitvector.h"
 #include "fcintl.h"
 #include "log.h"
 #include "support.h"
@@ -39,6 +39,7 @@ used throughout the client.
 #include "government.h"
 #include "map.h"
 #include "packets.h"
+#include "research.h"
 #include "spaceship.h"
 #include "unitlist.h"
 
@@ -59,7 +60,6 @@ used throughout the client.
 #include "mapview_common.h"
 #include "messagewin_common.h"
 #include "packhand.h"
-#include "plrdlg_common.h"
 #include "repodlgs_common.h"
 #include "tilespec.h"
 
@@ -76,11 +76,9 @@ void client_remove_unit(struct unit *punit)
   int old = get_num_units_in_focus();
   bool update;
 
-  freelog(LOG_DEBUG, "removing unit %d, %s %s (%d %d) hcity %d",
-	  punit->id,
-	  nation_rule_name(nation_of_unit(punit)),
-	  unit_rule_name(punit),
-	  TILE_XY(punit->tile), hc);
+  log_debug("removing unit %d, %s %s (%d %d) hcity %d",
+            punit->id, nation_rule_name(nation_of_unit(punit)),
+            unit_rule_name(punit), TILE_XY(unit_tile(punit)), hc);
 
   update = (get_focus_unit_on_tile(punit->tile) != NULL);
   control_unit_killed(punit);
@@ -100,20 +98,18 @@ void client_remove_unit(struct unit *punit)
       refresh_city_dialog(pcity);
     }
 
-    freelog(LOG_DEBUG, "map city %s, %s, (%d %d)",
-	    city_name(pcity),
-	    nation_rule_name(nation_of_city(pcity)),
-	    TILE_XY(pcity->tile));
+    log_debug("map city %s, %s, (%d %d)",
+              city_name(pcity), nation_rule_name(nation_of_city(pcity)),
+              TILE_XY(city_tile(pcity)));
   }
 
   if (!client_has_player() || unit_owner(&old_unit) == client_player()) {
-    pcity = game_find_city_by_number(hc);
+    pcity = game_city_by_number(hc);
     if (NULL != pcity) {
       refresh_city_dialog(pcity);
-      freelog(LOG_DEBUG, "home city %s, %s, (%d %d)",
-	      city_name(pcity),
-	      nation_rule_name(nation_of_city(pcity)),
-	      TILE_XY(pcity->tile));
+      log_debug("home city %s, %s, (%d %d)",
+                city_name(pcity), nation_rule_name(nation_of_city(pcity)),
+                TILE_XY(city_tile(pcity)));
     }
   }
 
@@ -129,9 +125,7 @@ void client_remove_city(struct city *pcity)
   struct tile *ptile = city_tile(pcity);
   struct city old_city = *pcity;
 
-  freelog(LOG_DEBUG, "client_remove_city() %d, %s",
-	  pcity->id,
-	  city_name(pcity));
+  log_debug("client_remove_city() %d, %s", pcity->id, city_name(pcity));
 
   /* Explicitly remove all improvements, to properly remove any global effects
      and to handle the preservation of "destroyed" effects. */
@@ -156,11 +150,8 @@ void client_remove_city(struct city *pcity)
 Change all cities building X to building Y, if possible.  X and Y
 could be improvements or units. X and Y are compound ids.
 **************************************************************************/
-void client_change_all(struct universal from,
-		       struct universal to)
+void client_change_all(struct universal from, struct universal to)
 {
-  int last_request_id = 0;
-
   if (!can_client_issue_orders()) {
     return;
   }
@@ -177,13 +168,12 @@ void client_change_all(struct universal from,
   connection_do_buffer(&client.conn);
   city_list_iterate (client.conn.playing->cities, pcity) {
     if (are_universals_equal(&pcity->production, &from)
-	&& can_city_build_now(pcity, to)) {
-      last_request_id = city_change_production(pcity, to);
+        && can_city_build_now(pcity, to)) {
+      city_change_production(pcity, to);
     }
   } city_list_iterate_end;
 
   connection_do_unbuffer(&client.conn);
-  reports_freeze_till(last_request_id);
 }
 
 /***************************************************************************
@@ -206,8 +196,8 @@ const char *get_embassy_status(const struct player *me,
     }
   } else if (player_has_embassy(them, me)) {
     return Q_("?embassy:With Us");
-  } else if (me->diplstates[player_index(them)].contact_turns_left > 0
-             || them->diplstates[player_index(me)].contact_turns_left > 0) {
+  } else if (player_diplstate_get(me, them)->contact_turns_left > 0
+             || player_diplstate_get(them, me)->contact_turns_left > 0) {
     return Q_("?embassy:Contact");
   } else {
     return Q_("?embassy:No Contact");
@@ -243,53 +233,54 @@ void client_diplomacy_clause_string(char *buf, int bufsiz,
 
   switch(pclause->type) {
   case CLAUSE_ADVANCE:
-    my_snprintf(buf, bufsiz, _("The %s give %s"),
-		nation_plural_for_player(pclause->from),
-		advance_name_for_player(client.conn.playing, pclause->value));
+    fc_snprintf(buf, bufsiz, _("The %s give %s"),
+                nation_plural_for_player(pclause->from),
+                advance_name_for_player(client.conn.playing, pclause->value));
     break;
   case CLAUSE_CITY:
-    pcity = game_find_city_by_number(pclause->value);
+    pcity = game_city_by_number(pclause->value);
     if (pcity) {
-      my_snprintf(buf, bufsiz, _("The %s give %s"),
+      fc_snprintf(buf, bufsiz, _("The %s give %s"),
                   nation_plural_for_player(pclause->from),
-		  city_name(pcity));
+                  city_name(pcity));
     } else {
-      my_snprintf(buf, bufsiz,_("The %s give unknown city."),
+      fc_snprintf(buf, bufsiz,_("The %s give an unknown city"),
                   nation_plural_for_player(pclause->from));
     }
     break;
   case CLAUSE_GOLD:
-    my_snprintf(buf, bufsiz, _("The %s give %d gold"),
-		nation_plural_for_player(pclause->from),
-		pclause->value);
+    fc_snprintf(buf, bufsiz, PL_("The %s give %d gold",
+                                 "The %s give %d gold", pclause->value),
+                nation_plural_for_player(pclause->from),
+                pclause->value);
     break;
   case CLAUSE_MAP:
-    my_snprintf(buf, bufsiz, _("The %s give their worldmap"),
-		nation_plural_for_player(pclause->from));
+    fc_snprintf(buf, bufsiz, _("The %s give their worldmap"),
+                nation_plural_for_player(pclause->from));
     break;
   case CLAUSE_SEAMAP:
-    my_snprintf(buf, bufsiz, _("The %s give their seamap"),
-		nation_plural_for_player(pclause->from));
+    fc_snprintf(buf, bufsiz, _("The %s give their seamap"),
+                nation_plural_for_player(pclause->from));
     break;
   case CLAUSE_CEASEFIRE:
-    my_snprintf(buf, bufsiz, _("The parties agree on a cease-fire"));
+    fc_snprintf(buf, bufsiz, _("The parties agree on a cease-fire"));
     break;
   case CLAUSE_PEACE:
-    my_snprintf(buf, bufsiz, _("The parties agree on a peace"));
+    fc_snprintf(buf, bufsiz, _("The parties agree on a peace"));
     break;
   case CLAUSE_ALLIANCE:
-    my_snprintf(buf, bufsiz, _("The parties create an alliance"));
+    fc_snprintf(buf, bufsiz, _("The parties create an alliance"));
     break;
   case CLAUSE_VISION:
-    my_snprintf(buf, bufsiz, _("The %s give shared vision"),
-		nation_plural_for_player(pclause->from));
+    fc_snprintf(buf, bufsiz, _("The %s give shared vision"),
+                nation_plural_for_player(pclause->from));
     break;
   case CLAUSE_EMBASSY:
-    my_snprintf(buf, bufsiz, _("The %s give an embassy"),
+    fc_snprintf(buf, bufsiz, _("The %s give an embassy"),
                 nation_plural_for_player(pclause->from));
     break;
   default:
-    assert(FALSE);
+    fc_assert(FALSE);
     if (bufsiz > 0) {
       *buf = '\0';
     }
@@ -347,9 +338,9 @@ struct sprite *client_research_sprite(void)
   if (NULL != client.conn.playing && can_client_change_view()) {
     int index = 0;
 
-    if (A_UNSET != get_player_research(client.conn.playing)->researching) {
+    if (A_UNSET != player_research_get(client.conn.playing)->researching) {
       index = (NUM_TILES_PROGRESS
-	       * get_player_research(client.conn.playing)->bulbs_researched)
+	       * player_research_get(client.conn.playing)->bulbs_researched)
 	/ (total_bulbs_required(client.conn.playing) + 1);
     }
 
@@ -427,21 +418,21 @@ void center_on_something(void)
   can_slide = FALSE;
   if (get_num_units_in_focus() > 0) {
     center_tile_mapcanvas(head_of_units_in_focus()->tile);
-  } else if (NULL != client.conn.playing
-             && NULL != (pcity = find_palace(client.conn.playing))) {
+  } else if (client_has_player()
+             && NULL != (pcity = player_palace(client_player()))) {
     /* Else focus on the capital. */
     center_tile_mapcanvas(pcity->tile);
   } else if (NULL != client.conn.playing
              && 0 < city_list_size(client.conn.playing->cities)) {
     /* Just focus on any city. */
     pcity = city_list_get(client.conn.playing->cities, 0);
-    assert(pcity != NULL);
+    fc_assert_ret(pcity != NULL);
     center_tile_mapcanvas(pcity->tile);
   } else if (NULL != client.conn.playing
              && 0 < unit_list_size(client.conn.playing->units)) {
     /* Just focus on any unit. */
     punit = unit_list_get(client.conn.playing->units, 0);
-    assert(punit != NULL);
+    fc_assert_ret(punit != NULL);
     center_tile_mapcanvas(punit->tile);
   } else {
     struct tile *ctile = native_pos_to_tile(map.xsize / 2, map.ysize / 2);
@@ -605,7 +596,7 @@ static int my_cmp(const void *p1, const void *p2)
   int s2 = target_get_section(i2->item);
 
   if (s1 == s2) {
-    return mystrcasecmp(i1->descr, i2->descr);
+    return fc_strcasecmp(i1->descr, i2->descr);
   }
   return s1 - s2;
 }
@@ -649,12 +640,13 @@ void name_and_sort_items(struct universal *targets, int num_targets,
 
     if (show_cost) {
       if (cost < 0) {
-	my_snprintf(pitem->descr, sizeof(pitem->descr), "%s (XX)", name);
+        fc_snprintf(pitem->descr, sizeof(pitem->descr), "%s (XX)", name);
       } else {
-	my_snprintf(pitem->descr, sizeof(pitem->descr), "%s (%d)", name, cost);
+        fc_snprintf(pitem->descr, sizeof(pitem->descr),
+                    "%s (%d)", name, cost);
       }
     } else {
-      (void) mystrlcpy(pitem->descr, name, sizeof(pitem->descr));
+      (void) fc_strlcpy(pitem->descr, name, sizeof(pitem->descr));
     }
   }
 
@@ -679,10 +671,6 @@ int collect_production_targets(struct universal *targets,
   cid cid;
   int items_used = 0;
 
-  if (NULL == client.conn.playing) {
-    return 0;
-  }
-
   for (cid = first; cid < last; cid++) {
     bool append = FALSE;
     struct universal target = cid_decode(cid);
@@ -692,10 +680,15 @@ int collect_production_targets(struct universal *targets,
     }
 
     if (!change_prod) {
-      city_list_iterate(client.conn.playing->cities, pcity) {
-	append |= test_func(pcity, cid_decode(cid));
+      if (client_has_player()) {
+        city_list_iterate(client_player()->cities, pcity) {
+          append |= test_func(pcity, cid_decode(cid));
+        } city_list_iterate_end;
+      } else {
+        cities_iterate(pcity) {
+          append |= test_func(pcity, cid_decode(cid));
+        } cities_iterate_end;
       }
-      city_list_iterate_end;
     } else {
       int i;
 
@@ -777,36 +770,52 @@ int collect_buildable_targets(struct universal *targets)
   return cids_used;
 }
 
-/**************************************************************************
- Collect the cids of all targets which can be build by this city or
- in general.
-
-  FIXME: this should probably take a pplayer argument.
-**************************************************************************/
+/****************************************************************************
+  Collect the cids of all targets which can be build by this city or
+  in general.
+****************************************************************************/
 int collect_eventually_buildable_targets(struct universal *targets,
-					 struct city *pcity,
-					 bool advanced_tech)
+                                         struct city *pcity,
+                                         bool advanced_tech)
 {
+  struct player *pplayer = client_player();
   int cids_used = 0;
 
-  if (NULL == client.conn.playing) {
-    return 0;
-  }
-
   improvement_iterate(pimprove) {
-    bool can_build = can_player_build_improvement_now(client.conn.playing, pimprove);
-    bool can_eventually_build =
-	can_player_build_improvement_later(client.conn.playing, pimprove);
+    bool can_build;
+    bool can_eventually_build;
 
-    /* If there's a city, can the city build the improvement? */
-    if (pcity) {
-      can_build = can_build && can_city_build_improvement_now(pcity, pimprove);
-      can_eventually_build = can_eventually_build &&
-	  can_city_build_improvement_later(pcity, pimprove);
+    if (NULL != pcity) {
+      /* Can the city build? */
+      can_build = can_city_build_improvement_now(pcity, pimprove);
+      can_eventually_build = can_city_build_improvement_later(pcity,
+                                                              pimprove);
+    } else if (NULL != pplayer) {
+      /* Can our player build? */
+      can_build = can_player_build_improvement_now(pplayer, pimprove);
+      can_eventually_build = can_player_build_improvement_later(pplayer,
+                                                                pimprove);
+    } else {
+      /* Global observer case: can any player build? */
+      can_build = FALSE;
+      players_iterate(aplayer) {
+        if (can_player_build_improvement_now(aplayer, pimprove)) {
+          can_build = TRUE;
+          break;
+        }
+      } players_iterate_end;
+
+      can_eventually_build = FALSE;
+      players_iterate(aplayer) {
+        if (can_player_build_improvement_later(aplayer, pimprove)) {
+          can_eventually_build = TRUE;
+          break;
+        }
+      } players_iterate_end;
     }
 
-    if ((advanced_tech && can_eventually_build) ||
-	(!advanced_tech && can_build)) {
+    if ((advanced_tech && can_eventually_build)
+        || (!advanced_tech && can_build)) {
       targets[cids_used].kind = VUT_IMPROVEMENT;
       targets[cids_used].value.building = pimprove;
       cids_used++;
@@ -814,19 +823,38 @@ int collect_eventually_buildable_targets(struct universal *targets,
   } improvement_iterate_end;
 
   unit_type_iterate(punittype) {
-    bool can_build = can_player_build_unit_now(client.conn.playing, punittype);
-    bool can_eventually_build =
-	can_player_build_unit_later(client.conn.playing, punittype);
+    bool can_build;
+    bool can_eventually_build;
 
-    /* If there's a city, can the city build the unit? */
-    if (pcity) {
-      can_build = can_build && can_city_build_unit_now(pcity, punittype);
-      can_eventually_build = can_eventually_build &&
-	  can_city_build_unit_later(pcity, punittype);
+    if (NULL != pcity) {
+      /* Can the city build? */
+      can_build = can_city_build_unit_now(pcity, punittype);
+      can_eventually_build = can_city_build_unit_later(pcity, punittype);
+    } else if (NULL != pplayer) {
+      /* Can our player build? */
+      can_build = can_player_build_unit_now(pplayer, punittype);
+      can_eventually_build = can_player_build_unit_later(pplayer, punittype);
+    } else {
+      /* Global observer case: can any player build? */
+      can_build = FALSE;
+      players_iterate(aplayer) {
+        if (can_player_build_unit_now(aplayer, punittype)) {
+          can_build = TRUE;
+          break;
+        }
+      } players_iterate_end;
+
+      can_eventually_build = FALSE;
+      players_iterate(aplayer) {
+        if (can_player_build_unit_later(aplayer, punittype)) {
+          can_eventually_build = TRUE;
+          break;
+        }
+      } players_iterate_end;
     }
 
-    if ((advanced_tech && can_eventually_build) ||
-	(!advanced_tech && can_build)) {
+    if ((advanced_tech && can_eventually_build)
+        || (!advanced_tech && can_build)) {
       targets[cids_used].kind = VUT_UTYPE;
       targets[cids_used].value.utype = punittype;
       cids_used++;
@@ -844,7 +872,7 @@ int collect_already_built_targets(struct universal *targets,
 {
   int cids_used = 0;
 
-  assert(pcity != NULL);
+  fc_assert_ret_val(pcity != NULL, 0);
 
   city_built_iterate(pcity, pimprove) {
     targets[cids_used].kind = VUT_IMPROVEMENT;
@@ -864,7 +892,7 @@ int num_supported_units_in_city(struct city *pcity)
 
   if (can_player_see_city_internals(client.conn.playing, pcity)) {
     /* Other players don't see inside the city (but observers do). */
-    plist = pcity->info_units_supported;
+    plist = pcity->client.info_units_supported;
   } else {
     plist = pcity->units_supported;
   }
@@ -881,7 +909,7 @@ int num_present_units_in_city(struct city *pcity)
 
   if (can_player_see_units_in_city(client.conn.playing, pcity)) {
     /* Other players don't see inside the city (but observers do). */
-    plist = pcity->info_units_present;
+    plist = pcity->client.info_units_present;
   } else {
     plist = pcity->tile->units;
   }
@@ -896,7 +924,7 @@ void handle_event(const char *featured_text, struct tile *ptile,
 		  enum event_type event, int conn_id)
 {
   char plain_text[MAX_LEN_MSG];
-  struct text_tag_list *tags = text_tag_list_new();
+  struct text_tag_list *tags;
   int where = MW_OUTPUT;	/* where to display the message */
   bool fallback_needed = FALSE; /* we want fallback if actual 'where' is not
                                  * usable */
@@ -904,14 +932,14 @@ void handle_event(const char *featured_text, struct tile *ptile,
 
   if (event >= E_LAST)  {
     /* Server may have added a new event; leave as MW_OUTPUT */
-    freelog(LOG_VERBOSE, "Unknown event type %d!", event);
+    log_verbose("Unknown event type %d!", event);
   } else if (event >= 0)  {
     where = messages_where[event];
   }
 
   /* Get the original text. */
   featured_text_to_plain_text(featured_text, plain_text,
-                              sizeof(plain_text), tags);
+                              sizeof(plain_text), &tags);
 
   /* Display link marks when an user is pointed us something. */
   if (conn_id != -1) {
@@ -924,8 +952,9 @@ void handle_event(const char *featured_text, struct tile *ptile,
 
   /* Maybe highlight our player and user names if someone is talking
    * about us. */
-  if (highlight_our_names[0] != '\0'
-      && conn_id != -1 && conn_id != client.conn.id) {
+  if (-1 != conn_id
+      && client.conn.id != conn_id
+      && ft_color_requested(highlight_our_names)) {
     const char *username = client.conn.username;
     size_t userlen = strlen(username);
     const char *playername = ((client_player() && !client_is_observer())
@@ -942,18 +971,18 @@ void handle_event(const char *featured_text, struct tile *ptile,
     }
 
     for (p = plain_text; *p != '\0'; p++) {
-      if (username
-          && 0 == mystrncasecmp(p, username, userlen)) {
+      if (NULL != username
+          && 0 == fc_strncasecmp(p, username, userlen)) {
         /* Appends to be sure it will be applied at last. */
         text_tag_list_append(tags, text_tag_new(TTT_COLOR, p - plain_text,
-                             p - plain_text + userlen,
-                             ft_color(NULL, highlight_our_names)));
-      } else if (playername
-                 && 0 == mystrncasecmp(p, playername, playerlen)) {
+                                                p - plain_text + userlen,
+                                                highlight_our_names));
+      } else if (NULL != playername
+                 && 0 == fc_strncasecmp(p, playername, playerlen)) {
         /* Appends to be sure it will be applied at last. */
         text_tag_list_append(tags, text_tag_new(TTT_COLOR, p - plain_text,
-                             p - plain_text + playerlen,
-                             ft_color(NULL, highlight_our_names)));
+                                                p - plain_text + playerlen,
+                                                highlight_our_names));
       }
     }
   }
@@ -963,7 +992,7 @@ void handle_event(const char *featured_text, struct tile *ptile,
     /* Popups are usually not shown if player is under AI control.
      * Server operator messages are shown always. */
     if (NULL == client.conn.playing
-        || !client.conn.playing->ai_data.control
+        || !client.conn.playing->ai_controlled
         || event == E_MESSAGE_WALL) {
       popup_notify_goto_dialog(_("Popup Request"), plain_text, tags, ptile);
       shown = TRUE;
@@ -979,7 +1008,7 @@ void handle_event(const char *featured_text, struct tile *ptile,
   if (BOOL_VAL(where & MW_MESSAGES)) {
     /* When the game isn't running, the messages dialog isn't present. */
     if (C_S_RUNNING <= client_state()) {
-      add_notify_window(plain_text, tags, ptile, event);
+      meswin_add(plain_text, tags, ptile, event);
       shown = TRUE;
     } else {
       /* Force to chatline instead. */
@@ -995,8 +1024,7 @@ void handle_event(const char *featured_text, struct tile *ptile,
   play_sound_for_event(event);
 
   /* Free tags */
-  text_tag_list_clear_all(tags);
-  text_tag_list_free(tags);
+  text_tag_list_destroy(tags);
 }
 
 /**************************************************************************
@@ -1010,7 +1038,7 @@ void create_event(struct tile *ptile, enum event_type event,
   char message[MAX_LEN_MSG];
 
   va_start(ap, format);
-  my_vsnprintf(message, sizeof(message), format, ap);
+  fc_vsnprintf(message, sizeof(message), format, ap);
   va_end(ap);
 
   if (ft_color_requested(color)) {
@@ -1022,55 +1050,6 @@ void create_event(struct tile *ptile, enum event_type event,
   } else {
     handle_event(message, ptile, event, -1);
   }
-}
-
-/**************************************************************************
-  Freeze all reports and other GUI elements.
-**************************************************************************/
-void reports_freeze(void)
-{
-  freelog(LOG_DEBUG, "reports_freeze");
-
-  meswin_freeze();
-  plrdlg_freeze();
-  report_dialogs_freeze();
-  output_window_freeze();
-}
-
-/**************************************************************************
-  Freeze all reports and other GUI elements until the given request
-  was executed.
-**************************************************************************/
-void reports_freeze_till(int request_id)
-{
-  if (request_id != 0) {
-    reports_freeze();
-    set_reports_thaw_request(request_id);
-  }
-}
-
-/**************************************************************************
-  Thaw all reports and other GUI elements.
-**************************************************************************/
-void reports_thaw(void)
-{
-  freelog(LOG_DEBUG, "reports_thaw");
-
-  meswin_thaw();
-  plrdlg_thaw();
-  report_dialogs_thaw();
-  output_window_thaw();
-}
-
-/**************************************************************************
-  Thaw all reports and other GUI elements unconditionally.
-**************************************************************************/
-void reports_force_thaw(void)
-{
-  meswin_force_thaw();
-  plrdlg_force_thaw();
-  report_dialogs_force_thaw();
-  output_window_force_thaw();
 }
 
 /**************************************************************************
@@ -1119,7 +1098,7 @@ void cityrep_buy(struct city *pcity)
 
   if (city_production_has_flag(pcity, IF_GOLD)) {
     create_event(pcity->tile, E_BAD_COMMAND, ftc_client,
-                 _("You don't buy %s in %s!"),
+                 _("You can't buy %s in %s!"),
                  improvement_name_translation(pcity->production.value.building),
                  city_link(pcity));
     return;
@@ -1129,11 +1108,22 @@ void cityrep_buy(struct city *pcity)
   if (city_owner(pcity)->economic.gold >= value) {
     city_buy_production(pcity);
   } else {
+    /* Split into two to allow localization of two pluralisations. */
+    char buf[MAX_LEN_MSG];
+    /* TRANS: %s is a production type; this whole string is a sentence
+     * fragment that is only ever included in one other string
+     * (search comments for this string to find it) */
+    fc_snprintf(buf, ARRAY_SIZE(buf), PL_("%s costs %d gold",
+                                          "%s costs %d gold", value),
+                city_production_name_translation(pcity),
+                value);
     create_event(NULL, E_BAD_COMMAND, ftc_client,
-                 _("%s costs %d gold and you only have %d gold."),
-                 city_production_name_translation(pcity),
-                 value,
-                 city_owner(pcity)->economic.gold);
+                 /* TRANS: %s is a pre-pluralised sentence fragment:
+                  * "%s costs %d gold" */
+                 PL_("%s and you only have %d gold.",
+                     "%s and you only have %d gold.",
+                     city_owner(pcity)->economic.gold),
+                 buf, city_owner(pcity)->economic.gold);
   }
 }
 
@@ -1205,7 +1195,7 @@ enum unit_bg_color_type unit_color_type(const struct unit_type *punittype)
     return UNIT_BG_SEA;
   }
 
-  assert(pclass->move_type == BOTH_MOVING);
+  fc_assert(pclass->move_type == BOTH_MOVING);
 
   if (uclass_has_flag(pclass, UCF_TERRAIN_SPEED)) {
     /* Unit moves on both sea and land by speed determined by terrain */
@@ -1270,4 +1260,49 @@ void buy_production_in_selected_cities(void)
   }
 
   connection_do_unbuffer(pconn);
+}
+
+/***************************************************************
+  ...
+***************************************************************/
+void set_unit_focus_status(struct player *pplayer)
+{
+  unit_list_iterate(pplayer->units, punit) {
+    punit->client.focus_status = FOCUS_AVAIL;
+  } unit_list_iterate_end;
+}
+
+/***************************************************************
+  Initialise a player on the client side.
+***************************************************************/
+void client_player_init(struct player *pplayer)
+{
+  vision_layer_iterate(v) {
+    pplayer->client.tile_vision[v].vec = NULL;
+    pplayer->client.tile_vision[v].bits = 0;
+  } vision_layer_iterate_end;
+}
+
+/***************************************************************
+ Destroy a player on the client side.
+***************************************************************/
+void client_player_destroy(struct player *pplayer)
+{
+  vision_layer_iterate(v) {
+    dbv_free(&pplayer->client.tile_vision[v]);
+  } vision_layer_iterate_end;
+}
+
+/***************************************************************
+  Reset the private map of a player.
+***************************************************************/
+void client_player_maps_reset(void)
+{
+  players_iterate(pplayer) {
+    vision_layer_iterate(v) {
+      dbv_resize(&pplayer->client.tile_vision[v], MAP_INDEX_SIZE);
+    } vision_layer_iterate_end;
+
+    dbv_resize(&pplayer->tile_known, MAP_INDEX_SIZE);
+  } players_iterate_end;
 }

@@ -15,7 +15,6 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <stdlib.h>		/* qsort */
 
 /* utility */
@@ -54,7 +53,6 @@ static int rec_w, rec_h;                /* width, heigth in pixels */
 
 bool rbutton_down = FALSE;
 bool rectangle_active = FALSE;
-static bool rectangle_append;
 
 /* This changes the behaviour of left mouse
    button in Area Selection mode. */
@@ -77,7 +75,7 @@ struct city *city_workers_display = NULL;
 /*************************************************************************/
 
 static void clipboard_send_production_packet(struct city *pcity);
-static void define_tiles_within_rectangle(void);
+static void define_tiles_within_rectangle(bool append);
 
 /**************************************************************************
  Called when Right Mouse Button is depressed. Record the canvas
@@ -85,8 +83,7 @@ static void define_tiles_within_rectangle(void);
  anchor is not the drawing start point, but is used to calculate
  width, height. Also record the current mapview centering.
 **************************************************************************/
-void anchor_selection_rectangle(int canvas_x, int canvas_y,
-				bool append)
+void anchor_selection_rectangle(int canvas_x, int canvas_y)
 {
   struct tile *ptile = canvas_pos_to_nearest_tile(canvas_x, canvas_y);
 
@@ -96,7 +93,6 @@ void anchor_selection_rectangle(int canvas_x, int canvas_y,
   /* FIXME: This may be off-by-one. */
   rec_canvas_center_tile = get_center_tile_mapcanvas();
   rec_w = rec_h = 0;
-  rectangle_append = append;
 }
 
 /**************************************************************************
@@ -113,7 +109,7 @@ void anchor_selection_rectangle(int canvas_x, int canvas_y,
  NB: At the end of this function the current selection rectangle will be
  erased (by being redrawn).
 **************************************************************************/
-static void define_tiles_within_rectangle(void)
+static void define_tiles_within_rectangle(bool append)
 {
   const int W = tileset_tile_width(tileset),   half_W = W / 2;
   const int H = tileset_tile_height(tileset),  half_H = H / 2;
@@ -125,6 +121,12 @@ static void define_tiles_within_rectangle(void)
   const int inc_y = (rec_h > 0 ? half_H : -half_H);
   int x, y, x2, y2, xx, yy;
   struct unit_list *units = unit_list_new();
+
+  bool found_any_cities = FALSE;
+
+  if (!append) {
+    cancel_tile_hiliting();
+  }
 
   y = rec_corner_y;
   for (yy = 0; yy <= segments_y; yy++, y += inc_y) {
@@ -156,9 +158,8 @@ static void define_tiles_within_rectangle(void)
        */
       if (NULL != tile_city(ptile)
           && tile_owner(ptile) == client.conn.playing) {
-	/* FIXME: handle rectangle_append */
         mapdeco_set_highlight(ptile, TRUE);
-        tiles_hilited_cities = TRUE;
+        found_any_cities = tiles_hilited_cities = TRUE;
       }
       unit_list_iterate(ptile->units, punit) {
         if (unit_owner(punit) == client.conn.playing) {
@@ -168,18 +169,18 @@ static void define_tiles_within_rectangle(void)
     }
   }
 
-  if (!(separate_unit_selection && tiles_hilited_cities)
+  if (!(separate_unit_selection && found_any_cities)
       && unit_list_size(units) > 0) {
-    if (!rectangle_append) {
+    if (!append) {
       struct unit *punit = unit_list_get(units, 0);
       set_unit_focus(punit);
-      unit_list_unlink(units, punit);
+      unit_list_remove(units, punit);
     }
     unit_list_iterate(units, punit) {
       add_unit_focus(punit);
     } unit_list_iterate_end;
   }
-  unit_list_free(units);
+  unit_list_destroy(units);
 
   /* Clear previous rectangle. */
   draw_selection_rectangle(rec_corner_x, rec_corner_y, rec_w, rec_h);
@@ -313,11 +314,12 @@ void cancel_tile_hiliting(void)
  Action depends on whether the mouse pointer moved
  a tile between press and release.
 **************************************************************************/
-void release_right_button(int canvas_x, int canvas_y)
+void release_right_button(int canvas_x, int canvas_y, bool shift)
 {
   if (rectangle_active) {
-    define_tiles_within_rectangle();
+    define_tiles_within_rectangle(shift);
   } else {
+    cancel_tile_hiliting();
     recenter_button_pressed(canvas_x, canvas_y);
   }
   rectangle_active = FALSE;
@@ -368,32 +370,33 @@ void key_city_overlay(int canvas_x, int canvas_y)
 }
 
 /**************************************************************************
- Shift-Left-Click on owned city or any visible unit to copy.
+  Shift-Left-Click on owned city or any visible unit to copy.
+  Returns whether it found anything to try to copy.
 **************************************************************************/
-void clipboard_copy_production(struct tile *ptile)
+bool clipboard_copy_production(struct tile *ptile)
 {
   char buffer[256];
   struct city *pcity = tile_city(ptile);
 
   if (!can_client_issue_orders()) {
-    return;
+    return FALSE;
   }
 
   if (pcity) {
     if (city_owner(pcity) != client.conn.playing)  {
-      return;
+      return FALSE;
     }
     clipboard = pcity->production;
   } else {
     struct unit *punit = find_visible_unit(ptile);
     if (!punit) {
-      return;
+      return FALSE;
     }
     if (!can_player_build_unit_direct(client.conn.playing, unit_type(punit)))  {
       create_event(ptile, E_BAD_COMMAND, ftc_client,
                    _("You don't know how to build %s!"),
                    unit_name_translation(punit));
-      return;
+      return TRUE;
     }
     clipboard.kind = VUT_UTYPE;
     clipboard.value.utype = unit_type(punit);
@@ -403,6 +406,7 @@ void clipboard_copy_production(struct tile *ptile)
   create_event(ptile, E_CITY_PRODUCTION_CHANGED, /* ? */
                ftc_client, _("Copy %s to clipboard."),
                universal_name_translation(&clipboard, buffer, sizeof(buffer)));
+  return TRUE;
 }
 
 /**************************************************************************
@@ -509,7 +513,7 @@ void maybe_activate_keyboardless_goto(int canvas_x, int canvas_y)
 bool get_turn_done_button_state(void)
 {
   return (can_client_issue_orders()
-          && !client.conn.playing->ai_data.control
+          && !client.conn.playing->ai_controlled
           && !client.conn.playing->phase_done
           && !agents_busy());
 }
@@ -572,10 +576,8 @@ void adjust_workers_button_pressed(int canvas_x, int canvas_y)
 
     if (pcity && !cma_is_city_under_agent(pcity, NULL)) {
       int city_x, city_y;
-      bool success;
 
-      success = city_base_to_city_map(&city_x, &city_y, pcity, ptile);
-      assert(success);
+      fc_assert_ret(city_base_to_city_map(&city_x, &city_y, pcity, ptile));
 
       if (NULL != tile_worked(ptile) && tile_worked(ptile) == pcity) {
 	dsend_packet_city_make_specialist(&client.conn, pcity->id,
@@ -621,7 +623,7 @@ void update_turn_done_button_state(void)
   if (turn_done_state) {
     if (waiting_for_end_turn
         || (NULL != client.conn.playing
-            && client.conn.playing->ai_data.control
+            && client.conn.playing->ai_controlled
             && !ai_manual_turn_done)) {
       send_turn_done();
     } else {
@@ -693,8 +695,8 @@ static int unit_list_compare(const void *a, const void *b)
   } else {
     /* If the transporters aren't the same, put in order by the
      * transporters. */
-    const struct unit *ptrans1 = game_find_unit_by_number(punit1->transported_by);
-    const struct unit *ptrans2 = game_find_unit_by_number(punit2->transported_by);
+    const struct unit *ptrans1 = game_unit_by_number(punit1->transported_by);
+    const struct unit *ptrans2 = game_unit_by_number(punit2->transported_by);
 
     if (!ptrans1) {
       ptrans1 = punit1;

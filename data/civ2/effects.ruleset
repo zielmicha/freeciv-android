@@ -11,7 +11,7 @@
 
 [datafile]
 description="Civ2 effects data for Freeciv (incomplete)"
-options="1.0"
+options="+Freeciv-2.3-ruleset"
 
 ; /* <-- avoid gettext warnings
 ; */ <-- avoid gettext warnings
@@ -532,6 +532,14 @@ reqs    =
       "Gov", "Democracy",  "Player"
     }
 
+[effect_empire_size_base_6]
+name    = "Empire_Size_Base"
+value   = 14
+reqs    =
+    { "type",       "name",      "range"
+      "Gov", "Fundamentalism",  "Player"
+    }
+
 [effect_empire_size_step_0]
 name    = "Empire_Size_Step"
 value   = 6
@@ -578,6 +586,14 @@ value   = 12
 reqs    =
     { "type",       "name",      "range"
       "Gov", "Democracy", "Player"
+    }
+
+[effect_empire_size_step_6]
+name    = "Empire_Size_Step"
+value   = 12
+reqs    =
+    { "type",       "name",      "range"
+      "Gov", "Fundamentalism", "Player"
     }
 
 [effect_max_rates_0]
@@ -2103,4 +2119,9 @@ reqs    =
 ; Cities can always work tiles
 [effect_tile_workable]
 name    = "Tile_Workable"
+value   = 1
+
+; each city has at least one slot to build units
+[effect_city_build_slots_basic]
+name    = "City_Build_Slots"
 value   = 1

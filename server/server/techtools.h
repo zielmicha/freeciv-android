@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 2005 The Freeciv Team
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -10,8 +10,8 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 ***********************************************************************/
-#ifndef FC__RESEARCH_H
-#define FC__RESEARCH_H
+#ifndef FC__TECHTOOLS_H
+#define FC__TECHTOOLS_H
 
 #include "player.h"
 #include "tech.h"
@@ -22,8 +22,8 @@ void do_dipl_cost(struct player *pplayer, Tech_type_id tech);
 
 void do_tech_parasite_effect(struct player *pplayer);
 void found_new_tech(struct player *plr, Tech_type_id tech_found,
-		    bool was_discovery, bool saving_bulbs);
-void update_tech(struct player *plr, int bulbs);
+                    bool was_discovery, bool saving_bulbs);
+bool update_bulbs(struct player *plr, int bulbs, bool check_tech);
 void init_tech(struct player *plr, bool update);
 void choose_tech(struct player *plr, Tech_type_id tech);
 void choose_random_tech(struct player* plr);
@@ -37,4 +37,7 @@ void give_global_initial_techs(struct player *pplayer);
 void give_nation_initial_techs(struct player *pplayer);
 Tech_type_id give_random_initial_tech(struct player *pplayer);
 
-#endif
+bool tech_transfer(struct player *plr_recv, struct player *plr_donor,
+                   Tech_type_id tech);
+
+#endif  /* FC__TECHTOOLS_H */

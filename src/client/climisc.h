@@ -13,9 +13,6 @@
 #ifndef FC__CLIMISC_H
 #define FC__CLIMISC_H
 
-/* utility */
-#include "shared.h"             /* MAX_LEN_NAME */
-
 /* common */
 #include "fc_types.h"
 #include "featured_text.h"      /* struct ft_color */
@@ -108,11 +105,6 @@ void create_event(struct tile *ptile, enum event_type event,
                   const struct ft_color color, const char *format, ...)
                   fc__attribute((__format__ (__printf__, 4, 5)));
 
-void reports_freeze(void);
-void reports_freeze_till(int request_id);
-void reports_thaw(void);
-void reports_force_thaw(void);
-
 struct city *get_nearest_city(const struct unit *punit, int *sq_dist);
 
 void cityrep_buy(struct city *pcity);
@@ -130,5 +122,12 @@ enum unit_bg_color_type { UNIT_BG_HP_LOSS,
 enum unit_bg_color_type unit_color_type(const struct unit_type *punittype);
 
 void buy_production_in_selected_cities(void);
+
+void set_unit_focus_status(struct player *pplayer);
+
+void client_player_init(struct player *pplayer);
+void client_player_destroy(struct player *pplayer);
+
+void client_player_maps_reset(void);
 
 #endif  /* FC__CLIMISC_H */

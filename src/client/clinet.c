@@ -15,20 +15,25 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
 #endif
 #ifdef HAVE_PWD_H
 #include <pwd.h>
@@ -36,14 +41,8 @@
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#endif
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
 #endif
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
@@ -62,7 +61,6 @@
 #include "capstr.h"
 #include "dataio.h"
 #include "fcintl.h"
-#include "hash.h"
 #include "log.h"
 #include "mem.h"
 #include "netintf.h"
@@ -123,21 +121,29 @@ static void close_socket_nomessage(struct connection *pc)
   popdown_races_dialog(); 
   close_connection_dialog();
 
-  reports_force_thaw();
-  
   set_client_state(C_S_DISCONNECTED);
 }
 
-/**************************************************************************
-...
-**************************************************************************/
-static void close_socket_callback(struct connection *pc)
+/****************************************************************************
+  Client connection close socket callback. It shouldn't be called directy.
+  Use connection_close() instead.
+****************************************************************************/
+static void client_conn_close_callback(struct connection *pconn)
 {
-  close_socket_nomessage(pc);
-  /* If we lost connection to the internal server - kill him */
+  char reason[256];
+
+  if (NULL != pconn->closing_reason) {
+    fc_strlcpy(reason, pconn->closing_reason, sizeof(reason));
+  } else {
+    fc_strlcpy(reason, _("unknown reason"), sizeof(reason));
+  }
+
+  close_socket_nomessage(pconn);
+  /* If we lost connection to the internal server - kill it. */
   client_kill_server(TRUE);
-  freelog(LOG_ERROR, "Lost connection to server!");
-  output_window_append(ftc_client, _("Lost connection to server!"));
+  log_error("Lost connection to server: %s.", reason);
+  output_window_printf(ftc_client, _("Lost connection to server (%s)!"),
+                       reason);
   if (with_ggz) {
     client_exit();
   }
@@ -162,7 +168,7 @@ static int get_server_address(const char *hostname, int port,
     hostname = "localhost";
 
   if (!net_lookup_service(hostname, port, &names[0], FALSE)) {
-    (void) mystrlcpy(errbuf, _("Failed looking up host."), errbufsize);
+    (void) fc_strlcpy(errbuf, _("Failed looking up host."), errbufsize);
     return -1;
   }
   name_count = 1;
@@ -197,11 +203,11 @@ static int try_to_connect(const char *username, char *errbuf, int errbufsize)
   int i;
   int sock = -1;
 
-  close_socket_set_callback(close_socket_callback);
+  connections_set_close_callback(client_conn_close_callback);
 
   /* connection in progress? wait. */
   if (client.conn.used) {
-    (void) mystrlcpy(errbuf, _("Connection in progress."), errbufsize);
+    (void) fc_strlcpy(errbuf, _("Connection in progress."), errbufsize);
     return -1;
   }
 
@@ -226,14 +232,14 @@ static int try_to_connect(const char *username, char *errbuf, int errbufsize)
 
   client.conn.sock = sock;
   if (client.conn.sock == -1) {
-    fc_errno err = fc_get_errno();  /* Save errno value before calling anything */
+    fc_errno err = fc_get_errno(); /* Save errno value before calling anything */
 
-    (void) mystrlcpy(errbuf, fc_strerror(err), errbufsize);
+    (void) fc_strlcpy(errbuf, fc_strerror(err), errbufsize);
 #ifdef HAVE_WINSOCK
     return -1;
 #else
     return err;
-#endif
+#endif /* HAVE_WINSOCK */
   }
 
   make_connection(client.conn.sock, username);
@@ -315,63 +321,62 @@ void disconnect_from_server(void)
   }
 }  
 
-/**************************************************************************
-A wrapper around read_socket_data() which also handles the case the
-socket becomes writeable and there is still data which should be sent
-to the server.
+/****************************************************************************
+  A wrapper around read_socket_data() which also handles the case the
+  socket becomes writeable and there is still data which should be sent
+  to the server.
 
 Returns:
     -1  :  an error occurred - you should close the socket
+    -2  :  the connection was closed
     >0  :  number of bytes read
     =0  :  no data read, would block
-**************************************************************************/
+****************************************************************************/
 static int read_from_connection(struct connection *pc, bool block)
 {
   for (;;) {
     fd_set readfs, writefs, exceptfs;
     int socket_fd = pc->sock;
     bool have_data_for_server = (pc->used && pc->send_buffer
-				&& pc->send_buffer->ndata > 0);
+                                 && 0 < pc->send_buffer->ndata);
     int n;
     struct timeval tv;
 
     tv.tv_sec = 0;
     tv.tv_usec = 0;
 
-    MY_FD_ZERO(&readfs);
+    FC_FD_ZERO(&readfs);
     FD_SET(socket_fd, &readfs);
 
-    MY_FD_ZERO(&exceptfs);
+    FC_FD_ZERO(&exceptfs);
     FD_SET(socket_fd, &exceptfs);
 
     if (have_data_for_server) {
-      MY_FD_ZERO(&writefs);
+      FC_FD_ZERO(&writefs);
       FD_SET(socket_fd, &writefs);
-      n =
-	  fc_select(socket_fd + 1, &readfs, &writefs, &exceptfs,
-		    block ? NULL : &tv);
+      n = fc_select(socket_fd + 1, &readfs, &writefs, &exceptfs,
+                    block ? NULL : &tv);
     } else {
-      n =
-	  fc_select(socket_fd + 1, &readfs, NULL, &exceptfs,
-		    block ? NULL : &tv);
+      n = fc_select(socket_fd + 1, &readfs, NULL, &exceptfs,
+                    block ? NULL : &tv);
     }
 
     /* the socket is neither readable, writeable nor got an
-       exception */
+     * exception */
     if (n == 0) {
       return 0;
     }
 
     if (n == -1) {
       if (errno == EINTR) {
-	/* EINTR can happen sometimes, especially when compiling with -pg.
-	 * Generally we just want to run select again. */
-	freelog(LOG_DEBUG, "select() returned EINTR");
-	continue;
+        /* EINTR can happen sometimes, especially when compiling with -pg.
+         * Generally we just want to run select again. */
+        log_debug("select() returned EINTR");
+        continue;
       }
 
-      freelog(LOG_ERROR, "select() return=%d errno=%d (%s)",
-	      n, errno, fc_strerror(fc_get_errno()));
+      log_error("select() return=%d errno=%d (%s)",
+                n, errno, fc_strerror(fc_get_errno()));
       return -1;
     }
 
@@ -395,31 +400,36 @@ static int read_from_connection(struct connection *pc, bool block)
 **************************************************************************/
 void input_from_server(int fd)
 {
-  assert(fd == client.conn.sock);
+  int nb;
 
-  if (read_from_connection(&client.conn, FALSE) >= 0) {
+  fc_assert_ret(fd == client.conn.sock);
+
+  nb = read_from_connection(&client.conn, FALSE);
+  if (0 <= nb) {
     enum packet_type type;
 
-    reports_freeze();
     agents_freeze_hint();
-    while (TRUE) {
+    while (client.conn.used) {
       bool result;
       void *packet = get_packet_from_connection(&client.conn,
 						&type, &result);
 
       if (result) {
-	assert(packet != NULL);
+        fc_assert_action(packet != NULL, break);
 	client_packet_input(packet, type);
 	free(packet);
       } else {
-	assert(packet == NULL);
+        fc_assert(packet == NULL);
 	break;
       }
     }
-    agents_thaw_hint();
-    reports_thaw();
+    if (client.conn.used) {
+      agents_thaw_hint();
+    }
+  } else if (-2 == nb) {
+    connection_close(&client.conn, _("server disconnected"));
   } else {
-    close_socket_callback(&client.conn);
+    connection_close(&client.conn, _("read error"));
   }
 }
 
@@ -432,15 +442,16 @@ void input_from_server(int fd)
 void input_from_server_till_request_got_processed(int fd, 
 						  int expected_request_id)
 {
-  assert(expected_request_id);
-  assert(fd == client.conn.sock);
+  fc_assert_ret(expected_request_id);
+  fc_assert_ret(fd == client.conn.sock);
 
-  freelog(LOG_DEBUG,
-	  "input_from_server_till_request_got_processed("
-	  "expected_request_id=%d)", expected_request_id);
+  log_debug("input_from_server_till_request_got_processed("
+            "expected_request_id=%d)", expected_request_id);
 
   while (TRUE) {
-    if (read_from_connection(&client.conn, TRUE) >= 0) {
+    int nb = read_from_connection(&client.conn, TRUE);
+
+    if (0 <= nb) {
       enum packet_type type;
 
       while (TRUE) {
@@ -448,27 +459,30 @@ void input_from_server_till_request_got_processed(int fd,
 	void *packet = get_packet_from_connection(&client.conn,
 						  &type, &result);
 	if (!result) {
-	  assert(packet == NULL);
+          fc_assert(packet == NULL);
 	  break;
 	}
 
-	assert(packet != NULL);
+        fc_assert_action(packet != NULL, break);
 	client_packet_input(packet, type);
 	free(packet);
 
 	if (type == PACKET_PROCESSING_FINISHED) {
-	  freelog(LOG_DEBUG, "ifstrgp: expect=%d, seen=%d",
-		  expected_request_id,
-		  client.conn.client.last_processed_request_id_seen);
+          log_debug("ifstrgp: expect=%d, seen=%d",
+                    expected_request_id,
+                    client.conn.client.last_processed_request_id_seen);
 	  if (client.conn.client.last_processed_request_id_seen >=
 	      expected_request_id) {
-	    freelog(LOG_DEBUG, "ifstrgp: got it; returning");
+            log_debug("ifstrgp: got it; returning");
 	    return;
 	  }
 	}
       }
+    } else if (-2 == nb) {
+      connection_close(&client.conn, _("server disconnected"));
+      break;
     } else {
-      close_socket_callback(&client.conn);
+      connection_close(&client.conn, _("read error"));
       break;
     }
   }
@@ -494,10 +508,9 @@ double try_to_autoconnect(void)
   count++;
 
   if (count >= MAX_AUTOCONNECT_ATTEMPTS) {
-    freelog(LOG_FATAL,
-	    _("Failed to contact server \"%s\" at port "
-	      "%d as \"%s\" after %d attempts"),
-	    server_host, server_port, user_name, count);
+    log_fatal(_("Failed to contact server \"%s\" at port "
+                "%d as \"%s\" after %d attempts"),
+              server_host, server_port, user_name, count);
     exit(EXIT_FAILURE);
   }
 
@@ -510,8 +523,7 @@ double try_to_autoconnect(void)
   /* See PR#4042 for more info on issues with try_to_connect() and errno. */
   case ECONNREFUSED:		/* Server not available (yet) */
     if (!warning_shown) {
-      freelog(LOG_ERROR, "Connection to server refused. "
-                         "Please start the server.");
+      log_error("Connection to server refused. Please start the server.");
       output_window_append(ftc_client, _("Connection to server refused. "
                                          "Please start the server."));
       warning_shown = 1;
@@ -520,10 +532,9 @@ double try_to_autoconnect(void)
     return 0.001 * AUTOCONNECT_INTERVAL;
 #endif
   default:			/* All other errors are fatal */
-    freelog(LOG_FATAL,
-	    _("Error contacting server \"%s\" at port %d "
-	      "as \"%s\":\n %s\n"),
-	    server_host, server_port, user_name, errbuf);
+    log_fatal(_("Error contacting server \"%s\" at port %d "
+                "as \"%s\":\n %s\n"),
+              server_host, server_port, user_name, errbuf);
     exit(EXIT_FAILURE);
   }
 }
@@ -547,10 +558,9 @@ void start_autoconnecting_to_server(void)
                        MAX_AUTOCONNECT_ATTEMPTS);
 
   if (get_server_address(server_host, server_port, buf, sizeof(buf)) < 0) {
-    freelog(LOG_FATAL,
-            _("Error contacting server \"%s\" at port %d "
-              "as \"%s\":\n %s\n"),
-            server_host, server_port, user_name, buf);
+    log_fatal(_("Error contacting server \"%s\" at port %d "
+                "as \"%s\":\n %s\n"),
+              server_host, server_port, user_name, buf);
     exit(EXIT_FAILURE);
   }
   autoconnecting = TRUE;

@@ -21,50 +21,30 @@
 
 /* server */
 #include "aiiface.h"
-#include "settlers.h"
+
+/* server/advisors */
+#include "autosettlers.h"
 
 /* ai */
-#include "aicity.h"
-#include "aiexplorer.h"
-#include "aihand.h"
-#include "aisettler.h"
-#include "aitools.h"
+#include "defaultai.h"
 
 /**************************************************************************
-  Initialize player ai_funcs function pointers.
+  Initialize default ai_type.
 **************************************************************************/
 void ai_init(void)
 {
-  struct ai_type *ai = get_ai_type(FC_AI_DEFAULT);
+  struct ai_type *ai = ai_type_alloc();
 
   init_ai(ai);
 
-  ai->funcs.init_city = ai_init_city;
-  ai->funcs.close_city = ai_close_city;
-  ai->funcs.auto_settlers = auto_settlers_player;
-  ai->funcs.building_advisor_init = ai_manage_buildings;
-  ai->funcs.building_advisor = ai_advisor_choose_building;
-  ai->funcs.auto_explorer = ai_manage_explorer;
-  ai->funcs.first_activities = ai_do_first_activities;
-  ai->funcs.diplomacy_actions = ai_diplomacy_actions;
-  ai->funcs.last_activities = ai_do_last_activities;
-  ai->funcs.before_auto_settlers = ai_settler_init;
-  ai->funcs.treaty_evaluate = ai_treaty_evaluate;
-  ai->funcs.treaty_accepted = ai_treaty_accepted;
-  ai->funcs.first_contact = ai_diplomacy_first_contact;
-  ai->funcs.incident = ai_incident;
+  fc_ai_default_setup(ai);
 }
 
 /**************************************************************************
-  Call incident function of victim, or failing that, incident function
-  of violator.
+  Call incident function of victim.
 **************************************************************************/
 void call_incident(enum incident_type type, struct player *violator,
                    struct player *victim)
 {
-  if (victim && victim->ai->funcs.incident) {
-    victim->ai->funcs.incident(type, violator, victim);
-  } else if (violator && violator->ai->funcs.incident) {
-    violator->ai->funcs.incident(type, violator, victim);
-  }
+  CALL_PLR_AI_FUNC(incident, victim, type, violator, victim);
 }

@@ -13,21 +13,29 @@
 #ifndef FC__REPODLGS_G_H
 #define FC__REPODLGS_G_H
 
-#include "packets.h"         
-#include "shared.h"		/* bool type */
+/* utility */
+#include "support.h"            /* bool type */
 
+/* common */
+#include "packets.h"
+
+/* client */
 #include "repodlgs_common.h"
 
-void update_report_dialogs(void);
 
-void science_dialog_update(void);
-void popup_science_dialog(bool raise);
-void science_dialog_redraw(void);
+void science_report_dialog_popup(bool raise);
+void science_report_dialog_redraw(void);
+void economy_report_dialog_popup(bool raise);
+void units_report_dialog_popup(bool raise);
+void endgame_report_dialog_popup(const struct packet_endgame_report *packet);
+
+void real_science_report_dialog_update(void);
+void real_economy_report_dialog_update(void);
+void real_units_report_dialog_update(void);
+
+/* Actually defined in update_queue.c */
+void science_report_dialog_update(void);
 void economy_report_dialog_update(void);
-void popup_economy_report_dialog(bool raise);
-void activeunits_report_dialog_update(void);
-void popup_activeunits_report_dialog(bool raise);
-void popup_endgame_report_dialog(struct packet_endgame_report *packet);
-void popup_settable_options_dialog(void);
+void units_report_dialog_update(void);
 
 #endif  /* FC__REPODLGS_G_H */

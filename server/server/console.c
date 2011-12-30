@@ -51,7 +51,8 @@ static int con_dump(enum rfc_status rfc_status, const char *message, ...);
 Function to handle log messages.
 This must match the log_callback_fn typedef signature.
 ************************************************************************/
-static void con_handle_log(int level, const char *message, bool file_too)
+static void con_handle_log(enum log_level level, const char *message,
+                           bool file_too)
 {
   if (LOG_ERROR == level) {
     notify_conn(NULL, NULL, E_LOG_ERROR, ftc_warning, "%s", message);
@@ -100,12 +101,40 @@ static void con_update_prompt(void)
   console_prompt_is_showing = TRUE;
 }
 
+#ifdef DEBUG
+/************************************************************************
+  Prefix for log messages saved to file. At the moment the turn and the
+  current date and time are used.
+************************************************************************/
+static const char *log_prefix(void)
+{
+  static char buf[128];
+  char timestr[32];
+  time_t timestamp;
+
+  time(&timestamp);
+  strftime(timestr, sizeof(timestr), "%Y/%m/%d %H:%M:%S",
+           localtime(&timestamp));
+
+  fc_snprintf(buf, sizeof(buf), "T%03d - %s", game.info.turn, timestr);
+
+  return buf;
+}
+#endif /* DEBUG */
+
 /************************************************************************
   Initialize logging via console.
 ************************************************************************/
-void con_log_init(const char *log_filename, int log_level)
+void con_log_init(const char *log_filename, enum log_level level,
+                  int fatal_assertions)
 {
-  log_init(log_filename, log_level, con_handle_log);
+#ifdef DEBUG
+  log_init(log_filename, level, con_handle_log, log_prefix,
+           fatal_assertions);
+#else
+  log_init(log_filename, level, con_handle_log, NULL,
+           fatal_assertions);
+#endif /* DEBUG */
 }
 
 #ifndef HAVE_LIBREADLINE
@@ -118,7 +147,7 @@ static int con_dump(enum rfc_status rfc_status, const char *message, ...)
   va_list args;
   
   va_start(args, message);
-  my_vsnprintf(buf, sizeof(buf), message, args);
+  fc_vsnprintf(buf, sizeof(buf), message, args);
   va_end(args);
 
   if (console_prompt_is_showing) {
@@ -145,7 +174,7 @@ void con_write(enum rfc_status rfc_status, const char *message, ...)
   va_list args;
 
   va_start(args, message);
-  my_vsnprintf(buf1, sizeof(buf1), message, args);
+  fc_vsnprintf(buf1, sizeof(buf1), message, args);
   va_end(args);
 
   /* remove all format tags */

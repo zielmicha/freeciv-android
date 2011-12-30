@@ -15,8 +15,6 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
-
 /* utility */
 #include "log.h"
 
@@ -31,15 +29,19 @@
 
 /* server */
 #include "citytools.h"
-#include "gotohand.h"
 #include "maphand.h"
+#include "srv_log.h"
 #include "unithand.h"
 #include "unittools.h"
 
+/* server/advisors */
+#include "advgoto.h"
+
 /* ai */
-#include "ailog.h"
+#include "aicity.h"
 #include "aitools.h"
 #include "aiunit.h"
+#include "defaultai.h"
 
 #include "aiair.h"
 
@@ -61,7 +63,7 @@ static struct tile *find_nearest_airbase(const struct unit *punit,
   pft_fill_unit_parameter(&parameter, punit);
   pfm = pf_map_new(&parameter);
 
-  pf_map_iterate_move_costs(pfm, ptile, move_cost, TRUE) {
+  pf_map_move_costs_iterate(pfm, ptile, move_cost, TRUE) {
     if (move_cost > punit->moves_left) {
       /* Too far! */
       break;
@@ -69,12 +71,12 @@ static struct tile *find_nearest_airbase(const struct unit *punit,
 
     if (is_airunit_refuel_point(ptile, pplayer, punittype, FALSE)) {
       if (path) {
-        *path = pf_map_get_path(pfm, ptile);
+        *path = pf_map_path(pfm, ptile);
       }
       pf_map_destroy(pfm);
       return ptile;
     }
-  } pf_map_iterate_move_costs_end;
+  } pf_map_move_costs_iterate_end;
 
   pf_map_destroy(pfm);
   return NULL;
@@ -94,10 +96,11 @@ static bool ai_should_we_air_attack_tile(struct unit *punit,
    * attack anything.  Production should not happen if there is an idle 
    * unit of the same type nearby */
   if (acity && punit->id != 0
-      && acity->ai->invasion.occupy == 0 && !COULD_OCCUPY(punit)) {
+      && def_ai_city_data(acity)->invasion.occupy == 0
+      && !unit_can_take_over(punit)) {
     /* No units capable of occupying are invading */
-    freelog(LOG_DEBUG, "Don't want to attack %s, although we could", 
-            city_name(acity));
+    log_debug("Don't want to attack %s, although we could",
+              city_name(acity));
     return FALSE;
   }
 
@@ -111,7 +114,7 @@ static bool ai_should_we_air_attack_tile(struct unit *punit,
 static int ai_evaluate_tile_for_air_attack(struct unit *punit, 
 					   struct tile *dst_tile)
 {
-  struct unit *pdefender = get_defender(punit, dst_tile);
+  struct unit *pdefender;
   /* unit costs in shields */
   int balanced_cost, unit_cost, victim_cost = 0;
   /* unit stats */
@@ -122,8 +125,8 @@ static int ai_evaluate_tile_for_air_attack(struct unit *punit,
   int sortie_time;
 #define PROB_MULTIPLIER 100 /* should unify with those in combat.c */
 
-  if ((pdefender == NULL) 
-      || !can_unit_attack_all_at_tile(punit, dst_tile)) {
+  if (!can_unit_attack_tile(punit, dst_tile)
+      || !(pdefender = get_defender(punit, dst_tile))) {
     return 0;
   }
 
@@ -135,7 +138,10 @@ static int ai_evaluate_tile_for_air_attack(struct unit *punit,
   unit_cost = unit_cost * unit_type(punit)->hp / punit->hp; 
 
   /* Determine cost of enemy units */
-  victim_cost = stack_cost(pdefender);
+  victim_cost = stack_cost(punit, pdefender);
+  if (0 == victim_cost) {
+    return 0;
+  }
 
   /* Missile would die 100% so we adjust the victim_cost -- GB */
   if (uclass_has_flag(unit_class(punit), UCF_MISSILE)) {
@@ -155,15 +161,14 @@ static int ai_evaluate_tile_for_air_attack(struct unit *punit,
     - SHIELD_WEIGHTING + 2 * TRADE_WEIGHTING;
   if (profit > 0) {
     profit = military_amortize(unit_owner(punit), 
-                               game_find_city_by_number(punit->homecity),
+                               game_city_by_number(punit->homecity),
                                profit, sortie_time, balanced_cost);
-    freelog(LOG_DEBUG, "%s at (%d, %d) is a worthy target with profit %d", 
-	    unit_rule_name(pdefender), TILE_XY(dst_tile), profit);
+    log_debug("%s at (%d, %d) is a worthy target with profit %d", 
+              unit_rule_name(pdefender), TILE_XY(dst_tile), profit);
   } else {
-    freelog(LOG_DEBUG,
-            "%s(%d, %d): %s at (%d, %d) is unworthy with profit %d",
-	    unit_rule_name(punit), TILE_XY(unit_tile(punit)),
-	    unit_rule_name(pdefender), TILE_XY(dst_tile), profit);
+    log_debug("%s(%d, %d): %s at (%d, %d) is unworthy with profit %d",
+              unit_rule_name(punit), TILE_XY(unit_tile(punit)),
+              unit_rule_name(pdefender), TILE_XY(dst_tile), profit);
     profit = 0;
   }
 
@@ -193,7 +198,7 @@ static int find_something_to_bomb(struct unit *punit, struct pf_path **path,
   pfm = pf_map_new(&parameter);
 
   /* Let's find something to bomb */
-  pf_map_iterate_move_costs(pfm, ptile, move_cost, FALSE) {
+  pf_map_move_costs_iterate(pfm, ptile, move_cost, FALSE) {
     if (move_cost >= punit->moves_left) {
       /* Too far! */
       break;
@@ -212,24 +217,24 @@ static int find_something_to_bomb(struct unit *punit, struct pf_path **path,
 
     if (is_enemy_unit_tile(ptile, pplayer)
         && ai_should_we_air_attack_tile(punit, ptile)
-        && can_unit_attack_all_at_tile(punit, ptile)) {
+        && can_unit_attack_tile(punit, ptile)) {
       int new_best = ai_evaluate_tile_for_air_attack(punit, ptile);
 
       if (new_best > best) {
         best_tile = ptile;
-	best = new_best;
-	freelog(LOG_DEBUG, "%s wants to attack tile (%d, %d)", 
-		unit_rule_name(punit), TILE_XY(ptile));
+        best = new_best;
+        log_debug("%s wants to attack tile (%d, %d)", 
+                  unit_rule_name(punit), TILE_XY(ptile));
       }
     }
-  } pf_map_iterate_positions_end;
+  } pf_map_positions_iterate_end;
 
   /* Return the best values. */
   if (pptile) {
     *pptile = best_tile;
   }
   if (path) {
-    *path = best_tile ? pf_map_get_path(pfm, best_tile) : NULL;
+    *path = best_tile ? pf_map_path(pfm, best_tile) : NULL;
   }
 
   pf_map_destroy(pfm);
@@ -254,7 +259,7 @@ static struct tile *ai_find_strategic_airbase(const struct unit *punit,
 
   pft_fill_unit_parameter(&parameter, punit);
   pfm = pf_map_new(&parameter);
-  pf_map_iterate_move_costs(pfm, ptile, move_cost, FALSE) {
+  pf_map_move_costs_iterate(pfm, ptile, move_cost, FALSE) {
     if (move_cost >= punit->moves_left) {
       break; /* Too far! */
     }
@@ -264,7 +269,8 @@ static struct tile *ai_find_strategic_airbase(const struct unit *punit,
       continue; /* Cannot refuel here. */
     }
 
-    if ((pcity = tile_city(ptile)) && pcity->ai->grave_danger != 0) {
+    if ((pcity = tile_city(ptile))
+        && def_ai_city_data(pcity)->grave_danger != 0) {
       best_tile = ptile;
       break; /* Fly there immediately!! */
     }
@@ -272,7 +278,7 @@ static struct tile *ai_find_strategic_airbase(const struct unit *punit,
     if (!pvirtual) {
       pvirtual =
         create_unit_virtual(pplayer,
-                            player_find_city_by_id(pplayer, punit->homecity),
+                            player_city_by_number(pplayer, punit->homecity),
                             unit_type(punit), punit->veteran);
     }
 
@@ -284,7 +290,7 @@ static struct tile *ai_find_strategic_airbase(const struct unit *punit,
       best_tile = ptile;
       /* We can still look for something better. */
     }
-  } pf_map_iterate_move_costs_end;
+  } pf_map_move_costs_iterate_end;
 
   if (pvirtual) {
     destroy_unit_virtual(pvirtual);
@@ -292,7 +298,7 @@ static struct tile *ai_find_strategic_airbase(const struct unit *punit,
 
   if (path) {
     /* Stores the path. */
-    *path = best_tile ? pf_map_get_path(pfm, best_tile) : NULL;
+    *path = best_tile ? pf_map_path(pfm, best_tile) : NULL;
   }
   pf_map_destroy(pfm);
 
@@ -333,9 +339,9 @@ void ai_manage_airunit(struct player *pplayer, struct unit *punit)
         && is_airunit_refuel_point(punit->goto_tile, 
                                    pplayer, unit_type(punit), FALSE)) {
       pfm = pf_map_new(&parameter);
-      path = pf_map_get_path(pfm, punit->goto_tile);
+      path = pf_map_path(pfm, punit->goto_tile);
       if (path) {
-        bool alive = ai_follow_path(punit, path, punit->goto_tile);
+        bool alive = adv_follow_path(punit, path, punit->goto_tile);
 
         pf_path_destroy(path);
         pf_map_destroy(pfm);
@@ -348,7 +354,7 @@ void ai_manage_airunit(struct player *pplayer, struct unit *punit)
       pf_map_destroy(pfm);
     } else if ((dst_tile = find_nearest_airbase(punit, &path))) {
       /* Go refuelling */
-      if (!ai_follow_path(punit, path, dst_tile)) {
+      if (!adv_follow_path(punit, path, dst_tile)) {
         pf_path_destroy(path);
         return; /* The unit died. */
       }
@@ -357,7 +363,7 @@ void ai_manage_airunit(struct player *pplayer, struct unit *punit)
       if (punit->fuel == 1) {
 	UNIT_LOG(LOG_DEBUG, punit, "Oops, fallin outta the sky");
       }
-      punit->ai.done = TRUE; /* Won't help trying again */
+      def_ai_unit_data(punit)->done = TRUE; /* Won't help trying again */
       return;
     }
 
@@ -368,8 +374,8 @@ void ai_manage_airunit(struct player *pplayer, struct unit *punit)
       /* Found target, coordinates are in punit's goto_dest.
        * TODO: separate attacking into a function, check for the best 
        * tile to attack from */
-      assert(path != NULL && dst_tile != NULL);
-      if (!ai_follow_path(punit, path, dst_tile)) {
+      fc_assert_ret(path != NULL && dst_tile != NULL);
+      if (!adv_follow_path(punit, path, dst_tile)) {
         pf_path_destroy(path);
         return; /* The unit died. */
       }
@@ -383,24 +389,24 @@ void ai_manage_airunit(struct player *pplayer, struct unit *punit)
         (void) unit_move_handling(punit, dst_tile, TRUE, FALSE);
       }
     } else if ((dst_tile = ai_find_strategic_airbase(punit, &path))) {
-      freelog(LOG_DEBUG, "%s will fly to (%i, %i) (%s) to fight there",
-              unit_rule_name(punit), TILE_XY(dst_tile),
-              tile_city(dst_tile) ? city_name(tile_city(dst_tile)) : "");
-      punit->ai.done = TRUE; /* Wait for next turn */
-      if (!ai_follow_path(punit, path, dst_tile)) {
+      log_debug("%s will fly to (%i, %i) (%s) to fight there",
+                unit_rule_name(punit), TILE_XY(dst_tile),
+                tile_city(dst_tile) ? city_name(tile_city(dst_tile)) : "");
+      def_ai_unit_data(punit)->done = TRUE; /* Wait for next turn */
+      if (!adv_follow_path(punit, path, dst_tile)) {
         pf_path_destroy(path);
         return; /* The unit died. */
       }
       pf_path_destroy(path);
     } else {
-      freelog(LOG_DEBUG, "%s cannot find anything to kill and is staying put", 
-              unit_rule_name(punit));
-      punit->ai.done = TRUE;
+      log_debug("%s cannot find anything to kill and is staying put", 
+                unit_rule_name(punit));
+      def_ai_unit_data(punit)->done = TRUE;
       unit_activity_handling(punit, ACTIVITY_IDLE);
     }
   }
 
-  if ((punit = game_find_unit_by_number(id)) != NULL && punit->moves_left > 0
+  if ((punit = game_unit_by_number(id)) != NULL && punit->moves_left > 0
       && punit->moves_left != moves) {
     /* We have moved this turn, might have ended up stuck out in the fields
      * so, as a safety measure, let's manage again */
@@ -452,21 +458,17 @@ bool ai_choose_attacker_air(struct player *pplayer, struct city *pcity,
       int profit = find_something_to_bomb(virtual_unit, NULL, NULL);
 
       if (profit > choice->want){
-	/* Update choice */
-	choice->want = profit;
-	choice->value.utype = punittype;
-	choice->type = CT_ATTACKER;
-	choice->need_boat = FALSE;
-	want_something = TRUE;
-	freelog(LOG_DEBUG, "%s wants to build %s (want=%d)",
-		city_name(pcity),
-		utype_rule_name(punittype),
-		profit);
+        /* Update choice */
+        choice->want = profit;
+        choice->value.utype = punittype;
+        choice->type = CT_ATTACKER;
+        choice->need_boat = FALSE;
+        want_something = TRUE;
+        log_debug("%s wants to build %s (want=%d)",
+                  city_name(pcity), utype_rule_name(punittype), profit);
       } else {
-      freelog(LOG_DEBUG, "%s doesn't want to build %s (want=%d)",
-		city_name(pcity),
-		utype_rule_name(punittype),
-		profit);
+        log_debug("%s doesn't want to build %s (want=%d)",
+                  city_name(pcity), utype_rule_name(punittype), profit);
       }
       destroy_unit_virtual(virtual_unit);
     }

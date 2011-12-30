@@ -15,18 +15,21 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
-
-#include "hash.h"
+/* utility */
 #include "log.h"
 #include "shared.h"
 
+/* common */
 #include "player.h"
 
+/* client/include */
 #include "colors_g.h"
 
-#include "colors_common.h"
+/* client */
 #include "tilespec.h"
+
+#include "colors_common.h"
+
 
 /* An RGBcolor contains the R,G,B bitvalues for a color.  The color itself
  * holds the color structure for this color but may be NULL (it's allocated
@@ -36,17 +39,31 @@ struct rgbcolor {
   struct color *color;
 };
 
+static struct rgbcolor *rgbcolor_copy(const struct rgbcolor *prgb);
+static void rgbcolor_destroy(struct rgbcolor *prgb);
+
+#define SPECHASH_TAG terrain_color
+#define SPECHASH_KEY_TYPE char *
+#define SPECHASH_DATA_TYPE struct rgbcolor *
+#define SPECHASH_KEY_VAL genhash_str_val_func
+#define SPECHASH_KEY_COMP genhash_str_comp_func
+#define SPECHASH_KEY_COPY genhash_str_copy_func
+#define SPECHASH_KEY_FREE genhash_str_free_func
+#define SPECHASH_DATA_COPY rgbcolor_copy
+#define SPECHASH_DATA_FREE rgbcolor_destroy
+#include "spechash.h"
+
 struct color_system {
   struct rgbcolor colors[COLOR_LAST];
 
   int num_player_colors;
   struct rgbcolor *player_colors;
 
-  /* Terrain colors: we have one color per terrain.  These are stored in a
-   * larger-than-necessary array.  There's also a hash that is used to store
+  /* Terrain colors: we have one color per terrain. These are stored in a
+   * larger-than-necessary array. There's also a hash that is used to store
    * all colors; this is created when the tileset toplevel is read and later
    * used when the rulesets are received. */
-  struct hash_table *terrain_hash;
+  struct terrain_color_hash *terrain_hash;
   struct rgbcolor terrain_colors[MAX_NUM_TERRAINS];
 };
 
@@ -97,6 +114,26 @@ char *color_names[] = {
 };
 
 /****************************************************************************
+  Duplicate a rgb color.
+****************************************************************************/
+static struct rgbcolor *rgbcolor_copy(const struct rgbcolor *prgb)
+{
+  struct rgbcolor *pnew = fc_malloc(sizeof(*pnew));
+
+  *pnew = *prgb;
+  return pnew;
+}
+
+/****************************************************************************
+  Free a rgb color.
+****************************************************************************/
+static void rgbcolor_destroy(struct rgbcolor *prgb)
+{
+  fc_assert_ret(NULL != prgb);
+  free(prgb);
+}
+
+/****************************************************************************
   Called when the client first starts to allocate the default colors.
 
   Currently this must be called in ui_main, generally after UI
@@ -107,19 +144,24 @@ struct color_system *color_system_read(struct section_file *file)
   int i;
   struct color_system *colors = fc_malloc(sizeof(*colors));
 
-  assert(ARRAY_SIZE(color_names) == COLOR_LAST);
+  fc_assert_ret_val(ARRAY_SIZE(color_names) == COLOR_LAST, NULL);
   for (i = 0; i < COLOR_LAST; i++) {
-    colors->colors[i].r
-      = secfile_lookup_int(file, "colors.%s0.r", color_names[i]);
-    colors->colors[i].g
-      = secfile_lookup_int(file, "colors.%s0.g", color_names[i]);
-    colors->colors[i].b
-      = secfile_lookup_int(file, "colors.%s0.b", color_names[i]);
+    if (!secfile_lookup_int(file, &colors->colors[i].r,
+                            "colors.%s0.r", color_names[i])
+        || !secfile_lookup_int(file, &colors->colors[i].g,
+                               "colors.%s0.g", color_names[i])
+        || !secfile_lookup_int(file, &colors->colors[i].b,
+                               "colors.%s0.b", color_names[i])) {
+      log_error("Color %s: %s", color_names[i], secfile_error());
+      colors->colors[i].r = 0;
+      colors->colors[i].g = 0;
+      colors->colors[i].b = 0;
+    }
     colors->colors[i].color = NULL;
   }
 
-  for (i = 0; i < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; i++) {
-    if (!section_file_lookup(file, "colors.player%d.r", i)) {
+  for (i = 0; i < player_slot_count(); i++) {
+    if (NULL == secfile_entry_lookup(file, "colors.player%d.r", i)) {
       break;
     }
   }
@@ -128,8 +170,7 @@ struct color_system *color_system_read(struct section_file *file)
 				    * sizeof(*colors->player_colors));
   if (i == 0) {
     /* Use a simple fallback. */
-    freelog(LOG_ERROR,
-	    "Missing colors.player.  See misc/colors.tilespec.");
+    log_error("Missing colors.player. See misc/colors.tilespec.");
     colors->player_colors[0].r = 128;
     colors->player_colors[0].g = 0;
     colors->player_colors[0].b = 0;
@@ -138,9 +179,14 @@ struct color_system *color_system_read(struct section_file *file)
     for (i = 0; i < colors->num_player_colors; i++) {
       struct rgbcolor *rgb = &colors->player_colors[i];
 
-      rgb->r = secfile_lookup_int(file, "colors.player%d.r", i);
-      rgb->g = secfile_lookup_int(file, "colors.player%d.g", i);
-      rgb->b = secfile_lookup_int(file, "colors.player%d.b", i);
+      if (!secfile_lookup_int(file, &rgb->r, "colors.player%d.r", i)
+          || !secfile_lookup_int(file, &rgb->g, "colors.player%d.g", i)
+          || !secfile_lookup_int(file, &rgb->b, "colors.player%d.b", i)) {
+        log_error("Player color %d: %s", i, secfile_error());
+        rgb->r = 0;
+        rgb->g = 0;
+        rgb->b = 0;
+      }
       rgb->color = NULL;
     }
   }
@@ -151,23 +197,24 @@ struct color_system *color_system_read(struct section_file *file)
     rgb->r = rgb->g = rgb->b = 0;
     rgb->color = NULL;
   }
-  colors->terrain_hash = hash_new(hash_fval_string, hash_fcmp_string);
+  colors->terrain_hash = terrain_color_hash_new();
   for (i = 0; ; i++) {
-    struct rgbcolor *rgb;
-    char *key;
+    struct rgbcolor rgb;
+    const char *key;
 
-    if (!section_file_lookup(file, "colors.tiles%d.r", i)) {
+    if (!secfile_lookup_int(file, &rgb.r, "colors.tiles%d.r", i)
+        || !secfile_lookup_int(file, &rgb.g, "colors.tiles%d.g", i)
+        || !secfile_lookup_int(file, &rgb.b, "colors.tiles%d.b", i)) {
       break;
     }
-    rgb = fc_malloc(sizeof(*rgb));
-    rgb->r = secfile_lookup_int(file, "colors.tiles%d.r", i);
-    rgb->g = secfile_lookup_int(file, "colors.tiles%d.g", i);
-    rgb->b = secfile_lookup_int(file, "colors.tiles%d.b", i);
-    rgb->color = NULL;
+
+    rgb.color = NULL;
     key = secfile_lookup_str(file, "colors.tiles%d.tag", i);
 
-    if (!hash_insert(colors->terrain_hash, mystrdup(key), rgb)) {
-      freelog(LOG_ERROR, "warning: already have a color for %s", key);
+    if (NULL == key) {
+      log_error("warning: tag for tiles %d: %s", i, secfile_error());
+    } else if (!terrain_color_hash_insert(colors->terrain_hash, key, &rgb)) {
+      log_error("warning: already have a color for %s", key);
     }
   }
 
@@ -178,17 +225,16 @@ struct color_system *color_system_read(struct section_file *file)
   Called when terrain info is received from the server.
 ****************************************************************************/
 void color_system_setup_terrain(struct color_system *colors,
-				const struct terrain *pterrain,
-				const char *tag)
+                                const struct terrain *pterrain,
+                                const char *tag)
 {
-  struct rgbcolor *rgb
-    = hash_lookup_data(colors->terrain_hash, tag);
+  struct rgbcolor *rgb;
 
-  if (rgb) {
+  if (terrain_color_hash_lookup(colors->terrain_hash, tag, &rgb)) {
     colors->terrain_colors[terrain_index(pterrain)] = *rgb;
   } else {
-    freelog(LOG_ERROR, "[colors] missing [tile_%s] for \"%s\".",
-            tag, terrain_rule_name(pterrain));
+    log_error("[colors] missing [tile_%s] for \"%s\".",
+              tag, terrain_rule_name(pterrain));
     /* Fallback: the color remains black. */
   }
 }
@@ -216,15 +262,7 @@ void color_system_free(struct color_system *colors)
       color_free(colors->terrain_colors[i].color);
     }
   }
-  while (hash_num_entries(colors->terrain_hash) > 0) {
-    const char *key = hash_key_by_number(colors->terrain_hash, 0);
-    const void *rgb = hash_value_by_number(colors->terrain_hash, 0);
-
-    hash_delete_entry(colors->terrain_hash, key);
-    free((void *)key);
-    free((void *)rgb);
-  }
-  hash_free(colors->terrain_hash);
+  terrain_color_hash_destroy(colors->terrain_hash);
   free(colors);
 }
 
@@ -263,11 +301,12 @@ struct color *get_player_color(const struct tileset *t,
     struct color_system *colors = get_color_system(t);
     int index = player_index(pplayer);
 
-    assert(index >= 0 && colors->num_player_colors > 0);
+    fc_assert_ret_val(index >= 0 && colors->num_player_colors > 0, NULL);
     index %= colors->num_player_colors;
     return ensure_color(&colors->player_colors[index]);
   } else {
-    assert(0);
+    /* Always fails. */
+    fc_assert(NULL != pplayer);
     return NULL;
   }
 }
@@ -286,7 +325,8 @@ struct color *get_terrain_color(const struct tileset *t,
 
     return ensure_color(&colors->terrain_colors[terrain_index(pterrain)]);
   } else {
-    assert(0);
+    /* Always fails. */
+    fc_assert(NULL != pterrain);
     return NULL;
   }
 }

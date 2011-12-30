@@ -21,16 +21,15 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>		/* exit */
 #include <string.h>
 
 /* utility */
 #include "astring.h"
+#include "bitvector.h"
 #include "capability.h"
 #include "fcintl.h"
-#include "hash.h"
 #include "log.h"
 #include "mem.h"
 #include "rand.h"
@@ -71,21 +70,22 @@
 
 #include "tilespec.h"
 
-#define TILESPEC_CAPSTR "+tilespec4+2007.Oct.26 duplicates_ok"
+#define TILESPEC_CAPSTR "+Freeciv-2.3-tilespec duplicates_ok"
 /*
  * Tilespec capabilities acceptable to this program:
  *
- * +tilespec4     -  basic format; required
+ * +Freeciv-2.3-tilespec  -  basic format for Freeciv versions 2.3.x;
+ *                           required
  *
- * duplicates_ok  -  we can handle existence of duplicate tags
- *                   (lattermost tag which appears is used; tilesets which
- *		     have duplicates should specify "+duplicates_ok")
+ * duplicates_ok  -  we can handle existence of duplicate tags (lattermost
+ *                   tag which appears is used; tilesets which have
+ *                   duplicates should specify "duplicates_ok")
  */
 
-#define SPEC_CAPSTR "+spec3"
+#define SPEC_CAPSTR "+Freeciv-2.3-spec"
 /*
  * Individual spec file capabilities acceptable to this program:
- * +spec3          -  basic format, required
+ * +Freeciv-2.3-spec  -  basic format for Freeciv versions 2.3.x; required
  */
 
 #define TILESPEC_SUFFIX ".tilespec"
@@ -264,7 +264,8 @@ struct named_sprites {
     struct sprite
       *disorder,
       *size[NUM_TILES_DIGITS],
-      *size_tens[NUM_TILES_DIGITS],		/* first unused */
+      *size_tens[NUM_TILES_DIGITS],
+      *size_hundreds[NUM_TILES_DIGITS],
       *tile_foodnum[NUM_TILES_DIGITS],
       *tile_shieldnum[NUM_TILES_DIGITS],
       *tile_tradenum[NUM_TILES_DIGITS];
@@ -280,7 +281,8 @@ struct named_sprites {
   struct {
     struct sprite
       *turns[NUM_TILES_DIGITS],
-      *turns_tens[NUM_TILES_DIGITS];
+      *turns_tens[NUM_TILES_DIGITS],
+      *turns_hundreds[NUM_TILES_DIGITS];
   } path;
   struct {
     struct sprite *attention;
@@ -314,16 +316,16 @@ struct named_sprites {
       *selected[EDGE_COUNT],
       *coastline[EDGE_COUNT],
       *borders[EDGE_COUNT][2],
-      *player_borders[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS][EDGE_COUNT][2];
+      *player_borders[MAX_NUM_PLAYER_SLOTS][EDGE_COUNT][2];
   } grid;
   struct {
-    struct sprite *player[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS];
+    struct sprite *player[MAX_NUM_PLAYER_SLOTS];
     struct sprite *background; /* Generic background */
   } backgrounds;
   struct {
     struct sprite_vector overlays;
     struct sprite *background; /* Generic background color */
-    struct sprite *player[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS];
+    struct sprite *player[MAX_NUM_PLAYER_SLOTS];
   } colors;
 
   struct drawing_data *drawing[MAX_NUM_ITEMS];
@@ -391,13 +393,38 @@ struct small_sprite {
   struct sprite *sprite;
 };
 
+/* 'struct small_sprite_list' and related functions. */
 #define SPECLIST_TAG small_sprite
 #define SPECLIST_TYPE struct small_sprite
 #include "speclist.h"
+#define small_sprite_list_iterate(list, pitem)                              \
+  TYPED_LIST_ITERATE(struct small_sprite, list, pitem)
+#define small_sprite_list_iterate_end LIST_ITERATE_END
 
-#define small_sprite_list_iterate(list, pitem) \
-    TYPED_LIST_ITERATE(struct small_sprite, list, pitem)
-#define small_sprite_list_iterate_end  LIST_ITERATE_END
+/* 'struct sprite_hash' and related functions. */
+#define SPECHASH_TAG sprite
+#define SPECHASH_KEY_TYPE char *
+#define SPECHASH_DATA_TYPE struct small_sprite *
+#define SPECHASH_KEY_VAL genhash_str_val_func
+#define SPECHASH_KEY_COMP genhash_str_comp_func
+#define SPECHASH_KEY_COPY genhash_str_copy_func
+#define SPECHASH_KEY_FREE genhash_str_free_func
+#include "spechash.h"
+#define sprite_hash_iterate(hash, tag_name, sprite)                         \
+  TYPED_HASH_ITERATE(const char *, struct small_sprite *,                   \
+                     hash, tag_name, sprite)
+#define sprite_hash_iterate_end HASH_ITERATE_END
+
+/* 'struct drawing_hash' and related functions. */
+static void drawing_data_destroy(struct drawing_data *draw);
+
+#define SPECHASH_TAG drawing
+#define SPECHASH_KEY_TYPE char *
+#define SPECHASH_DATA_TYPE struct drawing_data *
+#define SPECHASH_KEY_VAL genhash_str_val_func
+#define SPECHASH_KEY_COMP genhash_str_comp_func
+#define SPECHASH_DATA_FREE drawing_data_destroy
+#include "spechash.h"
 
 struct tileset {
   char name[512];
@@ -434,19 +461,17 @@ struct tileset {
 
   struct tileset_layer {
     char **match_types;
-    int match_count;
+    size_t match_count;
   } layers[MAX_NUM_LAYERS];
 
   struct specfile_list *specfiles;
   struct small_sprite_list *small_sprites;
 
-  /*
-   * This hash table maps tilespec tags to struct small_sprites.
-   */
-  struct hash_table *sprite_hash;
+  /* This hash table maps tilespec tags to struct small_sprites. */
+  struct sprite_hash *sprite_hash;
 
   /* This hash table maps terrain graphic strings to drawing data. */
-  struct hash_table *tile_hash;
+  struct drawing_hash *tile_hash;
 
   struct named_sprites sprites;
 
@@ -460,12 +485,48 @@ struct tileset *tileset;
 
 int focus_unit_state = 0;
 
+
 /****************************************************************************
-  Hash callback for freeing key
+  Create a new drawing data.
 ****************************************************************************/
-static void sprite_hash_free_key(void *key)
+static struct drawing_data *drawing_data_new(const char *name)
 {
-  free(key);
+  struct drawing_data *draw = fc_calloc(1, sizeof(*draw));
+
+  draw->name = fc_strdup(name);
+  return draw;
+}
+
+/****************************************************************************
+  Free a drawing data.
+****************************************************************************/
+static void drawing_data_destroy(struct drawing_data *draw)
+{
+  int i;
+
+  fc_assert_ret(NULL != draw);
+
+  free(draw->name);
+  if (NULL != draw->mine_tag) {
+    free(draw->mine_tag);
+  }
+  for (i = 0; i < 4; i++) {
+    if (draw->blend[i]) {
+      free_sprite(draw->blend[i]);
+    }
+  }
+  for (i = 0; i < draw->num_layers; i++) {
+    int vec_size = sprite_vector_size(&draw->layer[i].allocated);
+    int j;
+
+    for (j = 0; j < vec_size; j++) {
+      free_sprite(draw->layer[i].allocated.p[j]);
+    }
+
+    sprite_vector_free(&draw->layer[i].base);
+    sprite_vector_free(&draw->layer[i].allocated);
+  }
+  free(draw);
 }
 
 /****************************************************************************
@@ -589,7 +650,7 @@ int tileset_small_sprite_width(const struct tileset *t)
 
 /****************************************************************************
   Return the offset from the origin of the city tile at which to place the
-  citybar text.
+  city bar text.
 ****************************************************************************/
 int tileset_citybar_offset_y(const struct tileset *t)
 {
@@ -678,7 +739,7 @@ static const char *dir_get_tileset_name(enum direction8 dir)
   case DIR8_NORTHWEST:
     return "nw";
   }
-  assert(0);
+  log_error("Wrong direction8 variant: %d.", dir);
   return "";
 }
 
@@ -725,20 +786,18 @@ const struct strvec *get_tileset_list(void)
   if (!tilesets) {
     /* Note: this means you must restart the client after installing a new
        tileset. */
-    char **list, **file;
+    struct strvec *list = fileinfolist(get_data_dirs(), TILESPEC_SUFFIX);
 
     tilesets = strvec_new();
-    list = datafilelist(TILESPEC_SUFFIX);
-    for (file = list; NULL != *file; file++) {
-      struct tileset *t = tileset_read_toplevel(*file, FALSE);
+    strvec_iterate(list, file) {
+      struct tileset *t = tileset_read_toplevel(file, FALSE);
 
       if (t) {
-        strvec_append(tilesets, *file);
+        strvec_append(tilesets, file);
         tileset_free(t);
       }
-      free(*file);
-    }
-    free(list);
+    } strvec_iterate_end;
+    strvec_destroy(list);
   }
 
   return tilesets;
@@ -754,15 +813,16 @@ const struct strvec *get_tileset_list(void)
 static char *tilespec_fullname(const char *tileset_name)
 {
   if (tileset_name) {
-    char fname[strlen(tileset_name) + strlen(TILESPEC_SUFFIX) + 1], *dname;
+    char fname[strlen(tileset_name) + strlen(TILESPEC_SUFFIX) + 1];
+    const char *dname;
 
-    my_snprintf(fname, sizeof(fname),
-		"%s%s", tileset_name, TILESPEC_SUFFIX);
+    fc_snprintf(fname, sizeof(fname),
+                "%s%s", tileset_name, TILESPEC_SUFFIX);
 
-    dname = datafilename(fname);
+    dname = fileinfoname(get_data_dirs(), fname);
 
     if (dname) {
-      return mystrdup(dname);
+      return fc_strdup(dname);
     }
   }
 
@@ -780,23 +840,27 @@ static bool check_tilespec_capabilities(struct section_file *file,
 					const char *filename,
                                         bool verbose)
 {
-  int log_level = verbose ? LOG_ERROR : LOG_DEBUG;
+  enum log_level level = verbose ? LOG_ERROR : LOG_DEBUG;
 
-  char *file_capstr = secfile_lookup_str(file, "%s.options", which);
-  
+  const char *file_capstr = secfile_lookup_str(file, "%s.options", which);
+
+  if (NULL == file_capstr) {
+    log_base(level, "\"%s\": %s file doesn't have a capability string",
+             filename, which);
+    return FALSE;
+  }
   if (!has_capabilities(us_capstr, file_capstr)) {
-    freelog(log_level, "\"%s\": %s file appears incompatible:",
-	    filename, which);
-    freelog(log_level, "  datafile options: %s", file_capstr);
-    freelog(log_level, "  supported options: %s", us_capstr);
+    log_base(level, "\"%s\": %s file appears incompatible:",
+             filename, which);
+    log_base(level, "  datafile options: %s", file_capstr);
+    log_base(level, "  supported options: %s", us_capstr);
     return FALSE;
   }
   if (!has_capabilities(file_capstr, us_capstr)) {
-    freelog(log_level, "\"%s\": %s file requires option(s)"
-			 " that client doesn't support:",
-	    filename, which);
-    freelog(log_level, "  datafile options: %s", file_capstr);
-    freelog(log_level, "  supported options: %s", us_capstr);
+    log_base(level, "\"%s\": %s file requires option(s) "
+             "that client doesn't support:", filename, which);
+    log_base(level, "  datafile options: %s", file_capstr);
+    log_base(level, "  supported options: %s", us_capstr);
     return FALSE;
   }
 
@@ -831,34 +895,7 @@ static void tileset_free_toplevel(struct tileset *t)
   t->num_prefered_themes = 0;
 
   if (t->tile_hash) {
-    while (hash_num_entries(t->tile_hash) > 0) {
-      struct drawing_data *draw
-         = (void *)hash_value_by_number(t->tile_hash, 0);
-
-      hash_delete_entry(t->tile_hash, draw->name);
-      free(draw->name);
-      if (draw->mine_tag) {
-	free(draw->mine_tag);
-      }
-      for (i = 0; i < 4; i++) {
-	if (draw->blend[i]) {
-	  free_sprite(draw->blend[i]);
-	}
-      }
-      for (i = 0; i < draw->num_layers; i++) {
-        int vec_size = sprite_vector_size(&draw->layer[i].allocated);
-        int j;
-
-        for (j = 0; j < vec_size; j++) {
-          free_sprite(draw->layer[i].allocated.p[j]);
-        }
-
-	sprite_vector_free(&draw->layer[i].base);
-        sprite_vector_free(&draw->layer[i].allocated);
-      }
-      free(draw);
-    }
-    hash_free(t->tile_hash);
+    drawing_hash_destroy(t->tile_hash);
     t->tile_hash = NULL; /* Helpful for sanity. */
   }
 
@@ -887,8 +924,8 @@ void tileset_free(struct tileset *t)
 {
   tileset_free_tiles(t);
   tileset_free_toplevel(t);
-  specfile_list_free(t->specfiles);
-  small_sprite_list_free(t->small_sprites);
+  specfile_list_destroy(t->specfiles);
+  small_sprite_list_destroy(t->small_sprites);
   free(t);
 }
 
@@ -901,29 +938,27 @@ void tileset_free(struct tileset *t)
 void tilespec_try_read(const char *tileset_name, bool verbose)
 {
   if (!(tileset = tileset_read_toplevel(tileset_name, verbose))) {
-    char **list = datafilelist(TILESPEC_SUFFIX);
-    int i;
+    struct strvec *list = fileinfolist(get_data_dirs(), TILESPEC_SUFFIX);
 
-    for (i = 0; list[i]; i++) {
-      struct tileset *t = tileset_read_toplevel(list[i], FALSE);
+    strvec_iterate(list, file) {
+      struct tileset *t = tileset_read_toplevel(file, FALSE);
 
       if (t) {
-	if (!tileset || t->priority > tileset->priority) {
-	  tileset = t;
-	} else {
-	  tileset_free(t);
-	}
+        if (!tileset || t->priority > tileset->priority) {
+          tileset = t;
+        } else {
+          tileset_free(t);
+        }
       }
-      free(list[i]);
-    }
-    free(list);
+    } strvec_iterate_end;
+    strvec_destroy(list);
 
     if (!tileset) {
-      freelog(LOG_FATAL, _("No usable default tileset found, aborting!"));
+      log_fatal(_("No usable default tileset found, aborting!"));
       exit(EXIT_FAILURE);
     }
 
-    freelog(LOG_VERBOSE, "Trying tileset \"%s\".", tileset->name);
+    log_verbose("Trying tileset \"%s\".", tileset->name);
   }
   sz_strlcpy(default_tileset_name, tileset_get_name(tileset));
 }
@@ -951,7 +986,7 @@ void tilespec_reread(const char *new_tileset_name)
   sz_strlcpy(tileset_name, name);
   sz_strlcpy(old_name, tileset->name);
 
-  freelog(LOG_NORMAL, _("Loading tileset \"%s\"."), tileset_name);
+  log_normal(_("Loading tileset \"%s\"."), tileset_name);
 
   /* Step 0:  Record old data.
    *
@@ -972,7 +1007,9 @@ void tilespec_reread(const char *new_tileset_name)
    */
   if (!(tileset = tileset_read_toplevel(tileset_name, FALSE))) {
     if (!(tileset = tileset_read_toplevel(old_name, FALSE))) {
-      die("Failed to re-read the currently loaded tileset.");
+      /* Always fails. */
+      fc_assert_exit_msg(NULL != tileset,
+                         "Failed to re-read the currently loaded tileset.");
     }
   }
   sz_strlcpy(default_tileset_name, tileset->name);
@@ -1007,9 +1044,9 @@ void tilespec_reread(const char *new_tileset_name)
   unit_type_iterate(punittype) {
     tileset_setup_unit_type(tileset, punittype);
   } unit_type_iterate_end;
-  government_iterate(gov) {
+  governments_iterate(gov) {
     tileset_setup_government(tileset, gov);
-  } government_iterate_end;
+  } governments_iterate_end;
   base_type_iterate(pbase) {
     tileset_setup_base(tileset, pbase);
   } base_type_iterate_end;
@@ -1048,13 +1085,13 @@ void tilespec_reread(const char *new_tileset_name)
   This is merely a wrapper for tilespec_reread (above) for use in
   options.c and the client local options dialog.
 **************************************************************************/
-void tilespec_reread_callback(struct client_option *poption)
+void tilespec_reread_callback(struct option *poption)
 {
   const char *tileset_name = option_str_get(poption);
 
-  RETURN_IF_FAIL(NULL != tileset_name && tileset_name[0] != '\0');
+  fc_assert_ret(NULL != tileset_name && tileset_name[0] != '\0');
   tilespec_reread(tileset_name);
-  update_menus();
+  menus_init();
 }
 
 /**************************************************************************
@@ -1068,12 +1105,12 @@ static struct sprite *load_gfx_file(const char *gfx_filename)
 
   /* Try out all supported file extensions to find one that works. */
   while ((gfx_fileext = *gfx_fileexts++)) {
-    char *real_full_name;
+    const char *real_full_name;
     char full_name[strlen(gfx_filename) + strlen(gfx_fileext) + 2];
 
     sprintf(full_name, "%s.%s", gfx_filename, gfx_fileext);
-    if ((real_full_name = datafilename(full_name))) {
-      freelog(LOG_DEBUG, "trying to load gfx file \"%s\".", real_full_name);
+    if ((real_full_name = fileinfoname(get_data_dirs(), full_name))) {
+      log_debug("trying to load gfx file \"%s\".", real_full_name);
       s = load_gfxfile(real_full_name);
       if (s) {
 	return s;
@@ -1081,7 +1118,7 @@ static struct sprite *load_gfx_file(const char *gfx_filename)
     }
   }
 
-  freelog(LOG_ERROR, "Could not load gfx file \"%s\".", gfx_filename);
+  log_error("Could not load gfx file \"%s\".", gfx_filename);
   return NULL;
 }
 
@@ -1090,7 +1127,7 @@ static struct sprite *load_gfx_file(const char *gfx_filename)
 **************************************************************************/
 static void ensure_big_sprite(struct specfile *sf)
 {
-  struct section_file the_file, *file = &the_file;
+  struct section_file *file;
   const char *gfx_filename;
 
   if (sf->big_sprite) {
@@ -1101,8 +1138,8 @@ static void ensure_big_sprite(struct specfile *sf)
   /* Otherwise load it.  The big sprite will sometimes be freed and will have
    * to be reloaded, but most of the time it's just loaded once, the small
    * sprites are extracted, and then it's freed. */
-  if (!section_file_load(file, sf->file_name)) {
-    freelog(LOG_FATAL, _("Could not open \"%s\"."), sf->file_name);
+  if (!(file = secfile_load(sf->file_name, TRUE))) {
+    log_fatal(_("Could not open '%s':\n%s"), sf->file_name, secfile_error());
     exit(EXIT_FAILURE);
   }
 
@@ -1116,11 +1153,11 @@ static void ensure_big_sprite(struct specfile *sf)
   sf->big_sprite = load_gfx_file(gfx_filename);
 
   if (!sf->big_sprite) {
-    freelog(LOG_FATAL, "Could not load gfx file for the spec file \"%s\".",
-	    sf->file_name);
+    log_fatal("Could not load gfx file for the spec file \"%s\".",
+              sf->file_name);
     exit(EXIT_FAILURE);
   }
-  section_file_free(file);
+  secfile_destroy(file);
 }
 
 /**************************************************************************
@@ -1131,12 +1168,12 @@ static void ensure_big_sprite(struct specfile *sf)
 static void scan_specfile(struct tileset *t, struct specfile *sf,
 			  bool duplicates_ok)
 {
-  struct section_file the_file, *file = &the_file;
-  char **gridnames;
-  int num_grids, i;
+  struct section_file *file;
+  struct section_list *sections;
+  int i;
 
-  if (!section_file_load(file, sf->file_name)) {
-    freelog(LOG_FATAL, _("Could not open \"%s\"."), sf->file_name);
+  if (!(file = secfile_load(sf->file_name, TRUE))) {
+    log_fatal(_("Could not open '%s':\n%s"), sf->file_name, secfile_error());
     exit(EXIT_FAILURE);
   }
   if (!check_tilespec_capabilities(file, "spec",
@@ -1145,97 +1182,115 @@ static void scan_specfile(struct tileset *t, struct specfile *sf,
   }
 
   /* currently unused */
-  (void) section_file_lookup(file, "info.artists");
+  (void) secfile_entry_lookup(file, "info.artists");
 
-  gridnames = secfile_get_secnames_prefix(file, "grid_", &num_grids);
+  if ((sections = secfile_sections_by_name_prefix(file, "grid_"))) {
+    section_list_iterate(sections, psection) {
+      int j, k;
+      int x_top_left, y_top_left, dx, dy;
+      int pixel_border;
+      const char *sec_name = section_name(psection);
 
-  for (i = 0; i < num_grids; i++) {
-    int j, k;
-    int x_top_left, y_top_left, dx, dy;
-    int pixel_border;
+      pixel_border = secfile_lookup_int_default(file, 0, "%s.pixel_border",
+                                                sec_name);
 
-    pixel_border = secfile_lookup_int_default(file, 0, "%s.pixel_border",
-					      gridnames[i]);
-
-    x_top_left = secfile_lookup_int(file, "%s.x_top_left", gridnames[i]);
-    y_top_left = secfile_lookup_int(file, "%s.y_top_left", gridnames[i]);
-    dx = secfile_lookup_int(file, "%s.dx", gridnames[i]);
-    dy = secfile_lookup_int(file, "%s.dy", gridnames[i]);
-
-    j = -1;
-    while (section_file_lookup(file, "%s.tiles%d.tag", gridnames[i], ++j)) {
-      struct small_sprite *ss = fc_malloc(sizeof(*ss));
-      int row, column;
-      int x1, y1;
-      char **tags;
-      int num_tags;
-      int hot_x, hot_y;
-
-      row = secfile_lookup_int(file, "%s.tiles%d.row", gridnames[i], j);
-      column = secfile_lookup_int(file, "%s.tiles%d.column", gridnames[i], j);
-      tags = secfile_lookup_str_vec(file, &num_tags, "%s.tiles%d.tag",
-				    gridnames[i], j);
-      hot_x = secfile_lookup_int_default(file, 0, "%s.tiles%d.hot_x",
-					 gridnames[i], j);
-      hot_y = secfile_lookup_int_default(file, 0, "%s.tiles%d.hot_y",
-					 gridnames[i], j);
-
-      /* there must be at least 1 because of the while(): */
-      assert(num_tags > 0);
-
-      x1 = x_top_left + (dx + pixel_border) * column;
-      y1 = y_top_left + (dy + pixel_border) * row;
-
-      ss->ref_count = 0;
-      ss->file = NULL;
-      ss->x = x1;
-      ss->y = y1;
-      ss->width = dx;
-      ss->height = dy;
-      ss->sf = sf;
-      ss->sprite = NULL;
-      ss->hot_x = hot_x;
-      ss->hot_y = hot_y;
-
-      small_sprite_list_prepend(t->small_sprites, ss);
-
-      if (!duplicates_ok) {
-        for (k = 0; k < num_tags; k++) {
-          if (!hash_insert(t->sprite_hash, mystrdup(tags[k]), ss)) {
-	    freelog(LOG_ERROR, "warning: already have a sprite for \"%s\".", tags[k]);
-          }
-        }
-      } else {
-        for (k = 0; k < num_tags; k++) {
-	  (void) hash_replace(t->sprite_hash, mystrdup(tags[k]), ss);
-        }
+      if (!secfile_lookup_int(file, &x_top_left, "%s.x_top_left", sec_name)
+          || !secfile_lookup_int(file, &y_top_left,
+                                 "%s.y_top_left", sec_name)
+          || !secfile_lookup_int(file, &dx, "%s.dx", sec_name)
+          || !secfile_lookup_int(file, &dy, "%s.dy", sec_name)) {
+        log_error("Grid \"%s\" invalid: %s", sec_name, secfile_error());
+        continue;
       }
 
-      free(tags);
-      tags = NULL;
-    }
+      j = -1;
+      while (NULL != secfile_entry_lookup(file, "%s.tiles%d.tag",
+                                          sec_name, ++j)) {
+        struct small_sprite *ss;
+        int row, column;
+        int x1, y1;
+        const char **tags;
+        size_t num_tags;
+        int hot_x, hot_y;
+
+        if (!secfile_lookup_int(file, &row, "%s.tiles%d.row", sec_name, j)
+            || !secfile_lookup_int(file, &column, "%s.tiles%d.column",
+                                   sec_name, j)
+            || !(tags = secfile_lookup_str_vec(file, &num_tags,
+                                               "%s.tiles%d.tag",
+                                               sec_name, j))) {
+          log_error("Small sprite \"%s.tiles%d\" invalid: %s",
+                    sec_name, j, secfile_error());
+          continue;
+        }
+        hot_x = secfile_lookup_int_default(file, 0, "%s.tiles%d.hot_x",
+                                           sec_name, j);
+        hot_y = secfile_lookup_int_default(file, 0, "%s.tiles%d.hot_y",
+                                           sec_name, j);
+
+        /* there must be at least 1 because of the while(): */
+        fc_assert_action(num_tags > 0, continue);
+
+        x1 = x_top_left + (dx + pixel_border) * column;
+        y1 = y_top_left + (dy + pixel_border) * row;
+
+        ss = fc_malloc(sizeof(*ss));
+        ss->ref_count = 0;
+        ss->file = NULL;
+        ss->x = x1;
+        ss->y = y1;
+        ss->width = dx;
+        ss->height = dy;
+        ss->sf = sf;
+        ss->sprite = NULL;
+        ss->hot_x = hot_x;
+        ss->hot_y = hot_y;
+
+        small_sprite_list_prepend(t->small_sprites, ss);
+
+        if (!duplicates_ok) {
+          for (k = 0; k < num_tags; k++) {
+            if (!sprite_hash_insert(t->sprite_hash, tags[k], ss)) {
+              log_error("warning: already have a sprite for \"%s\".",
+                        tags[k]);
+            }
+          }
+        } else {
+          for (k = 0; k < num_tags; k++) {
+            (void) sprite_hash_replace(t->sprite_hash, tags[k], ss);
+          }
+        }
+
+        free(tags);
+        tags = NULL;
+      }
+    } section_list_iterate_end;
+    section_list_destroy(sections);
   }
-  free(gridnames);
-  gridnames = NULL;
 
   /* Load "extra" sprites.  Each sprite is one file. */
   i = -1;
-  while (secfile_lookup_str_default(file, NULL, "extra.sprites%d.tag", ++i)) {
-    struct small_sprite *ss = fc_malloc(sizeof(*ss));
-    char **tags;
-    char *filename;
-    int num_tags, k;
+  while (NULL != secfile_entry_lookup(file, "extra.sprites%d.tag", ++i)) {
+    struct small_sprite *ss;
+    const char **tags;
+    const char *filename;
+    size_t num_tags, k;
     int hot_x, hot_y;
 
-    tags
-      = secfile_lookup_str_vec(file, &num_tags, "extra.sprites%d.tag", i);
-    filename = secfile_lookup_str(file, "extra.sprites%d.file", i);
-
+    if (!(tags = secfile_lookup_str_vec(file, &num_tags,
+                                        "extra.sprites%d.tag", i))
+        || !(filename = secfile_lookup_str(file,
+                                           "extra.sprites%d.file", i))) {
+      log_error("Extra sprite \"extra.sprites%d\" invalid: %s",
+                i, secfile_error());
+      continue;
+    }
     hot_x = secfile_lookup_int_default(file, 0, "extra.sprites%d.hot_x", i);
     hot_y = secfile_lookup_int_default(file, 0, "extra.sprites%d.hot_y", i);
 
+    ss = fc_malloc(sizeof(*ss));
     ss->ref_count = 0;
-    ss->file = mystrdup(filename);
+    ss->file = fc_strdup(filename);
     ss->sf = NULL;
     ss->sprite = NULL;
     ss->hot_x = hot_x;
@@ -1245,20 +1300,20 @@ static void scan_specfile(struct tileset *t, struct specfile *sf,
 
     if (!duplicates_ok) {
       for (k = 0; k < num_tags; k++) {
-	if (!hash_insert(t->sprite_hash, mystrdup(tags[k]), ss)) {
-	  freelog(LOG_ERROR, "warning: already have a sprite for \"%s\".", tags[k]);
-	}
+        if (!sprite_hash_insert(t->sprite_hash, tags[k], ss)) {
+          log_error("warning: already have a sprite for \"%s\".", tags[k]);
+        }
       }
     } else {
       for (k = 0; k < num_tags; k++) {
-	(void) hash_replace(t->sprite_hash, mystrdup(tags[k]), ss);
+        (void) sprite_hash_replace(t->sprite_hash, tags[k], ss);
       }
     }
     free(tags);
   }
 
-  section_file_check_unused(file, sf->file_name);
-  section_file_free(file);
+  secfile_check_unused(file);
+  secfile_destroy(file);
 }
 
 /**********************************************************************
@@ -1274,19 +1329,19 @@ static char *tilespec_gfx_filename(const char *gfx_filename)
   {
     char *full_name =
        fc_malloc(strlen(gfx_filename) + strlen(gfx_current_fileext) + 2);
-    char *real_full_name;
+    const char *real_full_name;
 
     sprintf(full_name,"%s.%s",gfx_filename,gfx_current_fileext);
 
-    real_full_name = datafilename(full_name);
+    real_full_name = fileinfoname(get_data_dirs(), full_name);
     free(full_name);
     if (real_full_name) {
-      return mystrdup(real_full_name);
+      return fc_strdup(real_full_name);
     }
   }
 
-  freelog(LOG_FATAL, "Couldn't find a supported gfx file extension for \"%s\".",
-         gfx_filename);
+  log_fatal("Couldn't find a supported gfx file extension for \"%s\".",
+            gfx_filename);
   exit(EXIT_FAILURE);
   return NULL;
 }
@@ -1296,18 +1351,16 @@ static char *tilespec_gfx_filename(const char *gfx_filename)
 ***********************************************************************/
 static int check_sprite_type(const char *sprite_type, const char *tile_section)
 {
-  if (mystrcasecmp(sprite_type, "corner") == 0) {
+  if (fc_strcasecmp(sprite_type, "corner") == 0) {
     return CELL_CORNER;
   }
-  if (mystrcasecmp(sprite_type, "single") == 0) {
+  if (fc_strcasecmp(sprite_type, "single") == 0) {
     return CELL_WHOLE;
   }
-  if (mystrcasecmp(sprite_type, "whole") == 0) {
+  if (fc_strcasecmp(sprite_type, "whole") == 0) {
     return CELL_WHOLE;
   }
-  freelog(LOG_ERROR, "[%s] unknown sprite_type \"%s\".",
-	  tile_section,
-	  sprite_type);
+  log_error("[%s] unknown sprite_type \"%s\".", tile_section, sprite_type);
   return CELL_WHOLE;
 }
 
@@ -1318,58 +1371,67 @@ static int check_sprite_type(const char *sprite_type, const char *tile_section)
 ***********************************************************************/
 struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
 {
-  struct section_file the_file, *file = &the_file;
-  char *fname, *c;
+  struct section_file *file;
+  char *fname;
+  const char *c;
   int i;
-  int num_spec_files, num_sections;
-  char **spec_filenames, **sections;
-  char *file_capstr;
+  size_t num_spec_files;
+  const char **spec_filenames;
+  struct section_list *sections = NULL;
+  const char *file_capstr;
   bool duplicates_ok, is_hex;
   enum direction8 dir;
   const int spl = strlen(TILE_SECTION_PREFIX);
-  struct tileset *t = tileset_new();
+  struct tileset *t = NULL;
+  int ei1, ei2;
 
   fname = tilespec_fullname(tileset_name);
   if (!fname) {
     if (verbose) {
-      freelog(LOG_ERROR, "Can't find tileset \"%s\".", tileset_name); 
+      log_error("Can't find tileset \"%s\".", tileset_name); 
     }
-    tileset_free(t);
     return NULL;
   }
-  freelog(LOG_VERBOSE, "tilespec file is \"%s\".", fname);
+  log_verbose("tilespec file is \"%s\".", fname);
 
-  if (!section_file_load(file, fname)) {
-    freelog(LOG_ERROR, "Could not open \"%s\".", fname);
-    section_file_free(file);
+  if (!(file = secfile_load(fname, TRUE))) {
+    log_error("Could not open '%s':\n%s", fname, secfile_error());
     free(fname);
-    tileset_free(t);
     return NULL;
   }
 
   if (!check_tilespec_capabilities(file, "tilespec",
-				   TILESPEC_CAPSTR, fname, verbose)) {
-    section_file_free(file);
+                                   TILESPEC_CAPSTR, fname, verbose)) {
+    secfile_destroy(file);
     free(fname);
-    tileset_free(t);
     return NULL;
   }
 
+  t = tileset_new();
   file_capstr = secfile_lookup_str(file, "%s.options", "tilespec");
-  duplicates_ok = has_capabilities("+duplicates_ok", file_capstr);
+  duplicates_ok = (NULL != file_capstr
+                   && has_capabilities("+duplicates_ok", file_capstr));
 
-  (void) section_file_lookup(file, "tilespec.name"); /* currently unused */
+  (void) secfile_entry_lookup(file, "tilespec.name"); /* currently unused */
 
   sz_strlcpy(t->name, tileset_name);
-  t->priority = secfile_lookup_int(file, "tilespec.priority");
-
-  t->is_isometric = secfile_lookup_bool(file, "tilespec.is_isometric");
+  if (!secfile_lookup_int(file, &t->priority, "tilespec.priority")
+      || !secfile_lookup_bool(file, &t->is_isometric,
+                              "tilespec.is_isometric")
+      || !secfile_lookup_bool(file, &is_hex, "tilespec.is_hex")) {
+    log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+    goto ON_ERROR;
+  }
 
   /* Read hex-tileset information. */
-  is_hex = secfile_lookup_bool(file, "tilespec.is_hex");
   t->hex_width = t->hex_height = 0;
   if (is_hex) {
-    int hex_side = secfile_lookup_int(file, "tilespec.hex_side");
+    int hex_side;
+
+    if (!secfile_lookup_int(file, &hex_side, "tilespec.hex_side")) {
+      log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+      goto ON_ERROR;
+    }
 
     if (t->is_isometric) {
       t->hex_height = hex_side;
@@ -1381,22 +1443,16 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
   }
 
   if (t->is_isometric && !isometric_view_supported()) {
-    freelog(LOG_NORMAL, _("Client does not support isometric tilesets."));
-    freelog(LOG_NORMAL, _("Using default tileset instead."));
-    assert(tileset_name != NULL);
-    section_file_free(file);
-    free(fname);
-    tileset_free(t);
-    return NULL;
+    log_normal(_("Client does not support isometric tilesets."));
+    log_normal(_("Using default tileset instead."));
+    fc_assert(tileset_name != NULL);
+    goto ON_ERROR;
   }
   if (!t->is_isometric && !overhead_view_supported()) {
-    freelog(LOG_NORMAL, _("Client does not support overhead view tilesets."));
-    freelog(LOG_NORMAL, _("Using default tileset instead."));
-    assert(tileset_name != NULL);
-    section_file_free(file);
-    free(fname);
-    tileset_free(t);
-    return NULL;
+    log_normal(_("Client does not support overhead view tilesets."));
+    log_normal(_("Using default tileset instead."));
+    fc_assert(tileset_name != NULL);
+    goto ON_ERROR;
   }
 
   /* Create arrays of valid and cardinal tileset dirs.  These depend
@@ -1416,14 +1472,17 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
 
     dir = dir_cw(dir);
   } while (dir != DIR8_NORTH);
-  assert(t->num_valid_tileset_dirs % 2 == 0); /* Assumed elsewhere. */
+  fc_assert(t->num_valid_tileset_dirs % 2 == 0); /* Assumed elsewhere. */
   t->num_index_valid = 1 << t->num_valid_tileset_dirs;
   t->num_index_cardinal = 1 << t->num_cardinal_tileset_dirs;
 
-  t->normal_tile_width
-    = secfile_lookup_int(file, "tilespec.normal_tile_width");
-  t->normal_tile_height
-    = secfile_lookup_int(file, "tilespec.normal_tile_height");
+  if (!secfile_lookup_int(file, &t->normal_tile_width,
+                          "tilespec.normal_tile_width")
+      || !secfile_lookup_int(file, &t->normal_tile_height,
+                             "tilespec.normal_tile_height")) {
+    log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+    goto ON_ERROR;
+  }
   if (t->is_isometric) {
     t->full_tile_width = t->normal_tile_width;
     t->full_tile_height = 3 * t->normal_tile_height / 2;
@@ -1435,195 +1494,195 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
     = secfile_lookup_int_default(file, t->full_tile_width, "tilespec.unit_width");
   t->unit_tile_height
     = secfile_lookup_int_default(file, t->full_tile_height, "tilespec.unit_height");
-  t->small_sprite_width
-    = secfile_lookup_int(file, "tilespec.small_tile_width");
-  t->small_sprite_height
-    = secfile_lookup_int(file, "tilespec.small_tile_height");
-  freelog(LOG_VERBOSE, "tile sizes %dx%d, %d%d unit, %d%d small",
-	  t->normal_tile_width, t->normal_tile_height,
-	  t->full_tile_width, t->full_tile_height,
-	  t->small_sprite_width, t->small_sprite_height);
+  if (!secfile_lookup_int(file, &t->small_sprite_width,
+                          "tilespec.small_tile_width")
+      || !secfile_lookup_int(file, &t->small_sprite_height,
+                             "tilespec.small_tile_height")) {
+    log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+    goto ON_ERROR;
+  }
+  log_verbose("tile sizes %dx%d, %d%d unit, %d%d small",
+              t->normal_tile_width, t->normal_tile_height,
+              t->full_tile_width, t->full_tile_height,
+              t->small_sprite_width, t->small_sprite_height);
 
-  t->roadstyle = secfile_lookup_int(file, "tilespec.roadstyle");
-  t->fogstyle = secfile_lookup_int(file, "tilespec.fogstyle");
-  t->darkness_style = secfile_lookup_int(file, "tilespec.darkness_style");
+  if (!secfile_lookup_int(file, &t->roadstyle, "tilespec.roadstyle")
+      /* FIXME: use specenum to load this. */
+      || !secfile_lookup_int(file, &ei1,
+                             "tilespec.fogstyle")
+      /* FIXME: use specenum to load this. */
+      || !secfile_lookup_int(file, &ei2,
+                             "tilespec.darkness_style")) {
+    log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+    goto ON_ERROR;
+  }
+  t->fogstyle = ei1;
+  t->darkness_style = ei2;
+
   if (t->darkness_style < DARKNESS_NONE
       || t->darkness_style > DARKNESS_CORNER
       || (t->darkness_style == DARKNESS_ISORECT
-	  && (!t->is_isometric || t->hex_width > 0 || t->hex_height > 0))) {
-    freelog(LOG_FATAL, "Invalid darkness style set in tileset.");
-    exit(EXIT_FAILURE);
+          && (!t->is_isometric || t->hex_width > 0 || t->hex_height > 0))) {
+    log_error("Invalid darkness style set in tileset \"%s\".", t->name);
+    goto ON_ERROR;
   }
-  t->unit_flag_offset_x
-    = secfile_lookup_int(file, "tilespec.unit_flag_offset_x");
-  t->unit_flag_offset_y
-    = secfile_lookup_int(file, "tilespec.unit_flag_offset_y");
-  t->city_flag_offset_x
-    = secfile_lookup_int(file, "tilespec.city_flag_offset_x");
-  t->city_flag_offset_y
-    = secfile_lookup_int(file, "tilespec.city_flag_offset_y");
-  t->unit_offset_x = secfile_lookup_int(file, "tilespec.unit_offset_x");
-  t->unit_offset_y = secfile_lookup_int(file, "tilespec.unit_offset_y");
+  if (!secfile_lookup_int(file, &t->unit_flag_offset_x,
+                          "tilespec.unit_flag_offset_x")
+      || !secfile_lookup_int(file, &t->unit_flag_offset_y,
+                             "tilespec.unit_flag_offset_y")
+      || !secfile_lookup_int(file, &t->city_flag_offset_x,
+                             "tilespec.city_flag_offset_x")
+      || !secfile_lookup_int(file, &t->city_flag_offset_y,
+                             "tilespec.city_flag_offset_y")
+      || !secfile_lookup_int(file, &t->unit_offset_x,
+                             "tilespec.unit_offset_x")
+      || !secfile_lookup_int(file, &t->unit_offset_y,
+                             "tilespec.unit_offset_y")
+      || !secfile_lookup_int(file, &t->citybar_offset_y,
+                             "tilespec.citybar_offset_y")
+      || !secfile_lookup_int(file, &t->city_names_font_size,
+                             "tilespec.city_names_font_size")
+      || !secfile_lookup_int(file, &t->city_productions_font_size,
+                             "tilespec.city_productions_font_size")) {
+    log_error("Tileset \"%s\" invalid: %s", t->name, secfile_error());
+    goto ON_ERROR;
+  }
 
-  t->citybar_offset_y
-    = secfile_lookup_int(file, "tilespec.citybar_offset_y");
-
-  t->city_names_font_size
-    = secfile_lookup_int(file, "tilespec.city_names_font_size");
-
-  t->city_productions_font_size
-    = secfile_lookup_int(file, "tilespec.city_productions_font_size");
   set_city_names_font_sizes(t->city_names_font_size,
-			    t->city_productions_font_size);
+                            t->city_productions_font_size);
 
   c = secfile_lookup_str(file, "tilespec.main_intro_file");
   t->main_intro_filename = tilespec_gfx_filename(c);
-  freelog(LOG_DEBUG, "intro file %s", t->main_intro_filename);
-  
+  log_debug("intro file %s", t->main_intro_filename);
+
   c = secfile_lookup_str(file, "tilespec.minimap_intro_file");
   t->minimap_intro_filename = tilespec_gfx_filename(c);
-  freelog(LOG_DEBUG, "radar file %s", t->minimap_intro_filename);
+  log_debug("radar file %s", t->minimap_intro_filename);
 
   /* Terrain layer info. */
   for (i = 0; i < MAX_NUM_LAYERS; i++) {
     struct tileset_layer *tslp = &t->layers[i];
     int j, k;
 
-    tslp->match_types
-      = secfile_lookup_str_vec(file, &tslp->match_count,
-			       "layer%d.match_types", i);
+    tslp->match_types =
+        (char **) secfile_lookup_str_vec(file, &tslp->match_count,
+                                         "layer%d.match_types", i);
     for (j = 0; j < tslp->match_count; j++) {
-      tslp->match_types[j] = mystrdup(tslp->match_types[j]);
+      tslp->match_types[j] = fc_strdup(tslp->match_types[j]);
 
       for (k = 0; k < j; k++) {
         if (tslp->match_types[k][0] == tslp->match_types[j][0]) {
-          freelog(LOG_FATAL, "[layer%d] match_types: \"%s\" initial"
-                             " ('%c') is not unique.",
-                             i,
-                             tslp->match_types[j],
-                             tslp->match_types[j][0]);
-          exit(EXIT_FAILURE);
+          log_fatal("[layer%d] match_types: \"%s\" initial "
+                    "('%c') is not unique.",
+                    i, tslp->match_types[j], tslp->match_types[j][0]);
+          exit(EXIT_FAILURE); /* FIXME: Returns NULL. */
         }
       }
     }
   }
 
   /* Tile drawing info. */
-  sections = secfile_get_secnames_prefix(file, TILE_SECTION_PREFIX, &num_sections);
-  if (num_sections == 0) {
-    freelog(LOG_ERROR, "No [%s] sections supported by tileset \"%s\".",
-				TILE_SECTION_PREFIX, fname);
-    section_file_free(file);
-    free(fname);
-    tileset_free(t);
-    return NULL;
+  sections = secfile_sections_by_name_prefix(file, TILE_SECTION_PREFIX);
+  if (NULL == sections || 0 == section_list_size(sections)) {
+    log_error("No [%s] sections supported by tileset \"%s\".",
+              TILE_SECTION_PREFIX, fname);
+    goto ON_ERROR;
   }
 
-  assert(t->tile_hash == NULL);
-  t->tile_hash = hash_new(hash_fval_string, hash_fcmp_string);
+  fc_assert(t->tile_hash == NULL);
+  t->tile_hash = drawing_hash_new();
 
-  for (i = 0; i < num_sections; i++) {
-    struct drawing_data *draw = fc_calloc(1, sizeof(*draw));
-    char *sprite_type;
+  section_list_iterate(sections, psection) {
+    const char *sec_name = section_name(psection);
+    struct drawing_data *draw = drawing_data_new(sec_name + spl);
+    const char *sprite_type, *str;
     int l;
 
-    draw->name = mystrdup(sections[i] + spl);
-    draw->blending = secfile_lookup_int_default(file, 0,
-						"%s.is_blended",
-						sections[i]);
+    draw->blending = secfile_lookup_int_default(file, 0, "%s.is_blended",
+                                                sec_name);
     draw->blending = CLIP(0, draw->blending, MAX_NUM_LAYERS);
 
     draw->is_reversed = secfile_lookup_bool_default(file, FALSE,
-						    "%s.is_reversed",
-						    sections[i]);
-    draw->num_layers = secfile_lookup_int(file, "%s.num_layers",
-					  sections[i]);
+                                                    "%s.is_reversed",
+                                                    sec_name);
+    draw->num_layers = secfile_lookup_int_default(file, 0, "%s.num_layers",
+                                                  sec_name);
     draw->num_layers = CLIP(1, draw->num_layers, MAX_NUM_LAYERS);
 
     for (l = 0; l < draw->num_layers; l++) {
       struct drawing_layer *dlp = &draw->layer[l];
       struct tileset_layer *tslp = &t->layers[l];
-      char *match_type;
-      char **match_with;
-      int count;
+      const char *match_type;
+      const char **match_with;
+      size_t count;
 
       dlp->is_tall
-	= secfile_lookup_bool_default(file, FALSE, "%s.layer%d_is_tall",
-				      sections[i], l);
+        = secfile_lookup_bool_default(file, FALSE, "%s.layer%d_is_tall",
+                                      sec_name, l);
       dlp->offset_x
-	= secfile_lookup_int_default(file, 0, "%s.layer%d_offset_x",
-				     sections[i], l);
+        = secfile_lookup_int_default(file, 0, "%s.layer%d_offset_x",
+                                     sec_name, l);
       dlp->offset_y
-	= secfile_lookup_int_default(file, 0, "%s.layer%d_offset_y",
-				     sections[i], l);
+        = secfile_lookup_int_default(file, 0, "%s.layer%d_offset_y",
+                                     sec_name, l);
 
       match_type = secfile_lookup_str_default(file, NULL,
-					      "%s.layer%d_match_type",
-					      sections[i], l);
+                                              "%s.layer%d_match_type",
+                                              sec_name, l);
       if (match_type) {
         int j;
 
-	/* Determine our match_type. */
-	for (j = 0; j < tslp->match_count; j++) {
-	  if (mystrcasecmp(tslp->match_types[j], match_type) == 0) {
-	    break;
-	  }
-	}
-	if (j >= tslp->match_count) {
-	  freelog(LOG_ERROR, "[%s] invalid match_type \"%s\".",
-	                     sections[i],
-	                     match_type);
-	} else {
-	  dlp->match_index[dlp->match_indices++] = j;
-	}
+        /* Determine our match_type. */
+        for (j = 0; j < tslp->match_count; j++) {
+          if (fc_strcasecmp(tslp->match_types[j], match_type) == 0) {
+            break;
+          }
+        }
+        if (j >= tslp->match_count) {
+          log_error("[%s] invalid match_type \"%s\".", sec_name, match_type);
+        } else {
+          dlp->match_index[dlp->match_indices++] = j;
+        }
       }
 
       match_with = secfile_lookup_str_vec(file, &count,
-					  "%s.layer%d_match_with",
-					  sections[i], l);
+                                          "%s.layer%d_match_with",
+                                          sec_name, l);
       if (match_with) {
         int j, k;
 
         if (count > MAX_NUM_MATCH_WITH) {
-          freelog(LOG_ERROR, "[%s] match_with has too many types (%d, max %d)",
-                             sections[i],
-                             count,
-                             MAX_NUM_MATCH_WITH);
+          log_error("[%s] match_with has too many types (%d, max %d)",
+                    sec_name, (int) count, MAX_NUM_MATCH_WITH);
           count = MAX_NUM_MATCH_WITH;
         }
 
         if (1 < dlp->match_indices) {
-          freelog(LOG_ERROR, "[%s] previous match_with ignored.",
-                             sections[i]);
+          log_error("[%s] previous match_with ignored.", sec_name);
           dlp->match_indices = 1;
         } else if (1 > dlp->match_indices) {
-          freelog(LOG_ERROR, "[%s] missing match_type, using \"%s\".",
-                             sections[i],
-                             tslp->match_types[0]);
+          log_error("[%s] missing match_type, using \"%s\".",
+                    sec_name, tslp->match_types[0]);
           dlp->match_index[0] = 0;
           dlp->match_indices = 1;
         }
 
         for (k = 0; k < count; k++) {
           for (j = 0; j < tslp->match_count; j++) {
-            if (mystrcasecmp(tslp->match_types[j], match_with[k]) == 0) {
+            if (fc_strcasecmp(tslp->match_types[j], match_with[k]) == 0) {
               break;
             }
           }
           if (j >= tslp->match_count) {
-            freelog(LOG_ERROR, "[%s] layer%d_match_with: invalid  \"%s\".",
-                               sections[i],
-                               l,
-                               match_with[k]);
+            log_error("[%s] layer%d_match_with: invalid  \"%s\".",
+                      sec_name, l, match_with[k]);
           } else if (1 < count) {
             int m;
 
             for (m = 0; m < dlp->match_indices; m++) {
               if (dlp->match_index[m] == j) {
-                freelog(LOG_ERROR, "[%s] layer%d_match_with: duplicate \"%s\".",
-                                   sections[i],
-                                   l,
-                                   match_with[k]);
+                log_error("[%s] layer%d_match_with: duplicate \"%s\".",
+                          sec_name, l, match_with[k]);
                 break;
               }
             }
@@ -1658,8 +1717,8 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
 
       sprite_type
 	= secfile_lookup_str_default(file, "whole", "%s.layer%d_sprite_type",
-				     sections[i], l);
-      dlp->sprite_type = check_sprite_type(sprite_type, sections[i]);
+                                     sec_name, l);
+      dlp->sprite_type = check_sprite_type(sprite_type, sec_name);
 
       switch (dlp->sprite_type) {
       case CELL_WHOLE:
@@ -1669,10 +1728,9 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
 	if (dlp->is_tall
 	    || dlp->offset_x > 0
 	    || dlp->offset_y > 0) {
-	  freelog(LOG_ERROR,
-		  "[%s] layer %d: you cannot have tall terrain or\n"
-		  "a sprite offset with a cell-based drawing method.",
-		  sections[i], l);
+          log_error("[%s] layer %d: you cannot have tall terrain or\n"
+                    "a sprite offset with a cell-based drawing method.",
+                    sec_name, l);
 	  dlp->is_tall = FALSE;
 	  dlp->offset_x = dlp->offset_y = 0;
 	}
@@ -1680,54 +1738,43 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
       };
     }
 
-    draw->mine_tag = secfile_lookup_str_default(file, NULL, "%s.mine_sprite",
-						sections[i]);
-    if (draw->mine_tag) {
-      draw->mine_tag = mystrdup(draw->mine_tag);
+    str = secfile_lookup_str(file, "%s.mine_sprite", sec_name);
+    if (NULL != str) {
+      draw->mine_tag = fc_strdup(str);
     }
 
-    if (!hash_insert(t->tile_hash, draw->name, draw)) {
-      freelog(LOG_ERROR, "warning: duplicate tilespec entry [%s].",
-	      sections[i]);
-      section_file_free(file);
-      free(fname);
-      tileset_free(t);
-      return NULL;
+    if (!drawing_hash_insert(t->tile_hash, draw->name, draw)) {
+      log_error("warning: duplicate tilespec entry [%s].", sec_name);
+      goto ON_ERROR;
     }
-  }
-  free(sections);
+  } section_list_iterate_end;
+  section_list_destroy(sections);
+  sections = NULL;
 
   spec_filenames = secfile_lookup_str_vec(file, &num_spec_files,
-					  "tilespec.files");
-  if (num_spec_files == 0) {
-    freelog(LOG_ERROR, "No tile graphics files specified in \"%s\"", fname);
-    section_file_free(file);
-    free(fname);
-    tileset_free(t);
-    return NULL;
+                                          "tilespec.files");
+  if (NULL == spec_filenames || 0 == num_spec_files) {
+    log_error("No tile graphics files specified in \"%s\"", fname);
+    goto ON_ERROR;
   }
 
-  assert(t->sprite_hash == NULL);
-  t->sprite_hash = hash_new_full(hash_fval_string, hash_fcmp_string,
-                                 sprite_hash_free_key, NULL);
+  fc_assert(t->sprite_hash == NULL);
+  t->sprite_hash = sprite_hash_new();
   for (i = 0; i < num_spec_files; i++) {
     struct specfile *sf = fc_malloc(sizeof(*sf));
-    char *dname;
+    const char *dname;
 
-    freelog(LOG_DEBUG, "spec file %s", spec_filenames[i]);
+    log_debug("spec file %s", spec_filenames[i]);
     
     sf->big_sprite = NULL;
-    dname = datafilename(spec_filenames[i]);
+    dname = fileinfoname(get_data_dirs(), spec_filenames[i]);
     if (!dname) {
       if (verbose) {
-        freelog(LOG_ERROR, "Can't find spec file \"%s\".", spec_filenames[i]);
+        log_error("Can't find spec file \"%s\".", spec_filenames[i]);
       }
-      section_file_free(file);
-      free(fname);
-      tileset_free(t);
-      return NULL;
+      goto ON_ERROR;
     }
-    sf->file_name = mystrdup(dname);
+    sf->file_name = fc_strdup(dname);
     scan_specfile(t, sf, duplicates_ok);
 
     specfile_list_prepend(t->specfiles, sf);
@@ -1736,19 +1783,30 @@ struct tileset *tileset_read_toplevel(const char *tileset_name, bool verbose)
 
   t->color_system = color_system_read(file);
 
-  section_file_check_unused(file, fname);
-  
-  t->prefered_themes = secfile_lookup_str_vec(file, &(t->num_prefered_themes),
-                                              "tilespec.prefered_themes");
+  /* FIXME: remove this hack. */
+  t->prefered_themes =
+    (char **) secfile_lookup_str_vec(file, (size_t *)
+                                     &t->num_prefered_themes,
+                                     "tilespec.prefered_themes");
   for (i = 0; i < t->num_prefered_themes; i++) {
-    t->prefered_themes[i] = mystrdup(t->prefered_themes[i]);
+    t->prefered_themes[i] = fc_strdup(t->prefered_themes[i]);
   }
-  
-  section_file_free(file);
-  freelog(LOG_VERBOSE, "finished reading \"%s\".", fname);
+
+  secfile_check_unused(file);
+  secfile_destroy(file);
+  log_verbose("finished reading \"%s\".", fname);
   free(fname);
 
   return t;
+
+ON_ERROR:
+  secfile_destroy(file);
+  free(fname);
+  tileset_free(t);
+  if (NULL != sections) {
+    section_list_destroy(sections);
+  }
+  return NULL;
 }
 
 /**********************************************************************
@@ -1770,7 +1828,7 @@ static const char *citizen_rule_name(enum citizen_category citizen)
   default:
     break;
   }
-  die("unknown citizen type %d", (int) citizen);
+  log_error("Unknown citizen type: %d.", (int) citizen);
   return NULL;
 }
 
@@ -1822,25 +1880,25 @@ static char *valid_index_str(const struct tileset *t, int index)
 **************************************************************************/
 static struct sprite *load_sprite(struct tileset *t, const char *tag_name)
 {
-  /* Lookup information about where the sprite is found. */
-  struct small_sprite *ss = hash_lookup_data(t->sprite_hash, tag_name);
+  struct small_sprite *ss;
 
-  freelog(LOG_DEBUG, "load_sprite(tag='%s')", tag_name);
-  if (!ss) {
+  log_debug("load_sprite(tag='%s')", tag_name);
+  /* Lookup information about where the sprite is found. */
+  if (!sprite_hash_lookup(t->sprite_hash, tag_name, &ss)) {
     return NULL;
   }
 
-  assert(ss->ref_count >= 0);
+  fc_assert(ss->ref_count >= 0);
 
   if (!ss->sprite) {
     /* If the sprite hasn't been loaded already, then load it. */
-    assert(ss->ref_count == 0);
+    fc_assert(ss->ref_count == 0);
     if (ss->file) {
       ss->sprite = load_gfx_file(ss->file);
       if (!ss->sprite) {
-	freelog(LOG_FATAL, "Couldn't load gfx file \"%s\" for sprite '%s'.",
-		ss->file, tag_name);
-	exit(EXIT_FAILURE);
+        log_fatal("Couldn't load gfx file \"%s\" for sprite '%s'.",
+                  ss->file, tag_name);
+        exit(EXIT_FAILURE);
       }
     } else {
       int sf_w, sf_h;
@@ -1849,9 +1907,8 @@ static struct sprite *load_sprite(struct tileset *t, const char *tag_name)
       get_sprite_dimensions(ss->sf->big_sprite, &sf_w, &sf_h);
       if (ss->x < 0 || ss->x + ss->width > sf_w
 	  || ss->y < 0 || ss->y + ss->height > sf_h) {
-	freelog(LOG_ERROR,
-		"Sprite '%s' in file \"%s\" isn't within the image!",
-		tag_name, ss->sf->file_name);
+        log_error("Sprite '%s' in file \"%s\" isn't within the image!",
+                  tag_name, ss->sf->file_name);
 	return NULL;
       }
       ss->sprite =
@@ -1872,18 +1929,19 @@ static struct sprite *load_sprite(struct tileset *t, const char *tag_name)
 **************************************************************************/
 static void unload_sprite(struct tileset *t, const char *tag_name)
 {
-  struct small_sprite *ss = hash_lookup_data(t->sprite_hash, tag_name);
+  struct small_sprite *ss;
 
-  assert(ss);
-  assert(ss->ref_count >= 1);
-  assert(ss->sprite);
+  sprite_hash_lookup(t->sprite_hash, tag_name, &ss);
+  fc_assert_ret(ss);
+  fc_assert_ret(ss->ref_count >= 1);
+  fc_assert_ret(ss->sprite);
 
   ss->ref_count--;
 
   if (ss->ref_count == 0) {
     /* Nobody's using the sprite anymore, so we should free it.  We know
      * where to find it if we need it again. */
-    freelog(LOG_DEBUG, "freeing sprite '%s'.", tag_name);
+    log_debug("freeing sprite '%s'.", tag_name);
     free_sprite(ss->sprite);
     ss->sprite = NULL;
   }
@@ -1903,12 +1961,12 @@ static void insert_sprite(struct tileset *t, const char *tag_name,
 {
   struct small_sprite *ss = fc_calloc(sizeof(*ss), 1);
 
-  assert(load_sprite(t, tag_name) == 0);
+  fc_assert_ret(load_sprite(t, tag_name) == 0);
   ss->ref_count = 1;
   ss->sprite = sprite;
   small_sprite_list_prepend(t->small_sprites, ss);
-  if (!hash_insert(t->sprite_hash, mystrdup(tag_name), ss)) {
-    freelog(LOG_ERROR, "warning: already have a sprite for '%s'.", tag_name);
+  if (!sprite_hash_insert(t->sprite_hash, tag_name, ss)) {
+    log_error("warning: already have a sprite for '%s'.", tag_name);
   }
 }
 
@@ -1919,18 +1977,15 @@ static void insert_sprite(struct tileset *t, const char *tag_name,
 static bool sprite_exists(const struct tileset *t, const char *tag_name)
 {
   /* Lookup information about where the sprite is found. */
-  struct small_sprite *ss = hash_lookup_data(t->sprite_hash, tag_name);
-
-  return (ss != NULL);
+  return sprite_hash_lookup(t->sprite_hash, tag_name, NULL);
 }
 
 /* Not very safe, but convenient: */
 #define SET_SPRITE(field, tag)					  \
   do {								  \
     t->sprites.field = load_sprite(t, tag);			  \
-    if (!t->sprites.field) {					  \
-      die("Sprite tag '%s' missing.", tag);			  \
-    }								  \
+    fc_assert_exit_msg(NULL != t->sprites.field,                  \
+                       "Sprite tag '%s' missing.", tag);          \
   } while(FALSE)
 
 /* Sets sprites.field to tag or (if tag isn't available) to alt */
@@ -1940,9 +1995,9 @@ static bool sprite_exists(const struct tileset *t, const char *tag_name)
     if (!t->sprites.field) {						    \
       t->sprites.field = load_sprite(t, alt);				    \
     }									    \
-    if (!t->sprites.field) {						    \
-      die("Sprite tag '%s' and alternate '%s' are both missing.", tag, alt);\
-    }									    \
+    fc_assert_exit_msg(NULL != t->sprites.field,                            \
+                       "Sprite tag '%s' and alternate '%s' are "            \
+                       "both missing.", tag, alt)                           \
   } while(FALSE)
 
 /* Sets sprites.field to tag, or NULL if not available */
@@ -1966,7 +2021,7 @@ void tileset_setup_specialist_type(struct tileset *t, Specialist_type_id id)
   const char *name = specialist_rule_name(specialist_by_number(id));
 
   for (j = 0; j < MAX_NUM_CITIZEN_SPRITES; j++) {
-    my_snprintf(buffer, sizeof(buffer), "specialist.%s_%d", name, j);
+    fc_snprintf(buffer, sizeof(buffer), "specialist.%s_%d", name, j);
     t->sprites.specialist[id].sprite[j] = load_sprite(t, buffer);
     if (!t->sprites.specialist[id].sprite[j]) {
       break;
@@ -1974,7 +2029,7 @@ void tileset_setup_specialist_type(struct tileset *t, Specialist_type_id id)
   }
   t->sprites.specialist[id].count = j;
   if (j == 0) {
-    freelog(LOG_FATAL, "No graphics for specialist \"%s\".", name);
+    log_fatal("No graphics for specialist \"%s\".", name);
     exit(EXIT_FAILURE);
   }
 }
@@ -1992,7 +2047,7 @@ static void tileset_setup_citizen_types(struct tileset *t)
     const char *name = citizen_rule_name(i);
 
     for (j = 0; j < MAX_NUM_CITIZEN_SPRITES; j++) {
-      my_snprintf(buffer, sizeof(buffer), "citizen.%s_%d", name, j);
+      fc_snprintf(buffer, sizeof(buffer), "citizen.%s_%d", name, j);
       t->sprites.citizen[i].sprite[j] = load_sprite(t, buffer);
       if (!t->sprites.citizen[i].sprite[j]) {
 	break;
@@ -2000,7 +2055,7 @@ static void tileset_setup_citizen_types(struct tileset *t)
     }
     t->sprites.citizen[i].count = j;
     if (j == 0) {
-      freelog(LOG_FATAL, "No graphics for citizen \"%s\".", name);
+      log_fatal("No graphics for citizen \"%s\".", name);
       exit(EXIT_FAILURE);
     }
   }
@@ -2021,7 +2076,7 @@ static struct sprite *get_city_sprite(const struct city_sprite *city_sprite,
   struct city_style_threshold *thresholds;
   int t;
 
-  assert(style < city_sprite->num_styles);
+  fc_assert_ret_val(style < city_sprite->num_styles, NULL);
 
   if (is_ocean_tile(pcity->tile)
       && city_sprite->styles[style].oceanic_num_thresholds != 0) {
@@ -2063,7 +2118,7 @@ static int load_city_thresholds_sprites(struct tileset *t, const char *tag,
   *thresholds = NULL;
 
   for (size = 0; size < MAX_CITY_SIZE; size++) {
-    my_snprintf(buffer, sizeof(buffer), "%s_%s_%d",
+    fc_snprintf(buffer, sizeof(buffer), "%s_%s_%d",
                 gfx_in_use, tag, size);
     if ((sprite = load_sprite(t, buffer))) {
       num_thresholds++;
@@ -2153,8 +2208,8 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   const char dir_char[] = "nsew";
   const int W = t->normal_tile_width, H = t->normal_tile_height;
   int i, j, f;
-  
-  assert(t->sprite_hash != NULL);
+
+  fc_assert_ret(t->sprite_hash != NULL);
 
   SET_SPRITE(treaty_thumb[0], "treaty.disagree_thumb_down");
   SET_SPRITE(treaty_thumb[1], "treaty.agree_thumb_up");
@@ -2163,7 +2218,7 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
     const char *names[] = {"science_bulb", "warming_sun", "cooling_flake"};
 
     for (i = 0; i < NUM_TILES_PROGRESS; i++) {
-      my_snprintf(buffer, sizeof(buffer), "s.%s_%d", names[j], i);
+      fc_snprintf(buffer, sizeof(buffer), "s.%s_%d", names[j], i);
       SET_SPRITE(indicator[j][i], buffer);
     }
   }
@@ -2190,7 +2245,7 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
       = {"solar_panels", "life_support", "habitation",
 	 "structural", "fuel", "propulsion", "exhaust"};
 
-    my_snprintf(buffer, sizeof(buffer), "spaceship.%s", names[i]);
+    fc_snprintf(buffer, sizeof(buffer), "spaceship.%s", names[i]);
     SET_SPRITE(spaceship[i], buffer);
   }
 
@@ -2201,19 +2256,20 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
 		"invalid", "attack", "edit_paint", "edit_add", "wait"};
       struct small_sprite *ss;
 
-      assert(ARRAY_SIZE(names) == CURSOR_LAST);
-      my_snprintf(buffer, sizeof(buffer), "cursor.%s%d", names[i], f);
+      fc_assert(ARRAY_SIZE(names) == CURSOR_LAST);
+      fc_snprintf(buffer, sizeof(buffer), "cursor.%s%d", names[i], f);
       SET_SPRITE(cursor[i].frame[f], buffer);
-      ss = hash_lookup_data(t->sprite_hash, buffer);
-      t->sprites.cursor[i].hot_x = ss->hot_x;
-      t->sprites.cursor[i].hot_y = ss->hot_y;
+      if (sprite_hash_lookup(t->sprite_hash, buffer, &ss)) {
+        t->sprites.cursor[i].hot_x = ss->hot_x;
+        t->sprites.cursor[i].hot_y = ss->hot_y;
+      }
     }
   }
 
   for (i = 0; i < ICON_COUNT; i++) {
     const char *names[ICON_COUNT] = {"freeciv", "citydlg"};
 
-    my_snprintf(buffer, sizeof(buffer), "icon.%s", names[i]);
+    fc_snprintf(buffer, sizeof(buffer), "icon.%s", names[i]);
     SET_SPRITE(icon[i], buffer);
   }
 
@@ -2230,9 +2286,9 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
       enum direction8 dir = t->valid_tileset_dirs[i];
       const char *dir_name = dir_get_tileset_name(dir);
 
-      my_snprintf(buffer, sizeof(buffer), "r.road_%s", dir_name);
+      fc_snprintf(buffer, sizeof(buffer), "r.road_%s", dir_name);
       SET_SPRITE(road.dir[i], buffer);
-      my_snprintf(buffer, sizeof(buffer), "r.rail_%s", dir_name);
+      fc_snprintf(buffer, sizeof(buffer), "r.rail_%s", dir_name);
       SET_SPRITE(rail.dir[i], buffer);
     }
   } else if (t->roadstyle == 1) {
@@ -2258,26 +2314,28 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
 		     value);
       }
 
-      my_snprintf(buffer, sizeof(buffer), "r.c_road_%s", c);
+      fc_snprintf(buffer, sizeof(buffer), "r.c_road_%s", c);
       SET_SPRITE(road.even[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "r.d_road_%s", d);
+      fc_snprintf(buffer, sizeof(buffer), "r.d_road_%s", d);
       SET_SPRITE(road.odd[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "r.c_rail_%s", c);
+      fc_snprintf(buffer, sizeof(buffer), "r.c_rail_%s", c);
       SET_SPRITE(rail.even[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "r.d_rail_%s", d);
+      fc_snprintf(buffer, sizeof(buffer), "r.d_rail_%s", d);
       SET_SPRITE(rail.odd[i], buffer);
     }
   } else {
     /* Roadstyle 2 includes 256 sprites, one for every possibility.
      * Just go around clockwise, with all combinations. */
     for (i = 0; i < t->num_index_valid; i++) {
-      my_snprintf(buffer, sizeof(buffer), "r.road_%s", valid_index_str(t, i));
+      fc_snprintf(buffer, sizeof(buffer), "r.road_%s",
+                  valid_index_str(t, i));
       SET_SPRITE(road.total[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "r.rail_%s", valid_index_str(t, i));
+      fc_snprintf(buffer, sizeof(buffer), "r.rail_%s",
+                  valid_index_str(t, i));
       SET_SPRITE(rail.total[i], buffer);
     }
   }
@@ -2288,13 +2346,13 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
       enum direction8 dir = t->valid_tileset_dirs[i];
 
       if (!is_cardinal_tileset_dir(t, dir)) {
-	my_snprintf(buffer, sizeof(buffer), "r.c_road_%s",
-		    dir_get_tileset_name(dir));
-	SET_SPRITE_OPT(road.corner[dir], buffer);
+        fc_snprintf(buffer, sizeof(buffer), "r.c_road_%s",
+                    dir_get_tileset_name(dir));
+        SET_SPRITE_OPT(road.corner[dir], buffer);
 
-	my_snprintf(buffer, sizeof(buffer), "r.c_rail_%s",
-		    dir_get_tileset_name(dir));
-	SET_SPRITE_OPT(rail.corner[dir], buffer);
+        fc_snprintf(buffer, sizeof(buffer), "r.c_rail_%s",
+                    dir_get_tileset_name(dir));
+        SET_SPRITE_OPT(rail.corner[dir], buffer);
       }
     }
   }
@@ -2305,12 +2363,12 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   for (i = 0; ; i++) {
     struct sprite *sprite;
 
-    my_snprintf(buffer, sizeof(buffer), "explode.unit_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "explode.unit_%d", i);
     sprite = load_sprite(t, buffer);
     if (!sprite) {
       break;
     }
-    sprite_vector_append(&t->sprites.explode.unit, &sprite);
+    sprite_vector_append(&t->sprites.explode.unit, sprite);
   }
 
   SET_SPRITE(unit.auto_attack,  "unit.auto_attack");
@@ -2332,30 +2390,30 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   SET_SPRITE(unit.connect,      "unit.connect");
   SET_SPRITE(unit.patrol,       "unit.patrol");
   for (i = 0; i < MAX_NUM_BATTLEGROUPS; i++) {
-    my_snprintf(buffer, sizeof(buffer), "unit.battlegroup_%d", i);
-    my_snprintf(buffer2, sizeof(buffer2), "city.size_%d", i + 1);
-    assert(MAX_NUM_BATTLEGROUPS < NUM_TILES_DIGITS);
+    fc_snprintf(buffer, sizeof(buffer), "unit.battlegroup_%d", i);
+    fc_snprintf(buffer2, sizeof(buffer2), "city.size_%d", i + 1);
+    fc_assert(MAX_NUM_BATTLEGROUPS < NUM_TILES_DIGITS);
     SET_SPRITE_ALT(unit.battlegroup[i], buffer, buffer2);
   }
   SET_SPRITE(unit.lowfuel, "unit.lowfuel");
   SET_SPRITE(unit.tired, "unit.tired");
 
   for(i=0; i<NUM_TILES_HP_BAR; i++) {
-    my_snprintf(buffer, sizeof(buffer), "unit.hp_%d", i*10);
+    fc_snprintf(buffer, sizeof(buffer), "unit.hp_%d", i*10);
     SET_SPRITE(unit.hp_bar[i], buffer);
   }
 
   for (i = 0; i < MAX_VET_LEVELS; i++) {
     /* Veteran level sprites are optional.  For instance "green" units
      * usually have no special graphic. */
-    my_snprintf(buffer, sizeof(buffer), "unit.vet_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "unit.vet_%d", i);
     t->sprites.unit.vet_lev[i] = load_sprite(t, buffer);
   }
 
   t->sprites.unit.select[0] = NULL;
   if (sprite_exists(t, "unit.select0")) {
     for (i = 0; i < NUM_TILES_SELECT; i++) {
-      my_snprintf(buffer, sizeof(buffer), "unit.select%d", i);
+      fc_snprintf(buffer, sizeof(buffer), "unit.select%d", i);
       SET_SPRITE(unit.select[i], buffer);
     }
   }
@@ -2369,15 +2427,15 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   for (i = 0; ; i++) {
     struct sprite *sprite;
 
-    my_snprintf(buffer, sizeof(buffer), "citybar.occupancy_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "citybar.occupancy_%d", i);
     sprite = load_sprite(t, buffer);
     if (!sprite) {
       break;
     }
-    sprite_vector_append(&t->sprites.citybar.occupancy, &sprite);
+    sprite_vector_append(&t->sprites.citybar.occupancy, sprite);
   }
   if (t->sprites.citybar.occupancy.size < 2) {
-    freelog(LOG_FATAL, "Missing necessary citybar.occupancy_N sprites.");
+    log_fatal("Missing necessary citybar.occupancy_N sprites.");
     exit(EXIT_FAILURE);
   }
 
@@ -2402,33 +2460,37 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   SET_SPRITE(city.disorder, "city.disorder");
 
   for(i=0; i<NUM_TILES_DIGITS; i++) {
-    my_snprintf(buffer, sizeof(buffer), "city.size_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "city.size_%d", i);
     SET_SPRITE(city.size[i], buffer);
-    my_snprintf(buffer2, sizeof(buffer2), "path.turns_%d", i);
-    SET_SPRITE_ALT_OPT(path.turns[i], buffer2, buffer);
+    fc_snprintf(buffer2, sizeof(buffer2), "path.turns_%d", i);
+    SET_SPRITE_ALT(path.turns[i], buffer2, buffer);
 
-    if(i!=0) {
-      my_snprintf(buffer, sizeof(buffer), "city.size_%d", i*10);
-      SET_SPRITE(city.size_tens[i], buffer);
-      my_snprintf(buffer2, sizeof(buffer2), "path.turns_%d", i * 10);
-      SET_SPRITE_ALT_OPT(path.turns_tens[i], buffer2, buffer);
-    }
-    my_snprintf(buffer, sizeof(buffer), "city.t_food_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "city.size_%d0", i);
+    SET_SPRITE(city.size_tens[i], buffer);
+    fc_snprintf(buffer2, sizeof(buffer2), "path.turns_%d0", i);
+    SET_SPRITE_ALT(path.turns_tens[i], buffer2, buffer);
+
+    fc_snprintf(buffer, sizeof(buffer), "city.size_%d00", i);
+    SET_SPRITE_OPT(city.size_hundreds[i], buffer);
+    fc_snprintf(buffer2, sizeof(buffer2), "path.turns_%d00", i);
+    SET_SPRITE_ALT_OPT(path.turns_hundreds[i], buffer2, buffer);
+
+    fc_snprintf(buffer, sizeof(buffer), "city.t_food_%d", i);
     SET_SPRITE(city.tile_foodnum[i], buffer);
-    my_snprintf(buffer, sizeof(buffer), "city.t_shields_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "city.t_shields_%d", i);
     SET_SPRITE(city.tile_shieldnum[i], buffer);
-    my_snprintf(buffer, sizeof(buffer), "city.t_trade_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "city.t_trade_%d", i);
     SET_SPRITE(city.tile_tradenum[i], buffer);
   }
 
   SET_SPRITE(upkeep.unhappy[0], "upkeep.unhappy");
   SET_SPRITE(upkeep.unhappy[1], "upkeep.unhappy2");
   output_type_iterate(o) {
-    my_snprintf(buffer, sizeof(buffer),
-		"upkeep.%s", get_output_identifier(o));
+    fc_snprintf(buffer, sizeof(buffer),
+                "upkeep.%s", get_output_identifier(o));
     t->sprites.upkeep.output[o][0] = load_sprite(t, buffer);
-    my_snprintf(buffer, sizeof(buffer),
-		"upkeep.%s2", get_output_identifier(o));
+    fc_snprintf(buffer, sizeof(buffer),
+                "upkeep.%s2", get_output_identifier(o));
     t->sprites.upkeep.output[o][1] = load_sprite(t, buffer);
   } output_type_iterate_end;
   
@@ -2440,24 +2502,48 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   SET_SPRITE(tx.fog,        "tx.fog");
 
   /* Load color sprites. */
-  for (i = 0; i < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; i++) {
-    my_snprintf(buffer, sizeof(buffer), "colors.player%d", i);
-    SET_SPRITE(colors.player[i], buffer);
+  {
+    /* Loop over all players and load the corresponding colors. If there
+     * are no more colors start again with color 0. */
+    int now, last = -1; /* the current and the last valid player color */
+    for (i = 0; i < player_slot_count(); i++) {
+      if (last == -1) {
+        now = i;
+      } else {
+        now = i % last;
+      }
+
+      fc_snprintf(buffer, sizeof(buffer), "colors.player%d", now);
+      t->sprites.colors.player[i] = load_sprite(t, buffer);
+
+      if (last == -1 && NULL == t->sprites.colors.player[i]) {
+        last = i;
+        /* repeat this loop */
+        i--;
+      }
+
+      if (i == 0 && last == 0) {
+        /* no color defined */
+        fc_assert_exit_msg(NULL != t->sprites.colors.player[i],
+                           "No player colors defined (sprite tag '%s' "
+                           "missing).", buffer);
+      }
+    }
   }
   SET_SPRITE(colors.background, "colors.background");
   sprite_vector_init(&t->sprites.colors.overlays);
   for (i = 0; ; i++) {
     struct sprite *sprite;
 
-    my_snprintf(buffer, sizeof(buffer), "colors.overlay_%d", i);
+    fc_snprintf(buffer, sizeof(buffer), "colors.overlay_%d", i);
     sprite = load_sprite(t, buffer);
     if (!sprite) {
       break;
     }
-    sprite_vector_append(&t->sprites.colors.overlays, &sprite);
+    sprite_vector_append(&t->sprites.colors.overlays, sprite);
   }
   if (i == 0) {
-    freelog(LOG_FATAL, "Missing overlay-color sprite colors.overlay_0.");
+    log_fatal("Missing overlay-color sprite colors.overlay_0.");
     exit(EXIT_FAILURE);
   }
 
@@ -2485,7 +2571,7 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   t->sprites.backgrounds.background
     = crop_sprite(t->sprites.colors.background, 0, 0, W, H,
 		  t->sprites.mask.tile, 0, 0);
-  for (i = 0; i < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; i++) {
+  for (i = 0; i < player_slot_count(); i++) {
     t->sprites.backgrounds.player[i]
       = crop_sprite(t->sprites.colors.player[i], 0, 0, W, H,
 		    t->sprites.mask.tile, 0, 0);
@@ -2504,30 +2590,30 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
 	continue;
       }
 
-      my_snprintf(buffer, sizeof(buffer), "grid.main.%s", name[i]);
+      fc_snprintf(buffer, sizeof(buffer), "grid.main.%s", name[i]);
       SET_SPRITE(grid.main[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "grid.city.%s", name[i]);
+      fc_snprintf(buffer, sizeof(buffer), "grid.city.%s", name[i]);
       SET_SPRITE(grid.city[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "grid.worked.%s", name[i]);
+      fc_snprintf(buffer, sizeof(buffer), "grid.worked.%s", name[i]);
       SET_SPRITE(grid.worked[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "grid.selected.%s", name[i]);
+      fc_snprintf(buffer, sizeof(buffer), "grid.selected.%s", name[i]);
       SET_SPRITE(grid.selected[i], buffer);
 
-      my_snprintf(buffer, sizeof(buffer), "grid.coastline.%s", name[i]);
+      fc_snprintf(buffer, sizeof(buffer), "grid.coastline.%s", name[i]);
       SET_SPRITE(grid.coastline[i], buffer);
 
       for (j = 0; j < 2; j++) {
-	struct sprite *s;
+        struct sprite *s;
 
-	my_snprintf(buffer, sizeof(buffer), "grid.borders.%c", name[i][j]);
-	SET_SPRITE(grid.borders[i][j], buffer);
+        fc_snprintf(buffer, sizeof(buffer), "grid.borders.%c", name[i][j]);
+        SET_SPRITE(grid.borders[i][j], buffer);
 
-	for (p = 0; p < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; p++) {
-	  my_snprintf(buffer, sizeof(buffer), "grid.borders.%c.%d",
-		      name[i][j], p);
+        for (p = 0; p < player_slot_count(); p++) {
+          fc_snprintf(buffer, sizeof(buffer), "grid.borders.%c.%d",
+                      name[i][j], p);
 	  s = load_sprite(t, buffer);
 
 	  if (!s) {
@@ -2548,8 +2634,8 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   }
 
   for (i = 0; i < t->num_index_cardinal; i++) {
-    my_snprintf(buffer, sizeof(buffer), "tx.s_river_%s",
-		cardinal_index_str(t, i));
+    fc_snprintf(buffer, sizeof(buffer), "tx.s_river_%s",
+                cardinal_index_str(t, i));
     SET_SPRITE(tx.spec_river[i], buffer);
   }
 
@@ -2557,13 +2643,13 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
    * are available.  If not, we just fall back to the basic irrigation
    * graphics. */
   for (i = 0; i < t->num_index_cardinal; i++) {
-    my_snprintf(buffer, sizeof(buffer), "tx.s_irrigation_%s",
-		cardinal_index_str(t, i));
+    fc_snprintf(buffer, sizeof(buffer), "tx.s_irrigation_%s",
+                cardinal_index_str(t, i));
     SET_SPRITE_ALT(tx.irrigation[i], buffer, "tx.irrigation");
   }
   for (i = 0; i < t->num_index_cardinal; i++) {
-    my_snprintf(buffer, sizeof(buffer), "tx.s_farmland_%s",
-		cardinal_index_str(t, i));
+    fc_snprintf(buffer, sizeof(buffer), "tx.s_farmland_%s",
+                cardinal_index_str(t, i));
     SET_SPRITE_ALT(tx.farmland[i], buffer, "tx.farmland");
   }
 
@@ -2579,8 +2665,8 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
       int offsets[4][2] = {{W / 2, 0}, {0, H / 2}, {W / 2, H / 2}, {0, 0}};
 
       if (!darkness) {
-	freelog(LOG_FATAL, "Sprite tx.darkness missing.");
-	exit(EXIT_FAILURE);
+        log_fatal("Sprite tx.darkness missing.");
+        exit(EXIT_FAILURE);
       }
       for (i = 0; i < 4; i++) {
 	t->sprites.tx.darkness[i] = crop_sprite(darkness, offsets[i][0],
@@ -2593,14 +2679,14 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
     for (i = 0; i < t->num_cardinal_tileset_dirs; i++) {
       enum direction8 dir = t->cardinal_tileset_dirs[i];
 
-      my_snprintf(buffer, sizeof(buffer), "tx.darkness_%s",
+      fc_snprintf(buffer, sizeof(buffer), "tx.darkness_%s",
 		  dir_get_tileset_name(dir));
       SET_SPRITE(tx.darkness[i], buffer);
     }
     break;
   case DARKNESS_CARD_FULL:
     for(i = 1; i < t->num_index_cardinal; i++) {
-      my_snprintf(buffer, sizeof(buffer), "tx.darkness_%s",
+      fc_snprintf(buffer, sizeof(buffer), "tx.darkness_%s",
 		  cardinal_index_str(t, i));
       SET_SPRITE(tx.darkness[i], buffer);
     }
@@ -2620,7 +2706,7 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
 
 	cat_snprintf(buf, sizeof(buf), "_%c", ids[values[j]]);
       }
-      assert(k == 0);
+      fc_assert(k == 0);
 
       t->sprites.tx.fullfog[i] = load_sprite(t, buf);
     }
@@ -2628,7 +2714,7 @@ static void tileset_lookup_sprite_tags(struct tileset *t)
   };
 
   for(i=0; i<4; i++) {
-    my_snprintf(buffer, sizeof(buffer), "tx.river_outlet_%c", dir_char[i]);
+    fc_snprintf(buffer, sizeof(buffer), "tx.river_outlet_%c", dir_char[i]);
     SET_SPRITE(tx.river_outlet[i], buffer);
   }
 
@@ -2668,32 +2754,33 @@ void tileset_load_tiles(struct tileset *t)
   Lookup sprite to match tag, or else to match alt if don't find,
   or else return NULL, and emit log message.
 ***********************************************************************/
-struct sprite* tiles_lookup_sprite_tag_alt(struct tileset *t, int loglevel,
-					   const char *tag, const char *alt,
-					   const char *what, const char *name)
+struct sprite *tiles_lookup_sprite_tag_alt(struct tileset *t,
+                                           enum log_level level,
+                                           const char *tag, const char *alt,
+                                           const char *what,
+                                           const char *name)
 {
   struct sprite *sp;
-  
+
   /* (should get sprite_hash before connection) */
-  if (!t->sprite_hash) {
-    die("attempt to lookup for %s \"%s\" before sprite_hash setup", what, name);
-  }
+  fc_assert_ret_val_msg(NULL != t->sprite_hash, NULL,
+                        "attempt to lookup for %s \"%s\" before "
+                        "sprite_hash setup", what, name);
 
   sp = load_sprite(t, tag);
   if (sp) return sp;
 
   sp = load_sprite(t, alt);
   if (sp) {
-    freelog(LOG_VERBOSE,
-	    "Using alternate graphic \"%s\" (instead of \"%s\") for %s \"%s\".",
-	    alt, tag, what, name);
+    log_verbose("Using alternate graphic \"%s\" "
+                "(instead of \"%s\") for %s \"%s\".",
+                alt, tag, what, name);
     return sp;
   }
 
-  freelog(loglevel,
-	  "Don't have graphics tags \"%s\" or \"%s\" for %s \"%s\".",
-	  tag, alt, what, name);
-  if (LOG_FATAL >= loglevel) {
+  log_base(level, "Don't have graphics tags \"%s\" or \"%s\" for %s \"%s\".",
+           tag, alt, what, name);
+  if (LOG_FATAL >= level) {
     exit(EXIT_FAILURE);
   }
   return NULL;
@@ -2752,13 +2839,13 @@ void tileset_setup_tech_type(struct tileset *t,
   tilespec_load_tiles().
 ****************************************************************************/
 void tileset_setup_resource(struct tileset *t,
-			    const struct resource *presource)
+                            const struct resource *presource)
 {
-  assert(presource);
+  fc_assert_ret(NULL != presource);
   t->sprites.resource[resource_index(presource)] =
     tiles_lookup_sprite_tag_alt(t, LOG_VERBOSE, presource->graphic_str,
-				presource->graphic_alt, "resource",
-				resource_rule_name(presource));
+                                presource->graphic_alt, "resource",
+                                resource_rule_name(presource));
 }
 
 /****************************************************************************
@@ -2771,7 +2858,7 @@ void tileset_setup_base(struct tileset *t,
   char full_tag_name[MAX_LEN_NAME + strlen("_fg")];
   const int id = base_index(pbase);
 
-  assert(id >= 0 && id < base_count());
+  fc_assert_ret(id >= 0 && id < base_count());
 
   sz_strlcpy(full_tag_name, pbase->graphic_str);
   strcat(full_tag_name, "_bg");
@@ -2789,11 +2876,10 @@ void tileset_setup_base(struct tileset *t,
       && t->sprites.bases[id].middleground == NULL
       && t->sprites.bases[id].foreground == NULL) {
     /* No primary graphics at all. Try alternative */
-    freelog(LOG_VERBOSE,
-	    "Using alternate graphic \"%s\" (instead of \"%s\") for base \"%s\".",
-            pbase->graphic_alt,
-            pbase->graphic_str,
-            base_rule_name(pbase));
+    log_verbose("Using alternate graphic \"%s\" "
+                "(instead of \"%s\") for base \"%s\".",
+                pbase->graphic_alt, pbase->graphic_str,
+                base_rule_name(pbase));
 
     sz_strlcpy(full_tag_name, pbase->graphic_alt);
     strcat(full_tag_name, "_bg");
@@ -2811,17 +2897,16 @@ void tileset_setup_base(struct tileset *t,
         && t->sprites.bases[id].middleground == NULL
         && t->sprites.bases[id].foreground == NULL) {
       /* Cannot find alternative graphics either */
-      freelog(LOG_FATAL, "No graphics for base \"%s\" at all!",
-              base_rule_name(pbase));
+      log_fatal("No graphics for base \"%s\" at all!",
+                base_rule_name(pbase));
       exit(EXIT_FAILURE);
     }
   }
 
   t->sprites.bases[id].activity = load_sprite(t, pbase->activity_gfx);
   if (t->sprites.bases[id].activity == NULL) {
-    freelog(LOG_FATAL, "Missing %s building activity tag \"%s\".",
-            base_rule_name(pbase),
-            pbase->activity_gfx);
+    log_fatal("Missing %s building activity tag \"%s\".",
+              base_rule_name(pbase), pbase->activity_gfx);
     exit(EXIT_FAILURE);
   }
 }
@@ -2843,16 +2928,12 @@ void tileset_setup_tile_type(struct tileset *t,
     return;
   }
 
-  draw = hash_lookup_data(t->tile_hash, pterrain->graphic_str);
-  if (!draw) {
-    draw = hash_lookup_data(t->tile_hash, pterrain->graphic_alt);
-    if (!draw) {
-      freelog(LOG_FATAL, "Terrain \"%s\": no graphic tile \"%s\" or \"%s\".",
-	      terrain_rule_name(pterrain),
-	      pterrain->graphic_str,
-	      pterrain->graphic_alt);
-      exit(EXIT_FAILURE);
-    }
+  if (!drawing_hash_lookup(t->tile_hash, pterrain->graphic_str, &draw)
+      && !drawing_hash_lookup(t->tile_hash, pterrain->graphic_alt, &draw)) {
+    log_fatal("Terrain \"%s\": no graphic tile \"%s\" or \"%s\".",
+              terrain_rule_name(pterrain), pterrain->graphic_str,
+              pterrain->graphic_alt);
+    exit(EXIT_FAILURE);
   }
 
   /* Set up each layer of the drawing. */
@@ -2868,10 +2949,8 @@ void tileset_setup_tile_type(struct tileset *t,
       case MATCH_NONE:
 	/* Load whole sprites for this tile. */
 	for (i = 0; ; i++) {
-	  my_snprintf(buffer, sizeof(buffer), "t.l%d.%s%d",
-		      l,
-		      draw->name,
-		      i + 1);
+          fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s%d",
+                      l, draw->name, i + 1);
 	  sprite = load_sprite(t, buffer);
 	  if (!sprite) {
 	    break;
@@ -2881,18 +2960,15 @@ void tileset_setup_tile_type(struct tileset *t,
 	}
 	/* check for base sprite, allowing missing sprites above base */
 	if (0 == i  &&  0 == l) {
-	  freelog(LOG_FATAL, "Missing base sprite tag \"%s\".",
-		  buffer);
+          log_fatal("Missing base sprite tag \"%s\".", buffer);
 	  exit(EXIT_FAILURE);
 	}
 	break;
       case MATCH_SAME:
 	/* Load 16 cardinally-matched sprites. */
 	for (i = 0; i < t->num_index_cardinal; i++) {
-	  my_snprintf(buffer, sizeof(buffer), "t.l%d.%s_%s",
-		      l,
-		      draw->name,
-		      cardinal_index_str(t, i));
+          fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s_%s",
+                      l, draw->name, cardinal_index_str(t, i));
 	  dlp->match[i] =
 	    tiles_lookup_sprite_tag_alt(t, LOG_FATAL, buffer, "",
 					"matched terrain",
@@ -2901,8 +2977,8 @@ void tileset_setup_tile_type(struct tileset *t,
 	break;
       case MATCH_PAIR:
       case MATCH_FULL:
-	assert(0); /* not yet defined */
-	break;
+        fc_assert(FALSE); /* not yet defined */
+        break;
       };
       break;
     case CELL_CORNER:
@@ -2917,7 +2993,7 @@ void tileset_setup_tile_type(struct tileset *t,
 	case MATCH_PAIR:
 	case MATCH_SAME:
 	  /* N directions (NSEW) * 3 dimensions of matching */
-	  assert(count == 2);
+          fc_assert(count == 2);
 	  number = NUM_CORNER_DIRS * 2 * 2 * 2;
 	  break;
 	case MATCH_FULL:
@@ -2937,36 +3013,28 @@ void tileset_setup_tile_type(struct tileset *t,
 
 	  switch (dlp->match_style) {
 	  case MATCH_NONE:
-	    my_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c",
-			l,
-			draw->name,
-			direction4letters[dir]);
+            fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c",
+                        l, draw->name, direction4letters[dir]);
 	    dlp->cells[i] =
 	      tiles_lookup_sprite_tag_alt(t, LOG_FATAL, buffer, "",
 					  "cell terrain",
 					  terrain_rule_name(pterrain));
 	    break;
 	  case MATCH_SAME:
-	    my_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c%d%d%d",
-			l,
-			draw->name,
-			direction4letters[dir],
-			(value) & 1,
-			(value >> 1) & 1,
-			(value >> 2) & 1);
+            fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c%d%d%d",
+                        l, draw->name, direction4letters[dir],
+                        (value) & 1, (value >> 1) & 1, (value >> 2) & 1);
 	    dlp->cells[i] =
 	      tiles_lookup_sprite_tag_alt(t, LOG_FATAL, buffer, "",
 					  "same cell terrain",
 					  terrain_rule_name(pterrain));
 	    break;
 	  case MATCH_PAIR:
-	    my_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c_%c_%c_%c",
-			l,
-			draw->name,
-			direction4letters[dir],
-			tslp->match_types[dlp->match_index[(value) & 1]][0],
-			tslp->match_types[dlp->match_index[(value >> 1) & 1]][0],
-			tslp->match_types[dlp->match_index[(value >> 2) & 1]][0]);
+            fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s_cell_%c_%c_%c_%c",
+                        l, draw->name, direction4letters[dir],
+                        tslp->match_types[dlp->match_index[(value) & 1]][0],
+                        tslp->match_types[dlp->match_index[(value >> 1) & 1]][0],
+                        tslp->match_types[dlp->match_index[(value >> 2) & 1]][0]);
 	    dlp->cells[i] =
 	      tiles_lookup_sprite_tag_alt(t, LOG_FATAL, buffer, "",
 					  "cell pair terrain",
@@ -2984,7 +3052,7 @@ void tileset_setup_tile_type(struct tileset *t,
 	      value /= count;
 	      v3 = dlp->match_index[value % count];
 
-	      assert(v1 < count && v2 < count && v3 < count);
+              fc_assert(v1 < count && v2 < count && v3 < count);
 
 	      /* Assume merged cells.  This should be a separate option. */
 	      switch (dir) {
@@ -3017,13 +3085,10 @@ void tileset_setup_tile_type(struct tileset *t,
 
 	      /* Use first character of match_types,
 	       * already checked for uniqueness. */
-	      my_snprintf(buffer, sizeof(buffer),
-			  "t.l%d.cellgroup_%c_%c_%c_%c",
-			  l,
-			  tslp->match_types[n][0],
-			  tslp->match_types[e][0],
-			  tslp->match_types[s][0],
-			  tslp->match_types[w][0]);
+              fc_snprintf(buffer, sizeof(buffer),
+                          "t.l%d.cellgroup_%c_%c_%c_%c", l,
+                          tslp->match_types[n][0], tslp->match_types[e][0],
+                          tslp->match_types[s][0], tslp->match_types[w][0]);
 	      sprite = load_sprite(t, buffer);
 
 	      if (sprite) {
@@ -3047,8 +3112,7 @@ void tileset_setup_tile_type(struct tileset *t,
                 sprite_vector_reserve(&dlp->allocated, vec_size + 1);
                 dlp->allocated.p[vec_size] = sprite;
 	      } else {
-		freelog(LOG_ERROR, "Terrain graphics tag \"%s\" missing.",
-			buffer);
+                log_error("Terrain graphics tag \"%s\" missing.", buffer);
 	      }
 
 	      dlp->cells[i] = sprite;
@@ -3062,7 +3126,7 @@ void tileset_setup_tile_type(struct tileset *t,
   }
 
   /* try an optional special name */
-  my_snprintf(buffer, sizeof(buffer), "t.blend.%s", draw->name);
+  fc_snprintf(buffer, sizeof(buffer), "t.blend.%s", draw->name);
   draw->blender =
     tiles_lookup_sprite_tag_alt(t, LOG_VERBOSE, buffer, "",
 				"blend terrain",
@@ -3083,7 +3147,7 @@ void tileset_setup_tile_type(struct tileset *t,
 
     if (NULL == draw->blender) {
       /* try an unloaded base name */
-      my_snprintf(buffer, sizeof(buffer), "t.l%d.%s1", l, draw->name);
+      fc_snprintf(buffer, sizeof(buffer), "t.l%d.%s1", l, draw->name);
       draw->blender =
 	tiles_lookup_sprite_tag_alt(t, LOG_FATAL, buffer, "",
 				    "base (blend) terrain",
@@ -3149,17 +3213,16 @@ void tileset_setup_nation_flag(struct tileset *t,
   char buf[1024];
 
   for (i = 0; tags[i] && !flag; i++) {
-    my_snprintf(buf, sizeof(buf), "f.%s", tags[i]);
+    fc_snprintf(buf, sizeof(buf), "f.%s", tags[i]);
     flag = load_sprite(t, buf);
   }
   for (i = 0; tags[i] && !shield; i++) {
-    my_snprintf(buf, sizeof(buf), "f.shield.%s", tags[i]);
+    fc_snprintf(buf, sizeof(buf), "f.shield.%s", tags[i]);
     shield = load_sprite(t, buf);
   }
   if (!flag || !shield) {
     /* Should never get here because of the f.unknown fallback. */
-    freelog(LOG_FATAL, "Nation %s: no national flag.",
-            nation_rule_name(nation));
+    log_fatal("Nation %s: no national flag.", nation_rule_name(nation));
     exit(EXIT_FAILURE);
   }
 
@@ -3198,7 +3261,7 @@ static struct sprite *get_unit_nation_flag_sprite(const struct tileset *t,
 #define FULL_TILE_Y_OFFSET (t->normal_tile_height - t->full_tile_height)
 
 #define ADD_SPRITE(s, draw_fog, x_offset, y_offset)			    \
-  (assert(s != NULL),							    \
+  (fc_assert(s != NULL),						    \
    sprs->sprite = s,							    \
    sprs->foggable = (draw_fog && t->fogstyle == FOG_AUTO),		    \
    sprs->offset_x = x_offset,						    \
@@ -3234,8 +3297,8 @@ static void build_tile_data(const struct tile *ptile,
         tspecial_near[dir] = tile_specials(tile1);
         continue;
       }
-      freelog(LOG_ERROR, "build_tile_data() tile (%d,%d) has no terrain!",
-              TILE_XY(tile1));
+      log_error("build_tile_data() tile (%d,%d) has no terrain!",
+                TILE_XY(tile1));
     }
     /* At the edges of the (known) map, pretend the same terrain continued
      * past the edge of the map. */
@@ -3323,7 +3386,7 @@ static int fill_unit_sprite_array(const struct tileset *t,
     ADD_SPRITE_FULL(s);
   }
 
-  if (punit->ai.control && punit->activity != ACTIVITY_EXPLORE) {
+  if (punit->ai_controlled && punit->activity != ACTIVITY_EXPLORE) {
     if (is_military_unit(punit)) {
       ADD_SPRITE_FULL(t->sprites.unit.auto_attack);
     } else {
@@ -3385,7 +3448,7 @@ static int fill_road_corner_sprites(const struct tileset *t,
   struct drawn_sprite *saved_sprs = sprs;
   int i;
 
-  assert(draw_roads_rails);
+  fc_assert_ret_val(draw_roads_rails, 0);
 
   /* Roads going diagonally adjacent to this tile need to be
    * partly drawn on this tile. */
@@ -3431,7 +3494,7 @@ static int fill_rail_corner_sprites(const struct tileset *t,
   struct drawn_sprite *saved_sprs = sprs;
   int i;
 
-  assert(draw_roads_rails);
+  fc_assert_ret_val(draw_roads_rails, 0);
 
   /* Rails going diagonally adjacent to this tile need to be
    * partly drawn on this tile. */
@@ -3678,8 +3741,8 @@ static int fill_irrigation_sprite_array(const struct tileset *t,
   struct drawn_sprite *saved_sprs = sprs;
 
   /* Tiles with S_FARMLAND also have S_IRRIGATION set. */
-  assert(!contains_special(tspecial, S_FARMLAND)
-	 || contains_special(tspecial, S_IRRIGATION));
+  fc_assert_ret_val(!contains_special(tspecial, S_FARMLAND)
+                    || contains_special(tspecial, S_IRRIGATION), 0);
 
   /* We don't draw the irrigation if there's a city (it just gets overdrawn
    * anyway, and ends up looking bad). */
@@ -3727,7 +3790,7 @@ static int fill_city_overlays_sprite_array(const struct tileset *t,
 
   /* Below code does not work if pcity is invisible.
    * Make sure it is not. */
-  assert(pcity == NULL || pcity->tile != NULL);
+  fc_assert_ret_val(pcity == NULL || pcity->tile != NULL, 0);
   if (pcity && !pcity->tile) {
     pcity = NULL;
   }
@@ -3852,7 +3915,7 @@ static int fill_fog_sprite_array(const struct tileset *t,
 	  break;
 	}
       }
-      assert(value >= 0 && value < 3);
+      fc_assert(value >= 0 && value < 3);
 
       tileno = tileno * 3 + value;
     }
@@ -3898,8 +3961,9 @@ static int fill_terrain_sprite_array(struct tileset *t,
 	  int count = sprite_vector_size(&dlp->base);
 
 	  if (count > 0) {
-	    /* Pseudo-random reproducable algorithm to pick a sprite. */
-	    count = myrandomly(tile_index(ptile), count);
+            /* Pseudo-random reproducable algorithm to pick a sprite. Use modulo
+             * to limit the number to a handleable size [0..32000). */
+            count = fc_randomly(tile_index(ptile) % 32000, count);
 
 	    if (dlp->is_tall) {
 	      ox += FULL_TILE_X_OFFSET;
@@ -3930,8 +3994,8 @@ static int fill_terrain_sprite_array(struct tileset *t,
 	}
       case MATCH_PAIR:
       case MATCH_FULL:
-	assert(0); /* not yet defined */
-	break;
+        fc_assert(FALSE); /* not yet defined */
+        break;
       };
       break;
     }
@@ -4158,7 +4222,8 @@ static int fill_grid_sprite_array(const struct tileset *t,
               && !unit_has_orders(pfocus_unit)
               && city_can_be_built_here(pfocus_unit->tile, pfocus_unit)
               && city_tile_to_city_map(&dummy_x, &dummy_y,
-                                      pfocus_unit->tile, tile)) {
+                                       game.info.init_city_radius_sq,
+                                       pfocus_unit->tile, tile)) {
             unit[i] = TRUE;
             break;
           }
@@ -4167,10 +4232,10 @@ static int fill_grid_sprite_array(const struct tileset *t,
       worked[i] = FALSE;
 
       city[i] = (tile
-		 && (NULL == powner || NULL == client.conn.playing
-		     || powner == client.conn.playing)
-		 && (NULL == client.conn.playing
-		     || player_in_city_radius(client.conn.playing, tile)));
+                 && (NULL == powner || NULL == client.conn.playing
+                     || powner == client.conn.playing)
+                 && (NULL == client.conn.playing
+                     || player_in_city_map(client.conn.playing, tile)));
       if (city[i]) {
 	if (citymode) {
 	  /* In citymode, we only draw worked tiles for this city - other
@@ -4208,7 +4273,10 @@ static int fill_grid_sprite_array(const struct tileset *t,
       }
     }
 
-    if (draw_borders && game.info.borders > 0 && known[0] && known[1]) {
+    if (draw_borders
+        && BORDERS_DISABLED != game.info.borders
+        && known[0]
+        && known[1]) {
       struct player *owner0 = tile_owner(pedge->tile[0]);
       struct player *owner1 = tile_owner(pedge->tile[1]);
 
@@ -4249,30 +4317,44 @@ static int fill_goto_sprite_array(const struct tileset *t,
   struct drawn_sprite *saved_sprs = sprs;
 
   if (is_valid_goto_destination(ptile)) {
-    int length, units, tens;
+    bool warn= FALSE;
+    int length;
 
     goto_get_turns(NULL, &length);
-    if (length < 0 || length >= 100) {
-      static bool reported = FALSE;
 
-      if (!reported) {
-	freelog(LOG_ERROR,
-		_("Paths longer than 99 turns are not supported."));
-	freelog(LOG_ERROR,
-		/* TRANS: No full stop after the URL, could cause confusion. */
-		_("Please report this message at %s"),
-		BUG_URL);
-	reported = TRUE;
-      }
-      tens = units = 9;
+    if (0 > length) {
+      ADD_SPRITE_SIMPLE(t->sprites.path.turns[0]);
+      warn = TRUE;
     } else {
-      tens = (length / 10) % NUM_TILES_DIGITS;
-      units = length % NUM_TILES_DIGITS;
+      ADD_SPRITE_SIMPLE(t->sprites.path.turns[length % 10]);
+      if (10 <= length) {
+        ADD_SPRITE_SIMPLE(t->sprites.path.turns_tens[(length / 10) % 10]);
+        if (100 <= length) {
+          struct sprite *sprite =
+              t->sprites.path.turns_hundreds[(length / 100) % 10];
+
+          if (NULL != sprite) {
+            ADD_SPRITE_SIMPLE(sprite);
+          } else {
+            warn = TRUE;
+          }
+          if (1000 <= length) {
+            warn = TRUE;
+          }
+        }
+      }
     }
 
-    ADD_SPRITE_SIMPLE(t->sprites.path.turns[units]);
-    if (tens > 0) {
-      ADD_SPRITE_SIMPLE(t->sprites.path.turns_tens[tens]);
+    if (warn) {
+      /* Warn only once by tileset. */
+      static char last_reported[256] = "";
+
+      if (0 != strcmp(last_reported, t->name)) {
+        log_normal(_("Tileset \"%s\" doesn't support long goto paths, "
+                     "such as %d. Path not displayed as expected."),
+                   t->name, length);
+        sz_strlcpy(last_reported, t->name);
+      }
     }
   }
 
@@ -4354,8 +4436,8 @@ int fill_sprite_array(struct tileset *t,
     if (NULL != pterrain) {
       build_tile_data(ptile, pterrain, tterrain_near, tspecial_near);
     } else {
-      freelog(LOG_ERROR, "fill_sprite_array() tile (%d,%d) has no terrain!",
-              TILE_XY(ptile));
+      log_error("fill_sprite_array() tile (%d,%d) has no terrain!",
+                TILE_XY(ptile));
     }
   }
 
@@ -4390,7 +4472,7 @@ int fill_sprite_array(struct tileset *t,
 
   case LAYER_TERRAIN3:
     if (NULL != pterrain && draw_terrain && !solid_bg) {
-      assert(MAX_NUM_LAYERS == 3);
+      fc_assert(MAX_NUM_LAYERS == 3);
       sprs += fill_terrain_sprite_layer(t, sprs, 2, ptile, pterrain, tterrain_near);
     }
     break;
@@ -4560,12 +4642,40 @@ int fill_sprite_array(struct tileset *t,
   case LAYER_CITY2:
     /* City size.  Drawing this under fog makes it hard to read. */
     if (pcity && draw_cities && !draw_full_citybar) {
-      if (pcity->size >= 10) {
-	ADD_SPRITE(t->sprites.city.size_tens[pcity->size / 10],
-		   FALSE, FULL_TILE_X_OFFSET, FULL_TILE_Y_OFFSET);
-      }
+      bool warn = FALSE;
+
       ADD_SPRITE(t->sprites.city.size[pcity->size % 10],
-		 FALSE, FULL_TILE_X_OFFSET, FULL_TILE_Y_OFFSET);
+                 FALSE, FULL_TILE_X_OFFSET, FULL_TILE_Y_OFFSET);
+      if (10 <= pcity->size) {
+        ADD_SPRITE(t->sprites.city.size_tens[(pcity->size / 10) % 10],
+                   FALSE, FULL_TILE_X_OFFSET, FULL_TILE_Y_OFFSET);
+        if (100 <= pcity->size) {
+          struct sprite *sprite =
+              t->sprites.city.size_hundreds[(pcity->size / 100) % 10];
+
+          if (NULL != sprite) {
+            ADD_SPRITE(sprite, FALSE,
+                       FULL_TILE_X_OFFSET, FULL_TILE_Y_OFFSET);
+          } else {
+            warn = TRUE;
+          }
+          if (1000 <= pcity->size) {
+            warn = TRUE;
+          }
+        }
+      }
+
+      if (warn) {
+        /* Warn only once by tileset. */
+        static char last_reported[256] = "";
+
+        if (0 != strcmp(last_reported, t->name)) {
+          log_normal(_("Tileset \"%s\" doesn't support big cities size, "
+                       "such as %d. Size not displayed as expected."),
+                     t->name, pcity->size);
+          sz_strlcpy(last_reported, t->name);
+        }
+      }
     }
     break;
 
@@ -4600,14 +4710,15 @@ int fill_sprite_array(struct tileset *t,
         ADD_SPRITE_SIMPLE(t->sprites.city.unworked_tile_overlay.p[color]);
       }
 
-      if (map_has_startpos(ptile)) {
+      if (NULL != map_startpos_get(ptile)) {
+        /* FIXME: Use a more representative sprite. */
         ADD_SPRITE_SIMPLE(t->sprites.user.attention);
       }
     }
     break;
 
   case LAYER_COUNT:
-    assert(0);
+    fc_assert(FALSE);
     break;
   }
 
@@ -4633,19 +4744,19 @@ void tileset_setup_city_tiles(struct tileset *t, int style)
 
     for (style = 0; style < game.control.styles_count; style++) {
       if (t->sprites.city.tile->styles[style].land_num_thresholds == 0) {
-	freelog(LOG_FATAL, "City style \"%s\": no city graphics.",
-		city_style_rule_name(style));
-	exit(EXIT_FAILURE);
+        log_fatal("City style \"%s\": no city graphics.",
+                  city_style_rule_name(style));
+        exit(EXIT_FAILURE);
       }
       if (t->sprites.city.wall->styles[style].land_num_thresholds == 0) {
-	freelog(LOG_FATAL, "City style \"%s\": no wall graphics.",
-		city_style_rule_name(style));
-	exit(EXIT_FAILURE);
+        log_fatal("City style \"%s\": no wall graphics.",
+                  city_style_rule_name(style));
+        exit(EXIT_FAILURE);
       }
       if (t->sprites.city.occupied->styles[style].land_num_thresholds == 0) {
-	freelog(LOG_FATAL, "City style \"%s\": no occupied graphics.",
-		city_style_rule_name(style));
-	exit(EXIT_FAILURE);
+        log_fatal("City style \"%s\": no occupied graphics.",
+                  city_style_rule_name(style));
+        exit(EXIT_FAILURE);
       }
     }
   }
@@ -4724,16 +4835,11 @@ struct unit *get_drawable_unit(const struct tileset *t,
 static void unload_all_sprites(struct tileset *t)
 {
   if (t->sprite_hash) {
-    int i, entries = hash_num_entries(t->sprite_hash);
-
-    for (i = 0; i < entries; i++) {
-      const char *tag_name = hash_key_by_number(t->sprite_hash, i);
-      struct small_sprite *ss = hash_lookup_data(t->sprite_hash, tag_name);
-
+    sprite_hash_iterate(t->sprite_hash, tag_name, ss) {
       while (ss->ref_count > 0) {
-	unload_sprite(t, tag_name);
+        unload_sprite(t, tag_name);
       }
-    }
+    } sprite_hash_iterate_end;
   }
 }
 
@@ -4744,7 +4850,7 @@ void tileset_free_tiles(struct tileset *t)
 {
   int i;
 
-  freelog(LOG_DEBUG, "tileset_free_tiles()");
+  log_debug("tileset_free_tiles()");
 
   unload_all_sprites(t);
 
@@ -4756,30 +4862,21 @@ void tileset_free_tiles(struct tileset *t)
   t->sprites.city.occupied = NULL;
 
   if (t->sprite_hash) {
-    const int entries = hash_num_entries(t->sprite_hash);
-
-    for (i = 0; i < entries; i++) {
-      const char *key = hash_key_by_number(t->sprite_hash, 0);
-
-      hash_delete_entry(t->sprite_hash, key);
-      /* now freed by callback */
-    }
-
-    hash_free(t->sprite_hash);
+    sprite_hash_destroy(t->sprite_hash);
     t->sprite_hash = NULL;
   }
 
   small_sprite_list_iterate(t->small_sprites, ss) {
-    small_sprite_list_unlink(t->small_sprites, ss);
+    small_sprite_list_remove(t->small_sprites, ss);
     if (ss->file) {
       free(ss->file);
     }
-    assert(ss->sprite == NULL);
+    fc_assert(ss->sprite == NULL);
     free(ss);
   } small_sprite_list_iterate_end;
 
   specfile_list_iterate(t->specfiles, sf) {
-    specfile_list_unlink(t->specfiles, sf);
+    specfile_list_remove(t->specfiles, sf);
     free(sf->file_name);
     if (sf->big_sprite) {
       free_sprite(sf->big_sprite);
@@ -4798,7 +4895,7 @@ void tileset_free_tiles(struct tileset *t)
   } sprite_vector_iterate_end;
   sprite_vector_free(&t->sprites.city.unworked_tile_overlay);
 
-  for (i = 0; i < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; i++) {
+  for (i = 0; i < player_slot_count(); i++) {
     if (t->sprites.backgrounds.player[i]) {
       free_sprite(t->sprites.backgrounds.player[i]);
       t->sprites.backgrounds.player[i] = NULL;
@@ -4845,10 +4942,10 @@ struct sprite *get_citizen_sprite(const struct tileset *t,
   const struct citizen_graphic *graphic;
 
   if (type < CITIZEN_SPECIALIST) {
-    assert(type >= 0);
+    fc_assert(type >= 0);
     graphic = &t->sprites.citizen[type];
   } else {
-    assert(type < (CITIZEN_SPECIALIST + SP_MAX));
+    fc_assert(type < (CITIZEN_SPECIALIST + SP_MAX));
     graphic = &t->sprites.specialist[type - CITIZEN_SPECIALIST];
   }
 
@@ -4869,10 +4966,7 @@ struct sprite *get_nation_flag_sprite(const struct tileset *t,
 **************************************************************************/
 struct sprite *get_tech_sprite(const struct tileset *t, Tech_type_id tech)
 {
-  if (tech < 0 || tech >= advance_count()) {
-    assert(0);
-    return NULL;
-  }
+  fc_assert_ret_val(0 <= tech && tech < advance_count(), NULL);
   return t->sprites.tech[tech];
 }
 
@@ -4880,12 +4974,9 @@ struct sprite *get_tech_sprite(const struct tileset *t, Tech_type_id tech)
   Return the sprite for the building/improvement.
 **************************************************************************/
 struct sprite *get_building_sprite(const struct tileset *t,
-				   struct impr_type *pimprove)
+                                   struct impr_type *pimprove)
 {
-  if (!pimprove) {
-    assert(0);
-    return NULL;
-  }
+  fc_assert_ret_val(NULL != pimprove, NULL);
   return t->sprites.building[improvement_index(pimprove)];
 }
 
@@ -4893,12 +4984,9 @@ struct sprite *get_building_sprite(const struct tileset *t,
   Return the sprite for the government.
 ****************************************************************************/
 struct sprite *get_government_sprite(const struct tileset *t,
-				     const struct government *gov)
+                                     const struct government *gov)
 {
-  if (!gov) {
-    assert(0);
-    return NULL;
-  }
+  fc_assert_ret_val(NULL != gov, NULL);
   return t->sprites.government[government_index(gov)];
 }
 
@@ -4906,12 +4994,9 @@ struct sprite *get_government_sprite(const struct tileset *t,
   Return the sprite for the unit type (the base "unit" sprite).
 ****************************************************************************/
 struct sprite *get_unittype_sprite(const struct tileset *t,
-				   const struct unit_type *punittype)
+                                   const struct unit_type *punittype)
 {
-  if (!punittype) {
-    assert(0);
-    return NULL;
-  }
+  fc_assert_ret_val(NULL != punittype, NULL);
   return t->sprites.unittype[utype_index(punittype)];
 }
 
@@ -4936,9 +5021,9 @@ struct sprite *get_sample_city_sprite(const struct tileset *t,
   Return a sprite with an "arrow" theme graphic.
 **************************************************************************/
 struct sprite *get_arrow_sprite(const struct tileset *t,
-				enum arrow_type arrow)
+                                enum arrow_type arrow)
 {
-  assert(arrow >= 0 && arrow < ARROW_LAST);
+  fc_assert_ret_val(arrow >= 0 && arrow < ARROW_LAST, NULL);
 
   return t->sprites.arrow[arrow];
 }
@@ -4994,7 +5079,7 @@ struct sprite *get_nuke_explode_sprite(const struct tileset *t)
 }
 
 /**************************************************************************
-  Return all the sprites used for citybar drawing.
+  Return all the sprites used for city bar drawing.
 **************************************************************************/
 const struct citybar_sprites *get_citybar_sprites(const struct tileset *t)
 {
@@ -5058,11 +5143,11 @@ struct sprite *get_attention_crosshair_sprite(const struct tileset *t)
   index should be in [0, NUM_TILES_PROGRESS).
 ****************************************************************************/
 struct sprite *get_indicator_sprite(const struct tileset *t,
-				    enum indicator_type indicator,
-				    int index)
+                                    enum indicator_type indicator,
+                                    int index)
 {
   index = CLIP(0, index, NUM_TILES_PROGRESS - 1);
-  assert(indicator >= 0 && indicator < INDICATOR_COUNT);
+  fc_assert_ret_val(indicator >= 0 && indicator < INDICATOR_COUNT, NULL);
   return t->sprites.indicator[indicator][index];
 }
 
@@ -5156,18 +5241,17 @@ void tileset_use_prefered_theme(const struct tileset *t)
   for (i = 0; i < t->num_prefered_themes; i++) {
     if (strcmp(t->prefered_themes[i], default_theme_name)) {
       if (popup_theme_suggestion_dialog(t->prefered_themes[i])) {
-        freelog(LOG_DEBUG, "trying theme \"%s\".", t->prefered_themes[i]);
+        log_debug("trying theme \"%s\".", t->prefered_themes[i]);
         if (load_theme(t->prefered_themes[i])) {
-          (void) mystrlcpy(default_theme_name, t->prefered_themes[i],
-                           default_theme_name_sz);
+          (void) fc_strlcpy(default_theme_name, t->prefered_themes[i],
+                            default_theme_name_sz);
           return;
         }
       }
     }
   }
-  freelog(LOG_VERBOSE, "The tileset doesn't specify prefered themes or "
-                       "none of prefered themes can be used. Using system "
-		       "default");
+  log_verbose("The tileset doesn't specify preferred themes or none of its "
+              "preferred themes can be used. Using system default.");
   gui_clear_theme();
 }
 
@@ -5241,7 +5325,7 @@ struct sprite *get_basic_mine_sprite(const struct tileset *t)
   struct drawing_data *draw;
   struct terrain *tm;
 
-  tm = find_terrain_by_rule_name("mountains");
+  tm = terrain_by_rule_name("mountains");
   if (tm != NULL) {
     draw = t->sprites.drawing[terrain_index(tm)];
     if (draw->mine != NULL) {

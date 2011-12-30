@@ -154,11 +154,6 @@ void voteinfo_gui_update(void){
 	PyObject* ret = PY_CALL("s", "voteinfo_gui_update");
 	Py_DECREF(ret);
 }
-// void popup_city_dialog(struct city *pcity)
-void popup_city_dialog(struct city *pcity){
-	PyObject* ret = PY_CALL("sO", "popup_city_dialog", py_mapper_city(pcity));
-	Py_DECREF(ret);
-}
 // void popdown_city_dialog(struct city *pcity)
 void popdown_city_dialog(struct city *pcity){
 	PyObject* ret = PY_CALL("sO", "popdown_city_dialog", py_mapper_city(pcity));
@@ -167,11 +162,6 @@ void popdown_city_dialog(struct city *pcity){
 // void popdown_all_city_dialogs(void)
 void popdown_all_city_dialogs(void){
 	PyObject* ret = PY_CALL("s", "popdown_all_city_dialogs");
-	Py_DECREF(ret);
-}
-// void refresh_city_dialog(struct city *pcity)
-void refresh_city_dialog(struct city *pcity){
-	PyObject* ret = PY_CALL("sO", "refresh_city_dialog", py_mapper_city(pcity));
 	Py_DECREF(ret);
 }
 // void refresh_unit_city_dialogs(struct unit *punit)
@@ -257,20 +247,6 @@ void popup_city_report_dialog(bool raise){
 	PyObject* ret = PY_CALL("si", "popup_city_report_dialog", (int)raise);
 	Py_DECREF(ret);
 }
-// void city_report_dialog_update(void)
-void city_report_dialog_update(void){
-	PyObject* ret = PY_CALL("s", "city_report_dialog_update");
-	Py_DECREF(ret);
-}
-// void city_report_dialog_update_city(struct city *pcity)
-void city_report_dialog_update_city(struct city *pcity){
-	PyObject* ret = PY_CALL("sO", "city_report_dialog_update_city", py_mapper_city(pcity));
-	Py_DECREF(ret);
-}
-// void city_report_dialog_update_city(struct city *pcity)
-// continue city_report_dialog_update_city - was processed
-// void city_report_dialog_update_city(struct city *pcity)
-// continue city_report_dialog_update_city - was processed
 // void popup_meswin_dialog(bool raise)
 void popup_meswin_dialog(bool raise){
 	PyObject* ret = PY_CALL("si", "popup_meswin_dialog", (int)raise);
@@ -289,22 +265,9 @@ void real_update_meswin_dialog(void){
 	PyObject* ret = PY_CALL("s", "real_update_meswin_dialog");
 	Py_DECREF(ret);
 }
-// void set_client_page(enum client_pages page)
-void set_client_page(enum client_pages page){
-	PyObject* ret = PY_CALL("si", "set_client_page", (int)page);
-	Py_DECREF(ret);
-}
 // void gui_set_rulesets(int num_rulesets, char **rulesets)
 // ignored
 
-// enum client_pages get_client_page(void)
-enum client_pages get_client_page(void){
-	PyObject* ret = PY_CALL("s", "get_client_page");
-	int retval;
-	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from get_client_page (expected 'i')\n");
-	Py_DECREF(ret);
-	return (enum client_pages)retval;
-}
 // void update_start_page(void)
 void update_start_page(void){
 	PyObject* ret = PY_CALL("s", "update_start_page");
@@ -328,11 +291,6 @@ void science_dialog_update(void){
 // void popup_science_dialog(bool raise)
 void popup_science_dialog(bool raise){
 	PyObject* ret = PY_CALL("si", "popup_science_dialog", (int)raise);
-	Py_DECREF(ret);
-}
-// void economy_report_dialog_update(void)
-void economy_report_dialog_update(void){
-	PyObject* ret = PY_CALL("s", "economy_report_dialog_update");
 	Py_DECREF(ret);
 }
 // void popup_economy_report_dialog(bool raise)
@@ -764,6 +722,142 @@ int test_glue(int val){
 	Py_DECREF(ret);
 	return retval;
 }
+// void real_focus_units_changed(void)
+void real_focus_units_changed(void){
+	PyObject* ret = PY_CALL("s", "real_focus_units_changed");
+	Py_DECREF(ret);
+}
+// bool meswin_dialog_is_open(void)
+bool meswin_dialog_is_open(void){
+	PyObject* ret = PY_CALL("s", "meswin_dialog_is_open");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from meswin_dialog_is_open (expected 'i')\n");
+	Py_DECREF(ret);
+	return (bool)retval;
+}
+// void real_meswin_dialog_update(void)
+void real_meswin_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_meswin_dialog_update");
+	Py_DECREF(ret);
+}
+// void meswin_dialog_popup(bool raise)
+void meswin_dialog_popup(bool raise){
+	PyObject* ret = PY_CALL("si", "meswin_dialog_popup", (int)raise);
+	Py_DECREF(ret);
+}
+// void option_gui_update(struct option *poption)
+void option_gui_update(struct option *poption){
+	PyObject* ret = PY_CALL("sO", "option_gui_update", py_mapper_option(poption));
+	Py_DECREF(ret);
+}
+// void option_dialog_popdown(const struct option_set *poptset)
+void option_dialog_popdown(const struct option_set *poptset){
+	PyObject* ret = PY_CALL("sO", "option_dialog_popdown", py_mapper_option_set(poptset));
+	Py_DECREF(ret);
+}
+// void option_gui_remove(struct option *poption)
+void option_gui_remove(struct option *poption){
+	PyObject* ret = PY_CALL("sO", "option_gui_remove", py_mapper_option(poption));
+	Py_DECREF(ret);
+}
+// void option_gui_add(struct option *poption)
+void option_gui_add(struct option *poption){
+	PyObject* ret = PY_CALL("sO", "option_gui_add", py_mapper_option(poption));
+	Py_DECREF(ret);
+}
+// void science_report_dialog_redraw(void)
+void science_report_dialog_redraw(void){
+	PyObject* ret = PY_CALL("s", "science_report_dialog_redraw");
+	Py_DECREF(ret);
+}
+// void update_overview_scroll_window_pos(int x, int y)
+void update_overview_scroll_window_pos(int x, int y){
+	PyObject* ret = PY_CALL("sii", "update_overview_scroll_window_pos", x, y);
+	Py_DECREF(ret);
+}
+// void close_intel_dialog(struct player *p)
+void close_intel_dialog(struct player *p){
+	PyObject* ret = PY_CALL("sO", "close_intel_dialog", py_mapper_player(p));
+	Py_DECREF(ret);
+}
+// void science_report_dialog_popup(bool raise)
+void science_report_dialog_popup(bool raise){
+	PyObject* ret = PY_CALL("si", "science_report_dialog_popup", (int)raise);
+	Py_DECREF(ret);
+}
+// void endgame_report_dialog_popup(const struct packet_endgame_report *packet)
+void endgame_report_dialog_popup(const struct packet_endgame_report *packet){
+	PyObject* ret = PY_CALL("sO", "endgame_report_dialog_popup", py_mapper_packet_endgame_report(packet));
+	Py_DECREF(ret);
+}
+// void real_set_client_page(enum client_pages page)
+void real_set_client_page(enum client_pages page){
+	PyObject* ret = PY_CALL("si", "real_set_client_page", (int)page);
+	Py_DECREF(ret);
+}
+// enum client_pages get_current_client_page(void)
+enum client_pages get_current_client_page(void){
+	PyObject* ret = PY_CALL("s", "get_current_client_page");
+	int retval;
+	if(PyArg_ParseTuple(ret, "i", &retval) == 0) fprintf(stderr, "TypeError: bad return value from get_current_client_page (expected 'i')\n");
+	Py_DECREF(ret);
+	return (enum client_pages)retval;
+}
+// void real_menus_init(void)
+void real_menus_init(void){
+	PyObject* ret = PY_CALL("s", "real_menus_init");
+	Py_DECREF(ret);
+}
+// void real_menus_update(void)
+void real_menus_update(void){
+	PyObject* ret = PY_CALL("s", "real_menus_update");
+	Py_DECREF(ret);
+}
+// void real_city_report_update_city(struct city *pcity)
+void real_city_report_update_city(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "real_city_report_update_city", py_mapper_city(pcity));
+	Py_DECREF(ret);
+}
+// void real_city_dialog_refresh(struct city *pCity)
+void real_city_dialog_refresh(struct city *pCity){
+	PyObject* ret = PY_CALL("sO", "real_city_dialog_refresh", py_mapper_city(pCity));
+	Py_DECREF(ret);
+}
+// void real_city_dialog_popup(struct city *pcity)
+void real_city_dialog_popup(struct city *pcity){
+	PyObject* ret = PY_CALL("sO", "real_city_dialog_popup", py_mapper_city(pcity));
+	Py_DECREF(ret);
+}
+// void real_conn_list_dialog_update(void)
+void real_conn_list_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_conn_list_dialog_update");
+	Py_DECREF(ret);
+}
+// void real_players_dialog_update(void)
+void real_players_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_players_dialog_update");
+	Py_DECREF(ret);
+}
+// void real_city_report_dialog_update(void)
+void real_city_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_city_report_dialog_update");
+	Py_DECREF(ret);
+}
+// void real_science_report_dialog_update(void)
+void real_science_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_science_report_dialog_update");
+	Py_DECREF(ret);
+}
+// void real_economy_report_dialog_update(void)
+void real_economy_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_economy_report_dialog_update");
+	Py_DECREF(ret);
+}
+// void real_units_report_dialog_update(void)
+void real_units_report_dialog_update(void){
+	PyObject* ret = PY_CALL("s", "real_units_report_dialog_update");
+	Py_DECREF(ret);
+}
 // IGNORED:
 //  void get_overview_area_dimensions(int *width, int *height)
 //  const char **gfx_fileextensions(void)
@@ -778,4 +872,4 @@ int test_glue(int val){
 //  struct color *color_alloc(int r, int g, int b)
 //  char **get_gui_specific_themes_directories(int *count)
 //  char **get_useable_themes_in_directory(const char *directory, int *count)
-// processed 133 ignored 13
+// processed 152 ignored 13

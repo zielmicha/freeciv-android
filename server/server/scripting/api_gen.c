@@ -1,6 +1,6 @@
 /*
 ** Lua binding: api
-** Generated automatically by tolua 5.1.3 on Sat Jul 16 20:19:38 2011.
+** Generated automatically by tolua 5.1.3 on Sat Nov 19 20:25:10 2011.
 */
 
 #include "tolua.h"
@@ -24,6 +24,7 @@ LUALIB_API int luaopen_api (lua_State* tolua_S);
 #endif
 #include "api_types.h"
 #include "api_actions.h"
+#include "api_effects.h"
 #include "api_find.h"
 #include "api_intl.h"
 #include "api_methods.h"
@@ -34,43 +35,19 @@ LUALIB_API int luaopen_api (lua_State* tolua_S);
 /* function to register type */
 static void tolua_reg_types (lua_State* tolua_S)
 {
- tolua_usertype(tolua_S,"Government");
+ tolua_usertype(tolua_S,"Building_Type");
  tolua_usertype(tolua_S,"Tile");
  tolua_usertype(tolua_S,"Terrain");
- tolua_usertype(tolua_S,"Player_ai");
  tolua_usertype(tolua_S,"Nonexistent");
- tolua_usertype(tolua_S,"Nation_Type");
- tolua_usertype(tolua_S,"City");
  tolua_usertype(tolua_S,"Tech_Type");
- tolua_usertype(tolua_S,"Building_Type");
- tolua_usertype(tolua_S,"Unit_Type");
+ tolua_usertype(tolua_S,"Government");
  tolua_usertype(tolua_S,"Player");
+ tolua_usertype(tolua_S,"Unit_List_Link");
+ tolua_usertype(tolua_S,"Unit_Type");
  tolua_usertype(tolua_S,"Unit");
-}
-
-/* get function: control of class  Player_ai */
-static int tolua_get_Player_ai_Player_ai_control(lua_State* tolua_S)
-{
-  Player_ai* self = (Player_ai*)  tolua_tousertype(tolua_S,1,0);
-#ifndef TOLUA_RELEASE
- if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'control'",NULL);
-#endif
- tolua_pushboolean(tolua_S,(bool)self->control);
- return 1;
-}
-
-/* set function: control of class  Player_ai */
-static int tolua_set_Player_ai_Player_ai_control(lua_State* tolua_S)
-{
-  Player_ai* self = (Player_ai*)  tolua_tousertype(tolua_S,1,0);
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'control'",NULL);
- if (!tolua_isboolean(tolua_S,2,0,&tolua_err))
- tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
-#endif
-  self->control = ((bool)  tolua_toboolean(tolua_S,2,0));
- return 0;
+ tolua_usertype(tolua_S,"City_List_Link");
+ tolua_usertype(tolua_S,"City");
+ tolua_usertype(tolua_S,"Nation_Type");
 }
 
 /* get function: name of class  Player */
@@ -109,29 +86,302 @@ static int tolua_set_Player_Player_nation_ptr(lua_State* tolua_S)
  return 0;
 }
 
-/* get function: ai_data of class  Player */
-static int tolua_get_Player_Player_ai_data(lua_State* tolua_S)
+/* get function: ai_controlled of class  Player */
+static int tolua_get_Player_Player_ai_controlled(lua_State* tolua_S)
 {
   Player* self = (Player*)  tolua_tousertype(tolua_S,1,0);
 #ifndef TOLUA_RELEASE
- if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'ai_data'",NULL);
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'ai_controlled'",NULL);
 #endif
- tolua_pushusertype(tolua_S,(void*)&self->ai_data,"Player_ai");
+ tolua_pushboolean(tolua_S,(bool)self->ai_controlled);
  return 1;
 }
 
-/* set function: ai_data of class  Player */
-static int tolua_set_Player_Player_ai_data(lua_State* tolua_S)
+/* set function: ai_controlled of class  Player */
+static int tolua_set_Player_Player_ai_controlled(lua_State* tolua_S)
 {
   Player* self = (Player*)  tolua_tousertype(tolua_S,1,0);
 #ifndef TOLUA_RELEASE
  tolua_Error tolua_err;
- if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'ai_data'",NULL);
- if (!tolua_isusertype(tolua_S,2,"Player_ai",0,&tolua_err))
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'ai_controlled'",NULL);
+ if (!tolua_isboolean(tolua_S,2,0,&tolua_err))
  tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
 #endif
-  self->ai_data = *((Player_ai*)  tolua_tousertype(tolua_S,2,0));
+  self->ai_controlled = ((bool)  tolua_toboolean(tolua_S,2,0));
  return 0;
+}
+
+/* function: api_methods_player_number */
+static int tolua_api_Player_properties_id00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_player_number(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'id'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_num_cities */
+static int tolua_api_Player_num_cities00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_player_num_cities(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'num_cities'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_num_units */
+static int tolua_api_Player_num_units00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_player_num_units(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'num_units'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_has_wonder */
+static int tolua_api_Player_has_wonder00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+  Building_Type* building = ((Building_Type*)  tolua_tousertype(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_player_has_wonder(self,building);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'has_wonder'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_victory */
+static int tolua_api_Player_victory00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  api_methods_player_victory(self);
+ }
+ }
+ return 0;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'victory'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_civilization_score */
+static int tolua_api_Player_civilization_score00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_player_civilization_score(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'civilization_score'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_gold */
+static int tolua_api_Player_gold00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_player_gold(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'gold'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_player_knows_tech */
+static int tolua_api_Player_knows_tech00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Tech_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+  Tech_Type* ptech = ((Tech_Type*)  tolua_tousertype(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_player_knows_tech(self,ptech);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'knows_tech'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_private_player_unit_list_head */
+static int tolua_api_methods_private_Player_unit_list_head00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  Unit_List_Link* tolua_ret = (Unit_List_Link*)  api_methods_private_player_unit_list_head(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit_List_Link");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'unit_list_head'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_private_player_city_list_head */
+static int tolua_api_methods_private_Player_city_list_head00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* self = ((Player*)  tolua_tousertype(tolua_S,1,0));
+ {
+  City_List_Link* tolua_ret = (City_List_Link*)  api_methods_private_player_city_list_head(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"City_List_Link");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'city_list_head'.",&tolua_err);
+ return 0;
+#endif
 }
 
 /* get function: name of class  City */
@@ -170,6 +420,31 @@ static int tolua_set_City_City_owner_ptr(lua_State* tolua_S)
  return 0;
 }
 
+/* get function: original of class  City */
+static int tolua_get_City_City_original_ptr(lua_State* tolua_S)
+{
+  City* self = (City*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'original'",NULL);
+#endif
+ tolua_pushusertype(tolua_S,(void*)self->original,"Player");
+ return 1;
+}
+
+/* set function: original of class  City */
+static int tolua_set_City_City_original_ptr(lua_State* tolua_S)
+{
+  City* self = (City*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'original'",NULL);
+ if (!tolua_isusertype(tolua_S,2,"Player",0,&tolua_err))
+ tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->original = ((Player*)  tolua_tousertype(tolua_S,2,0));
+ return 0;
+}
+
 /* get function: tile of class  City */
 static int tolua_get_City_City_tile_ptr(lua_State* tolua_S)
 {
@@ -195,6 +470,31 @@ static int tolua_set_City_City_tile_ptr(lua_State* tolua_S)
  return 0;
 }
 
+/* get function: size of class  City */
+static int tolua_get_City_City_size(lua_State* tolua_S)
+{
+  City* self = (City*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'size'",NULL);
+#endif
+ tolua_pushnumber(tolua_S,(lua_Number)self->size);
+ return 1;
+}
+
+/* set function: size of class  City */
+static int tolua_set_City_City_size(lua_State* tolua_S)
+{
+  City* self = (City*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'size'",NULL);
+ if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+ tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->size = ((int)  tolua_tonumber(tolua_S,2,0));
+ return 0;
+}
+
 /* get function: id of class  City */
 static int tolua_get_City_City_id(lua_State* tolua_S)
 {
@@ -204,6 +504,62 @@ static int tolua_get_City_City_id(lua_State* tolua_S)
 #endif
  tolua_pushnumber(tolua_S,(lua_Number)self->id);
  return 1;
+}
+
+/* function: api_methods_city_has_building */
+static int tolua_api_City_has_building00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"City",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  City* self = ((City*)  tolua_tousertype(tolua_S,1,0));
+  Building_Type* building = ((Building_Type*)  tolua_tousertype(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_city_has_building(self,building);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'has_building'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_city_map_sq_radius */
+static int tolua_api_City_map_sq_radius00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"City",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  City* self = ((City*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_city_map_sq_radius(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'map_sq_radius'.",&tolua_err);
+ return 0;
+#endif
 }
 
 /* get function: utype of class  Unit */
@@ -317,6 +673,33 @@ static int tolua_get_Unit_Unit_id(lua_State* tolua_S)
  return 1;
 }
 
+/* function: api_methods_unit_city_can_be_built_here */
+static int tolua_api_Unit_is_on_possible_city_tile00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit* self = ((Unit*)  tolua_tousertype(tolua_S,1,0));
+ {
+  bool tolua_ret = (bool)  api_methods_unit_city_can_be_built_here(self);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'is_on_possible_city_tile'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* get function: nat_x of class  Tile */
 static int tolua_get_Tile_Tile_nat_x(lua_State* tolua_S)
 {
@@ -375,6 +758,205 @@ static int tolua_get_Tile_Tile_index(lua_State* tolua_S)
  return 1;
 }
 
+/* function: api_methods_tile_city */
+static int tolua_api_Tile_city00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* self = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+ {
+  City* tolua_ret = (City*)  api_methods_tile_city(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"City");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'city'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_tile_city_exists_within_max_city_map */
+static int tolua_api_Tile_city_exists_within_max_city_map00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isboolean(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* self = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+  bool center = ((bool)  tolua_toboolean(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_tile_city_exists_within_max_city_map(self,center);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'city_exists_within_max_city_map'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_tile_num_units */
+static int tolua_api_Tile_num_units00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* self = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_methods_tile_num_units(self);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'num_units'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_tile_sq_distance */
+static int tolua_api_Tile_sq_distance00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* self = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+  Tile* other = ((Tile*)  tolua_tousertype(tolua_S,2,0));
+ {
+  int tolua_ret = (int)  api_methods_tile_sq_distance(self,other);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'sq_distance'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_private_tile_next_outward_index */
+static int tolua_api_methods_private_Tile_next_outward_index00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,3,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,4,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* pcenter = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+  int index = ((int)  tolua_tonumber(tolua_S,2,0));
+  int max_dist = ((int)  tolua_tonumber(tolua_S,3,0));
+ {
+  int tolua_ret = (int)  api_methods_private_tile_next_outward_index(pcenter,index,max_dist);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'next_outward_index'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_private_tile_for_outward_index */
+static int tolua_api_methods_private_Tile_tile_for_outward_index00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* pcenter = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+  int index = ((int)  tolua_tonumber(tolua_S,2,0));
+ {
+  Tile* tolua_ret = (Tile*)  api_methods_private_tile_for_outward_index(pcenter,index);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Tile");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'tile_for_outward_index'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_private_tile_unit_list_head */
+static int tolua_api_methods_private_Tile_unit_list_head00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* self = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+ {
+  Unit_List_Link* tolua_ret = (Unit_List_Link*)  api_methods_private_tile_unit_list_head(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit_List_Link");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'unit_list_head'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* get function: item_number of class  Government */
 static int tolua_get_Government_Government_item_number(lua_State* tolua_S)
 {
@@ -386,6 +968,60 @@ static int tolua_get_Government_Government_item_number(lua_State* tolua_S)
  return 1;
 }
 
+/* function: api_methods_government_rule_name */
+static int tolua_api_Government_rule_name00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Government",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Government* self = ((Government*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_government_rule_name(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_government_name_translation */
+static int tolua_api_Government_name_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Government",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Government* self = ((Government*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_government_name_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* get function: item_number of class  Nation_Type */
 static int tolua_get_Nation_Type_Nation_Type_item_number(lua_State* tolua_S)
 {
@@ -395,6 +1031,87 @@ static int tolua_get_Nation_Type_Nation_Type_item_number(lua_State* tolua_S)
 #endif
  tolua_pushnumber(tolua_S,(lua_Number)self->item_number);
  return 1;
+}
+
+/* function: api_methods_nation_type_rule_name */
+static int tolua_api_Nation_Type_rule_name00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Nation_Type* self = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_nation_type_rule_name(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_nation_type_name_translation */
+static int tolua_api_Nation_Type_name_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Nation_Type* self = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_nation_type_name_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_nation_type_plural_translation */
+static int tolua_api_Nation_Type_plural_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Nation_Type* self = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_nation_type_plural_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'plural_translation'.",&tolua_err);
+ return 0;
+#endif
 }
 
 /* get function: build_cost of class  Building_Type */
@@ -433,6 +1150,168 @@ static int tolua_get_Building_Type_Building_Type_item_number(lua_State* tolua_S)
  return 1;
 }
 
+/* function: api_methods_building_type_is_wonder */
+static int tolua_api_Building_Type_is_wonder00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  bool tolua_ret = (bool)  api_methods_building_type_is_wonder(self);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'is_wonder'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_building_type_is_great_wonder */
+static int tolua_api_Building_Type_is_great_wonder00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  bool tolua_ret = (bool)  api_methods_building_type_is_great_wonder(self);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'is_great_wonder'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_building_type_is_small_wonder */
+static int tolua_api_Building_Type_is_small_wonder00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  bool tolua_ret = (bool)  api_methods_building_type_is_small_wonder(self);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'is_small_wonder'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_building_type_is_improvement */
+static int tolua_api_Building_Type_is_improvement00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  bool tolua_ret = (bool)  api_methods_building_type_is_improvement(self);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'is_improvement'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_building_type_rule_name */
+static int tolua_api_Building_Type_rule_name00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_building_type_rule_name(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_building_type_name_translation */
+static int tolua_api_Building_Type_name_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Building_Type* self = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_building_type_name_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* get function: build_cost of class  Unit_Type */
 static int tolua_get_Unit_Type_Unit_Type_build_cost(lua_State* tolua_S)
 {
@@ -469,6 +1348,147 @@ static int tolua_get_Unit_Type_Unit_Type_item_number(lua_State* tolua_S)
  return 1;
 }
 
+/* function: api_methods_unit_type_has_flag */
+static int tolua_api_Unit_Type_has_flag00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
+ !tolua_isstring(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_Type* self = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
+  const char* flag = ((const char*)  tolua_tostring(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_unit_type_has_flag(self,flag);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'has_flag'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_unit_type_has_role */
+static int tolua_api_Unit_Type_has_role00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
+ !tolua_isstring(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_Type* self = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
+  const char* role = ((const char*)  tolua_tostring(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_unit_type_has_role(self,role);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'has_role'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_unit_type_rule_name */
+static int tolua_api_Unit_Type_rule_name00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_Type* self = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_unit_type_rule_name(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_unit_type_name_translation */
+static int tolua_api_Unit_Type_name_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_Type* self = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_unit_type_name_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_unit_type_can_exist_at_tile */
+static int tolua_api_Unit_Type_can_exist_at_tile00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_Type* self = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
+  Tile* ptile = ((Tile*)  tolua_tousertype(tolua_S,2,0));
+ {
+  bool tolua_ret = (bool)  api_methods_unit_type_can_exist_at_tile(self,ptile);
+ tolua_pushboolean(tolua_S,(bool)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'can_exist_at_tile'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* get function: item_number of class  Tech_Type */
 static int tolua_get_Tech_Type_Tech_Type_item_number(lua_State* tolua_S)
 {
@@ -478,6 +1498,60 @@ static int tolua_get_Tech_Type_Tech_Type_item_number(lua_State* tolua_S)
 #endif
  tolua_pushnumber(tolua_S,(lua_Number)self->item_number);
  return 1;
+}
+
+/* function: api_methods_tech_type_rule_name */
+static int tolua_api_Tech_Type_rule_name00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tech_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tech_Type* self = ((Tech_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_tech_type_rule_name(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_tech_type_name_translation */
+static int tolua_api_Tech_Type_name_translation00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tech_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tech_Type* self = ((Tech_Type*)  tolua_tousertype(tolua_S,1,0));
+ {
+  const char* tolua_ret = (const char*)  api_methods_tech_type_name_translation(self);
+ tolua_pushstring(tolua_S,(const char*)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
+ return 0;
+#endif
 }
 
 /* get function: item_number of class  Terrain */
@@ -491,663 +1565,8 @@ static int tolua_get_Terrain_Terrain_item_number(lua_State* tolua_S)
  return 1;
 }
 
-/* function: api_methods_player_num_cities */
-static int tolua_api_methods_player_num_cities00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
- {
-  int tolua_ret = (int)  api_methods_player_num_cities(pplayer);
- tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_player_num_cities'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_player_num_units */
-static int tolua_api_methods_player_num_units00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
- {
-  int tolua_ret = (int)  api_methods_player_num_units(pplayer);
- tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_player_num_units'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_player_has_wonder */
-static int tolua_api_methods_player_has_wonder00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
- !tolua_isusertype(tolua_S,2,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,3,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
-  Building_Type* building = ((Building_Type*)  tolua_tousertype(tolua_S,2,0));
- {
-  bool tolua_ret = (bool)  api_methods_player_has_wonder(pplayer,building);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_player_has_wonder'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_player_victory */
-static int tolua_api_methods_player_victory00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
- {
-  api_methods_player_victory(pplayer);
- }
- }
- return 0;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_player_victory'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_player_number */
-static int tolua_api_methods_player_number00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
- {
-  int tolua_ret = (int)  api_methods_player_number(pplayer);
- tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_player_number'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_unit_city_can_be_built_here */
-static int tolua_api_methods_unit_city_can_be_built_here00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Unit",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Unit* punit = ((Unit*)  tolua_tousertype(tolua_S,1,0));
- {
-  bool tolua_ret = (bool)  api_methods_unit_city_can_be_built_here(punit);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_unit_city_can_be_built_here'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_tile_city_exists_within_city_radius */
-static int tolua_api_methods_tile_city_exists_within_city_radius00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
- !tolua_isboolean(tolua_S,2,0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,3,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Tile* ptile = ((Tile*)  tolua_tousertype(tolua_S,1,0));
-  bool center = ((bool)  tolua_toboolean(tolua_S,2,0));
- {
-  bool tolua_ret = (bool)  api_methods_tile_city_exists_within_city_radius(ptile,center);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_tile_city_exists_within_city_radius'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_government_rule_name */
-static int tolua_api_methods_government_rule_name00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Government",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Government* pgovernment = ((Government*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_government_rule_name(pgovernment);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_government_rule_name'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_government_name_translation */
-static int tolua_api_methods_government_name_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Government",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Government* pgovernment = ((Government*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_government_name_translation(pgovernment);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_government_name_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_nation_type_rule_name */
-static int tolua_api_methods_nation_type_rule_name00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Nation_Type* pnation = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_nation_type_rule_name(pnation);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_nation_type_rule_name'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_nation_type_name_translation */
-static int tolua_api_methods_nation_type_name_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Nation_Type* pnation = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_nation_type_name_translation(pnation);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_nation_type_name_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_nation_type_plural_translation */
-static int tolua_api_methods_nation_type_plural_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Nation_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Nation_Type* pnation = ((Nation_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_nation_type_plural_translation(pnation);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_nation_type_plural_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_is_wonder */
-static int tolua_api_methods_building_type_is_wonder00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  bool tolua_ret = (bool)  api_methods_building_type_is_wonder(pbuilding);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_is_wonder'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_is_great_wonder */
-static int tolua_api_methods_building_type_is_great_wonder00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  bool tolua_ret = (bool)  api_methods_building_type_is_great_wonder(pbuilding);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_is_great_wonder'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_is_small_wonder */
-static int tolua_api_methods_building_type_is_small_wonder00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  bool tolua_ret = (bool)  api_methods_building_type_is_small_wonder(pbuilding);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_is_small_wonder'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_is_improvement */
-static int tolua_api_methods_building_type_is_improvement00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  bool tolua_ret = (bool)  api_methods_building_type_is_improvement(pbuilding);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_is_improvement'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_rule_name */
-static int tolua_api_methods_building_type_rule_name00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_building_type_rule_name(pbuilding);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_rule_name'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_building_type_name_translation */
-static int tolua_api_methods_building_type_name_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Building_Type* pbuilding = ((Building_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_building_type_name_translation(pbuilding);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_building_type_name_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_unit_type_has_flag */
-static int tolua_api_methods_unit_type_has_flag00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
- !tolua_isstring(tolua_S,2,0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,3,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Unit_Type* punit_type = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
-  const char* flag = ((const char*)  tolua_tostring(tolua_S,2,0));
- {
-  bool tolua_ret = (bool)  api_methods_unit_type_has_flag(punit_type,flag);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_unit_type_has_flag'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_unit_type_has_role */
-static int tolua_api_methods_unit_type_has_role00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
- !tolua_isstring(tolua_S,2,0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,3,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Unit_Type* punit_type = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
-  const char* role = ((const char*)  tolua_tostring(tolua_S,2,0));
- {
-  bool tolua_ret = (bool)  api_methods_unit_type_has_role(punit_type,role);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_unit_type_has_role'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_unit_type_rule_name */
-static int tolua_api_methods_unit_type_rule_name00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Unit_Type* punit_type = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_unit_type_rule_name(punit_type);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_unit_type_rule_name'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_unit_type_name_translation */
-static int tolua_api_methods_unit_type_name_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Unit_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Unit_Type* punit_type = ((Unit_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_unit_type_name_translation(punit_type);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_unit_type_name_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_tech_type_rule_name */
-static int tolua_api_methods_tech_type_rule_name00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Tech_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Tech_Type* ptech = ((Tech_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_tech_type_rule_name(ptech);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_tech_type_rule_name'.",&tolua_err);
- return 0;
-#endif
-}
-
-/* function: api_methods_tech_type_name_translation */
-static int tolua_api_methods_tech_type_name_translation00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
- !tolua_isusertype(tolua_S,1,"Tech_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
- goto tolua_lerror;
- else
-#endif
- {
-  Tech_Type* ptech = ((Tech_Type*)  tolua_tousertype(tolua_S,1,0));
- {
-  const char* tolua_ret = (const char*)  api_methods_tech_type_name_translation(ptech);
- tolua_pushstring(tolua_S,(const char*)tolua_ret);
- }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_tech_type_name_translation'.",&tolua_err);
- return 0;
-#endif
-}
-
 /* function: api_methods_terrain_rule_name */
-static int tolua_api_methods_terrain_rule_name00(lua_State* tolua_S)
+static int tolua_api_Terrain_rule_name00(lua_State* tolua_S)
 {
 #ifndef TOLUA_RELEASE
  tolua_Error tolua_err;
@@ -1159,22 +1578,22 @@ static int tolua_api_methods_terrain_rule_name00(lua_State* tolua_S)
  else
 #endif
  {
-  Terrain* pterrain = ((Terrain*)  tolua_tousertype(tolua_S,1,0));
+  Terrain* self = ((Terrain*)  tolua_tousertype(tolua_S,1,0));
  {
-  const char* tolua_ret = (const char*)  api_methods_terrain_rule_name(pterrain);
+  const char* tolua_ret = (const char*)  api_methods_terrain_rule_name(self);
  tolua_pushstring(tolua_S,(const char*)tolua_ret);
  }
  }
  return 1;
 #ifndef TOLUA_RELEASE
  tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_terrain_rule_name'.",&tolua_err);
+ tolua_error(tolua_S,"#ferror in function 'rule_name'.",&tolua_err);
  return 0;
 #endif
 }
 
 /* function: api_methods_terrain_name_translation */
-static int tolua_api_methods_terrain_name_translation00(lua_State* tolua_S)
+static int tolua_api_Terrain_name_translation00(lua_State* tolua_S)
 {
 #ifndef TOLUA_RELEASE
  tolua_Error tolua_err;
@@ -1186,45 +1605,124 @@ static int tolua_api_methods_terrain_name_translation00(lua_State* tolua_S)
  else
 #endif
  {
-  Terrain* pterrain = ((Terrain*)  tolua_tousertype(tolua_S,1,0));
+  Terrain* self = ((Terrain*)  tolua_tousertype(tolua_S,1,0));
  {
-  const char* tolua_ret = (const char*)  api_methods_terrain_name_translation(pterrain);
+  const char* tolua_ret = (const char*)  api_methods_terrain_name_translation(self);
  tolua_pushstring(tolua_S,(const char*)tolua_ret);
  }
  }
  return 1;
 #ifndef TOLUA_RELEASE
  tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_terrain_name_translation'.",&tolua_err);
+ tolua_error(tolua_S,"#ferror in function 'name_translation'.",&tolua_err);
  return 0;
 #endif
 }
 
-/* function: api_methods_city_has_building */
-static int tolua_api_methods_city_has_building00(lua_State* tolua_S)
+/* function: api_methods_unit_list_link_data */
+static int tolua_api_Unit_List_Link_data00(lua_State* tolua_S)
 {
 #ifndef TOLUA_RELEASE
  tolua_Error tolua_err;
  if (
- !tolua_isusertype(tolua_S,1,"City",0,&tolua_err) || 
- !tolua_isusertype(tolua_S,2,"Building_Type",0,&tolua_err) || 
- !tolua_isnoobj(tolua_S,3,&tolua_err)
+ !tolua_isusertype(tolua_S,1,"Unit_List_Link",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
  )
  goto tolua_lerror;
  else
 #endif
  {
-  City* pcity = ((City*)  tolua_tousertype(tolua_S,1,0));
-  Building_Type* building = ((Building_Type*)  tolua_tousertype(tolua_S,2,0));
+  Unit_List_Link* self = ((Unit_List_Link*)  tolua_tousertype(tolua_S,1,0));
  {
-  bool tolua_ret = (bool)  api_methods_city_has_building(pcity,building);
- tolua_pushboolean(tolua_S,(bool)tolua_ret);
+  Unit* tolua_ret = (Unit*)  api_methods_unit_list_link_data(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit");
  }
  }
  return 1;
 #ifndef TOLUA_RELEASE
  tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'methods_city_has_building'.",&tolua_err);
+ tolua_error(tolua_S,"#ferror in function 'data'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_unit_list_next_link */
+static int tolua_api_Unit_List_Link_next00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Unit_List_Link",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Unit_List_Link* self = ((Unit_List_Link*)  tolua_tousertype(tolua_S,1,0));
+ {
+  Unit_List_Link* tolua_ret = (Unit_List_Link*)  api_methods_unit_list_next_link(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit_List_Link");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'next'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_city_list_link_data */
+static int tolua_api_City_List_Link_data00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"City_List_Link",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  City_List_Link* self = ((City_List_Link*)  tolua_tousertype(tolua_S,1,0));
+ {
+  City* tolua_ret = (City*)  api_methods_city_list_link_data(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"City");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'data'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_methods_city_list_next_link */
+static int tolua_api_City_List_Link_next00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"City_List_Link",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  City_List_Link* self = ((City_List_Link*)  tolua_tousertype(tolua_S,1,0));
+ {
+  City_List_Link* tolua_ret = (City_List_Link*)  api_methods_city_list_next_link(self);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"City_List_Link");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'next'.",&tolua_err);
  return 0;
 #endif
 }
@@ -1310,6 +1808,37 @@ static int tolua_api_find_unit00(lua_State* tolua_S)
 #ifndef TOLUA_RELEASE
  tolua_lerror:
  tolua_error(tolua_S,"#ferror in function 'unit'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_find_transport_unit */
+static int tolua_api_find_transport_unit00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Unit_Type",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,3,"Tile",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,4,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
+  Unit_Type* ptype = ((Unit_Type*)  tolua_tousertype(tolua_S,2,0));
+  Tile* ptile = ((Tile*)  tolua_tousertype(tolua_S,3,0));
+ {
+  Unit* tolua_ret = (Unit*)  api_find_transport_unit(pplayer,ptype,ptile);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'transport_unit'.",&tolua_err);
  return 0;
 #endif
 }
@@ -1917,6 +2446,91 @@ static int tolua_api_notify_event_msg00(lua_State* tolua_S)
 #endif
 }
 
+/* function: api_effects_world_bonus */
+static int tolua_api_effects_world_bonus00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isstring(tolua_S,1,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  const char* effect_type = ((const char*)  tolua_tostring(tolua_S,1,0));
+ {
+  int tolua_ret = (int)  api_effects_world_bonus(effect_type);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'world_bonus'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_effects_player_bonus */
+static int tolua_api_effects_player_bonus00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isstring(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
+  const char* effect_type = ((const char*)  tolua_tostring(tolua_S,2,0));
+ {
+  int tolua_ret = (int)  api_effects_player_bonus(pplayer,effect_type);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'player_bonus'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_effects_city_bonus */
+static int tolua_api_effects_city_bonus00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"City",0,&tolua_err) || 
+ !tolua_isstring(tolua_S,2,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  City* pcity = ((City*)  tolua_tousertype(tolua_S,1,0));
+  const char* effect_type = ((const char*)  tolua_tostring(tolua_S,2,0));
+ {
+  int tolua_ret = (int)  api_effects_city_bonus(pcity,effect_type);
+ tolua_pushnumber(tolua_S,(lua_Number)tolua_ret);
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'city_bonus'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* function: api_utilities_random */
 static int tolua_api_random00(lua_State* tolua_S)
 {
@@ -2035,6 +2649,47 @@ static int tolua_api_create_unit00(lua_State* tolua_S)
 #endif
 }
 
+/* function: api_actions_create_unit_full */
+static int tolua_api_create_unit_full00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Player",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Tile",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,3,"Unit_Type",0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,4,0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,5,"City",0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,6,0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,7,0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,8,"Unit",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,9,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,1,0));
+  Tile* ptile = ((Tile*)  tolua_tousertype(tolua_S,2,0));
+  Unit_Type* ptype = ((Unit_Type*)  tolua_tousertype(tolua_S,3,0));
+  int veteran_level = ((int)  tolua_tonumber(tolua_S,4,0));
+  City* homecity = ((City*)  tolua_tousertype(tolua_S,5,0));
+  int moves_left = ((int)  tolua_tonumber(tolua_S,6,0));
+  int hp_left = ((int)  tolua_tonumber(tolua_S,7,0));
+  Unit* ptransport = ((Unit*)  tolua_tousertype(tolua_S,8,0));
+ {
+  Unit* tolua_ret = (Unit*)  api_actions_create_unit_full(pplayer,ptile,ptype,veteran_level,homecity,moves_left,hp_left,ptransport);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Unit");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'create_unit_full'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* function: api_actions_create_city */
 static int tolua_api_create_city00(lua_State* tolua_S)
 {
@@ -2091,6 +2746,35 @@ static int tolua_api_create_base00(lua_State* tolua_S)
 #ifndef TOLUA_RELEASE
  tolua_lerror:
  tolua_error(tolua_S,"#ferror in function 'create_base'.",&tolua_err);
+ return 0;
+#endif
+}
+
+/* function: api_actions_create_player */
+static int tolua_api_create_player00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isstring(tolua_S,1,0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Nation_Type",0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  const char* username = ((const char*)  tolua_tostring(tolua_S,1,0));
+  Nation_Type* nation = ((Nation_Type*)  tolua_tousertype(tolua_S,2,0));
+ {
+  Player* tolua_ret = (Player*)  api_actions_create_player(username,nation);
+ tolua_pushusertype(tolua_S,(void*)tolua_ret,"Player");
+ }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'create_player'.",&tolua_err);
  return 0;
 #endif
 }
@@ -2181,6 +2865,38 @@ static int tolua_api_unleash_barbarians00(lua_State* tolua_S)
 #endif
 }
 
+/* function: api_actions_place_partisans */
+static int tolua_api_place_partisans00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+ !tolua_isusertype(tolua_S,1,"Tile",0,&tolua_err) || 
+ !tolua_isusertype(tolua_S,2,"Player",0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,3,0,&tolua_err) || 
+ !tolua_isnumber(tolua_S,4,0,&tolua_err) || 
+ !tolua_isnoobj(tolua_S,5,&tolua_err)
+ )
+ goto tolua_lerror;
+ else
+#endif
+ {
+  Tile* ptile = ((Tile*)  tolua_tousertype(tolua_S,1,0));
+  Player* pplayer = ((Player*)  tolua_tousertype(tolua_S,2,0));
+  int count = ((int)  tolua_tonumber(tolua_S,3,0));
+  int sq_radius = ((int)  tolua_tonumber(tolua_S,4,0));
+ {
+  api_actions_place_partisans(ptile,pplayer,count,sq_radius);
+ }
+ }
+ return 0;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'place_partisans'.",&tolua_err);
+ return 0;
+#endif
+}
+
 /* Open lib function */
 LUALIB_API int luaopen_api (lua_State* tolua_S)
 {
@@ -2188,22 +2904,47 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  tolua_reg_types(tolua_S);
  tolua_module(tolua_S,NULL,0);
  tolua_beginmodule(tolua_S,NULL);
- tolua_cclass(tolua_S,"Player_ai","Player_ai","",NULL);
- tolua_beginmodule(tolua_S,"Player_ai");
- tolua_variable(tolua_S,"control",tolua_get_Player_ai_Player_ai_control,tolua_set_Player_ai_Player_ai_control);
- tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Player","Player","",NULL);
  tolua_beginmodule(tolua_S,"Player");
  tolua_variable(tolua_S,"name",tolua_get_Player_Player_name,NULL);
  tolua_variable(tolua_S,"nation",tolua_get_Player_Player_nation_ptr,tolua_set_Player_Player_nation_ptr);
- tolua_variable(tolua_S,"ai_data",tolua_get_Player_Player_ai_data,tolua_set_Player_Player_ai_data);
+ tolua_variable(tolua_S,"ai_controlled",tolua_get_Player_Player_ai_controlled,tolua_set_Player_Player_ai_controlled);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Player",0);
+ tolua_beginmodule(tolua_S,"Player");
+ tolua_module(tolua_S,"properties",0);
+ tolua_beginmodule(tolua_S,"properties");
+ tolua_function(tolua_S,"id",tolua_api_Player_properties_id00);
+ tolua_endmodule(tolua_S);
+ tolua_function(tolua_S,"num_cities",tolua_api_Player_num_cities00);
+ tolua_function(tolua_S,"num_units",tolua_api_Player_num_units00);
+ tolua_function(tolua_S,"has_wonder",tolua_api_Player_has_wonder00);
+ tolua_function(tolua_S,"victory",tolua_api_Player_victory00);
+ tolua_function(tolua_S,"civilization_score",tolua_api_Player_civilization_score00);
+ tolua_function(tolua_S,"gold",tolua_api_Player_gold00);
+ tolua_function(tolua_S,"knows_tech",tolua_api_Player_knows_tech00);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"methods_private",0);
+ tolua_beginmodule(tolua_S,"methods_private");
+ tolua_module(tolua_S,"Player",0);
+ tolua_beginmodule(tolua_S,"Player");
+ tolua_function(tolua_S,"unit_list_head",tolua_api_methods_private_Player_unit_list_head00);
+ tolua_function(tolua_S,"city_list_head",tolua_api_methods_private_Player_city_list_head00);
+ tolua_endmodule(tolua_S);
  tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"City","City","",NULL);
  tolua_beginmodule(tolua_S,"City");
  tolua_variable(tolua_S,"name",tolua_get_City_City_name,NULL);
  tolua_variable(tolua_S,"owner",tolua_get_City_City_owner_ptr,tolua_set_City_City_owner_ptr);
+ tolua_variable(tolua_S,"original",tolua_get_City_City_original_ptr,tolua_set_City_City_original_ptr);
  tolua_variable(tolua_S,"tile",tolua_get_City_City_tile_ptr,tolua_set_City_City_tile_ptr);
+ tolua_variable(tolua_S,"size",tolua_get_City_City_size,tolua_set_City_City_size);
  tolua_variable(tolua_S,"id",tolua_get_City_City_id,NULL);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"City",0);
+ tolua_beginmodule(tolua_S,"City");
+ tolua_function(tolua_S,"has_building",tolua_api_City_has_building00);
+ tolua_function(tolua_S,"map_sq_radius",tolua_api_City_map_sq_radius00);
  tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Unit","Unit","",NULL);
  tolua_beginmodule(tolua_S,"Unit");
@@ -2213,6 +2954,10 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  tolua_variable(tolua_S,"tile",tolua_get_Unit_Unit_tile_ptr,tolua_set_Unit_Unit_tile_ptr);
  tolua_variable(tolua_S,"id",tolua_get_Unit_Unit_id,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Unit",0);
+ tolua_beginmodule(tolua_S,"Unit");
+ tolua_function(tolua_S,"is_on_possible_city_tile",tolua_api_Unit_is_on_possible_city_tile00);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Tile","Tile","",NULL);
  tolua_beginmodule(tolua_S,"Tile");
  tolua_variable(tolua_S,"nat_x",tolua_get_Tile_Tile_nat_x,NULL);
@@ -2220,248 +2965,241 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  tolua_variable(tolua_S,"terrain",tolua_get_Tile_Tile_terrain_ptr,tolua_set_Tile_Tile_terrain_ptr);
  tolua_variable(tolua_S,"id",tolua_get_Tile_Tile_index,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Tile",0);
+ tolua_beginmodule(tolua_S,"Tile");
+ tolua_function(tolua_S,"city",tolua_api_Tile_city00);
+ tolua_function(tolua_S,"city_exists_within_max_city_map",tolua_api_Tile_city_exists_within_max_city_map00);
+ tolua_function(tolua_S,"num_units",tolua_api_Tile_num_units00);
+ tolua_function(tolua_S,"sq_distance",tolua_api_Tile_sq_distance00);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"methods_private",0);
+ tolua_beginmodule(tolua_S,"methods_private");
+ tolua_module(tolua_S,"Tile",0);
+ tolua_beginmodule(tolua_S,"Tile");
+ tolua_function(tolua_S,"next_outward_index",tolua_api_methods_private_Tile_next_outward_index00);
+ tolua_function(tolua_S,"tile_for_outward_index",tolua_api_methods_private_Tile_tile_for_outward_index00);
+ tolua_function(tolua_S,"unit_list_head",tolua_api_methods_private_Tile_unit_list_head00);
+ tolua_endmodule(tolua_S);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Government","Government","",NULL);
  tolua_beginmodule(tolua_S,"Government");
  tolua_variable(tolua_S,"id",tolua_get_Government_Government_item_number,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Government",0);
+ tolua_beginmodule(tolua_S,"Government");
+ tolua_function(tolua_S,"rule_name",tolua_api_Government_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Government_name_translation00);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Nation_Type","Nation_Type","",NULL);
  tolua_beginmodule(tolua_S,"Nation_Type");
  tolua_variable(tolua_S,"id",tolua_get_Nation_Type_Nation_Type_item_number,NULL);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Nation_Type",0);
+ tolua_beginmodule(tolua_S,"Nation_Type");
+ tolua_function(tolua_S,"rule_name",tolua_api_Nation_Type_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Nation_Type_name_translation00);
+ tolua_function(tolua_S,"plural_translation",tolua_api_Nation_Type_plural_translation00);
  tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Building_Type","Building_Type","",NULL);
  tolua_beginmodule(tolua_S,"Building_Type");
  tolua_variable(tolua_S,"build_cost",tolua_get_Building_Type_Building_Type_build_cost,tolua_set_Building_Type_Building_Type_build_cost);
  tolua_variable(tolua_S,"id",tolua_get_Building_Type_Building_Type_item_number,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Building_Type",0);
+ tolua_beginmodule(tolua_S,"Building_Type");
+ tolua_function(tolua_S,"is_wonder",tolua_api_Building_Type_is_wonder00);
+ tolua_function(tolua_S,"is_great_wonder",tolua_api_Building_Type_is_great_wonder00);
+ tolua_function(tolua_S,"is_small_wonder",tolua_api_Building_Type_is_small_wonder00);
+ tolua_function(tolua_S,"is_improvement",tolua_api_Building_Type_is_improvement00);
+ tolua_function(tolua_S,"rule_name",tolua_api_Building_Type_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Building_Type_name_translation00);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Unit_Type","Unit_Type","",NULL);
  tolua_beginmodule(tolua_S,"Unit_Type");
  tolua_variable(tolua_S,"build_cost",tolua_get_Unit_Type_Unit_Type_build_cost,tolua_set_Unit_Type_Unit_Type_build_cost);
  tolua_variable(tolua_S,"id",tolua_get_Unit_Type_Unit_Type_item_number,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Unit_Type",0);
+ tolua_beginmodule(tolua_S,"Unit_Type");
+ tolua_function(tolua_S,"has_flag",tolua_api_Unit_Type_has_flag00);
+ tolua_function(tolua_S,"has_role",tolua_api_Unit_Type_has_role00);
+ tolua_function(tolua_S,"rule_name",tolua_api_Unit_Type_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Unit_Type_name_translation00);
+ tolua_function(tolua_S,"can_exist_at_tile",tolua_api_Unit_Type_can_exist_at_tile00);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Tech_Type","Tech_Type","",NULL);
  tolua_beginmodule(tolua_S,"Tech_Type");
  tolua_variable(tolua_S,"id",tolua_get_Tech_Type_Tech_Type_item_number,NULL);
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Tech_Type",0);
+ tolua_beginmodule(tolua_S,"Tech_Type");
+ tolua_function(tolua_S,"rule_name",tolua_api_Tech_Type_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Tech_Type_name_translation00);
  tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Terrain","Terrain","",NULL);
  tolua_beginmodule(tolua_S,"Terrain");
  tolua_variable(tolua_S,"id",tolua_get_Terrain_Terrain_item_number,NULL);
  tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Terrain",0);
+ tolua_beginmodule(tolua_S,"Terrain");
+ tolua_function(tolua_S,"rule_name",tolua_api_Terrain_rule_name00);
+ tolua_function(tolua_S,"name_translation",tolua_api_Terrain_name_translation00);
+ tolua_endmodule(tolua_S);
+ tolua_cclass(tolua_S,"Unit_List_Link","Unit_List_Link","",NULL);
+ tolua_beginmodule(tolua_S,"Unit_List_Link");
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"Unit_List_Link",0);
+ tolua_beginmodule(tolua_S,"Unit_List_Link");
+ tolua_function(tolua_S,"data",tolua_api_Unit_List_Link_data00);
+ tolua_function(tolua_S,"next",tolua_api_Unit_List_Link_next00);
+ tolua_endmodule(tolua_S);
+ tolua_cclass(tolua_S,"City_List_Link","City_List_Link","",NULL);
+ tolua_beginmodule(tolua_S,"City_List_Link");
+ tolua_endmodule(tolua_S);
+ tolua_module(tolua_S,"City_List_Link",0);
+ tolua_beginmodule(tolua_S,"City_List_Link");
+ tolua_function(tolua_S,"data",tolua_api_City_List_Link_data00);
+ tolua_function(tolua_S,"next",tolua_api_City_List_Link_next00);
+ tolua_endmodule(tolua_S);
  tolua_cclass(tolua_S,"Nonexistent","Nonexistent","",NULL);
  tolua_beginmodule(tolua_S,"Nonexistent");
  tolua_endmodule(tolua_S);
- tolua_function(tolua_S,"methods_player_num_cities",tolua_api_methods_player_num_cities00);
- tolua_function(tolua_S,"methods_player_num_units",tolua_api_methods_player_num_units00);
- tolua_function(tolua_S,"methods_player_has_wonder",tolua_api_methods_player_has_wonder00);
- tolua_function(tolua_S,"methods_player_victory",tolua_api_methods_player_victory00);
- tolua_function(tolua_S,"methods_player_number",tolua_api_methods_player_number00);
- tolua_function(tolua_S,"methods_unit_city_can_be_built_here",tolua_api_methods_unit_city_can_be_built_here00);
- tolua_function(tolua_S,"methods_tile_city_exists_within_city_radius",tolua_api_methods_tile_city_exists_within_city_radius00);
- tolua_function(tolua_S,"methods_government_rule_name",tolua_api_methods_government_rule_name00);
- tolua_function(tolua_S,"methods_government_name_translation",tolua_api_methods_government_name_translation00);
- tolua_function(tolua_S,"methods_nation_type_rule_name",tolua_api_methods_nation_type_rule_name00);
- tolua_function(tolua_S,"methods_nation_type_name_translation",tolua_api_methods_nation_type_name_translation00);
- tolua_function(tolua_S,"methods_nation_type_plural_translation",tolua_api_methods_nation_type_plural_translation00);
- tolua_function(tolua_S,"methods_building_type_is_wonder",tolua_api_methods_building_type_is_wonder00);
- tolua_function(tolua_S,"methods_building_type_is_great_wonder",tolua_api_methods_building_type_is_great_wonder00);
- tolua_function(tolua_S,"methods_building_type_is_small_wonder",tolua_api_methods_building_type_is_small_wonder00);
- tolua_function(tolua_S,"methods_building_type_is_improvement",tolua_api_methods_building_type_is_improvement00);
- tolua_function(tolua_S,"methods_building_type_rule_name",tolua_api_methods_building_type_rule_name00);
- tolua_function(tolua_S,"methods_building_type_name_translation",tolua_api_methods_building_type_name_translation00);
- tolua_function(tolua_S,"methods_unit_type_has_flag",tolua_api_methods_unit_type_has_flag00);
- tolua_function(tolua_S,"methods_unit_type_has_role",tolua_api_methods_unit_type_has_role00);
- tolua_function(tolua_S,"methods_unit_type_rule_name",tolua_api_methods_unit_type_rule_name00);
- tolua_function(tolua_S,"methods_unit_type_name_translation",tolua_api_methods_unit_type_name_translation00);
- tolua_function(tolua_S,"methods_tech_type_rule_name",tolua_api_methods_tech_type_rule_name00);
- tolua_function(tolua_S,"methods_tech_type_name_translation",tolua_api_methods_tech_type_name_translation00);
- tolua_function(tolua_S,"methods_terrain_rule_name",tolua_api_methods_terrain_rule_name00);
- tolua_function(tolua_S,"methods_terrain_name_translation",tolua_api_methods_terrain_name_translation00);
- tolua_function(tolua_S,"methods_city_has_building",tolua_api_methods_city_has_building00);
 
  { /* begin embedded lua code */
  static unsigned char B[] = {
-  10, 80,108, 97,121,101,114, 46,112,114,111,112,101,114,116,
- 105,101,115, 32, 61, 32,123, 10,105,100, 32, 61, 32,109,101,
- 116,104,111,100,115, 95,112,108, 97,121,101,114, 95,110,117,
- 109, 98,101,114, 44, 10,125, 10,102,117,110, 99,116,105,111,
- 110, 32, 80,108, 97,121,101,114, 58,105,115, 95,104,117,109,
-  97,110, 40, 41, 10,114,101,116,117,114,110, 32,110,111,116,
-  32,115,101,108,102, 46, 97,105, 95,100, 97,116, 97, 46, 99,
- 111,110,116,114,111,108, 10,101,110,100, 10,102,117,110, 99,
- 116,105,111,110, 32, 80,108, 97,121,101,114, 58,110,117,109,
-  95, 99,105,116,105,101,115, 40, 41, 10,114,101,116,117,114,
- 110, 32,109,101,116,104,111,100,115, 95,112,108, 97,121,101,
- 114, 95,110,117,109, 95, 99,105,116,105,101,115, 40,115,101,
- 108,102, 41, 10,101,110,100, 10,102,117,110, 99,116,105,111,
- 110, 32, 80,108, 97,121,101,114, 58,110,117,109, 95,117,110,
- 105,116,115, 40, 41, 10,114,101,116,117,114,110, 32,109,101,
- 116,104,111,100,115, 95,112,108, 97,121,101,114, 95,110,117,
- 109, 95,117,110,105,116,115, 40,115,101,108,102, 41, 10,101,
- 110,100, 10,102,117,110, 99,116,105,111,110, 32, 80,108, 97,
- 121,101,114, 58,104, 97,115, 95,119,111,110,100,101,114, 40,
-  98,117,105,108,100,105,110,103, 41, 10,114,101,116,117,114,
- 110, 32,109,101,116,104,111,100,115, 95,112,108, 97,121,101,
- 114, 95,104, 97,115, 95,119,111,110,100,101,114, 40,115,101,
- 108,102, 44, 32, 98,117,105,108,100,105,110,103, 41, 10,101,
- 110,100, 10,102,117,110, 99,116,105,111,110, 32, 80,108, 97,
- 121,101,114, 58,118,105, 99,116,111,114,121, 40, 41, 10,109,
- 101,116,104,111,100,115, 95,112,108, 97,121,101,114, 95,118,
- 105, 99,116,111,114,121, 40,115,101,108,102, 41, 10,101,110,
- 100, 10,102,117,110, 99,116,105,111,110, 32, 85,110,105,116,
-  58,101,120,105,115,116,115, 40, 41, 10,114,101,116,117,114,
- 110, 32,116,114,117,101, 10,101,110,100, 10,102,117,110, 99,
- 116,105,111,110, 32, 85,110,105,116, 58,103,101,116, 95,104,
- 111,109,101, 99,105,116,121, 40, 41, 10,114,101,116,117,114,
- 110, 32,102,105,110,100, 46, 99,105,116,121, 40,115,101,108,
- 102, 46,111,119,110,101,114, 44, 32,115,101,108,102, 46,104,
- 111,109,101, 99,105,116,121, 41, 10,101,110,100, 10,102,117,
- 110, 99,116,105,111,110, 32, 85,110,105,116, 58,105,115, 95,
- 111,110, 95,112,111,115,115,105, 98,108,101, 95, 99,105,116,
- 121, 95,116,105,108,101, 40, 41, 10,114,101,116,117,114,110,
-  32,109,101,116,104,111,100,115, 95,117,110,105,116, 95, 99,
- 105,116,121, 95, 99, 97,110, 95, 98,101, 95, 98,117,105,108,
- 116, 95,104,101,114,101, 40,115,101,108,102, 41, 10,101,110,
- 100, 10,102,117,110, 99,116,105,111,110, 32, 84,105,108,101,
-  58, 99,105,116,121, 95,101,120,105,115,116,115, 95,119,105,
- 116,104,105,110, 95, 99,105,116,121, 95,114, 97,100,105,117,
- 115, 40, 99,101,110,116,101,114, 41, 10,114,101,116,117,114,
- 110, 32,109,101,116,104,111,100,115, 95,116,105,108,101, 95,
-  99,105,116,121, 95,101,120,105,115,116,115, 95,119,105,116,
- 104,105,110, 95, 99,105,116,121, 95,114, 97,100,105,117,115,
-  40,115,101,108,102, 44, 32, 99,101,110,116,101,114, 41, 10,
- 101,110,100, 10,102,117,110, 99,116,105,111,110, 32, 71,111,
- 118,101,114,110,109,101,110,116, 58,114,117,108,101, 95,110,
-  97,109,101, 40, 41, 10,114,101,116,117,114,110, 32,109,101,
- 116,104,111,100,115, 95,103,111,118,101,114,110,109,101,110,
- 116, 95,114,117,108,101, 95,110, 97,109,101, 40,115,101,108,
- 102, 41, 10,101,110,100, 10,102,117,110, 99,116,105,111,110,
-  32, 71,111,118,101,114,110,109,101,110,116, 58,110, 97,109,
- 101, 95,116,114, 97,110,115,108, 97,116,105,111,110, 40, 41,
-  10,114,101,116,117,114,110, 32,109,101,116,104,111,100,115,
-  95,103,111,118,101,114,110,109,101,110,116, 95,110, 97,109,
- 101, 95,116,114, 97,110,115,108, 97,116,105,111,110, 40,115,
- 101,108,102, 41, 10,101,110,100, 10,102,117,110, 99,116,105,
- 111,110, 32, 78, 97,116,105,111,110, 95, 84,121,112,101, 58,
- 114,117,108,101, 95,110, 97,109,101, 40, 41, 10,114,101,116,
- 117,114,110, 32,109,101,116,104,111,100,115, 95,110, 97,116,
- 105,111,110, 95,116,121,112,101, 95,114,117,108,101, 95,110,
-  97,109,101, 40,115,101,108,102, 41, 10,101,110,100, 10,102,
- 117,110, 99,116,105,111,110, 32, 78, 97,116,105,111,110, 95,
-  84,121,112,101, 58,110, 97,109,101, 95,116,114, 97,110,115,
- 108, 97,116,105,111,110, 40, 41, 10,114,101,116,117,114,110,
-  32,109,101,116,104,111,100,115, 95,110, 97,116,105,111,110,
-  95,116,121,112,101, 95,110, 97,109,101, 95,116,114, 97,110,
- 115,108, 97,116,105,111,110, 40,115,101,108,102, 41, 10,101,
- 110,100, 10,102,117,110, 99,116,105,111,110, 32, 78, 97,116,
- 105,111,110, 95, 84,121,112,101, 58,112,108,117,114, 97,108,
-  95,116,114, 97,110,115,108, 97,116,105,111,110, 40, 41, 10,
- 114,101,116,117,114,110, 32,109,101,116,104,111,100,115, 95,
- 110, 97,116,105,111,110, 95,116,121,112,101, 95,112,108,117,
- 114, 97,108, 95,116,114, 97,110,115,108, 97,116,105,111,110,
-  40,115,101,108,102, 41, 10,101,110,100, 10,102,117,110, 99,
- 116,105,111,110, 32, 66,117,105,108,100,105,110,103, 95, 84,
- 121,112,101, 58, 98,117,105,108,100, 95,115,104,105,101,108,
- 100, 95, 99,111,115,116, 40, 41, 10,114,101,116,117,114,110,
-  32,115,101,108,102, 46, 98,117,105,108,100, 95, 99,111,115,
- 116, 10,101,110,100, 10,102,117,110, 99,116,105,111,110, 32,
-  66,117,105,108,100,105,110,103, 95, 84,121,112,101, 58,105,
- 115, 95,119,111,110,100,101,114, 40, 41, 10,114,101,116,117,
- 114,110, 32,109,101,116,104,111,100,115, 95, 98,117,105,108,
- 100,105,110,103, 95,116,121,112,101, 95,105,115, 95,119,111,
- 110,100,101,114, 40,115,101,108,102, 41, 10,101,110,100, 10,
- 102,117,110, 99,116,105,111,110, 32, 66,117,105,108,100,105,
- 110,103, 95, 84,121,112,101, 58,105,115, 95,103,114,101, 97,
- 116, 95,119,111,110,100,101,114, 40, 41, 10,114,101,116,117,
- 114,110, 32,109,101,116,104,111,100,115, 95, 98,117,105,108,
- 100,105,110,103, 95,116,121,112,101, 95,105,115, 95,103,114,
- 101, 97,116, 95,119,111,110,100,101,114, 40,115,101,108,102,
-  41, 10,101,110,100, 10,102,117,110, 99,116,105,111,110, 32,
-  66,117,105,108,100,105,110,103, 95, 84,121,112,101, 58,105,
- 115, 95,115,109, 97,108,108, 95,119,111,110,100,101,114, 40,
-  41, 10,114,101,116,117,114,110, 32,109,101,116,104,111,100,
- 115, 95, 98,117,105,108,100,105,110,103, 95,116,121,112,101,
-  95,105,115, 95,115,109, 97,108,108, 95,119,111,110,100,101,
- 114, 40,115,101,108,102, 41, 10,101,110,100, 10,102,117,110,
-  99,116,105,111,110, 32, 66,117,105,108,100,105,110,103, 95,
-  84,121,112,101, 58,105,115, 95,105,109,112,114,111,118,101,
- 109,101,110,116, 40, 41, 10,114,101,116,117,114,110, 32,109,
- 101,116,104,111,100,115, 95, 98,117,105,108,100,105,110,103,
-  95,116,121,112,101, 95,105,115, 95,105,109,112,114,111,118,
- 101,109,101,110,116, 40,115,101,108,102, 41, 10,101,110,100,
   10,102,117,110, 99,116,105,111,110, 32, 66,117,105,108,100,
- 105,110,103, 95, 84,121,112,101, 58,114,117,108,101, 95,110,
-  97,109,101, 40, 41, 10,114,101,116,117,114,110, 32,109,101,
- 116,104,111,100,115, 95, 98,117,105,108,100,105,110,103, 95,
- 116,121,112,101, 95,114,117,108,101, 95,110, 97,109,101, 40,
- 115,101,108,102, 41, 10,101,110,100, 10,102,117,110, 99,116,
- 105,111,110, 32, 66,117,105,108,100,105,110,103, 95, 84,121,
- 112,101, 58,110, 97,109,101, 95,116,114, 97,110,115,108, 97,
- 116,105,111,110, 40, 41, 10,114,101,116,117,114,110, 32,109,
- 101,116,104,111,100,115, 95, 98,117,105,108,100,105,110,103,
-  95,116,121,112,101, 95,110, 97,109,101, 95,116,114, 97,110,
- 115,108, 97,116,105,111,110, 40,115,101,108,102, 41, 10,101,
- 110,100, 10,102,117,110, 99,116,105,111,110, 32, 85,110,105,
- 116, 95, 84,121,112,101, 58, 98,117,105,108,100, 95,115,104,
- 105,101,108,100, 95, 99,111,115,116, 40, 41, 10,114,101,116,
- 117,114,110, 32,115,101,108,102, 46, 98,117,105,108,100, 95,
-  99,111,115,116, 10,101,110,100, 10,102,117,110, 99,116,105,
- 111,110, 32, 85,110,105,116, 95, 84,121,112,101, 58,104, 97,
- 115, 95,102,108, 97,103, 40,102,108, 97,103, 41, 10,114,101,
- 116,117,114,110, 32,109,101,116,104,111,100,115, 95,117,110,
- 105,116, 95,116,121,112,101, 95,104, 97,115, 95,102,108, 97,
- 103, 40,115,101,108,102, 44, 32,102,108, 97,103, 41, 10,101,
- 110,100, 10,102,117,110, 99,116,105,111,110, 32, 85,110,105,
- 116, 95, 84,121,112,101, 58,104, 97,115, 95,114,111,108,101,
-  40,114,111,108,101, 41, 10,114,101,116,117,114,110, 32,109,
- 101,116,104,111,100,115, 95,117,110,105,116, 95,116,121,112,
- 101, 95,104, 97,115, 95,114,111,108,101, 40,115,101,108,102,
-  44, 32,114,111,108,101, 41, 10,101,110,100, 10,102,117,110,
-  99,116,105,111,110, 32, 85,110,105,116, 95, 84,121,112,101,
-  58,114,117,108,101, 95,110, 97,109,101, 40, 41, 10,114,101,
- 116,117,114,110, 32,109,101,116,104,111,100,115, 95,117,110,
- 105,116, 95,116,121,112,101, 95,114,117,108,101, 95,110, 97,
- 109,101, 40,115,101,108,102, 41, 10,101,110,100, 10,102,117,
- 110, 99,116,105,111,110, 32, 85,110,105,116, 95, 84,121,112,
- 101, 58,110, 97,109,101, 95,116,114, 97,110,115,108, 97,116,
- 105,111,110, 40, 41, 10,114,101,116,117,114,110, 32,109,101,
- 116,104,111,100,115, 95,117,110,105,116, 95,116,121,112,101,
-  95,110, 97,109,101, 95,116,114, 97,110,115,108, 97,116,105,
- 111,110, 40,115,101,108,102, 41, 10,101,110,100, 10,102,117,
- 110, 99,116,105,111,110, 32, 84,101, 99,104, 95, 84,121,112,
- 101, 58,114,117,108,101, 95,110, 97,109,101, 40, 41, 10,114,
- 101,116,117,114,110, 32,109,101,116,104,111,100,115, 95,116,
- 101, 99,104, 95,116,121,112,101, 95,114,117,108,101, 95,110,
-  97,109,101, 40,115,101,108,102, 41, 10,101,110,100, 10,102,
- 117,110, 99,116,105,111,110, 32, 84,101, 99,104, 95, 84,121,
- 112,101, 58,110, 97,109,101, 95,116,114, 97,110,115,108, 97,
- 116,105,111,110, 40, 41, 10,114,101,116,117,114,110, 32,109,
- 101,116,104,111,100,115, 95,116,101, 99,104, 95,116,121,112,
- 101, 95,110, 97,109,101, 95,116,114, 97,110,115,108, 97,116,
- 105,111,110, 40,115,101,108,102, 41, 10,101,110,100, 10,102,
- 117,110, 99,116,105,111,110, 32, 84,101,114,114, 97,105,110,
-  58,114,117,108,101, 95,110, 97,109,101, 40, 41, 10,114,101,
- 116,117,114,110, 32,109,101,116,104,111,100,115, 95,116,101,
- 114,114, 97,105,110, 95,114,117,108,101, 95,110, 97,109,101,
-  40,115,101,108,102, 41, 10,101,110,100, 10,102,117,110, 99,
- 116,105,111,110, 32, 84,101,114,114, 97,105,110, 58,110, 97,
- 109,101, 95,116,114, 97,110,115,108, 97,116,105,111,110, 40,
-  41, 10,114,101,116,117,114,110, 32,109,101,116,104,111,100,
- 115, 95,116,101,114,114, 97,105,110, 95,110, 97,109,101, 95,
- 116,114, 97,110,115,108, 97,116,105,111,110, 40,115,101,108,
- 102, 41, 10,101,110,100, 10,102,117,110, 99,116,105,111,110,
-  32, 67,105,116,121, 58,101,120,105,115,116,115, 40, 41, 10,
- 114,101,116,117,114,110, 32,116,114,117,101, 10,101,110,100,
-  10,102,117,110, 99,116,105,111,110, 32, 67,105,116,121, 58,
- 104, 97,115, 95, 98,117,105,108,100,105,110,103, 40, 98,117,
- 105,108,100,105,110,103, 41, 10,114,101,116,117,114,110, 32,
- 109,101,116,104,111,100,115, 95, 99,105,116,121, 95,104, 97,
- 115, 95, 98,117,105,108,100,105,110,103, 40,115,101,108,102,
-  44, 32, 98,117,105,108,100,105,110,103, 41, 10,101,110,100,
-  10,102,117,110, 99,116,105,111,110, 32, 78,111,110,101,120,
- 105,115,116,101,110,116, 58,101,120,105,115,116,115, 40, 41,
-  10,114,101,116,117,114,110, 32,102, 97,108,115,101, 10,101,
- 110,100, 10,100,111, 10,108,111, 99, 97,108, 32, 97,112,105,
-  95,116,121,112,101,115, 32, 61, 32,123, 10, 34, 80,108, 97,
- 121,101,114, 95, 97,105, 34, 44, 10, 34, 80,108, 97,121,101,
+ 105,110,103, 95, 84,121,112,101, 58, 98,117,105,108,100, 95,
+ 115,104,105,101,108,100, 95, 99,111,115,116, 40, 41, 10,114,
+ 101,116,117,114,110, 32,115,101,108,102, 46, 98,117,105,108,
+ 100, 95, 99,111,115,116, 10,101,110,100, 10,102,117,110, 99,
+ 116,105,111,110, 32, 80,108, 97,121,101,114, 58,105,115, 95,
+ 104,117,109, 97,110, 40, 41, 10,114,101,116,117,114,110, 32,
+ 110,111,116, 32,115,101,108,102, 46, 97,105, 95, 99,111,110,
+ 116,114,111,108,108,101,100, 10,101,110,100, 10,100,111, 10,
+ 108,111, 99, 97,108, 32,112,114,105,118, 97,116,101, 32, 61,
+  32,109,101,116,104,111,100,115, 95,112,114,105,118, 97,116,
+ 101, 10,108,111, 99, 97,108, 32,102,117,110, 99,116,105,111,
+ 110, 32,118, 97,108,117,101, 95,105,116,101,114, 97,116,111,
+ 114, 40, 97,114,114, 97,121, 41, 10,108,111, 99, 97,108, 32,
+ 105, 32, 61, 32, 48, 10,108,111, 99, 97,108, 32,102,117,110,
+  99,116,105,111,110, 32,105,116,101,114, 97,116,111,114, 40,
+  41, 10,105, 32, 61, 32,105, 32, 43, 32, 49, 10,114,101,116,
+ 117,114,110, 32, 97,114,114, 97,121, 91,105, 93, 10,101,110,
+ 100, 10,114,101,116,117,114,110, 32,105,116,101,114, 97,116,
+ 111,114, 10,101,110,100, 10,108,111, 99, 97,108, 32,102,117,
+ 110, 99,116,105,111,110, 32,115, 97,102,101, 95,105,116,101,
+ 114, 97,116,101, 95,108,105,115,116, 40,108,105,110,107, 41,
+  10,108,111, 99, 97,108, 32,111, 98,106,115, 32, 61, 32,123,
+ 125, 10,119,104,105,108,101, 32,108,105,110,107, 32,100,111,
+  10,111, 98,106,115, 91, 35,111, 98,106,115, 32, 43, 32, 49,
+  93, 32, 61, 32,108,105,110,107, 58,100, 97,116, 97, 40, 41,
+  10,108,105,110,107, 32, 61, 32,108,105,110,107, 58,110,101,
+ 120,116, 40, 41, 10,101,110,100, 10,114,101,116,117,114,110,
+  32,118, 97,108,117,101, 95,105,116,101,114, 97,116,111,114,
+  40,111, 98,106,115, 41, 10,101,110,100, 10,102,117,110, 99,
+ 116,105,111,110, 32, 80,108, 97,121,101,114, 58,117,110,105,
+ 116,115, 95,105,116,101,114, 97,116,101, 40, 41, 10,114,101,
+ 116,117,114,110, 32,115, 97,102,101, 95,105,116,101,114, 97,
+ 116,101, 95,108,105,115,116, 40,112,114,105,118, 97,116,101,
+  46, 80,108, 97,121,101,114, 46,117,110,105,116, 95,108,105,
+ 115,116, 95,104,101, 97,100, 40,115,101,108,102, 41, 41, 10,
+ 101,110,100, 10,102,117,110, 99,116,105,111,110, 32, 80,108,
+  97,121,101,114, 58, 99,105,116,105,101,115, 95,105,116,101,
+ 114, 97,116,101, 40, 41, 10,114,101,116,117,114,110, 32,115,
+  97,102,101, 95,105,116,101,114, 97,116,101, 95,108,105,115,
+ 116, 40,112,114,105,118, 97,116,101, 46, 80,108, 97,121,101,
+ 114, 46, 99,105,116,121, 95,108,105,115,116, 95,104,101, 97,
+ 100, 40,115,101,108,102, 41, 41, 10,101,110,100, 10,102,117,
+ 110, 99,116,105,111,110, 32, 84,105,108,101, 58,117,110,105,
+ 116,115, 95,105,116,101,114, 97,116,101, 40, 41, 10,114,101,
+ 116,117,114,110, 32,115, 97,102,101, 95,105,116,101,114, 97,
+ 116,101, 95,108,105,115,116, 40,112,114,105,118, 97,116,101,
+  46, 84,105,108,101, 46,117,110,105,116, 95,108,105,115,116,
+  95,104,101, 97,100, 40,115,101,108,102, 41, 41, 10,101,110,
+ 100, 10,101,110,100, 10,102,117,110, 99,116,105,111,110, 32,
+  84,105,108,101, 58, 99,105,116,121, 95,101,120,105,115,116,
+ 115, 95,119,105,116,104,105,110, 95, 99,105,116,121, 95,114,
+  97,100,105,117,115, 40, 99,101,110,116,101,114, 41, 10,114,
+ 101,116,117,114,110, 32,115,101,108,102, 58, 99,105,116,121,
+  95,101,120,105,115,116,115, 95,119,105,116,104,105,110, 95,
+ 109, 97,120, 95, 99,105,116,121, 95,109, 97,112, 40, 99,101,
+ 110,116,101,114, 41, 10,101,110,100, 10,100,111, 10,108,111,
+  99, 97,108, 32,110,101,120,116, 95,111,117,116,119, 97,114,
+ 100, 95,105,110,100,101,120, 32, 61, 32,109,101,116,104,111,
+ 100,115, 95,112,114,105,118, 97,116,101, 46, 84,105,108,101,
+  46,110,101,120,116, 95,111,117,116,119, 97,114,100, 95,105,
+ 110,100,101,120, 10,108,111, 99, 97,108, 32,116,105,108,101,
+  95,102,111,114, 95,111,117,116,119, 97,114,100, 95,105,110,
+ 100,101,120, 32, 61, 32,109,101,116,104,111,100,115, 95,112,
+ 114,105,118, 97,116,101, 46, 84,105,108,101, 46,116,105,108,
+ 101, 95,102,111,114, 95,111,117,116,119, 97,114,100, 95,105,
+ 110,100,101,120, 10,102,117,110, 99,116,105,111,110, 32, 84,
+ 105,108,101, 58,115,113,117, 97,114,101, 95,105,116,101,114,
+  97,116,101, 40,114, 97,100,105,117,115, 41, 10,108,111, 99,
+  97,108, 32,105,110,100,101,120, 32, 61, 32, 45, 49, 10,108,
+ 111, 99, 97,108, 32,102,117,110, 99,116,105,111,110, 32,105,
+ 116,101,114, 97,116,111,114, 40, 41, 10,105,110,100,101,120,
+  32, 61, 32,110,101,120,116, 95,111,117,116,119, 97,114,100,
+  95,105,110,100,101,120, 40,115,101,108,102, 44, 32,105,110,
+ 100,101,120, 44, 32,114, 97,100,105,117,115, 41, 10,105,102,
+  32,105,110,100,101,120, 32, 60, 32, 48, 32,116,104,101,110,
+  10,114,101,116,117,114,110, 32,110,105,108, 10,101,108,115,
+ 101, 10,114,101,116,117,114,110, 32,116,105,108,101, 95,102,
+ 111,114, 95,111,117,116,119, 97,114,100, 95,105,110,100,101,
+ 120, 40,115,101,108,102, 44, 32,105,110,100,101,120, 41, 10,
+ 101,110,100, 10,101,110,100, 10,114,101,116,117,114,110, 32,
+ 105,116,101,114, 97,116,111,114, 10,101,110,100, 10,102,117,
+ 110, 99,116,105,111,110, 32, 84,105,108,101, 58, 99,105,114,
+  99,108,101, 95,105,116,101,114, 97,116,101, 40,115,113, 95,
+ 114, 97,100,105,117,115, 41, 10,108,111, 99, 97,108, 32, 99,
+ 114, 95,114, 97,100,105,117,115, 32, 61, 32,109, 97,116,104,
+  46,102,108,111,111,114, 40,109, 97,116,104, 46,115,113,114,
+ 116, 40,115,113, 95,114, 97,100,105,117,115, 41, 41, 10,108,
+ 111, 99, 97,108, 32,115,113, 95,105,116,101,114, 32, 61, 32,
+ 115,101,108,102, 58,115,113,117, 97,114,101, 95,105,116,101,
+ 114, 97,116,101, 40, 99,114, 95,114, 97,100,105,117,115, 41,
+  10,108,111, 99, 97,108, 32,102,117,110, 99,116,105,111,110,
+  32,105,116,101,114, 97,116,111,114, 40, 41, 10,108,111, 99,
+  97,108, 32,116,105,108,101, 32, 61, 32,110,105,108, 10,114,
+ 101,112,101, 97,116, 10,116,105,108,101, 32, 61, 32,115,113,
+  95,105,116,101,114, 40, 41, 10,117,110,116,105,108, 32,110,
+ 111,116, 32,116,105,108,101, 32,111,114, 32,115,101,108,102,
+  58,115,113, 95,100,105,115,116, 97,110, 99,101, 40,116,105,
+ 108,101, 41, 32, 60, 61, 32,115,113, 95,114, 97,100,105,117,
+ 115, 10,114,101,116,117,114,110, 32,116,105,108,101, 10,101,
+ 110,100, 10,114,101,116,117,114,110, 32,105,116,101,114, 97,
+ 116,111,114, 10,101,110,100, 10,101,110,100, 10,102,117,110,
+  99,116,105,111,110, 32, 67,105,116,121, 58,101,120,105,115,
+ 116,115, 40, 41, 10,114,101,116,117,114,110, 32,116,114,117,
+ 101, 10,101,110,100, 10,102,117,110, 99,116,105,111,110, 32,
+  85,110,105,116, 58,101,120,105,115,116,115, 40, 41, 10,114,
+ 101,116,117,114,110, 32,116,114,117,101, 10,101,110,100, 10,
+ 102,117,110, 99,116,105,111,110, 32, 85,110,105,116, 58,103,
+ 101,116, 95,104,111,109,101, 99,105,116,121, 40, 41, 10,114,
+ 101,116,117,114,110, 32,102,105,110,100, 46, 99,105,116,121,
+  40,115,101,108,102, 46,111,119,110,101,114, 44, 32,115,101,
+ 108,102, 46,104,111,109,101, 99,105,116,121, 41, 10,101,110,
+ 100, 10,102,117,110, 99,116,105,111,110, 32, 85,110,105,116,
+  95, 84,121,112,101, 58, 98,117,105,108,100, 95,115,104,105,
+ 101,108,100, 95, 99,111,115,116, 40, 41, 10,114,101,116,117,
+ 114,110, 32,115,101,108,102, 46, 98,117,105,108,100, 95, 99,
+ 111,115,116, 10,101,110,100, 10,102,117,110, 99,116,105,111,
+ 110, 32, 78,111,110,101,120,105,115,116,101,110,116, 58,101,
+ 120,105,115,116,115, 40, 41, 10,114,101,116,117,114,110, 32,
+ 102, 97,108,115,101, 10,101,110,100, 10,109,101,116,104,111,
+ 100,115, 95,112,114,105,118, 97,116,101, 32, 61, 32,110,105,
+ 108,32
+ };
+ if (!luaL_loadbuffer(tolua_S,(char*)B,sizeof(B),"tolua: embedded Lua code")) {
+ lua_pcall(tolua_S,0,LUA_MULTRET,0);
+ }
+ } /* end of embedded lua code */
+
+
+ { /* begin embedded lua code */
+ static unsigned char B[] = {
+  10,100,111, 10,108,111, 99, 97,108, 32, 97,112,105, 95,116,
+ 121,112,101,115, 32, 61, 32,123, 10, 34, 80,108, 97,121,101,
  114, 34, 44, 10, 34, 85,110,105,116, 34, 44, 10, 34, 67,105,
  116,121, 34, 44, 10, 34, 84,105,108,101, 34, 44, 10, 34, 71,
  111,118,101,114,110,109,101,110,116, 34, 44, 10, 34, 78, 97,
@@ -2469,80 +3207,83 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  105,108,100,105,110,103, 95, 84,121,112,101, 34, 44, 10, 34,
   85,110,105,116, 95, 84,121,112,101, 34, 44, 10, 34, 84,101,
   99,104, 95, 84,121,112,101, 34, 44, 10, 34, 84,101,114,114,
-  97,105,110, 34, 44, 10, 34, 78,111,110,101,120,105,115,116,
- 101,110,116, 34, 44, 10,125, 10,108,111, 99, 97,108, 32,102,
- 117,110, 99,116,105,111,110, 32,105,100, 95,101,113, 32, 40,
- 111, 49, 44, 32,111, 50, 41, 10,114,101,116,117,114,110, 32,
- 111, 49, 46,105,100, 32, 61, 61, 32,111, 50, 46,105,100, 32,
-  97,110,100, 32, 40,111, 49, 46,105,100, 32,126, 61, 32,110,
- 105,108, 41, 10,101,110,100, 10,108,111, 99, 97,108, 32,102,
- 117,110, 99,116,105,111,110, 32,115,116,114,105,110,103, 95,
- 114,101,112, 40,115,101,108,102, 41, 10,108,111, 99, 97,108,
-  32,105,100, 32, 61, 32,115,101,108,102, 46,105,100, 10,108,
- 111, 99, 97,108, 32,110, 97,109,101, 32, 61, 32,115,101,108,
- 102, 46,114,117,108,101, 95,110, 97,109,101, 32, 97,110,100,
-  32,115,101,108,102, 58,114,117,108,101, 95,110, 97,109,101,
-  40, 41, 32,111,114, 32,115,101,108,102, 46,110, 97,109,101,
-  10,105,102, 32,110, 97,109,101, 32, 97,110,100, 32,105,100,
-  32,116,104,101,110, 10,114,101,116,117,114,110, 32,115,116,
- 114,105,110,103, 46,102,111,114,109, 97,116, 40, 39, 60, 37,
- 115, 32, 35, 37,100, 32, 37,115, 62, 39, 44, 32,116,111,108,
- 117, 97, 46,116,121,112,101, 40,115,101,108,102, 41, 44, 32,
- 105,100, 44, 32,110, 97,109,101, 41, 10,101,108,115,101,105,
- 102, 32,105,100, 32,116,104,101,110, 10,114,101,116,117,114,
- 110, 32,115,116,114,105,110,103, 46,102,111,114,109, 97,116,
-  40, 39, 60, 37,115, 32, 35, 37,100, 62, 39, 44, 32,116,111,
- 108,117, 97, 46,116,121,112,101, 40,115,101,108,102, 41, 44,
-  32,105,100, 41, 10,101,108,115,101, 10,114,101,116,117,114,
- 110, 32,115,116,114,105,110,103, 46,102,111,114,109, 97,116,
-  40, 39, 60, 37,115, 62, 39, 44, 32,116,111,108,117, 97, 46,
- 116,121,112,101, 40,115,101,108,102, 41, 41, 10,101,110,100,
-  10,101,110,100, 10,102,111,114, 32,105,110,100,101,120, 44,
-  32,116,121,112,101,110, 97,109,101, 32,105,110, 32,105,112,
-  97,105,114,115, 40, 97,112,105, 95,116,121,112,101,115, 41,
-  32,100,111, 10,108,111, 99, 97,108, 32, 97,112,105, 95,116,
- 121,112,101, 32, 61, 32, 95, 71, 91,116,121,112,101,110, 97,
- 109,101, 93, 10, 97,112,105, 95,116,121,112,101, 91, 34, 46,
- 101,113, 34, 93, 32, 61, 32,105,100, 95,101,113, 10, 97,112,
- 105, 95,116,121,112,101, 46, 95, 95,116,111,115,116,114,105,
- 110,103, 32, 61, 32,115,116,114,105,110,103, 95,114,101,112,
-  10,108,111, 99, 97,108, 32, 97,112,105, 95,116,121,112,101,
-  95,105,110,100,101,120, 32, 61, 32, 97,112,105, 95,116,121,
- 112,101, 46, 95, 95,105,110,100,101,120, 10,108,111, 99, 97,
- 108, 32,112,114,111,112,101,114,116,105,101,115, 32, 61, 32,
-  97,112,105, 95,116,121,112,101, 46,112,114,111,112,101,114,
- 116,105,101,115, 10,108,111, 99, 97,108, 32,114, 97,119,101,
- 113,117, 97,108, 32, 61, 32,114, 97,119,101,113,117, 97,108,
-  10,108,111, 99, 97,108, 32,115,116,114,105,110,103, 95,115,
- 117, 98, 32, 61, 32,115,116,114,105,110,103, 46,115,117, 98,
-  10,108,111, 99, 97,108, 32,102,117,110, 99,116,105,111,110,
-  32,102,105,101,108,100, 95,103,101,116,116,101,114, 40,115,
- 101,108,102, 44, 32,102,105,101,108,100, 41, 10,108,111, 99,
-  97,108, 32,103,101,116,116,101,114, 32, 61, 32,112,114,111,
- 112,101,114,116,105,101,115, 32, 97,110,100, 32,112,114,111,
- 112,101,114,116,105,101,115, 91,102,105,101,108,100, 93, 10,
- 105,102, 32,103,101,116,116,101,114, 32,116,104,101,110, 10,
- 114,101,116,117,114,110, 32,103,101,116,116,101,114, 40,115,
- 101,108,102, 41, 10,101,108,115,101, 10,108,111, 99, 97,108,
-  32,112,102,120, 32, 61, 32,115,116,114,105,110,103, 95,115,
- 117, 98, 40,102,105,101,108,100, 44, 32, 49, 44, 32, 49, 41,
-  10,105,102, 32,114, 97,119,101,113,117, 97,108, 40,112,102,
- 120, 44, 32, 39, 46, 39, 41, 32,111,114, 32,114, 97,119,101,
- 113,117, 97,108, 40,112,102,120, 44, 32, 39, 95, 39, 41, 32,
- 116,104,101,110, 10,114,101,116,117,114,110, 32,110,105,108,
-  10,101,108,115,101, 10,114,101,116,117,114,110, 32, 97,112,
- 105, 95,116,121,112,101, 95,105,110,100,101,120, 40,115,101,
- 108,102, 44, 32,102,105,101,108,100, 41, 10,101,110,100, 10,
- 101,110,100, 10,101,110,100, 10, 97,112,105, 95,116,121,112,
- 101, 46, 95, 95,105,110,100,101,120, 32, 61, 32,102,105,101,
- 108,100, 95,103,101,116,116,101,114, 10, 97,112,105, 95,116,
- 121,112,101, 91, 34, 46,115,101,116, 34, 93, 32, 61, 32,110,
- 105,108, 10, 97,112,105, 95,116,121,112,101, 46, 95, 95,109,
- 101,116, 97,116, 97, 98,108,101, 32, 61, 32,102, 97,108,115,
- 101, 10, 95, 71, 91,116,121,112,101,110, 97,109,101, 93, 32,
-  61, 32,110,105,108, 10,101,110,100, 10,101,110,100, 10,116,
- 111,108,117, 97, 32, 61, 32,123, 10,116,121,112,101, 61,116,
- 111,108,117, 97, 46,116,121,112,101, 44, 10,125,32
+  97,105,110, 34, 44, 10, 34, 85,110,105,116, 95, 76,105,115,
+ 116, 95, 76,105,110,107, 34, 44, 10, 34, 67,105,116,121, 95,
+  76,105,115,116, 95, 76,105,110,107, 34, 44, 10, 34, 78,111,
+ 110,101,120,105,115,116,101,110,116, 34, 44, 10,125, 10,108,
+ 111, 99, 97,108, 32,102,117,110, 99,116,105,111,110, 32,105,
+ 100, 95,101,113, 32, 40,111, 49, 44, 32,111, 50, 41, 10,114,
+ 101,116,117,114,110, 32,111, 49, 46,105,100, 32, 61, 61, 32,
+ 111, 50, 46,105,100, 32, 97,110,100, 32, 40,111, 49, 46,105,
+ 100, 32,126, 61, 32,110,105,108, 41, 10,101,110,100, 10,108,
+ 111, 99, 97,108, 32,102,117,110, 99,116,105,111,110, 32,115,
+ 116,114,105,110,103, 95,114,101,112, 40,115,101,108,102, 41,
+  10,108,111, 99, 97,108, 32,105,100, 32, 61, 32,115,101,108,
+ 102, 46,105,100, 10,108,111, 99, 97,108, 32,110, 97,109,101,
+  32, 61, 32,115,101,108,102, 46,114,117,108,101, 95,110, 97,
+ 109,101, 32, 97,110,100, 32,115,101,108,102, 58,114,117,108,
+ 101, 95,110, 97,109,101, 40, 41, 32,111,114, 32,115,101,108,
+ 102, 46,110, 97,109,101, 10,105,102, 32,110, 97,109,101, 32,
+  97,110,100, 32,105,100, 32,116,104,101,110, 10,114,101,116,
+ 117,114,110, 32,115,116,114,105,110,103, 46,102,111,114,109,
+  97,116, 40, 39, 60, 37,115, 32, 35, 37,100, 32, 37,115, 62,
+  39, 44, 32,116,111,108,117, 97, 46,116,121,112,101, 40,115,
+ 101,108,102, 41, 44, 32,105,100, 44, 32,110, 97,109,101, 41,
+  10,101,108,115,101,105,102, 32,105,100, 32,116,104,101,110,
+  10,114,101,116,117,114,110, 32,115,116,114,105,110,103, 46,
+ 102,111,114,109, 97,116, 40, 39, 60, 37,115, 32, 35, 37,100,
+  62, 39, 44, 32,116,111,108,117, 97, 46,116,121,112,101, 40,
+ 115,101,108,102, 41, 44, 32,105,100, 41, 10,101,108,115,101,
+  10,114,101,116,117,114,110, 32,115,116,114,105,110,103, 46,
+ 102,111,114,109, 97,116, 40, 39, 60, 37,115, 62, 39, 44, 32,
+ 116,111,108,117, 97, 46,116,121,112,101, 40,115,101,108,102,
+  41, 41, 10,101,110,100, 10,101,110,100, 10,102,111,114, 32,
+ 105,110,100,101,120, 44, 32,116,121,112,101,110, 97,109,101,
+  32,105,110, 32,105,112, 97,105,114,115, 40, 97,112,105, 95,
+ 116,121,112,101,115, 41, 32,100,111, 10,108,111, 99, 97,108,
+  32, 97,112,105, 95,116,121,112,101, 32, 61, 32, 95, 71, 91,
+ 116,121,112,101,110, 97,109,101, 93, 10, 97,112,105, 95,116,
+ 121,112,101, 91, 34, 46,101,113, 34, 93, 32, 61, 32,105,100,
+  95,101,113, 10, 97,112,105, 95,116,121,112,101, 46, 95, 95,
+ 116,111,115,116,114,105,110,103, 32, 61, 32,115,116,114,105,
+ 110,103, 95,114,101,112, 10,108,111, 99, 97,108, 32, 97,112,
+ 105, 95,116,121,112,101, 95,105,110,100,101,120, 32, 61, 32,
+  97,112,105, 95,116,121,112,101, 46, 95, 95,105,110,100,101,
+ 120, 10,108,111, 99, 97,108, 32,112,114,111,112,101,114,116,
+ 105,101,115, 32, 61, 32, 97,112,105, 95,116,121,112,101, 46,
+ 112,114,111,112,101,114,116,105,101,115, 10,108,111, 99, 97,
+ 108, 32,114, 97,119,101,113,117, 97,108, 32, 61, 32,114, 97,
+ 119,101,113,117, 97,108, 10,108,111, 99, 97,108, 32,115,116,
+ 114,105,110,103, 95,115,117, 98, 32, 61, 32,115,116,114,105,
+ 110,103, 46,115,117, 98, 10,108,111, 99, 97,108, 32,102,117,
+ 110, 99,116,105,111,110, 32,102,105,101,108,100, 95,103,101,
+ 116,116,101,114, 40,115,101,108,102, 44, 32,102,105,101,108,
+ 100, 41, 10,108,111, 99, 97,108, 32,103,101,116,116,101,114,
+  32, 61, 32,112,114,111,112,101,114,116,105,101,115, 32, 97,
+ 110,100, 32,112,114,111,112,101,114,116,105,101,115, 91,102,
+ 105,101,108,100, 93, 10,105,102, 32,103,101,116,116,101,114,
+  32,116,104,101,110, 10,114,101,116,117,114,110, 32,103,101,
+ 116,116,101,114, 40,115,101,108,102, 41, 10,101,108,115,101,
+  10,108,111, 99, 97,108, 32,112,102,120, 32, 61, 32,115,116,
+ 114,105,110,103, 95,115,117, 98, 40,102,105,101,108,100, 44,
+  32, 49, 44, 32, 49, 41, 10,105,102, 32,114, 97,119,101,113,
+ 117, 97,108, 40,112,102,120, 44, 32, 39, 46, 39, 41, 32,111,
+ 114, 32,114, 97,119,101,113,117, 97,108, 40,112,102,120, 44,
+  32, 39, 95, 39, 41, 32,116,104,101,110, 10,114,101,116,117,
+ 114,110, 32,110,105,108, 10,101,108,115,101, 10,114,101,116,
+ 117,114,110, 32, 97,112,105, 95,116,121,112,101, 95,105,110,
+ 100,101,120, 40,115,101,108,102, 44, 32,102,105,101,108,100,
+  41, 10,101,110,100, 10,101,110,100, 10,101,110,100, 10, 97,
+ 112,105, 95,116,121,112,101, 46, 95, 95,105,110,100,101,120,
+  32, 61, 32,102,105,101,108,100, 95,103,101,116,116,101,114,
+  10, 97,112,105, 95,116,121,112,101, 91, 34, 46,115,101,116,
+  34, 93, 32, 61, 32,110,105,108, 10, 97,112,105, 95,116,121,
+ 112,101, 46, 95, 95,109,101,116, 97,116, 97, 98,108,101, 32,
+  61, 32,102, 97,108,115,101, 10, 95, 71, 91,116,121,112,101,
+ 110, 97,109,101, 93, 32, 61, 32,110,105,108, 10,101,110,100,
+  10,101,110,100, 10,116,111,108,117, 97, 32, 61, 32,123, 10,
+ 116,121,112,101, 61,116,111,108,117, 97, 46,116,121,112,101,
+  44, 10,125,32
  };
  if (!luaL_loadbuffer(tolua_S,(char*)B,sizeof(B),"tolua: embedded Lua code")) {
  lua_pcall(tolua_S,0,LUA_MULTRET,0);
@@ -2554,6 +3295,7 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  tolua_function(tolua_S,"player",tolua_api_find_player00);
  tolua_function(tolua_S,"city",tolua_api_find_city00);
  tolua_function(tolua_S,"unit",tolua_api_find_unit00);
+ tolua_function(tolua_S,"transport_unit",tolua_api_find_transport_unit00);
  tolua_function(tolua_S,"tile",tolua_api_find_tile00);
  tolua_function(tolua_S,"tile",tolua_api_find_tile01);
  tolua_function(tolua_S,"government",tolua_api_find_government00);
@@ -2623,6 +3365,34 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  }
  } /* end of embedded lua code */
 
+
+ { /* begin embedded lua code */
+ static unsigned char B[] = {
+  10,100,111, 10,108,111, 99, 97,108, 32,102,117,110, 99,116,
+ 105,111,110, 32,105,110,100,101,120, 95,105,116,101,114, 97,
+ 116,101, 40,108,111,111,107,117,112, 41, 10,108,111, 99, 97,
+ 108, 32,105,110,100,101,120, 32, 61, 32, 45, 49, 10,108,111,
+  99, 97,108, 32,102,117,110, 99,116,105,111,110, 32,105,116,
+ 101,114, 97,116,111,114, 40, 41, 10,105,110,100,101,120, 32,
+  61, 32,105,110,100,101,120, 32, 43, 32, 49, 10,114,101,116,
+ 117,114,110, 32,108,111,111,107,117,112, 40,105,110,100,101,
+ 120, 41, 10,101,110,100, 10,114,101,116,117,114,110, 32,105,
+ 116,101,114, 97,116,111,114, 10,101,110,100, 10,102,117,110,
+  99,116,105,111,110, 32,112,108, 97,121,101,114,115, 95,105,
+ 116,101,114, 97,116,101, 40, 41, 10,114,101,116,117,114,110,
+  32,105,110,100,101,120, 95,105,116,101,114, 97,116,101, 40,
+ 102,105,110,100, 46,112,108, 97,121,101,114, 41, 10,101,110,
+ 100, 10,102,117,110, 99,116,105,111,110, 32,119,104,111,108,
+ 101, 95,109, 97,112, 95,105,116,101,114, 97,116,101, 40, 41,
+  10,114,101,116,117,114,110, 32,105,110,100,101,120, 95,105,
+ 116,101,114, 97,116,101, 40,102,105,110,100, 46,116,105,108,
+ 101, 41, 10,101,110,100, 10,101,110,100,32
+ };
+ if (!luaL_loadbuffer(tolua_S,(char*)B,sizeof(B),"tolua: embedded Lua code")) {
+ lua_pcall(tolua_S,0,LUA_MULTRET,0);
+ }
+ } /* end of embedded lua code */
+
  tolua_module(tolua_S,"signal",0);
  tolua_beginmodule(tolua_S,"signal");
  tolua_function(tolua_S,"connect",tolua_api_signal_connect00);
@@ -2638,115 +3408,6 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  tolua_endmodule(tolua_S);
  tolua_module(tolua_S,"E",0);
  tolua_beginmodule(tolua_S,"E");
- tolua_constant(tolua_S,"CITY_CANTBUILD",E_CITY_CANTBUILD);
- tolua_constant(tolua_S,"CITY_LOST",E_CITY_LOST);
- tolua_constant(tolua_S,"CITY_LOVE",E_CITY_LOVE);
- tolua_constant(tolua_S,"CITY_DISORDER",E_CITY_DISORDER);
- tolua_constant(tolua_S,"CITY_FAMINE",E_CITY_FAMINE);
- tolua_constant(tolua_S,"CITY_FAMINE_FEARED",E_CITY_FAMINE_FEARED);
- tolua_constant(tolua_S,"CITY_GROWTH",E_CITY_GROWTH);
- tolua_constant(tolua_S,"CITY_MAY_SOON_GROW",E_CITY_MAY_SOON_GROW);
- tolua_constant(tolua_S,"CITY_AQUEDUCT",E_CITY_AQUEDUCT);
- tolua_constant(tolua_S,"CITY_AQ_BUILDING",E_CITY_AQ_BUILDING);
- tolua_constant(tolua_S,"CITY_NORMAL",E_CITY_NORMAL);
- tolua_constant(tolua_S,"CITY_NUKED",E_CITY_NUKED);
- tolua_constant(tolua_S,"CITY_CMA_RELEASE",E_CITY_CMA_RELEASE);
- tolua_constant(tolua_S,"CITY_GRAN_THROTTLE",E_CITY_GRAN_THROTTLE);
- tolua_constant(tolua_S,"CITY_TRANSFER",E_CITY_TRANSFER);
- tolua_constant(tolua_S,"CITY_BUILD",E_CITY_BUILD);
- tolua_constant(tolua_S,"CITY_PRODUCTION_CHANGED",E_CITY_PRODUCTION_CHANGED);
- tolua_constant(tolua_S,"CITY_PLAGUE",E_CITY_PLAGUE);
- tolua_constant(tolua_S,"WORKLIST",E_WORKLIST);
- tolua_constant(tolua_S,"UPRISING",E_UPRISING);
- tolua_constant(tolua_S,"CIVIL_WAR",E_CIVIL_WAR);
- tolua_constant(tolua_S,"ANARCHY",E_ANARCHY);
- tolua_constant(tolua_S,"FIRST_CONTACT",E_FIRST_CONTACT);
- tolua_constant(tolua_S,"NEW_GOVERNMENT",E_NEW_GOVERNMENT);
- tolua_constant(tolua_S,"LOW_ON_FUNDS",E_LOW_ON_FUNDS);
- tolua_constant(tolua_S,"POLLUTION",E_POLLUTION);
- tolua_constant(tolua_S,"REVOLT_DONE",E_REVOLT_DONE);
- tolua_constant(tolua_S,"REVOLT_START",E_REVOLT_START);
- tolua_constant(tolua_S,"SPACESHIP",E_SPACESHIP);
- tolua_constant(tolua_S,"MY_DIPLOMAT_BRIBE",E_MY_DIPLOMAT_BRIBE);
- tolua_constant(tolua_S,"DIPLOMATIC_INCIDENT",E_DIPLOMATIC_INCIDENT);
- tolua_constant(tolua_S,"MY_DIPLOMAT_ESCAPE",E_MY_DIPLOMAT_ESCAPE);
- tolua_constant(tolua_S,"MY_DIPLOMAT_EMBASSY",E_MY_DIPLOMAT_EMBASSY);
- tolua_constant(tolua_S,"MY_DIPLOMAT_FAILED",E_MY_DIPLOMAT_FAILED);
- tolua_constant(tolua_S,"MY_DIPLOMAT_INCITE",E_MY_DIPLOMAT_INCITE);
- tolua_constant(tolua_S,"MY_DIPLOMAT_POISON",E_MY_DIPLOMAT_POISON);
- tolua_constant(tolua_S,"MY_DIPLOMAT_SABOTAGE",E_MY_DIPLOMAT_SABOTAGE);
- tolua_constant(tolua_S,"MY_DIPLOMAT_THEFT",E_MY_DIPLOMAT_THEFT);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_BRIBE",E_ENEMY_DIPLOMAT_BRIBE);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_EMBASSY",E_ENEMY_DIPLOMAT_EMBASSY);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_FAILED",E_ENEMY_DIPLOMAT_FAILED);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_INCITE",E_ENEMY_DIPLOMAT_INCITE);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_POISON",E_ENEMY_DIPLOMAT_POISON);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_SABOTAGE",E_ENEMY_DIPLOMAT_SABOTAGE);
- tolua_constant(tolua_S,"ENEMY_DIPLOMAT_THEFT",E_ENEMY_DIPLOMAT_THEFT);
- tolua_constant(tolua_S,"CARAVAN_ACTION",E_CARAVAN_ACTION);
- tolua_constant(tolua_S,"SCRIPT",E_SCRIPT);
- tolua_constant(tolua_S,"BROADCAST_REPORT",E_BROADCAST_REPORT);
- tolua_constant(tolua_S,"GAME_END",E_GAME_END);
- tolua_constant(tolua_S,"GAME_START",E_GAME_START);
- tolua_constant(tolua_S,"E_LOG_ERROR",E_LOG_ERROR);
- tolua_constant(tolua_S,"MESSAGE_WALL",E_MESSAGE_WALL);
- tolua_constant(tolua_S,"NATION_SELECTED",E_NATION_SELECTED);
- tolua_constant(tolua_S,"DESTROYED",E_DESTROYED);
- tolua_constant(tolua_S,"REPORT",E_REPORT);
- tolua_constant(tolua_S,"TURN_BELL",E_TURN_BELL);
- tolua_constant(tolua_S,"NEXT_YEAR",E_NEXT_YEAR);
- tolua_constant(tolua_S,"GLOBAL_ECO",E_GLOBAL_ECO);
- tolua_constant(tolua_S,"NUKE",E_NUKE);
- tolua_constant(tolua_S,"HUT_BARB",E_HUT_BARB);
- tolua_constant(tolua_S,"HUT_CITY",E_HUT_CITY);
- tolua_constant(tolua_S,"HUT_GOLD",E_HUT_GOLD);
- tolua_constant(tolua_S,"HUT_BARB_KILLED",E_HUT_BARB_KILLED);
- tolua_constant(tolua_S,"HUT_MERC",E_HUT_MERC);
- tolua_constant(tolua_S,"HUT_SETTLER",E_HUT_SETTLER);
- tolua_constant(tolua_S,"HUT_TECH",E_HUT_TECH);
- tolua_constant(tolua_S,"HUT_BARB_CITY_NEAR",E_HUT_BARB_CITY_NEAR);
- tolua_constant(tolua_S,"IMP_BUY",E_IMP_BUY);
- tolua_constant(tolua_S,"IMP_BUILD",E_IMP_BUILD);
- tolua_constant(tolua_S,"IMP_AUCTIONED",E_IMP_AUCTIONED);
- tolua_constant(tolua_S,"IMP_AUTO",E_IMP_AUTO);
- tolua_constant(tolua_S,"IMP_SOLD",E_IMP_SOLD);
- tolua_constant(tolua_S,"TECH_GAIN",E_TECH_GAIN);
- tolua_constant(tolua_S,"TECH_LEARNED",E_TECH_LEARNED);
- tolua_constant(tolua_S,"TREATY_ALLIANCE",E_TREATY_ALLIANCE);
- tolua_constant(tolua_S,"TREATY_BROKEN",E_TREATY_BROKEN);
- tolua_constant(tolua_S,"TREATY_CEASEFIRE",E_TREATY_CEASEFIRE);
- tolua_constant(tolua_S,"TREATY_PEACE",E_TREATY_PEACE);
- tolua_constant(tolua_S,"TREATY_SHARED_VISION",E_TREATY_SHARED_VISION);
- tolua_constant(tolua_S,"UNIT_LOST_ATT",E_UNIT_LOST_ATT);
- tolua_constant(tolua_S,"UNIT_WIN_ATT",E_UNIT_WIN_ATT);
- tolua_constant(tolua_S,"UNIT_BUY",E_UNIT_BUY);
- tolua_constant(tolua_S,"UNIT_BUILT",E_UNIT_BUILT);
- tolua_constant(tolua_S,"UNIT_LOST_DEF",E_UNIT_LOST_DEF);
- tolua_constant(tolua_S,"UNIT_WIN",E_UNIT_WIN);
- tolua_constant(tolua_S,"UNIT_LOST_MISC",E_UNIT_LOST_MISC);
- tolua_constant(tolua_S,"UNIT_BECAME_VET",E_UNIT_BECAME_VET);
- tolua_constant(tolua_S,"UNIT_UPGRADED",E_UNIT_UPGRADED);
- tolua_constant(tolua_S,"UNIT_RELOCATED",E_UNIT_RELOCATED);
- tolua_constant(tolua_S,"UNIT_ORDERS",E_UNIT_ORDERS);
- tolua_constant(tolua_S,"VOTE_NEW",E_VOTE_NEW);
- tolua_constant(tolua_S,"VOTE_RESOLVED",E_VOTE_RESOLVED);
- tolua_constant(tolua_S,"VOTE_ABORTED",E_VOTE_ABORTED);
- tolua_constant(tolua_S,"WONDER_BUILD",E_WONDER_BUILD);
- tolua_constant(tolua_S,"WONDER_OBSOLETE",E_WONDER_OBSOLETE);
- tolua_constant(tolua_S,"WONDER_STARTED",E_WONDER_STARTED);
- tolua_constant(tolua_S,"WONDER_STOPPED",E_WONDER_STOPPED);
- tolua_constant(tolua_S,"WONDER_WILL_BE_BUILT",E_WONDER_WILL_BE_BUILT);
- tolua_constant(tolua_S,"DIPLOMACY",E_DIPLOMACY);
- tolua_constant(tolua_S,"TREATY_EMBASSY",E_TREATY_EMBASSY);
- tolua_constant(tolua_S,"BAD_COMMAND",E_BAD_COMMAND);
- tolua_constant(tolua_S,"SETTING",E_SETTING);
- tolua_constant(tolua_S,"CHAT_MSG",E_CHAT_MSG);
- tolua_constant(tolua_S,"CHAT_ERROR",E_CHAT_ERROR);
- tolua_constant(tolua_S,"CONNECTION",E_CONNECTION);
- tolua_constant(tolua_S,"AI_DEBUG",E_AI_DEBUG);
- tolua_constant(tolua_S,"LOG_FATAL",E_LOG_FATAL);
- tolua_constant(tolua_S,"TECH_GOAL",E_TECH_GOAL);
- tolua_constant(tolua_S,"LAST",E_LAST);
  tolua_endmodule(tolua_S);
 
  { /* begin embedded lua code */
@@ -2787,15 +3448,24 @@ LUALIB_API int luaopen_api (lua_State* tolua_S)
  }
  } /* end of embedded lua code */
 
+ tolua_module(tolua_S,"effects",0);
+ tolua_beginmodule(tolua_S,"effects");
+ tolua_function(tolua_S,"world_bonus",tolua_api_effects_world_bonus00);
+ tolua_function(tolua_S,"player_bonus",tolua_api_effects_player_bonus00);
+ tolua_function(tolua_S,"city_bonus",tolua_api_effects_city_bonus00);
+ tolua_endmodule(tolua_S);
  tolua_function(tolua_S,"random",tolua_api_random00);
  tolua_function(tolua_S,"error_log",tolua_api_error_log00);
  tolua_function(tolua_S,"debug_log",tolua_api_debug_log00);
  tolua_function(tolua_S,"create_unit",tolua_api_create_unit00);
+ tolua_function(tolua_S,"create_unit_full",tolua_api_create_unit_full00);
  tolua_function(tolua_S,"create_city",tolua_api_create_city00);
  tolua_function(tolua_S,"create_base",tolua_api_create_base00);
+ tolua_function(tolua_S,"create_player",tolua_api_create_player00);
  tolua_function(tolua_S,"change_gold",tolua_api_change_gold00);
  tolua_function(tolua_S,"give_technology",tolua_api_give_technology00);
  tolua_function(tolua_S,"unleash_barbarians",tolua_api_unleash_barbarians00);
+ tolua_function(tolua_S,"place_partisans",tolua_api_place_partisans00);
  tolua_endmodule(tolua_S);
  return 1;
 }

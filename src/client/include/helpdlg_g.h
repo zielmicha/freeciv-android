@@ -15,8 +15,9 @@
 
 /* This must be in same order as names in helpdata.c */
 enum help_page_type { HELP_ANY, HELP_TEXT, HELP_UNIT, HELP_IMPROVEMENT,
-		      HELP_WONDER, HELP_TECH, HELP_TERRAIN,
-                      HELP_GOVERNMENT, HELP_RULESET, HELP_LAST };
+		      HELP_WONDER, HELP_TECH, HELP_TERRAIN, HELP_BASE,
+                      HELP_SPECIALIST, HELP_GOVERNMENT, HELP_RULESET,
+                      HELP_NATIONS, HELP_LAST };
 
 void popup_help_dialog_string(const char *item);
 void popup_help_dialog_typed(const char *item, enum help_page_type);
@@ -24,7 +25,7 @@ void popdown_help_dialog(void);
 
 /* TRANS: "Overview" topic in built-in help */
 #define HELP_OVERVIEW_ITEM N_("?help:Overview")
-#define HELP_PLAYING_ITEM N_("Strategy and tactics")
+#define HELP_PLAYING_ITEM N_("Strategy and Tactics")
 #define HELP_LANGUAGES_ITEM N_("Languages")
 #define HELP_CONNECTING_ITEM N_("Connecting")
 #define HELP_CHATLINE_ITEM N_("Chatline")
@@ -32,6 +33,7 @@ void popdown_help_dialog(void);
 #define HELP_CMA_ITEM N_("Citizen Governor")
 #define HELP_CONTROLS_ITEM N_("Controls")
 #define HELP_RULESET_ITEM N_("About Ruleset")
+#define HELP_NATIONS_ITEM N_("About Nations")
 #define HELP_ECONOMY_ITEM N_("Economy")
 #define HELP_CITIES_ITEM N_("Cities")
 #define HELP_IMPROVEMENTS_ITEM N_("City Improvements")

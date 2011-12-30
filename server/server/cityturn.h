@@ -14,7 +14,7 @@
 #ifndef FC__CITYTURN_H
 #define FC__CITYTURN_H
 
-#include "shared.h"		/* bool type */
+#include "support.h"            /* bool type */
 
 #include "fc_types.h"
 
@@ -28,8 +28,7 @@ void city_refresh_queue_add(struct city *pcity);
 void city_refresh_queue_processing(void);
 
 void auto_arrange_workers(struct city *pcity); /* will arrange the workers */
-void apply_cmresult_to_city(struct city *pcity,
-			    const struct cm_result *const cmr);
+void apply_cmresult_to_city(struct city *pcity, const struct cm_result *cmr);
 
 bool city_change_size(struct city *pcity, int new_size);
 bool city_reduce_size(struct city *pcity, int pop_loss,
@@ -42,6 +41,7 @@ int city_incite_cost(struct player *pplayer, struct city *pcity);
 void remove_obsolete_buildings_city(struct city *pcity, bool refresh);
 void remove_obsolete_buildings(struct player *pplayer);
 
+void choose_build_target(struct player *pplayer, struct city *pcity);
 void advisor_choose_build(struct player *pplayer, struct city *pcity);
 
 void nullify_prechange_production(struct city *pcity);

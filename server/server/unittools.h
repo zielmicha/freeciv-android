@@ -15,7 +15,6 @@
 
 #include "fc_types.h"
 
-#include "gotohand.h"
 #include "packets.h"		/* enum unit_info_use */
 #include "unitlist.h"
 
@@ -39,8 +38,8 @@ void update_unit_activities(struct player *pplayer);
 
 /* various */
 enum goto_move_restriction get_activity_move_restriction(enum unit_activity activity);
-void make_partisans(struct city *pcity);
-bool enemies_at(struct unit *punit, struct tile *ptile);
+void place_partisans(struct tile *pcenter, struct player *powner,
+                     int count, int sq_radius);
 bool teleport_unit_to_city(struct unit *punit, struct city *pcity, int move_cost,
 			  bool verbose);
 void resolve_unit_stacks(struct player *pplayer, struct player *aplayer,
@@ -55,10 +54,11 @@ void unit_assign_specific_activity_target(struct unit *punit,
                                           enum unit_activity *activity,
                                           enum tile_special_type *target,
                                           Base_type_id *base);
+void unit_forget_last_activity(struct unit *punit);
 
 /* creation/deletion/upgrading */
-void upgrade_unit(struct unit *punit, struct unit_type *to_unit,
-		  bool has_to_pay);
+void transform_unit(struct unit *punit, struct unit_type *to_unit,
+                    bool has_to_pay);
 struct unit *create_unit(struct player *pplayer, struct tile *ptile,
 			 struct unit_type *punittype,
 			 int veteran_level, int homecity_id, int moves_left);
@@ -68,6 +68,9 @@ struct unit *create_unit_full(struct player *pplayer, struct tile *ptile,
 			      struct unit *ptrans);
 void wipe_unit(struct unit *punit);
 void kill_unit(struct unit *pkiller, struct unit *punit, bool vet);
+
+struct unit *unit_change_owner(struct unit *punit, struct player *pplayer,
+                               int homecity) fc__warn_unused_result;
 
 /* sending to client */
 void package_unit(struct unit *punit, struct packet_unit_info *packet);
@@ -90,5 +93,8 @@ void load_unit_onto_transporter(struct unit *punit, struct unit *ptrans);
 void unload_unit_from_transporter(struct unit *punit);
 bool move_unit(struct unit *punit, struct tile *ptile, int move_cost);
 bool execute_orders(struct unit *punit);
+
+bool unit_can_do_action_now(const struct unit *punit);
+void unit_did_action(struct unit *punit);
 
 #endif  /* FC__UNITTOOLS_H */

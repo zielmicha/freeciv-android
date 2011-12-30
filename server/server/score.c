@@ -18,22 +18,27 @@
 #include <stdio.h>
 #include <string.h>
 
+/* utility */
+#include "bitvector.h"
 #include "log.h"
 #include "mem.h"
 #include "shared.h"
 
+/* common */
 #include "game.h"
 #include "improvement.h"
 #include "map.h"
 #include "player.h"
+#include "research.h"
 #include "specialist.h"
 #include "unit.h"
 #include "unitlist.h"
 
+/* server */
+#include "plrhand.h"
 #include "score.h"
 #include "srv_main.h"
 
-static int get_civ_score(const struct player *pplayer);
 static int get_spaceship_score(const struct player *pplayer);
 
 /**************************************************************************
@@ -46,7 +51,7 @@ static int get_spaceship_score(const struct player *pplayer);
 struct claim_map {
   struct {
     int landarea, settledarea;
-  } player[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS];
+  } player[MAX_NUM_PLAYER_SLOTS];
 };
 
 /**************************************************************************
@@ -104,6 +109,13 @@ static void print_landarea_map(struct claim_map *pcmap, int turn)
 {
   int p;
 
+  player_slots_iterate(pslot) {
+    if (player_slot_index(pslot) >= 32 && player_slot_is_used(pslot)) {
+      log_error("Debugging not possible! Player slots >= 32 are used.");
+      return;
+    }
+  } player_slots_iterate_end;
+
   if (turn == 0) {
     putchar('\n');
   }
@@ -114,13 +126,13 @@ static void print_landarea_map(struct claim_map *pcmap, int turn)
     for (p = 0; p < player_count(); p++) {
       printf(".know (%d)\n  ", p);
       WRITE_MAP_DATA("%c",
-		     TEST_BIT(pcmap->claims[map_pos_to_index(x, y)].know,
-			      p) ? 'X' : '-');
+                     BV_ISSET(pcmap->claims[map_pos_to_index(x, y)].know,
+                              p) ? 'X' : '-');
       printf(".cities (%d)\n  ", p);
       WRITE_MAP_DATA("%c",
-		     TEST_BIT(pcmap->
-			      claims[map_pos_to_index(x, y)].cities,
-			      p) ? 'O' : '-');
+                     BV_ISSET(pcmap->
+                              claims[map_pos_to_index(x, y)].cities,
+                              p) ? 'O' : '-');
     }
   }
 
@@ -143,9 +155,8 @@ static void print_landarea_map(struct claim_map *pcmap, int turn)
 ****************************************************************************/
 static void build_landarea_map(struct claim_map *pcmap)
 {
-  bv_player claims[MAP_INDEX_SIZE];
+  bv_player *claims = fc_calloc(MAP_INDEX_SIZE, sizeof(*claims));
 
-  memset(claims, 0, sizeof(claims));
   memset(pcmap, 0, sizeof(*pcmap));
 
   /* First calculate claims: which tiles are owned by each player. */
@@ -153,7 +164,7 @@ static void build_landarea_map(struct claim_map *pcmap)
     city_list_iterate(pplayer->cities, pcity) {
       struct tile *pcenter = city_tile(pcity);
 
-      city_tile_iterate(pcenter, tile1) {
+      city_tile_iterate(city_map_radius_sq_get(pcity), pcenter, tile1) {
 	BV_SET(claims[tile_index(tile1)], player_index(city_owner(pcity)));
       } city_tile_iterate_end;
     } city_list_iterate_end;
@@ -179,7 +190,7 @@ static void build_landarea_map(struct claim_map *pcmap)
       }
     }
 
-    if (game.info.borders > 0) {
+    if (BORDERS_DISABLED != game.info.borders) {
       /* If borders are enabled, use owner information directly from the
        * map.  Otherwise use the calculations above. */
       owner = tile_owner(ptile);
@@ -188,6 +199,8 @@ static void build_landarea_map(struct claim_map *pcmap)
       pcmap->player[player_index(owner)].landarea++;
     }
   } whole_map_iterate_end;
+
+  FC_FREE(claims);
 
 #if LAND_AREA_DEBUG >= 2
   print_landarea_map(pcmap, turn);
@@ -293,7 +306,7 @@ void calc_civ_score(struct player *pplayer)
       pplayer->score.techs++;
     }
   } advance_index_iterate_end;
-  pplayer->score.techs += get_player_research(pplayer)->future_tech * 5 / 2;
+  pplayer->score.techs += player_research_get(pplayer)->future_tech * 5 / 2;
   
   unit_list_iterate(pplayer->units, punit) {
     if (is_military_unit(punit)) {
@@ -303,8 +316,8 @@ void calc_civ_score(struct player *pplayer)
 
   improvement_iterate(i) {
     if (is_great_wonder(i)
-	&& (pcity = find_city_from_great_wonder(i))
-	&& player_owns_city(pplayer, pcity)) {
+        && (pcity = city_from_great_wonder(i))
+        && player_owns_city(pplayer, pcity)) {
       pplayer->score.wonders++;
     }
   } improvement_iterate_end;
@@ -315,16 +328,26 @@ void calc_civ_score(struct player *pplayer)
 }
 
 /**************************************************************************
+  Return the score given by the units stats.
+**************************************************************************/
+static int get_units_score(const struct player *pplayer)
+{
+  return (pplayer->score.units_built / 10
+          + pplayer->score.units_killed / 3);
+}
+
+/**************************************************************************
   Return the civilization score (a numerical value) for the player.
 **************************************************************************/
-static int get_civ_score(const struct player *pplayer)
+int get_civ_score(const struct player *pplayer)
 {
   /* We used to count pplayer->score.happy here too, but this is too easily
    * manipulated by players at the endrturn. */
   return (total_player_citizens(pplayer)
-	  + pplayer->score.techs * 2
-	  + pplayer->score.wonders * 5
-	  + get_spaceship_score(pplayer));
+          + pplayer->score.techs * 2
+          + pplayer->score.wonders * 5
+          + get_spaceship_score(pplayer)
+          + get_units_score(pplayer));
 }
 
 /**************************************************************************
@@ -359,6 +382,24 @@ int total_player_citizens(const struct player *pplayer)
   return count;
 }
 
+static const int *ppm_player_color(int player_number)
+{
+  /* the colors for each player. these were selected to give
+   * the most differentiation between all players. YMMV. */
+  static const int col[][3] = {
+    {255,   0,   0}, {  0, 128,   0}, {255, 255, 255}, {255, 255,   0},
+    {138,  43, 226}, {255, 140,   0}, {  0, 255, 255}, {139,  69,  19},
+    {211, 211, 211}, {255, 215,   0}, {255,  20, 147}, {124, 252,   0},
+    {218, 112, 214}, { 30, 144, 255}, {250, 128, 114}, {154, 205,  50},
+    { 25,  25, 112}, {  0, 255, 127}, {139,   0,   0}, {100, 149, 237},
+    {  0, 128, 128}, {255, 192, 203}, {255, 250, 205}, {119, 136, 153},
+    {255, 127,  80}, {255,   0, 255}, {128, 128,   0}, {245, 222, 179},
+    {184, 134,  11}, {173, 216, 230}, {102, 205, 170}, {255, 165,   0},
+  };
+
+  return col[player_number % ARRAY_SIZE(col)];
+}
+
 /**************************************************************************
  save a ppm file which is a representation of the map of the current turn.
  this can later be turned into a animated gif.
@@ -371,28 +412,15 @@ void save_ppm(void)
   char tmpname[600];
   FILE *fp;
   int i, j;
-
-  /* the colors for each player. these were selected to give
-   * the most differentiation between all players. YMMV. */
-  int col[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS][3] = {
-    {255,   0,   0}, {  0, 128,   0}, {255, 255, 255}, {255, 255,   0},
-    {138,  43, 226}, {255, 140,   0}, {  0, 255, 255}, {139,  69,  19},
-    {211, 211, 211}, {255, 215,   0}, {255,  20, 147}, {124, 252,   0},
-    {218, 112, 214}, { 30, 144, 255}, {250, 128, 114}, {154, 205,  50},
-    { 25,  25, 112}, {  0, 255, 127}, {139,   0,   0}, {100, 149, 237},
-    {  0, 128, 128}, {255, 192, 203}, {255, 250, 205}, {119, 136, 153},
-    {255, 127,  80}, {255,   0, 255}, {128, 128,   0}, {245, 222, 179},
-    {184, 134,  11}, {173, 216, 230}, {102, 205, 170}, {255, 165,   0},
-  };
-  int watercol[3] = {0,0,255}; /* blue */
-  int landcol[3] =  {0,0,0};   /* black */
+  static const int watercol[3] = {0,0,255}; /* blue */
+  static const int landcol[3] =  {0,0,0};   /* black */
 
   if (!srvarg.save_ppm) {
     return;
   }
 
   /* put this file in the same place we put savegames */
-  my_snprintf(filename, sizeof(filename),
+  fc_snprintf(filename, sizeof(filename),
               "%s%+05d.int.ppm", game.server.save_name, game.info.year);
 
   /* Ensure the saves directory exists. */
@@ -408,7 +436,7 @@ void save_ppm(void)
   fp = fc_fopen(filename, "w");
 
   if (!fp) {
-    freelog(LOG_ERROR, "couldn't open file ppm save: %s\n", filename);
+    log_error("couldn't open ppm file: %s", filename);
     return;
   }
 
@@ -417,11 +445,9 @@ void save_ppm(void)
           game.server.save_name, game.info.year);
 
   players_iterate(pplayer) {
+    const int *color = ppm_player_color(player_index(pplayer));
     fprintf(fp, "# playerno:%d:color:#%02x%02x%02x:name:\"%s\"\n", 
-            player_number(pplayer),
-            col[player_index(pplayer)][0],
-            col[player_index(pplayer)][1],
-            col[player_index(pplayer)][2],
+            player_number(pplayer), color[0], color[1], color[2],
             player_name(pplayer));
   } players_iterate_end;
 
@@ -431,13 +457,15 @@ void save_ppm(void)
   for (j = 0; j < map.ysize; j++) {
     for (i = 0; i < map.xsize; i++) {
        struct tile *ptile = native_pos_to_tile(i, j);
-       int *color;
+       const int *color;
 
        /* color for cities first, then units, then land */
        if (tile_city(ptile)) {
-         color = col[player_index(city_owner(tile_city(ptile)))];
+         color = ppm_player_color(player_index(city_owner(tile_city(ptile))));
        } else if (unit_list_size(ptile->units) > 0) {
-         color = col[player_index(unit_owner(unit_list_get(ptile->units, 0)))];
+         color = ppm_player_color(player_index(
+                   unit_owner(unit_list_get(ptile->units, 0))
+                 ));
        } else if (is_ocean_tile(ptile)) {
          color = watercol;
        } else {
@@ -470,11 +498,11 @@ void rank_users(void)
   FILE *fp;
   int i;
   enum victory_state { VS_NONE, VS_LOSER, VS_WINNER };
-  enum victory_state plr_state[MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS];
+  enum victory_state plr_state[player_slot_count()];
   struct player *spacerace_winner = NULL;
 
   /* game ending via endturn results in a draw. We don't rank. */
-  if (game.info.turn > game.info.end_turn) {
+  if (game.info.turn > game.server.end_turn) {
     return;
   }
 
@@ -487,13 +515,13 @@ void rank_users(void)
 
   /* don't fail silently, at least print an error */
   if (!fp) {
-    freelog(LOG_ERROR, "couldn't open ranking log file: \"%s\"",
-            srvarg.ranklog_filename);
+    log_error("couldn't open ranking log file: \"%s\"",
+              srvarg.ranklog_filename);
     return;
   }
 
   /* initialize plr_state */
-  for (i = 0; i < MAX_NUM_PLAYERS + MAX_NUM_BARBARIANS; i++) {
+  for (i = 0; i < player_slot_count(); i++) {
     plr_state[i] = VS_NONE;
   }
 
@@ -510,7 +538,7 @@ void rank_users(void)
   if (spacerace_winner) {
     players_iterate(pplayer) {
       if (pplayer != spacerace_winner) {
-        pplayer->surrendered = TRUE;
+        player_status_add(pplayer, PSTATUS_SURRENDER);
       }
     } players_iterate_end;
   }
@@ -520,7 +548,8 @@ void rank_users(void)
   players_iterate(pplayer) {
     if (is_barbarian(pplayer)) {
       plr_state[player_index(pplayer)] = VS_NONE;
-    } else if (pplayer->is_alive && !pplayer->surrendered) {
+    } else if (pplayer->is_alive
+               && !player_status_check(pplayer, PSTATUS_SURRENDER)) {
       plr_state[player_index(pplayer)] = VS_WINNER;
     } else {
       plr_state[player_index(pplayer)] = VS_LOSER;

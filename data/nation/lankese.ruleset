@@ -2,25 +2,29 @@
 
 name=_("Lankese")
 plural=_("?plural:Lankese")
-groups="Ancient", "Medieval", "Modern", "Asian"
+groups="Ancient", "Medieval", "Early Modern", "Modern", "Asian"
 legend=_("Prince Vijaya came to Sri Lanka from Orissa, in north-eastern\
  India during the 6th century BC and founded the Sinhalese kingdom there.\
  During British colonialism the country was known as Ceylon.")
-leader=
- "Vijaya",
- "Parakramabahu I",
- "Kasyapa",
- "J.R. Jayewardene"
-leader_sex="Male", "Male", "Male", "Male"
+
+leaders = {
+ "name",                "sex"
+ "Vijaya",              "Male"
+ "Parakramabahu I",     "Male"
+ "Kasyapa",             "Male"
+ "J.R. Jayewardene",    "Male"
+}
+
+ruler_titles = {
+ "government",   "male_title",             "female_title"
+ "Despotism",    _("Prince %s"),           _("Princess %s")
+ "Republic",     _("Governor %s"),         _("?female:Governor %s")
+ "Communism",    _("Supreme Commander %s"),_("?female:Supreme Commander %s")
+}
+
 flag="srilanka"
 flag_alt = "-"
 city_style = "Asian"
-
-ruler_titles = { "government",      "male_title",      "female_title"
-                 "Despotism",       _("Prince"),       _("Princess")
-                 "Republic",        _("Governor"),     _("?female:Governor")
-            "Communism",_("Supreme Commander"),_("?female:Supreme Commander")
-               }
 
 init_techs=""
 init_buildings=""

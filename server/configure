@@ -1,6 +1,6 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
-GCC_PARAMS="-Iserver -Iserver/generator -Iserver/scripting -Icommon -Icommon/aicore -Iutility -Iai -Ilua -Itolua -I. -DHAVE_CONFIG_H"
+GCC_PARAMS="-Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Icommon -Icommon/aicore -Iutility -Iai -Ilua -Itolua -I. -DHAVE_CONFIG_H"
 EXCLUDE_FILES="lua/luac.c"
 ADD_SYMBOLS="none"
 ADD_SYMBOLS_FLAGS="-g"
@@ -11,7 +11,7 @@ output() {
 echo > Makefile.tmp
 
 ev=""
-for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
+for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
 	if echo "$name" | grep "$EXCLUDE_FILES"; then
 		continue
 	fi

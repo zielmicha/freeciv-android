@@ -19,6 +19,25 @@
 /* common */
 #include "events.h"
 #include "fc_types.h"           /* enum gui_type */
+#include "featured_text.h"      /* struct ft_color */
+
+#define DEFAULT_METASERVER_OPTION "default"
+
+struct video_mode {
+  int width;
+  int height;
+};
+#define VIDEO_MODE(ARG_width, ARG_height) \
+    { .width = ARG_width, .height = ARG_height }
+/****************************************************************************
+  Constructor.
+****************************************************************************/
+static inline struct video_mode video_mode(int width, int height)
+{
+  struct video_mode mode = VIDEO_MODE(width, height);
+  return mode;
+}
+
 
 extern char default_user_name[512];
 extern char default_server_host[512];
@@ -27,6 +46,7 @@ extern char default_metaserver[512];
 extern char default_tileset_name[512];
 extern char default_sound_set_name[512];
 extern char default_sound_plugin_name[512];
+extern char default_chat_logfile[512];
 
 extern bool save_options_on_exit;
 extern bool fullscreen_mode;
@@ -37,6 +57,7 @@ extern bool solid_color_behind_units;
 extern bool sound_bell_at_new_turn;
 extern int smooth_move_unit_msec;
 extern int smooth_center_slide_msec;
+extern int smooth_combat_step_msec;
 extern bool do_combat_animation;
 extern bool ai_manual_turn_done;
 extern bool auto_center_on_unit;
@@ -56,7 +77,7 @@ extern bool keyboardless_goto;
 extern bool enable_cursor_changes;
 extern bool separate_unit_selection;
 extern bool unit_selection_clears_orders;
-extern char highlight_our_names[128];
+extern struct ft_color highlight_our_names;
 
 extern bool voteinfo_bar_use;
 extern bool voteinfo_bar_always_show;
@@ -100,14 +121,21 @@ extern bool gui_gtk2_show_task_icons;
 extern bool gui_gtk2_enable_tabs;
 extern bool gui_gtk2_better_fog;
 extern bool gui_gtk2_show_chat_message_time;
-extern bool gui_gtk2_split_bottom_notebook;
 extern bool gui_gtk2_new_messages_go_to_top;
 extern bool gui_gtk2_show_message_window_buttons;
 extern bool gui_gtk2_metaserver_tab_first;
 extern bool gui_gtk2_allied_chat_only;
+enum {
+  /* Order must match strings in
+   * options.c:gui_gtk2_message_chat_location_name() */
+  GUI_GTK2_MSGCHAT_SPLIT,
+  GUI_GTK2_MSGCHAT_SEPARATE,
+  GUI_GTK2_MSGCHAT_MERGED
+};
+extern int gui_gtk2_message_chat_location; /* enum GUI_GTK2_MSGCHAT_* */
 extern bool gui_gtk2_small_display_layout;
-extern bool gui_gtk2_merge_notebooks;
 extern bool gui_gtk2_mouse_over_map_focus;
+extern bool gui_gtk2_chatline_autocompletion;
 extern int gui_gtk2_citydlg_xsize;
 extern int gui_gtk2_citydlg_ysize;
 extern char gui_gtk2_font_city_label[512];
@@ -128,105 +156,146 @@ extern char gui_gtk2_font_reqtree_text[512];
 #define FC_SDL_DEFAULT_THEME_NAME "human"
 extern char gui_sdl_default_theme_name[512];
 extern bool gui_sdl_fullscreen;
-extern int gui_sdl_screen_width;
-extern int gui_sdl_screen_height;
+extern struct video_mode gui_sdl_screen;
+extern bool gui_sdl_do_cursor_animation;
+extern bool gui_sdl_use_color_cursors;
 
 /* gui-win32 client specific options. */
 extern bool gui_win32_better_fog;
 extern bool gui_win32_enable_alpha;
 
-enum client_option_type {
-  COT_BOOLEAN,
-  COT_INTEGER,
-  COT_STRING,
-  COT_FONT
-};
 
-enum client_option_class {
-  COC_GRAPHICS,
-  COC_OVERVIEW,
-  COC_SOUND,
-  COC_INTERFACE,
-  COC_NETWORK,
-  COC_FONT,
-  COC_MAX
-};
+#define SPECENUM_NAME option_type
+#define SPECENUM_VALUE0 OT_BOOLEAN
+#define SPECENUM_VALUE1 OT_INTEGER
+#define SPECENUM_VALUE2 OT_STRING
+#define SPECENUM_VALUE3 OT_ENUM
+#define SPECENUM_VALUE4 OT_BITWISE
+#define SPECENUM_VALUE5 OT_FONT
+#define SPECENUM_VALUE6 OT_COLOR
+#define SPECENUM_VALUE7 OT_VIDEO_MODE
+#include "specenum_gen.h"
 
-struct client_option;           /* Opaque type. */
 
-#define client_options_iterate(_p)                                          \
-{                                                                           \
-  struct client_option *_p = option_first();                                \
-  for (; _p; _p = option_next(_p)) {                                        \
+struct option;                  /* Opaque type. */
+struct option_set;              /* Opaque type. */
 
-#define client_options_iterate_end                                          \
-  }                                                                         \
-}
 
 /* Main functions. */
 void options_init(void);
 void options_free(void);
+void server_options_init(void);
+void server_options_free(void);
 void options_load(void);
 void options_save(void);
 
 
-/* Option function accessors. */
-struct client_option *option_by_number(int id);
-struct client_option *option_by_name(const char *name);
-struct client_option *option_first(void);
-struct client_option *option_next(struct client_option *poption);
+/* Option sets. */
+extern const struct option_set const *client_optset;
+extern const struct option_set const *server_optset;
 
-void option_set_changed_callback(struct client_option *poption,
-                                 void (*callback) (struct client_option *));
-void option_changed(struct client_option *poption);
-bool option_reset(struct client_option *poption);
-struct section_file;
-bool option_load(struct client_option *poption, struct section_file *sf);
+struct option *optset_option_by_number(const struct option_set *poptset,
+                                       int id);
+#define optset_option_by_index optset_option_by_number
+struct option *optset_option_by_name(const struct option_set *poptset,
+                                     const char *name);
+struct option *optset_option_first(const struct option_set *poptset);
 
-int option_number(const struct client_option *poption);
-const char *option_name(const struct client_option *poption);
-const char *option_description(const struct client_option *poption);
-const char *option_help_text(const struct client_option *poption);
-enum client_option_type option_type(const struct client_option *poption);
-enum client_option_class option_class(const struct client_option *poption);
-const char *option_class_name(enum client_option_class option_class);
+int optset_category_number(const struct option_set *poptset);
+const char *optset_category_name(const struct option_set *poptset,
+                                 int category);
+
+
+/* Common option functions. */
+const struct option_set *option_optset(const struct option *poption);
+int option_number(const struct option *poption);
+#define option_index option_number
+const char *option_name(const struct option *poption);
+const char *option_description(const struct option *poption);
+const char *option_help_text(const struct option *poption);
+enum option_type option_type(const struct option *poption);
+int option_category(const struct option *poption);
+const char *option_category_name(const struct option *poption);
+bool option_is_changeable(const struct option *poption);
+struct option *option_next(const struct option *poption);
+
+bool option_reset(struct option *poption);
+void option_set_changed_callback(struct option *poption,
+                                 void (*callback) (struct option *));
+void option_changed(struct option *poption);
 
 /* Option gui functions. */
-void option_set_gui_data(struct client_option *poption, void *data);
-void *option_get_gui_data(const struct client_option *poption);
+void option_set_gui_data(struct option *poption, void *data);
+void *option_get_gui_data(const struct option *poption);
 
-/* Option type COT_BOOLEAN functions. */
-bool option_bool_get(const struct client_option *poption);
-bool option_bool_def(const struct client_option *poption);
-bool option_bool_set(struct client_option *poption, bool val);
+/* Option type OT_BOOLEAN functions. */
+bool option_bool_get(const struct option *poption);
+bool option_bool_def(const struct option *poption);
+bool option_bool_set(struct option *poption, bool val);
 
-/* Option type COT_INTEGER functions. */
-int option_int_get(const struct client_option *poption);
-int option_int_def(const struct client_option *poption);
-int option_int_min(const struct client_option *poption);
-int option_int_max(const struct client_option *poption);
-bool option_int_set(struct client_option *poption, int val);
+/* Option type OT_INTEGER functions. */
+int option_int_get(const struct option *poption);
+int option_int_def(const struct option *poption);
+int option_int_min(const struct option *poption);
+int option_int_max(const struct option *poption);
+bool option_int_set(struct option *poption, int val);
 
-/* Option type COT_STRING functions. */
-const char *option_str_get(const struct client_option *poption);
-const char *option_str_def(const struct client_option *poption);
-const struct strvec *option_str_values(const struct client_option *poption);
-bool option_str_set(struct client_option *poption, const char *str);
+/* Option type OT_STRING functions. */
+const char *option_str_get(const struct option *poption);
+const char *option_str_def(const struct option *poption);
+const struct strvec *option_str_values(const struct option *poption);
+bool option_str_set(struct option *poption, const char *str);
 
-/* Option type COT_FONT functions. */
-const char *option_font_get(const struct client_option *poption);
-const char *option_font_def(const struct client_option *poption);
-const char *option_font_target(const struct client_option *poption);
-bool option_font_set(struct client_option *poption, const char *str);
+/* Option type OT_ENUM functions. */
+int option_enum_str_to_int(const struct option *poption, const char *str);
+const char *option_enum_int_to_str(const struct option *poption, int val);
+int option_enum_get_int(const struct option *poption);
+const char *option_enum_get_str(const struct option *poption);
+int option_enum_def_int(const struct option *poption);
+const char *option_enum_def_str(const struct option *poption);
+const struct strvec *option_enum_values(const struct option *poption);
+bool option_enum_set_int(struct option *poption, int val);
+bool option_enum_set_str(struct option *poption, const char *str);
+
+/* Option type OT_BITWISE functions. */
+unsigned option_bitwise_get(const struct option *poption);
+unsigned option_bitwise_def(const struct option *poption);
+unsigned option_bitwise_mask(const struct option *poption);
+const struct strvec *option_bitwise_values(const struct option *poption);
+bool option_bitwise_set(struct option *poption, unsigned val);
+
+/* Option type OT_FONT functions. */
+const char *option_font_get(const struct option *poption);
+const char *option_font_def(const struct option *poption);
+const char *option_font_target(const struct option *poption);
+bool option_font_set(struct option *poption, const char *font);
+
+/* Option type OT_COLOR functions. */
+struct ft_color option_color_get(const struct option *poption);
+struct ft_color option_color_def(const struct option *poption);
+bool option_color_set(struct option *poption, struct ft_color color);
+
+/* Option type OT_VIDEO_MODE functions. */
+struct video_mode option_video_mode_get(const struct option *poption);
+struct video_mode option_video_mode_def(const struct option *poption);
+bool option_video_mode_set(struct option *poption, struct video_mode mode);
+
+
+#define options_iterate(poptset, poption)                                   \
+{                                                                           \
+  struct option *poption = optset_option_first(poptset);                    \
+  for (; NULL != poption; poption = option_next(poption))                {  \
+
+#define options_iterate_end                                                 \
+  }                                                                         \
+}
 
 
 /** Desired settable options. **/
-struct options_settable;
 void desired_settable_options_update(void);
 void desired_settable_option_update(const char *op_name,
                                     const char *op_value,
                                     bool allow_replace);
-void desired_settable_option_send(struct options_settable *pset);
 
 
 /** Dialog report options. **/
@@ -242,10 +311,12 @@ void options_dialogs_set(void);
 #define MW_MESSAGES  2		/* add to the messages window */
 #define MW_POPUP     4		/* popup an individual window */
 
-extern unsigned int messages_where[];	/* OR-ed MW_ values [E_LAST] */
+extern int messages_where[];	/* OR-ed MW_ values [E_LAST] */
 
 
-/** Client specific min/max/default option values **/
+/** Client options **/
+
+#define GUI_DEFAULT_CHAT_LOGFILE        "freeciv-chat.log"
 
 /* gui-gtk2: [xy]size of the city dialog */
 #define GUI_GTK2_CITYDLG_DEFAULT_XSIZE  770
@@ -257,4 +328,6 @@ extern unsigned int messages_where[];	/* OR-ed MW_ values [E_LAST] */
 #define GUI_GTK2_CITYDLG_MAX_YSIZE      4096
 
 
+#define GUI_GTK_OVERVIEW_MIN_XSIZE      160
+#define GUI_GTK_OVERVIEW_MIN_YSIZE      100
 #endif  /* FC__OPTIONS_H */

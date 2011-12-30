@@ -17,17 +17,23 @@
 
 #include <string.h>
 
+/* utility */
+#include "log.h"
+
+/* common */
 #include "game.h"
 #include "government.h"
-#include "log.h"
 #include "player.h"
+#include "research.h"
 #include "tech.h"
 
+/* server */
 #include "plrhand.h"
+#include "srv_log.h"
 #include "techtools.h"
 
+/* ai */
 #include "advmilitary.h"
-#include "ailog.h"
 #include "aitools.h"
 
 #include "aitech.h"
@@ -71,14 +77,14 @@ static void ai_select_tech(struct player *pplayer,
 
   /* if we are researching future techs, then simply continue with that. 
    * we don't need to do anything below. */
-  if (is_future_tech(get_player_research(pplayer)->researching)) {
+  if (is_future_tech(player_research_get(pplayer)->researching)) {
     if (choice) {
-      choice->choice = get_player_research(pplayer)->researching;
+      choice->choice = player_research_get(pplayer)->researching;
       choice->want = 1;
       choice->current_want = 1;
     }
     if (goal) {
-      goal->choice = get_player_research(pplayer)->tech_goal;
+      goal->choice = player_research_get(pplayer)->tech_goal;
       goal->want = 1;
       goal->current_want = 1;
     }
@@ -93,10 +99,10 @@ static void ai_select_tech(struct player *pplayer,
 
       /* We only want it if we haven't got it (so AI is human after all) */
       if (steps > 0) { 
-        values[i] += pplayer->ai_data.tech_want[i];
+        values[i] += pplayer->ai_common.tech_want[i];
 	advance_index_iterate(A_FIRST, k) {
 	  if (is_tech_a_req_for_goal(pplayer, k, i)) {
-            values[k] += pplayer->ai_data.tech_want[i] / steps;
+            values[k] += pplayer->ai_common.tech_want[i] / steps;
 	  }
 	} advance_index_iterate_end;
       }
@@ -124,10 +130,10 @@ static void ai_select_tech(struct player *pplayer,
        * it's supposed to be doing; it just looks strange. -- Syela */
       goal_values[i] /= steps;
       if (steps < 6) {
-	freelog(LOG_DEBUG, "%s: want = %d, value = %d, goal_value = %d",
-                advance_name_by_player(pplayer, i),
-                pplayer->ai_data.tech_want[i],
-		values[i], goal_values[i]);
+        log_debug("%s: want = %d, value = %d, goal_value = %d",
+                  advance_name_by_player(pplayer, i),
+                  pplayer->ai_common.tech_want[i],
+                  values[i], goal_values[i]);
       }
     }
   } advance_index_iterate_end;
@@ -137,12 +143,12 @@ static void ai_select_tech(struct player *pplayer,
   advance_index_iterate(A_FIRST, i) {
     if (valid_advance_by_number(i)) {
       if (values[i] > values[newtech]
-	  && player_invention_reachable(pplayer, i)
-	  && player_invention_state(pplayer, i) == TECH_PREREQS_KNOWN) {
-	newtech = i;
+          && player_invention_reachable(pplayer, i, FALSE)
+          && player_invention_state(pplayer, i) == TECH_PREREQS_KNOWN) {
+        newtech = i;
       }
       if (goal_values[i] > goal_values[newgoal]
-	  && player_invention_reachable(pplayer, i)) {
+	  && player_invention_reachable(pplayer, i, FALSE)) {
 	newgoal = i;
       }
     }
@@ -160,27 +166,26 @@ static void ai_select_tech(struct player *pplayer,
     choice->choice = newtech;
     choice->want = values[newtech] / num_cities_nonzero;
     choice->current_want = 
-      values[get_player_research(pplayer)->researching] / num_cities_nonzero;
+      values[player_research_get(pplayer)->researching] / num_cities_nonzero;
   }
 
   if (goal) {
     goal->choice = newgoal;
     goal->want = goal_values[newgoal] / num_cities_nonzero;
     goal->current_want
-      = (goal_values[get_player_research(pplayer)->tech_goal]
-	 / num_cities_nonzero);
-    freelog(LOG_DEBUG,
-	    "Goal->choice = %s, goal->want = %d, goal_value = %d, "
-	    "num_cities_nonzero = %d",
-	    advance_name_by_player(pplayer, goal->choice), goal->want,
-	    goal_values[newgoal],
-	    num_cities_nonzero);
+      = (goal_values[player_research_get(pplayer)->tech_goal]
+         / num_cities_nonzero);
+    log_debug("Goal->choice = %s, goal->want = %d, goal_value = %d, "
+              "num_cities_nonzero = %d",
+              advance_name_by_player(pplayer, goal->choice), goal->want,
+              goal_values[newgoal],
+              num_cities_nonzero);
   }
 
   /* we can't have this, which will happen in the circumstance 
    * where all ai.tech_wants are negative */
   if (choice && choice->choice == A_UNSET) {
-    choice->choice = get_player_research(pplayer)->researching;
+    choice->choice = player_research_get(pplayer)->researching;
   }
 
   return;
@@ -193,13 +198,13 @@ static void ai_select_tech(struct player *pplayer,
 void ai_manage_tech(struct player *pplayer)
 {
   struct ai_tech_choice choice, goal;
-  struct player_research *research = get_player_research(pplayer);
+  struct player_research *research = player_research_get(pplayer);
   /* Penalty for switching research */
   int penalty = (research->got_tech ? 0 : research->bulbs_researched);
 
   /* If there are humans in our team, they will choose the techs */
   players_iterate(aplayer) {
-    const struct player_diplstate *ds = pplayer_get_diplstate(pplayer, aplayer);
+    const struct player_diplstate *ds = player_diplstate_get(pplayer, aplayer);
 
     if (ds->type == DS_TEAM) {
       return;
@@ -224,12 +229,12 @@ void ai_manage_tech(struct player *pplayer)
   /* It worked, in particular, because the value it sets (research->tech_goal)
    * is practically never used, see the comment for ai_next_tech_goal */
   if (goal.choice != research->tech_goal) {
-    freelog(LOG_DEBUG, "%s change goal from %s (want=%d) to %s (want=%d)",
-	    player_name(pplayer),
-	    advance_name_by_player(pplayer, research->tech_goal), 
-	    goal.current_want,
-	    advance_name_by_player(pplayer, goal.choice),
-	    goal.want);
+    log_debug("%s change goal from %s (want=%d) to %s (want=%d)",
+              player_name(pplayer),
+              advance_name_by_player(pplayer, research->tech_goal), 
+              goal.current_want,
+              advance_name_by_player(pplayer, goal.choice),
+              goal.want);
     choose_tech_goal(pplayer, goal.choice);
   }
 }
@@ -291,7 +296,7 @@ struct unit_type *ai_wants_role_unit(struct player *pplayer,
       }
 
       if (cost < best_cost
-       && player_invention_reachable(pplayer, advance_number(itech))) {
+       && player_invention_reachable(pplayer, advance_number(itech), FALSE)) {
         best_tech = itech;
         best_cost = cost;
         best_unit = iunit;
@@ -305,7 +310,7 @@ struct unit_type *ai_wants_role_unit(struct player *pplayer,
       /* We already have a role unit of this kind */
       want /= 2;
     }
-    pplayer->ai_data.tech_want[advance_index(best_tech)] += want;
+    pplayer->ai_common.tech_want[advance_index(best_tech)] += want;
     TECH_LOG(LOG_DEBUG, pplayer, best_tech,
              "+ %d for %s by role",
              want,

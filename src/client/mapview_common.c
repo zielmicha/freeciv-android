@@ -15,11 +15,8 @@
 #include <config.h>
 #endif
 
-#include <assert.h>
-
 /* utility */
 #include "fcintl.h"
-#include "hash.h"
 #include "log.h"
 #include "rand.h"
 #include "support.h"
@@ -44,17 +41,33 @@
 #include "editor.h"
 #include "goto.h"
 #include "citydlg_common.h"
-#include "mapview_common.h"
 #include "overview_common.h"
 #include "tilespec.h"
 
-struct hash_table *mapdeco_highlight_table;
-struct hash_table *mapdeco_crosshair_table;
+#include "mapview_common.h"
+
+
+struct tile_hash *mapdeco_highlight_table;
+struct tile_hash *mapdeco_crosshair_table;
 
 struct gotoline_counter {
   int line_count[DIR8_COUNT];
 };
-struct hash_table *mapdeco_gotoline_table;
+
+static inline struct gotoline_counter *gotoline_counter_new(void);
+static void gotoline_counter_destroy(struct gotoline_counter *pglc);
+
+#define SPECHASH_TAG gotoline
+#define SPECHASH_KEY_TYPE struct tile *
+#define SPECHASH_DATA_TYPE struct gotoline_counter *
+#define SPECHASH_DATA_FREE gotoline_counter_destroy
+#include "spechash.h"
+#define gotoline_hash_iterate(hash, ptile, pglc)                            \
+  TYPED_HASH_ITERATE(struct tile *, struct gotoline_counter *,              \
+                     hash, ptile, pglc)
+#define gotoline_hash_iterate_end HASH_ITERATE_END
+
+struct gotoline_hash *mapdeco_gotoline_table;
 
 struct view mapview;
 bool can_slide = TRUE;
@@ -91,6 +104,24 @@ struct trade_route_line {
 /* A trade route line might need to be drawn in two parts. */
 static const int MAX_TRADE_ROUTE_DRAW_LINES = 2;
 
+
+/****************************************************************************
+  Create a new goto line counter.
+****************************************************************************/
+static inline struct gotoline_counter *gotoline_counter_new(void)
+{
+  struct gotoline_counter *pglc = fc_calloc(1, sizeof(*pglc));
+  return pglc;
+}
+
+/****************************************************************************
+  Create a new goto line counter.
+****************************************************************************/
+static void gotoline_counter_destroy(struct gotoline_counter *pglc)
+{
+  fc_assert_ret(NULL != pglc);
+  free(pglc);
+}
 
 /**************************************************************************
  Refreshes a single tile on the map canvas.
@@ -208,14 +239,14 @@ static void gui_to_map_pos(const struct tileset *t,
     int x, y, dx, dy;
     int xmult, ymult, mod, compar;
 
-    assert(tileset_is_isometric(t));
+    fc_assert(tileset_is_isometric(t));
 
     x = DIVIDE(gui_x, W);
     y = DIVIDE(gui_y, H);
     dx = gui_x - x * W;
     dy = gui_y - y * H;
-    assert(dx >= 0 && dx < W);
-    assert(dy >= 0 && dy < H);
+    fc_assert(dx >= 0 && dx < W);
+    fc_assert(dy >= 0 && dy < H);
 
     /* Now fold so we consider only one-quarter tile. */
     xmult = (dx >= W / 2) ? -1 : 1;
@@ -618,9 +649,9 @@ void set_mapview_origin(int gui_x0, int gui_y0)
     currtime = read_timer_seconds(anim_timer);
     total_frames += frames;
     total_time += currtime;
-    freelog(LOG_DEBUG, "Got %d frames in %f seconds: %f FPS (avg %f).",
-	    frames, currtime, (double)frames / currtime,
-	    total_frames / total_time);
+    log_debug("Got %d frames in %f seconds: %f FPS (avg %f).",
+              frames, currtime, (double)frames / currtime,
+              total_frames / total_time);
 
     /* A very small decay factor to make things more accurate when something
      * changes (mapview size, tileset change, etc.).  This gives a
@@ -734,8 +765,8 @@ void get_mapview_scroll_window(int *xmin, int *ymin, int *xmax, int *ymax,
     *ymax += (diff + 1) / 2;
   }
 
-  freelog(LOG_DEBUG, "x: %d<-%d->%d; y: %d<-%d->%d",
-	  *xmin, *xsize, *xmax, *ymin, *ymax, *ysize);
+  log_debug("x: %d<-%d->%d; y: %d<-%d->%d",
+            *xmin, *xsize, *xmax, *ymin, *ymax, *ysize);
 }
 
 /****************************************************************************
@@ -908,17 +939,17 @@ void put_drawn_sprites(struct canvas *pcanvas,
   canvas at the given position.
 **************************************************************************/
 void put_one_element(struct canvas *pcanvas, enum mapview_layer layer,
-		     struct tile *ptile,
-		     const struct tile_edge *pedge,
-		     const struct tile_corner *pcorner,
-		     const struct unit *punit, struct city *pcity,
-		     int canvas_x, int canvas_y,
-		     const struct city *citymode)
+                     const struct tile *ptile,
+                     const struct tile_edge *pedge,
+                     const struct tile_corner *pcorner,
+                     const struct unit *punit, const struct city *pcity,
+                     int canvas_x, int canvas_y,
+                     const struct city *citymode)
 {
   struct drawn_sprite tile_sprs[80];
   int count = fill_sprite_array(tileset, tile_sprs, layer,
-				ptile, pedge, pcorner,
-				punit, pcity, citymode);
+                                ptile, pedge, pcorner,
+                                punit, pcity, citymode);
   bool fog = (ptile && draw_fog_of_war
 	      && TILE_KNOWN_UNSEEN == client_tile_get_known(ptile));
 
@@ -1076,7 +1107,7 @@ void put_nuke_mushroom_pixmaps(struct tile *ptile)
   flush_dirty();
   gui_flush();
 
-  myusleep(1000000);
+  fc_usleep(1000000);
 
   update_map_canvas_visible();
 }
@@ -1186,7 +1217,7 @@ static void draw_trade_routes_for_city(const struct city *pcity_src)
   }
 
   for (i = 0; i < NUM_TRADE_ROUTES; i++) {
-    pcity_dest = game_find_city_by_number(pcity_src->trade[i]);
+    pcity_dest = game_city_by_number(pcity_src->trade[i]);
     if (!pcity_dest) {
       continue;
     }
@@ -1251,9 +1282,8 @@ void update_map_canvas(int canvas_x, int canvas_y, int width, int height)
 	  && width == mapview.store_width
 	  && height == mapview.store_height);
 
-  freelog(LOG_DEBUG,
-	  "update_map_canvas(pos=(%d,%d), size=(%d,%d))",
-	  canvas_x, canvas_y, width, height);
+  log_debug("update_map_canvas(pos=(%d,%d), size=(%d,%d))",
+            canvas_x, canvas_y, width, height);
 
   /* If a full redraw is done, we just draw everything onto the canvas.
    * However if a partial redraw is done we draw everything onto the
@@ -1363,8 +1393,8 @@ void update_city_description(struct city *pcity)
 }
 
 /****************************************************************************
-  Draw a "full" citybar for the city.  This is a subcase of show_city_desc
-  (see that function for more info) for tilesets that have a full citybar.
+  Draw a "full" city bar for the city.  This is a subcase of show_city_desc
+  (see that function for more info) for tilesets that have a full city bar.
 ****************************************************************************/
 static void show_full_citybar(struct canvas *pcanvas,
 			      const int canvas_x0, const int canvas_y0,
@@ -1424,7 +1454,7 @@ static void show_full_citybar(struct canvas *pcanvas,
 				   growth, sizeof(growth), &growth_color);
 
   if (draw_city_names) {
-    my_snprintf(size, sizeof(size), "%d", pcity->size);
+    fc_snprintf(size, sizeof(size), "%d", pcity->size);
 
     get_text_size(&size_rect.w, &size_rect.h, FONT_CITY_SIZE, size);
     get_text_size(&name_rect.w, &name_rect.h, FONT_CITY_NAME, name);
@@ -1624,9 +1654,9 @@ static void show_full_citybar(struct canvas *pcanvas,
 }
 
 /****************************************************************************
-  Draw a "small" citybar for the city.  This is a subcase of show_city_desc
+  Draw a "small" city bar for the city.  This is a subcase of show_city_desc
   (see that function for more info) for tilesets that do not have a full
-  citybar.
+  city bar.
 ****************************************************************************/
 static void show_small_citybar(struct canvas *pcanvas,
 			   int canvas_x, int canvas_y,
@@ -1803,15 +1833,15 @@ void show_city_descriptions(int canvas_x, int canvas_y,
 
       show_city_desc(mapview.store, canvas_x, canvas_y,
 		     pcity, &width, &height);
-      freelog(LOG_DEBUG, "Drawing %s.", city_name(pcity));
+      log_debug("Drawing %s.", city_name(pcity));
 
       if (width > max_desc_width || height > max_desc_height) {
-	/* The update was incomplete!  We queue a new update.  Note that
-	 * this is recursively queueing an update within a dequeuing of an
-	 * update.  This is allowed specifically because of the code in
-	 * unqueue_mapview_updates.  See that function for more. */
-	freelog(LOG_DEBUG, "Re-queuing %s.", city_name(pcity));
-	update_city_description(pcity);
+        /* The update was incomplete! We queue a new update. Note that
+         * this is recursively queueing an update within a dequeuing of an
+         * update. This is allowed specifically because of the code in
+         * unqueue_mapview_updates. See that function for more. */
+        log_debug("Re-queuing %s.", city_name(pcity));
+        update_city_description(pcity);
       }
       new_max_width = MAX(width, new_max_width);
       new_max_height = MAX(height, new_max_height);
@@ -1854,7 +1884,7 @@ bool show_unit_orders(struct unit *punit)
 	  /* This shouldn't happen unless the server gives us invalid
 	   * data.  To avoid disaster we need to break out of the
 	   * switch and the enclosing for loop. */
-	  assert(0);
+          fc_assert(NULL != ptile);
 	  i = punit->orders.length;
 	}
 	break;
@@ -1932,7 +1962,7 @@ void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
 
     anim_timer = renew_timer_start(anim_timer, TIMER_USER, TIMER_ACTIVE);
 
-    if (myrand(diff0 + diff1) < diff0) {
+    if (fc_rand(diff0 + diff1) < diff0) {
       punit0->hp--;
       refresh_unit_mapcanvas(punit0, punit0->tile, FALSE, FALSE);
     } else {
@@ -1943,7 +1973,7 @@ void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
     unqueue_mapview_updates(TRUE);
     gui_flush();
 
-    usleep_since_timer_start(anim_timer, 10000);
+    usleep_since_timer_start(anim_timer, smooth_combat_step_msec * 1000ul);
   }
 
   if (num_tiles_explode_unit > 0
@@ -1977,7 +2007,8 @@ void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
       flush_dirty();
       gui_flush();
 
-      usleep_since_timer_start(anim_timer, 20000);
+      usleep_since_timer_start(anim_timer,
+                               smooth_combat_step_msec * 2 * 1000ul);
     }
   }
 
@@ -2020,7 +2051,7 @@ void move_unit_map_canvas(struct unit *punit,
     int canvas_dx, canvas_dy;
     double timing_sec = (double)smooth_move_unit_msec / 1000.0, mytime;
 
-    assert(smooth_move_unit_msec > 0);
+    fc_assert(smooth_move_unit_msec > 0);
 
     map_to_gui_vector(tileset, &canvas_dx, &canvas_dy, dx, dy);
 
@@ -2105,12 +2136,13 @@ struct city *find_city_or_settler_near_tile(const struct tile *ptile,
   /* rule e */
   closest_city = NULL;
 
-  city_tile_iterate(ptile, tile1) {
+  /* check within maximum (squared) city radius */
+  city_tile_iterate(CITY_MAP_MAX_RADIUS_SQ, ptile, tile1) {
     pcity = tile_city(tile1);
     if (pcity
 	&& (NULL == client.conn.playing
 	    || city_owner(pcity) == client.conn.playing)
-	&& city_can_work_tile(pcity, tile1)) {
+	&& client_city_can_work_tile(pcity, tile1)) {
       /*
        * Note, we must explicitly check if the tile is workable (with
        * city_can_work_tile() above), since it is possible that another
@@ -2132,7 +2164,8 @@ struct city *find_city_or_settler_near_tile(const struct tile *ptile,
     return closest_city;
   }
 
-  city_tile_iterate(ptile, tile1) {
+  /* check within maximum (squared) city radius */
+  city_tile_iterate(CITY_MAP_MAX_RADIUS_SQ, ptile, tile1) {
       unit_list_iterate(tile1->units, psettler) {
 	if ((NULL == client.conn.playing
 	     || unit_owner(psettler) == client.conn.playing)
@@ -2246,7 +2279,7 @@ void get_city_mapview_trade_routes(struct city *pcity,
     num_trade_routes++;
   }
 
-  my_snprintf(trade_routes_buffer, trade_routes_buffer_len,
+  fc_snprintf(trade_routes_buffer, trade_routes_buffer_len,
               "%d/%d", num_trade_routes, NUM_TRADE_ROUTES);
 
   if (pcolor) {
@@ -2381,8 +2414,8 @@ void unqueue_mapview_updates(bool write_to_screen)
     return;
   }
 
-  freelog(LOG_DEBUG, "unqueue_mapview_update: needed_updates=%d",
-	  needed_updates);
+  log_debug("unqueue_mapview_update: needed_updates=%d",
+            needed_updates);
 
   /* This code "pops" the lists of tile updates off of the static array and
    * stores them locally.  This allows further updates to be queued within
@@ -2440,7 +2473,7 @@ void unqueue_mapview_updates(bool write_to_screen)
   }
   for (i = 0; i < TILE_UPDATE_COUNT; i++) {
     if (my_tile_updates[i]) {
-      tile_list_free(my_tile_updates[i]);
+      tile_list_destroy(my_tile_updates[i]);
     }
   }
   needed_updates = UPDATE_NONE;
@@ -2462,20 +2495,20 @@ void get_city_mapview_name_and_growth(struct city *pcity,
 				      size_t growth_buffer_len,
 				      enum color_std *growth_color)
 {
-  mystrlcpy(name_buffer, city_name(pcity), name_buffer_len);
+  fc_strlcpy(name_buffer, city_name(pcity), name_buffer_len);
 
   if (NULL == client.conn.playing
       || city_owner(pcity) == client.conn.playing) {
     int turns = city_turns_to_grow(pcity);
 
     if (turns == 0) {
-      my_snprintf(growth_buffer, growth_buffer_len, "X");
+      fc_snprintf(growth_buffer, growth_buffer_len, "X");
     } else if (turns == FC_INFINITY) {
-      my_snprintf(growth_buffer, growth_buffer_len, "-");
+      fc_snprintf(growth_buffer, growth_buffer_len, "-");
     } else {
       /* Negative turns means we're shrinking, but that's handled
          down below. */
-      my_snprintf(growth_buffer, growth_buffer_len, "%d", abs(turns));
+      fc_snprintf(growth_buffer, growth_buffer_len, "%d", abs(turns));
     }
 
     if (turns <= 0) {
@@ -2574,9 +2607,9 @@ void mapdeco_init(void)
   mapview.can_do_cached_drawing = can_do_cached_drawing();
 
   mapdeco_free();
-  mapdeco_highlight_table = hash_new(hash_fval_keyval, hash_fcmp_keyval);
-  mapdeco_crosshair_table = hash_new(hash_fval_keyval, hash_fcmp_keyval);
-  mapdeco_gotoline_table = hash_new(hash_fval_keyval, hash_fcmp_keyval);
+  mapdeco_highlight_table = tile_hash_new();
+  mapdeco_crosshair_table = tile_hash_new();
+  mapdeco_gotoline_table = gotoline_hash_new();
 }
 
 /**************************************************************************
@@ -2585,18 +2618,15 @@ void mapdeco_init(void)
 void mapdeco_free(void)
 {
   if (mapdeco_highlight_table) {
-    hash_free(mapdeco_highlight_table);
+    tile_hash_destroy(mapdeco_highlight_table);
     mapdeco_highlight_table = NULL;
   }
   if (mapdeco_crosshair_table) {
-    hash_free(mapdeco_crosshair_table);
+    tile_hash_destroy(mapdeco_crosshair_table);
     mapdeco_crosshair_table = NULL;
   }
   if (mapdeco_gotoline_table) {
-    hash_values_iterate(mapdeco_gotoline_table, pglc) {
-      free(pglc);
-    } hash_values_iterate_end;
-    hash_free(mapdeco_gotoline_table);
+    gotoline_hash_destroy(mapdeco_gotoline_table);
     mapdeco_gotoline_table = NULL;
   }
 }
@@ -2613,10 +2643,9 @@ void mapdeco_set_highlight(const struct tile *ptile, bool highlight)
   }
 
   if (highlight) {
-    changed = hash_insert(mapdeco_highlight_table, ptile, NULL);
+    changed = tile_hash_insert(mapdeco_highlight_table, ptile, NULL);
   } else {
-    changed = hash_key_exists(mapdeco_highlight_table, ptile);
-    hash_delete_entry(mapdeco_highlight_table, ptile);
+    changed = tile_hash_remove(mapdeco_highlight_table, ptile);
   }
 
   if (changed) {
@@ -2633,7 +2662,7 @@ bool mapdeco_is_highlight_set(const struct tile *ptile)
   if (!ptile || !mapdeco_highlight_table) {
     return FALSE;
   }
-  return hash_key_exists(mapdeco_highlight_table, ptile);
+  return tile_hash_lookup(mapdeco_highlight_table, ptile, NULL);
 }
 
 /**************************************************************************
@@ -2646,11 +2675,11 @@ void mapdeco_clear_highlights(void)
     return;
   }
 
-  hash_keys_iterate(mapdeco_highlight_table, ptile) {
+  tile_hash_iterate(mapdeco_highlight_table, ptile) {
     refresh_tile_mapcanvas(ptile, TRUE, FALSE);
-  } hash_keys_iterate_end;
+  } tile_hash_iterate_end;
 
-  hash_delete_all_entries(mapdeco_highlight_table);
+  tile_hash_clear(mapdeco_highlight_table);
 }
 
 /**************************************************************************
@@ -2665,10 +2694,9 @@ void mapdeco_set_crosshair(const struct tile *ptile, bool crosshair)
   }
 
   if (crosshair) {
-    changed = hash_insert(mapdeco_crosshair_table, ptile, NULL);
+    changed = tile_hash_insert(mapdeco_crosshair_table, ptile, NULL);
   } else {
-    changed = hash_key_exists(mapdeco_crosshair_table, ptile);
-    hash_delete_entry(mapdeco_crosshair_table, ptile);
+    changed = tile_hash_remove(mapdeco_crosshair_table, ptile);
   }
 
   if (changed) {
@@ -2685,7 +2713,7 @@ bool mapdeco_is_crosshair_set(const struct tile *ptile)
   if (!mapdeco_crosshair_table || !ptile) {
     return FALSE;
   }
-  return hash_key_exists(mapdeco_crosshair_table, ptile);
+  return tile_hash_lookup(mapdeco_crosshair_table, ptile, NULL);
 }
 
 /**************************************************************************
@@ -2698,11 +2726,11 @@ void mapdeco_clear_crosshairs(void)
     return;
   }
 
-  hash_keys_iterate(mapdeco_crosshair_table, ptile) {
+  tile_hash_iterate(mapdeco_crosshair_table, ptile) {
     refresh_tile_mapcanvas(ptile, FALSE, FALSE);
-  } hash_keys_iterate_end;
+  } tile_hash_iterate_end;
 
-  hash_delete_all_entries(mapdeco_crosshair_table);
+  tile_hash_clear(mapdeco_crosshair_table);
 }
 
 /**************************************************************************
@@ -2725,10 +2753,9 @@ void mapdeco_add_gotoline(const struct tile *ptile, enum direction8 dir)
     return;
   }
 
-  pglc = hash_lookup_data(mapdeco_gotoline_table, ptile);
-  if (!pglc) {
-    pglc = fc_calloc(1, sizeof(*pglc));
-    hash_insert(mapdeco_gotoline_table, ptile, pglc);
+  if (!gotoline_hash_lookup(mapdeco_gotoline_table, ptile, &pglc)) {
+    pglc = gotoline_counter_new();
+    gotoline_hash_insert(mapdeco_gotoline_table, ptile, pglc);
   }
   changed = (pglc->line_count[dir] < 1);
   pglc->line_count[dir]++;
@@ -2756,8 +2783,7 @@ void mapdeco_remove_gotoline(const struct tile *ptile,
     return;
   }
 
-  pglc = hash_lookup_data(mapdeco_gotoline_table, ptile);
-  if (!pglc) {
+  if (!gotoline_hash_lookup(mapdeco_gotoline_table, ptile, &pglc)) {
     return;
   }
 
@@ -2826,8 +2852,7 @@ bool mapdeco_is_gotoline_set(const struct tile *ptile,
     return FALSE;
   }
 
-  pglc = hash_lookup_data(mapdeco_gotoline_table, ptile);
-  if (!pglc) {
+  if (!gotoline_hash_lookup(mapdeco_gotoline_table, ptile, &pglc)) {
     return FALSE;
   }
 
@@ -2840,28 +2865,19 @@ bool mapdeco_is_gotoline_set(const struct tile *ptile,
 **************************************************************************/
 void mapdeco_clear_gotoroutes(void)
 {
-  const struct tile *ptile;
-  struct gotoline_counter *pglc;
-
   if (!mapdeco_gotoline_table) {
     return;
   }
 
-  hash_iterate(mapdeco_gotoline_table, iter) {
-    ptile = hash_iter_get_key(iter);
-    pglc = hash_iter_get_value(iter);
-
-    /* FIXME: Remove the casts. */
-    refresh_tile_mapcanvas((struct tile *) ptile, FALSE, FALSE);
+  gotoline_hash_iterate(mapdeco_gotoline_table, ptile, pglc) {
+    refresh_tile_mapcanvas(ptile, FALSE, FALSE);
     adjc_dir_iterate(ptile, ptile_dest, dir) {
       if (pglc->line_count[dir] > 0) {
-        refresh_tile_mapcanvas((struct tile *) ptile_dest, FALSE, FALSE);
+        refresh_tile_mapcanvas(ptile_dest, FALSE, FALSE);
       }
     } adjc_dir_iterate_end;
-
-    free(pglc);
-  } hash_iterate_end;
-  hash_delete_all_entries(mapdeco_gotoline_table);
+  } gotoline_hash_iterate_end;
+  gotoline_hash_clear(mapdeco_gotoline_table);
 }
 
 /**************************************************************************
@@ -2939,6 +2955,15 @@ void init_mapcanvas_and_overview(void)
 {
   /* Create a dummy map to make sure mapview.store is never NULL. */
   map_canvas_resized(1, 1);
+}
+
+/**************************************************************************
+  Frees resources allocated for mapview and overview
+**************************************************************************/
+void free_mapcanvas_and_overview(void)
+{
+  canvas_free(mapview.store);
+  canvas_free(mapview.tmp_store);
 }
 
 /****************************************************************************
@@ -3071,7 +3096,6 @@ static struct link_mark *link_mark_new(enum text_link_type type,
   pmark->type = type;
   pmark->id = id;
   pmark->turn_counter = turns;
-  link_mark_list_append(link_marks, pmark);
 
   return pmark;
 }
@@ -3079,9 +3103,8 @@ static struct link_mark *link_mark_new(enum text_link_type type,
 /********************************************************************** 
   Remove a link mark.
 ***********************************************************************/
-static void link_mark_remove(struct link_mark *pmark)
+static void link_mark_destroy(struct link_mark *pmark)
 {
-  link_mark_list_unlink(link_marks, pmark);
   free(pmark);
 }
 
@@ -3093,14 +3116,14 @@ static struct tile *link_mark_tile(const struct link_mark *pmark)
   switch (pmark->type) {
   case TLT_CITY:
     {
-      struct city *pcity = game_find_city_by_number(pmark->id);
+      struct city *pcity = game_city_by_number(pmark->id);
       return pcity ? pcity->tile : NULL;
     }
   case TLT_TILE:
     return index_to_tile(pmark->id);
   case TLT_UNIT:
     {
-      struct unit *punit = game_find_unit_by_number(pmark->id);
+      struct unit *punit = game_unit_by_number(pmark->id);
       return punit ? punit->tile : NULL;
     }
   }
@@ -3167,7 +3190,7 @@ void link_marks_init(void)
     link_marks_free();
   }
 
-  link_marks = link_mark_list_new();
+  link_marks = link_mark_list_new_full(link_mark_destroy);
 }
 
 /********************************************************************** 
@@ -3179,10 +3202,7 @@ void link_marks_free(void)
     return;
   }
 
-  link_marks_iterate(pmark) {
-    free(pmark);
-  } link_marks_iterate_end;
-  link_mark_list_free(link_marks);
+  link_mark_list_destroy(link_marks);
   link_marks = NULL;
 }
 
@@ -3201,10 +3221,7 @@ void link_marks_draw_all(void)
 ***********************************************************************/
 void link_marks_clear_all(void)
 {
-  link_marks_iterate(pmark) {
-    link_mark_remove(pmark);
-  } link_marks_iterate_end;
-
+  link_mark_list_clear(link_marks);
   update_map_canvas_visible();
 }
 
@@ -3215,7 +3232,7 @@ void link_marks_decrease_turn_counters(void)
 {
   link_marks_iterate(pmark) {
     if (--pmark->turn_counter <= 0) {
-      link_mark_remove(pmark);
+      link_mark_list_remove(link_marks, pmark);
     }
   } link_marks_iterate_end;
 
@@ -3237,6 +3254,7 @@ void link_mark_add_new(enum text_link_type type, int id)
   }
 
   pmark = link_mark_new(type, id, 2);
+  link_mark_list_append(link_marks, pmark);
   ptile = link_mark_tile(pmark);
   if (ptile && tile_visible_mapcanvas(ptile)) {
     refresh_tile_mapcanvas(ptile, FALSE, FALSE);
@@ -3256,6 +3274,7 @@ void link_mark_restore(enum text_link_type type, int id)
   }
 
   pmark = link_mark_new(type, id, 1);
+  link_mark_list_append(link_marks, pmark);
   ptile = link_mark_tile(pmark);
   if (ptile && tile_visible_mapcanvas(ptile)) {
     refresh_tile_mapcanvas(ptile, FALSE, FALSE);

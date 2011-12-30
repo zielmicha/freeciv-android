@@ -1,8 +1,8 @@
 [nation_burundi]
 
-name=_("Burundi")
-plural=_("?plural:Burundi")
-groups="African", "Medieval", "Modern"
+name=_("Burundian")
+plural=_("?plural:Burundians")
+groups="African", "Medieval", "Early Modern", "Modern"
 
 legend=_("A monarchy emerged in the Great Lakes region of East Africa in\
  the 1100s, ruled by a Mwami (king) and several Ganwa (princes). It went\
@@ -13,23 +13,23 @@ legend=_("A monarchy emerged in the Great Lakes region of East Africa in\
  the colony fell to Belgium. Following international pressure after World\
  War II, Burundi became an independent nation in January 1962.")
 
-leader=
- "Mwezi I",
- "Ntare IV Rutaganzwa Rugamba",
- "Mutaga II",
- "Mwambutsa III Mbariza",
- "Ntare V Ndizeye",
- "Inamabuye",
- "Rugari",
- "Kayagge"
+leaders = {
+ "name",                        "sex"
+ "Mwezi I",                     "Male"
+ "Ntare IV Rutaganzwa Rugamba", "Male"
+ "Mutaga II",                   "Male"
+ "Mwambutsa III Mbariza",       "Male"
+ "Ntare V Ndizeye",             "Male"
+ "Inamabuye",                   "Female"
+ "Rugari",                      "Female"
+ "Kayagge",                     "Female"
+}
 
-leader_sex = "Male", "Male", "Male", "Male", "Male", "Female", "Female",
- "Female"
-
-ruler_titles = { "government",      "male_title",        "female_title"
-		 ; /* TRANS: Mwami/Mwamikazi = King/Queen */
-                 "Monarchy",        _("Mwami"),          _("Mwamikazi")
-               }
+ruler_titles = {
+ "government",      "male_title",        "female_title"
+ ; /* TRANS: Mwami/Mwamikazi = King/Queen */
+ "Monarchy",        _("Mwami %s"),       _("Mwamikazi %s")
+}
 
 flag         = "burundi"
 flag_alt     = "-"

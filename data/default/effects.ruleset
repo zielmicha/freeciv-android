@@ -11,7 +11,7 @@
 
 [datafile]
 description="Default effects data for Freeciv"
-options="1.0"
+options="+Freeciv-2.3-ruleset"
 
 ; /* <-- avoid gettext warnings
 ; */ <-- avoid gettext warnings
@@ -81,6 +81,10 @@ reqs    =
       "Tech", "Invention", "player"
     }
 
+; basic free tech upkeep
+[effect_upkeep_tech_free]
+name    = "Tech_Upkeep_Free"
+value   = 3
 
 ; Fortress HP regen
 [effect_fortress_hp_regen]
@@ -112,6 +116,14 @@ reqs	=
 name	= "Upkeep_Free"
 value	= 99
 reqs	=
+    { "type", "name", "range"
+      "Gov", "Anarchy", "Player"
+    }
+
+[effect_anarchy_upkeep_tech_free]
+name    = "Tech_Upkeep_Free"
+value   = 9999
+reqs    =
     { "type", "name", "range"
       "Gov", "Anarchy", "Player"
     }
@@ -398,6 +410,8 @@ reqs	=
     { "type",       "name",      "range"
       "Gov", "Monarchy", "Player"
     }
+
+; Empire_Size_Step disabled for Communism
 
 [effect_empire_size_step_3]
 name    = "Empire_Size_Step"
@@ -2190,4 +2204,9 @@ value   = 1
 ; Cities can always work tiles
 [effect_tile_workable]
 name    = "Tile_Workable"
+value   = 1
+
+; each city has at least one slot to build units
+[effect_city_build_slots_basic]
+name    = "City_Build_Slots"
 value   = 1

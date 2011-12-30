@@ -4,7 +4,7 @@ name=_("Tocharian")
 plural=_("?plural:Tocharians")
 groups="Asian"
 
-legend=_("The Tocharians were an Indo-European people living what is now\
+legend=_("The Tocharians were an Indo-European people living in what is now\
  Xinjiang in western China. Because of their unique geopolitical position,\
  their kingdoms of Shanshan, Kucha, and Khotan (as well as other, smaller\
  ones) were influenced by Chinese, Persian, Indian, Sogdian, Scythian, and\
@@ -19,20 +19,15 @@ legend=_("The Tocharians were an Indo-European people living what is now\
  Even this use fell when Islam spread and took the place of Buddhism as\
  the predominant religion in the region.")
 
-leader=
- "Jiva",
- "Maya",
- "Dhanika",
- "Ambare",
- "Ysassa-Pyapo",
- "Sulica"
-
-leader_sex = "Female", "Female", "Male", "Male", "Male", "Male"
-
-ruler_titles = { "government",      "male_title",        "female_title"
-		 ; /* TRANS: Lant/Lantsa = King/Queen */
-                 "Monarchy",       _("Lant"),            _("Lantsa")
-               }
+leaders = {
+ "name",                "sex"
+ "Jiva",                "Female"
+ "Maya",                "Female"
+ "Dhanika",             "Male"
+ "Ambare",              "Male"
+ "Ysassa-Pyapo",        "Male"
+ "Sulica",              "Male"
+}
 
 flag         = "tocharian"
 flag_alt     = "-"

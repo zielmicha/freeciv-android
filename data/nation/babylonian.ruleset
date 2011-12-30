@@ -6,22 +6,27 @@ groups="Ancient", "Asian"
 legend=_("Babylon was the dominant city of Mesopotamia from the 18th to\
  7th centuries BC under a succession of peoples including Amorites,\
  Kassites, Assyrians, and Chaldeans.")
-leader=
- "Hammurabi",
- "Sharru-Kin II", ; a.k.a. Sargon II
- "Nabu-Kudurri-Usur II", ; a.k.a. Nebuchadnezzar II
- "Tukulti-Apil-Eshara III", ; a.k.a. Tiglath-Pileser III
- "Burnaburish II", ; a.k.a. Burnaburiash II
- "Nabu-Nasir" ; a.k.a. Nabonassar
-leader_sex="Male", "Male", "Male", "Male", "Male", "Male"
-flag = "babylon"
-flag_alt = "iraq_old"
-city_style = "Babylonian"
 
-ruler_titles = { "government",	"male_title",	"female_title"
-		 ; /* TRANS: Lugal = Great Man */
-		 "Despotism",	_("Lugal"),	 _("?female:Lugal")
-	       } 
+leaders = {
+ "name",                        "sex"
+ "Hammurabi",                   "Male"
+ "Sharru-Kin II",               "Male" ; a.k.a. Sargon II
+ "Nabu-Kudurri-Usur II",        "Male" ; a.k.a. Nebuchadnezzar II
+ "Tukulti-Apil-Eshara III",     "Male" ; a.k.a. Tiglath-Pileser III
+ "Burnaburish II",              "Male" ; a.k.a. Burnaburiash II
+ "Nabu-Nasir",                  "Male" ; a.k.a. Nabonassar
+}
+
+ruler_titles =
+ { "government", "male_title",  "female_title"
+ ; /* TRANS: Lugal = Great Man */
+ "Monarchy",   _("%s Lugal"),   _("?female:%s Lugal")
+ "Communism",  _("%s Ensi"),    _("?female:%s Ensi")
+} 
+
+flag = "babylon"
+flag_alt = "-"
+city_style = "Babylonian"
 
 init_techs=""
 init_buildings=""

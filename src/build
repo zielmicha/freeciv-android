@@ -1,0 +1,1 @@
+cd .. && python gencallglue.py && cd src && make -f client.mk

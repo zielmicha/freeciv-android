@@ -13,15 +13,19 @@
 #ifndef FC__MAPVIEW_G_H
 #define FC__MAPVIEW_G_H
 
-#include "shared.h"		/* bool type */
+/* utility */
+#include "support.h"            /* bool type */
 
+/* common */
 #include "fc_types.h"
+#include "unitlist.h"
 
-#include "canvas_g.h"
-
+/* client */
 #include "mapview_common.h"
 
-#include "unitlist.h"
+/* client/include */
+#include "canvas_g.h"
+
 
 void update_info_label(void);
 void update_unit_info_label(struct unit_list *punitlist);
@@ -33,6 +37,7 @@ void set_indicator_icons(struct sprite *bulb, struct sprite *sol,
 			 struct sprite *flake, struct sprite *gov);
 
 void overview_size_changed(void);
+void update_overview_scroll_window_pos(int x, int y);
 void get_overview_area_dimensions(int *width, int *height);
 struct canvas *get_overview_window(void);
 

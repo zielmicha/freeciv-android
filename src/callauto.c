@@ -391,22 +391,22 @@ static PyObject* python_key_end_turn(PyObject* self, PyObject* args) {
 	key_end_turn();
 	return Py_BuildValue("i", 0);
 }
-// int get_num_messages(void)
-int get_num_messages(void);
+// int meswin_get_num_messages(void)
+int meswin_get_num_messages(void);
 
-static PyObject* python_get_num_messages(PyObject* self, PyObject* args) {
+static PyObject* python_meswin_get_num_messages(PyObject* self, PyObject* args) {
 	if(PyArg_ParseTuple(args, "") == 0) return NULL;
-	int retval = get_num_messages();
+	int retval = meswin_get_num_messages();
 	return Py_BuildValue("i", retval);
 }
-// struct message *get_message(int message_index)
-struct message *get_message(int message_index);
+// const struct message *meswin_get_message(int message_index)
+const struct message *meswin_get_message(int message_index);
 
-static PyObject* python_get_message(PyObject* self, PyObject* args) {
+static PyObject* python_meswin_get_message(PyObject* self, PyObject* args) {
 	int arg_message_index;
 	if(PyArg_ParseTuple(args, "i", &arg_message_index) == 0) return NULL;
 
-	struct message* retval = get_message(arg_message_index);
+	const struct message* retval = meswin_get_message(arg_message_index);
 	return Py_BuildValue("O", py_mapper_message(retval));
 }
 // void finish_city_at_unit(int unit, char* title)
@@ -495,14 +495,14 @@ static PyObject* python_tile_activity_time(PyObject* self, PyObject* args) {
 	int retval = tile_activity_time((enum unit_activity)arg_activity, (struct tile*)arg_ptile);
 	return Py_BuildValue("i", retval);
 }
-// bool can_unit_add_or_build_city(const struct unit *punit)
-bool can_unit_add_or_build_city(const struct unit *punit);
+// bool unit_can_add_or_build_city(const struct unit *punit)
+bool unit_can_add_or_build_city(const struct unit *punit);
 
-static PyObject* python_can_unit_add_or_build_city(PyObject* self, PyObject* args) {
+static PyObject* python_unit_can_add_or_build_city(PyObject* self, PyObject* args) {
 	int arg_punit;
 	if(PyArg_ParseTuple(args, "i", &arg_punit) == 0) return NULL;
 
-	bool retval = can_unit_add_or_build_city((struct unit*)arg_punit);
+	bool retval = unit_can_add_or_build_city((struct unit*)arg_punit);
 	return Py_BuildValue("i", (int)retval);
 }
 // bool unit_can_help_build_wonder_here(const struct unit *punit)
@@ -1135,10 +1135,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "free_ref", (int)ptr);
 	ptr = python_key_end_turn;
 	PY_CALL("ssi", "add_function", "key_end_turn", (int)ptr);
-	ptr = python_get_num_messages;
-	PY_CALL("ssi", "add_function", "get_num_messages", (int)ptr);
-	ptr = python_get_message;
-	PY_CALL("ssi", "add_function", "get_message", (int)ptr);
+	ptr = python_meswin_get_num_messages;
+	PY_CALL("ssi", "add_function", "meswin_get_num_messages", (int)ptr);
+	ptr = python_meswin_get_message;
+	PY_CALL("ssi", "add_function", "meswin_get_message", (int)ptr);
 	ptr = python_finish_city_at_unit;
 	PY_CALL("ssi", "add_function", "finish_city_at_unit", (int)ptr);
 	ptr = python_canvas_pos_to_nearest_tile_id;
@@ -1155,8 +1155,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "can_unit_do_activity", (int)ptr);
 	ptr = python_tile_activity_time;
 	PY_CALL("ssi", "add_function", "tile_activity_time", (int)ptr);
-	ptr = python_can_unit_add_or_build_city;
-	PY_CALL("ssi", "add_function", "can_unit_add_or_build_city", (int)ptr);
+	ptr = python_unit_can_add_or_build_city;
+	PY_CALL("ssi", "add_function", "unit_can_add_or_build_city", (int)ptr);
 	ptr = python_unit_can_help_build_wonder_here;
 	PY_CALL("ssi", "add_function", "unit_can_help_build_wonder_here", (int)ptr);
 	ptr = python_can_unit_paradrop;
