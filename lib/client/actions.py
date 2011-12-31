@@ -69,7 +69,7 @@ class Unit(object):
         yield ACTIVITY_WAIT
         yield ACTIVITY_DONE
         
-        if freeciv.func.can_unit_add_or_build_city(id):
+        if freeciv.func.unit_can_add_or_build_city(id):
             if city:
                 yield ACTIVITY_ADD_TO_CITY
             else:
@@ -203,7 +203,7 @@ def get_unit_in_focus():
         return None
 
 @freeciv.register
-def update_menus():
+def real_menus_update():
     units = freeciv.func.get_units_in_focus()
     if not units:
         client.client.disable_menus()

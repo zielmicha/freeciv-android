@@ -39,11 +39,11 @@ def close_connection_dialog():
     pass
 
 @freeciv.register
-def get_client_page():
+def get_current_client_page():
     return client_page
 
 @freeciv.register
-def set_client_page(page):
+def real_set_client_page(page):
     global client_page
     client_page = page
     print 'set_client_page', page
@@ -95,7 +95,7 @@ def refresh_spaceship_dialog(n):
     pass
 
 @freeciv.register
-def is_meswin_open():
+def meswin_dialog_is_open():
     return True
 
 @freeciv.register
