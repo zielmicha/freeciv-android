@@ -16,7 +16,7 @@ skip ln -sf $PWD/../src build/client/jni
 skip ln -sf $PWD/../zlib-1.2.5 build/zlib/jni
 skip ln -sf $PWD/pyjni build/pyjni
 
-. info.sh
+. info.sh || exit 1
 export PATH="$PATH:$ANDROID_PATH"
 
 cd build/server

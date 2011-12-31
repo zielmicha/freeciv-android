@@ -1,6 +1,6 @@
-It includes Freeciv 2.2.7
+It includes Freeciv 2.3.1
 
-If you don't need to change source code simply download APK from http://civ.zielm.com
+If you don't need to change source code and don't need latest version simply download APK from http://civ.zielm.com
 
 == DEPENDENCIES ==
 Building Freeciv for Android is currently only possible on Linux. On Ubuntu/Debian you need:

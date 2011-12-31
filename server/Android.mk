@@ -1,4 +1,4 @@
-# client makefile
+# server makefile
 
 LOCAL_PATH := $(call my-dir)
 
@@ -6,7 +6,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE    := freecivserver
 LOCAL_SRC_FILES := tolua/tolua_to.c tolua/tolua_push.c tolua/tolua_map.c tolua/tolua_is.c  \
-    tolua/tolua_event.c lua/print.c lua/lzio.c lua/lvm.c lua/lundump.c lua/luac.c  \
+    tolua/tolua_event.c lua/print.c lua/lzio.c lua/lvm.c lua/lundump.c  \
     lua/ltm.c lua/ltablib.c lua/ltable.c lua/lstrlib.c lua/lstring.c lua/lstate.c  \
     lua/lparser.c lua/loslib.c lua/lopcodes.c lua/lobject.c lua/loadlib.c  \
     lua/lmem.c lua/lmathlib.c lua/llex.c lua/liolib.c lua/linit.c lua/lgc.c  \
@@ -46,7 +46,7 @@ LOCAL_SRC_FILES := tolua/tolua_to.c tolua/tolua_push.c tolua/tolua_map.c tolua/t
     common/idex.c common/government.c common/game.c common/featured_text.c  \
     common/fc_interface.c common/events.c common/effects.c common/diptreaty.c  \
     common/dataio.c common/connection.c common/combat.c common/city.c common/capstr.c  \
-    common/borders.c common/base.c common/ai.c
+    common/borders.c common/base.c common/ai.c android_impl.c
 
 LOCAL_CFLAGS    := -Ijni/server -Ijni/server/generator -Ijni/server/advisors -Ijni/server/scripting -Ijni/common -Ijni/common/aicore -Ijni/utility -Ijni/ai \
     -Ijni/lua -Ijni/tolua -Ijni -DHAVE_CONFIG_H
