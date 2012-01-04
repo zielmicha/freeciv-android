@@ -401,6 +401,13 @@ bool handle_login_request(struct connection *pconn,
 ****************************************************************************/
 void lost_connection_to_client(struct connection *pconn)
 {
+  log_normal(_("Freeciv Android: Lost connection to player!"));
+  if(getenv("FREECIV_QUIT_ON_DISCONNECT")) {
+    log_normal(_("Freeciv Android: Server quit."));
+    exit(3);
+  } else {
+    log_normal(_("Freeciv Android: Not quiting."));
+  }
   const char *desc = conn_description(pconn);
 
   fc_assert_ret(TRUE == pconn->server.is_closing);
