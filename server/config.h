@@ -407,7 +407,7 @@
 #define NETWORK_CAPSTRING_MANDATORY "+Freeciv-2.3-network"
 
 /* Additional optional network capabilities */
-#define NETWORK_CAPSTRING_OPTIONAL "timeout_extended_range"
+#define NETWORK_CAPSTRING_OPTIONAL ""
 
 /* Version number of next release */
 #define NEXT_STABLE_VERSION "2.3.0"
