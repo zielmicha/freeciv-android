@@ -18,25 +18,6 @@ import actions
 
 client_page = 0
 
-@freeciv.register
-def set_city_names_font_sizes(a, b):
-    pass
-
-@freeciv.register
-def popdown_help_dialog():
-    pass
-
-@freeciv.register
-def update_players_dialog():
-    pass
-
-@freeciv.register
-def update_report_dialogs():
-    pass
-
-@freeciv.register
-def close_connection_dialog():
-    pass
 
 @freeciv.register
 def get_current_client_page():
@@ -64,34 +45,6 @@ def page_game():
 
 @freeciv.register
 def races_toggles_set_sensitive():
-    pass
-
-#@freeciv.register
-#def popdown_all_city_dialogs():
-#    pass
-
-@freeciv.register
-def close_all_diplomacy_dialogs():
-    pass
-
-@freeciv.register
-def popdown_all_game_dialogs():
-    pass
-
-@freeciv.register
-def popdown_races_dialog():
-    pass
-
-@freeciv.register
-def set_turn_done_button_state(enabled):
-    pass
-
-@freeciv.register
-def update_conn_list_dialog():
-    pass
-
-@freeciv.register
-def refresh_spaceship_dialog(n):
     pass
 
 @freeciv.register

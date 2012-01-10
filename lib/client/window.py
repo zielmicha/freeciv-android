@@ -61,6 +61,10 @@ def gui_flush():
     pass
 
 @freeciv.register
+def update_overview_scroll_window_pos(x, y):
+    pass
+
+@freeciv.register
 def update_mouse_cursor(cursor):
     #pygame.mouse.set_cursor((8,8),(0,0),(0,0,0,0,0,0,0,0),(0,0,0,0,0,0,0,0))
     #pygame.mouse.set_visible(False)

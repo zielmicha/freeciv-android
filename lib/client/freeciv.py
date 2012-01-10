@@ -87,12 +87,18 @@ def _end_callbacks():
         _show_profileinfo(_profiling_calls)
         print 'Callback stat'
         _show_profileinfo(_profiling_callback)
+        print 'Unused'
+        _show_unused()
 
 def _show_profileinfo(l):
     items = l.items()
     items.sort(key=lambda (k, (a, b)): b, reverse=True)
     for funname, (calln, calltime) in items:
         print '% 7.1f  % 7d %s' % (calltime, calln, funname)
+
+def _show_unused():
+    unused = set(callback.__dict__.keys()) - set(_profiling_callback.keys())
+    print '\t' + '\n\t'.join(sorted(unused))
 
 def register(name_or_func):
     if isinstance(name_or_func, str):    

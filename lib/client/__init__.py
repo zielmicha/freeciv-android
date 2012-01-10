@@ -15,6 +15,7 @@ import pygame
 import time
 
 import progress
+import monitor
 
 import freeciv
 
@@ -62,29 +63,13 @@ def real_output_window_append(text, tags, connid):
     client.console_line(text)
 
 @freeciv.register
-def real_update_meswin_dialog():
-    count = freeciv.func.get_num_messages()
-    client.update_meswin([ freeciv.func.get_message(i) for i in xrange(count) ])
+def real_meswin_dialog_update():
+    count = freeciv.func.meswin_get_num_messages()
+    client.update_meswin([ freeciv.func.meswin_get_message(i) for i in xrange(count) ])
 
 @freeciv.register
-def economy_report_dialog_update():
+def real_economy_report_dialog_update():
     client.update_taxes()
-
-@freeciv.register
-def update_info_label():
-    pass
-
-@freeciv.register
-def update_intel_dialog(id):
-    pass
-
-@freeciv.register
-def activeunits_report_dialog_update():
-    pass
-
-@freeciv.register
-def city_report_dialog_update():
-    pass
 
 @freeciv.register
 def update_turn_done_button(restore):
@@ -120,7 +105,7 @@ class Client(object):
     def console_line(self, text):
         if self.out_window_callback:
             self.out_window_callback(text)
-        print '[OutWindow]', text
+        monitor.log('outwindow', text)
     
     def end_turn(self):
         freeciv.func.key_end_turn()

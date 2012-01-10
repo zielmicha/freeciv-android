@@ -24,7 +24,7 @@ VUT_OTYPE, VUT_SPECIALIST, VUT_MINSIZE, VUT_AI_LEVEL, VUT_TERRAINCLASS, \
 VUT_BASE, VUT_MINYEAR, VUT_TERRAINALTER, VUT_CITYTILE, VUT_LAST = range(21)
 
 @freeciv.register
-def popup_city_dialog(city):
+def real_city_dialog_popup(city):
     client.client.popup_city_dialog(City(city))
 
 @freeciv.register
@@ -32,7 +32,7 @@ def city_dialog_is_open(city):
     return client.client.city_dialog_is_open(City(city))
 
 @freeciv.register
-def refresh_city_dialog(city):
+def real_city_dialog_refresh(city):
     return client.client.refresh_city_dialog(City(city))
 
 @freeciv.register

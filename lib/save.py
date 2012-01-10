@@ -16,6 +16,7 @@ import uidialog
 import osutil
 import client
 import sync
+import monitor
 
 import functools
 import time
@@ -245,5 +246,5 @@ def server_loop(port, args='', line_callback=None, quit_on_disconnect=True):
             break
         if line_callback:
             line_callback(line)
-        print '[server]', line.rstrip()
+        monitor.log('server', line.rstrip())
 
