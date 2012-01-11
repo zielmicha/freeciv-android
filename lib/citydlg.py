@@ -182,10 +182,13 @@ class Dialog(ui.HorizontalLayoutWidget):
         return panel
 
 class CityCanvas(object):
-    def __init__(self, dialog, city):
+    def __init__(self, dialog, city, scale_to=400):
+        self.scale_to = scale_to
         self.city = city
-        self.image = self.city.make_citymap()
-        self.size = self.image.get_size()
+        image = self.city.make_citymap()
+        self.orig_size = size = image.get_size()
+        self.size = (scale_to, size[1] * scale_to / size[0])
+        self.image = pygame.transform.smoothscale(image, self.size)
         self.dialog = dialog
     
     def draw(self, surf, pos):
@@ -193,8 +196,11 @@ class CityCanvas(object):
     
     def event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN:
-            self.city.map_click(*ev.pos)
+            self.city.map_click(*map(self._dev_to_map, ev.pos))
             # self.dialog.refresh()
+    
+    def _dev_to_map(self, pos):
+        return pos * self.orig_size[0] / self.scale_to
     
     def tick(self):
         pass

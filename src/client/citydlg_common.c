@@ -63,8 +63,11 @@ void generate_citydlg_dimensions(void)
 {
   int min_x = 0, max_x = 0, min_y = 0, max_y = 0;
 
+  int city_map_radius = 3; // temporary solution (Freeciv for Android)
+  int city_map_radius_sq = city_map_radius * city_map_radius + 1; // CITY_MAP_MAX_RADIUS_SQ
+
   /* use maximum possible squared city radius. */
-  city_map_iterate(CITY_MAP_MAX_RADIUS_SQ, city_index, city_x, city_y) {
+  city_map_iterate(city_map_radius_sq, city_index, city_x, city_y) {
     int canvas_x, canvas_y;
 
     map_to_gui_vector(tileset, &canvas_x, &canvas_y, CITY_ABS2REL(city_x),
