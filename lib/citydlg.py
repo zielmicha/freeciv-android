@@ -32,13 +32,15 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.info_label = self.get_labels()
         self.citypanel = ui.LinearLayoutWidget()
         self.prodpanel = ui.LinearLayoutWidget()
+        self.units_in_city = ui.HorizontalLayoutWidget()
+        self.setup_units_in_city()
         
         self.citypanel.add(ui.Label(self.city.get_name()))
         self.citypanel.add(self.get_citizen_icons())
         self.citypanel.add(self.canvas)
         self.citypanel.add(self.info_label)
         
-        self.ui = ui.ScrollWrapper(self)
+        self.ui = self # ui.ScrollWrapper(self)
         
         self.add(self.citypanel)
         self.add(self.prodpanel)
@@ -58,7 +60,7 @@ class Dialog(ui.HorizontalLayoutWidget):
         prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
         #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
         self.prodpanel.add(prodbuttons)
-        self.prodpanel.add(ui.Button('Units in city', self.show_units))
+        self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=340, ways=ui.SCROLL_WIDTH))
         self.prodpanel.add(ui.Button('Buildings in city', self.show_buildings))
         
         #print self.city.get_buildable_improvements()
@@ -66,6 +68,19 @@ class Dialog(ui.HorizontalLayoutWidget):
         
         self.update_layout()
         #print self.city.get_production_cost()
+    
+    def setup_units_in_city(self):
+        def focus(unit):
+            unit.focus()
+            ui.back()
+        
+        for unit in self.city.get_units():
+            callback = functools.partial(focus, unit)
+            panel = ui.LinearLayoutWidget(center=True)
+            panel.add(ui.Image(unit.get_image(), callback=callback))
+            panel.add(ui.Label(unit.get_name(), font=ui.consolefont, callback=callback))
+            self.units_in_city.add(panel)
+            self.units_in_city.add(ui.Spacing(10, 0))
     
     def show_units(self):
         def focus(unit):

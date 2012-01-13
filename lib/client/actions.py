@@ -143,6 +143,9 @@ class Unit(object):
     def get_name(self):
         return freeciv.func.get_unit_name(self.unit_id)
     
+    def get_image(self):
+        return freeciv.func.get_unit_image(self.unit_id)
+    
     def focus(self):
         freeciv.func.request_new_unit_activity(self.unit_id, ACTIVITY_IDLE)
         freeciv.func.set_unit_focus(self.unit_id)

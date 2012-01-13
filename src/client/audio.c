@@ -194,11 +194,7 @@ void audio_real_init(const char *const spec_name,
     return;
   }
   if (num_plugins_used == 1) {
-    /* We only have the dummy plugin, skip the code but issue an advertise */
-    log_normal(_("No real audio plugin present."));
-    log_normal(_("Proceeding with sound support disabled."));
-    log_normal(_("For sound support, install SDL_mixer"));
-    log_normal("http://www.libsdl.org/projects/SDL_mixer/index.html");
+    /* We only have the dummy plugin, skip the code */
     tagfile = NULL;
     return;
   }

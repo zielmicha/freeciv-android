@@ -127,11 +127,6 @@ void init_character_encodings(const char *my_internal_encoding,
 
 #else
    /* log_* may not work at this point. */
-  fprintf(stderr,
-          _("You are running Freeciv without using iconv. Unless\n"
-            "you are using the latin1 character set, some characters\n"
-            "may not be displayed properly. You can download iconv\n"
-            "at http://gnu.org/.\n"));
 #endif
 
   is_init = TRUE;

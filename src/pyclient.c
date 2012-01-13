@@ -108,6 +108,10 @@ const char* get_unit_name(const struct unit* u) {
     return utype_name_translation(unit_type(u));
 }
 
+struct sprite* get_unit_image(const struct unit* u) {
+    return get_unittype_sprite(tileset, unit_type(u));
+}
+
 void get_overview_area_dimensions(int *width, int *height) {
     PyObject* ret = PY_CALL("s", "get_overview_area_dimensions");
     if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");

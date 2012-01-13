@@ -1049,6 +1049,16 @@ static PyObject* python_get_built_improvements_in_city(PyObject* self, PyObject*
 	PyObject* retval = get_built_improvements_in_city((struct city*)arg_pCity);
 	return Py_BuildValue("O", py_get_pyobject(retval));
 }
+// struct sprite* get_unit_image(const struct unit* u)
+struct sprite* get_unit_image(const struct unit* u);
+
+static PyObject* python_get_unit_image(PyObject* self, PyObject* args) {
+	int arg_u;
+	if(PyArg_ParseTuple(args, "i", &arg_u) == 0) return NULL;
+
+	struct sprite* retval = get_unit_image((struct unit*)arg_u);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1263,4 +1273,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_turn_done_button_state", (int)ptr);
 	ptr = python_get_built_improvements_in_city;
 	PY_CALL("ssi", "add_function", "get_built_improvements_in_city", (int)ptr);
+	ptr = python_get_unit_image;
+	PY_CALL("ssi", "add_function", "get_unit_image", (int)ptr);
 }
