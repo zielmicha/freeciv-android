@@ -39,16 +39,17 @@ def new_game():
 def connect_dialog():
     host = uidialog.inputbox('Server host')
     port = int(uidialog.inputbox('Server port'))
-    connect(host, port)
+    username = int(uidialog.inputbox('User name'))
+    connect(host, port, username)
 
-def connect(host, port):
-    ui.set(ServerGUI(host=host, port=port, no_quit=True))
+def connect(host, port, login='player'):
+    ui.set(ServerGUI(host=host, port=port, login=login, no_quit=True))
 
 class ServerGUI(ui.LinearLayoutWidget):
-    def __init__(self, port, host='localhost', no_quit=False):
+    def __init__(self, port, host='localhost', login='player', no_quit=False):
         super(ServerGUI, self).__init__()
         sc_client = gamescreen.ScreenClient(no_quit=no_quit)
-        sc_client.connect_to_server('player', host, port)
+        sc_client.connect_to_server(login, host, port)
         self.has_ui = False
         self.setup_loading_ui()
     

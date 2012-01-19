@@ -127,3 +127,5 @@ PyObject* get_built_improvements_in_city(struct city* pCity)
 #int impr_sell_gold(const struct impr_type *pimprove)
 #bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove)
 struct sprite* get_unit_image(const struct unit* u)
+
+void authenticate(const char* password)

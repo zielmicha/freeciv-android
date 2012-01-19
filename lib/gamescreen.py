@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import ui
+import uidialog
 import client
 import pygame
 import pygame.gfxdraw
@@ -116,6 +117,11 @@ class ScreenClient(client.Client):
             self.turn_loading_dialog = ui.set_dialog(ui.Label('ending turn...'))
         elif dialog_state and enabled:
             self.turn_loading_dialog.close()
+    
+    def handle_authentication_req(self, prompt):
+        password = uidialog.inputbox(prompt)
+        if password:
+            self.authenticate(password)
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):

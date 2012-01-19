@@ -1059,6 +1059,16 @@ static PyObject* python_get_unit_image(PyObject* self, PyObject* args) {
 	struct sprite* retval = get_unit_image((struct unit*)arg_u);
 	return Py_BuildValue("O", py_get_pyobject(retval));
 }
+// void authenticate(const char* password)
+void authenticate(const char* password);
+
+static PyObject* python_authenticate(PyObject* self, PyObject* args) {
+	char* arg_password;
+	if(PyArg_ParseTuple(args, "s", &arg_password) == 0) return NULL;
+
+	authenticate(arg_password);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1275,4 +1285,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_built_improvements_in_city", (int)ptr);
 	ptr = python_get_unit_image;
 	PY_CALL("ssi", "add_function", "get_unit_image", (int)ptr);
+	ptr = python_authenticate;
+	PY_CALL("ssi", "add_function", "authenticate", (int)ptr);
 }

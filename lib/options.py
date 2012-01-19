@@ -31,6 +31,7 @@ class OptionsButton(ui.Button):
     
     def _callback(self):
         val = uidialog.inputbox('Value for %s' % self.feature_key)
+        if val is None: return
         try:
             features.set_perm(self.feature_key, val)
         except ValueError as e:

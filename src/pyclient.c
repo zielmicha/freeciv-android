@@ -112,6 +112,13 @@ struct sprite* get_unit_image(const struct unit* u) {
     return get_unittype_sprite(tileset, unit_type(u));
 }
 
+void authenticate(const char* password) {
+    struct packet_authentication_reply reply;
+
+    sz_strlcpy(reply.password, password);
+    send_packet_authentication_reply(&client.conn, &reply);
+}
+
 void get_overview_area_dimensions(int *width, int *height) {
     PyObject* ret = PY_CALL("s", "get_overview_area_dimensions");
     if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");

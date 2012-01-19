@@ -16,6 +16,7 @@ import time
 
 import progress
 import monitor
+import features
 
 import freeciv
 
@@ -30,6 +31,8 @@ import misc
 net_socket = -1
 client = None
 main = None
+
+features.add_feature('debug.outwindow', default=False, type=bool)
 
 class ConnectionError(Exception):
     pass
@@ -75,6 +78,10 @@ def real_economy_report_dialog_update():
 def update_turn_done_button(restore):
     client._set_turn_button_state(restore)
 
+@freeciv.register
+def handle_authentication_req(type, prompt):
+    client.handle_authentication_req(prompt)
+
 class Client(object):
     def __init__(self, no_quit=False):
         global client
@@ -106,6 +113,8 @@ class Client(object):
         if self.out_window_callback:
             self.out_window_callback(text)
         monitor.log('outwindow', text)
+        if features.get('debug.outwindow'):
+            print '[OutWindow]', text
     
     def end_turn(self):
         freeciv.func.key_end_turn()
@@ -221,6 +230,9 @@ class Client(object):
     
     def set_turn_button_state(self, enabled):
         pass
+    
+    def authenticate(self, password):
+        freeciv.func.authenticate(password)
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

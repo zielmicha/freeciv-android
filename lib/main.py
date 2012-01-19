@@ -77,8 +77,8 @@ def app_main():
         savename = sys.argv[2]
         save.load_game(savename)
     elif action == 'connect':
-        host, port = sys.argv[2:]
-        save.connect(host, int(port))
+        host, port, username = sys.argv[2:]
+        save.connect(host, int(port), username)
     elif action == 'eval':
         exec sys.argv[2]
     else:
@@ -208,9 +208,13 @@ def remove_pause_file():
     except OSError:
         print 'Failed to remove pause file'
 
+def setup_freeciv_config():
+    os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3'
+
 def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
+    setup_freeciv_config()
     size = size or check_force_size()
     
     start_autoupdate()
