@@ -25,6 +25,7 @@ import random
 import os
 import gzip
 import features
+import subprocess
 
 from monitor import get_save_dir
 
@@ -34,14 +35,14 @@ localhost = '127.0.0.1'
 
 def new_game():
     port = random.randint(2000, 15000)
-    args = '-r ./data/%s.serv' % features.get('app.ruleset')
+    args = ('-r', './data/%s.serv' % features.get('app.ruleset'))
     start_server(port, args=args)
     ui.set(ServerGUI(port))
 
 def connect_dialog():
     host = uidialog.inputbox('Server host')
     port = int(uidialog.inputbox('Server port'))
-    username = int(uidialog.inputbox('User name'))
+    username = uidialog.inputbox('User name')
     connect(host, port, username)
 
 def connect(host, port, login='player'):
@@ -195,7 +196,7 @@ def load_game(path):
             sc_client.out_window_callback = None
     
     port = random.randint(1500, 12000)
-    start_server(port, "-f '%s'" % path)
+    start_server(port, ('-f', path))
     
     sc_client = gamescreen.ScreenClient()
     sc_client.out_window_callback = out_callback
@@ -219,21 +220,21 @@ def start_client():
     client.client.chat('/start')
     ui.replace_anim(client.client.ui)
 
-def start_server(port, args='', line_callback=None, quit_on_disconnect=True):
+def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
     thread.start_new_thread(server_loop, (port, args, line_callback, quit_on_disconnect))
     time.sleep(0.3)
 
-def server_loop(port, args='', line_callback=None, quit_on_disconnect=True):
+def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     if osutil.is_android:
         serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
     else:
         serverpath = 'server/freeciv-server'
-    args = "--Ppm -p %d -s '%s' %s" % (port, get_save_dir(), args)
+    args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
     print 'starting server - executable at', serverpath
     stat = os.stat(serverpath)
     os.chmod(serverpath, 0o744) # octal!!!!
     piddir = get_save_dir()
-    cmd = '%s %s 2>&1 & echo $!>%s/serverpid' % (serverpath, args, piddir)
+    cmd = (serverpath, ) + args
     if osutil.is_desktop:
         os.environ['LD_PRELOAD'] = ''
     if quit_on_disconnect:
@@ -241,7 +242,11 @@ def server_loop(port, args='', line_callback=None, quit_on_disconnect=True):
     else:
         del os.environ['FREECIV_QUIT_ON_DISCONNECT']
     print cmd
-    stream = os.popen(cmd, 'r', 1) # line buffering
+    serv_in, stream = os.popen4(cmd, bufsize=1) # line buffering
+    
+    p = subprocess.Popen(cmd, bufsize=1,
+          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+    stream = p.stdout
     
     while True:
         line = stream.readline()
