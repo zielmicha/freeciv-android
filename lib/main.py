@@ -47,6 +47,10 @@ features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
 
+features.add_feature('debug.remote', default=False, type=bool)
+features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
+features.add_feature('debug.remote.port', default=15589, type=int)
+
 def apply_hardexit(t):
     client.freeciv.hard_exit = t
 
@@ -211,6 +215,12 @@ def remove_pause_file():
 def setup_freeciv_config():
     os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3'
 
+def maybe_start_remote_debug():
+    if features.get('debug.remote'):
+        import remote_shell
+        remote_shell.start()
+        
+
 def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
@@ -218,6 +228,8 @@ def main(size=None, init=True):
     size = size or check_force_size()
     
     start_autoupdate()
+    maybe_start_remote_debug()
+    
     monitor.start()
     
     client.window.init_screen(size)

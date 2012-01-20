@@ -18,6 +18,8 @@ cd build/pygame
 
 export PATH="$PATH:$ANDROID_PATH"
 
+rm bin/*.ap?.d
+rm bin/*.ap?
 (python2.7 build.py --dir ../public --private ../private \
 	--package "$PKG_PACKAGE" --name "$PKG_NAME" \
 	$PKG_ARG release \
