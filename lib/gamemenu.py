@@ -19,7 +19,7 @@ import features
 
 from client import freeciv
 
-features.add_feature('app.new_joystick', default=False, type=bool)
+features.add_feature('app.new_joystick', default=True, type=bool)
 
 order_sprites_names = ('auto attack,auto connect,auto explore,'
     'auto settlers,build city,cutdown forest,plant forest,'

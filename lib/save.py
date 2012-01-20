@@ -30,6 +30,8 @@ from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='default')
 
+localhost = '127.0.0.1'
+
 def new_game():
     port = random.randint(2000, 15000)
     args = '-r ./data/%s.serv' % features.get('app.ruleset')
@@ -46,7 +48,7 @@ def connect(host, port, login='player'):
     ui.set(ServerGUI(host=host, port=port, login=login, no_quit=True))
 
 class ServerGUI(ui.LinearLayoutWidget):
-    def __init__(self, port, host='localhost', login='player', no_quit=False):
+    def __init__(self, port, host=localhost, login='player', no_quit=False):
         super(ServerGUI, self).__init__()
         sc_client = gamescreen.ScreenClient(no_quit=no_quit)
         sc_client.connect_to_server(login, host, port)
@@ -198,7 +200,7 @@ def load_game(path):
     sc_client = gamescreen.ScreenClient()
     sc_client.out_window_callback = out_callback
     try:
-        sc_client.connect_to_server('player', 'localhost', port)
+        sc_client.connect_to_server('player', localhost, port)
     except client.ConnectionError:
         ui.message('Failed to connect to game server, try again', type='error')
         return
