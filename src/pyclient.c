@@ -507,6 +507,14 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
     return list;
 }
 
+PyObject* get_players() {
+    PyObject* list = PyList_New(0);
+    players_iterate(pl) {
+        PyList_Append(list, Py_BuildValue("i", (int)pl));
+    } players_iterate_end;
+    return list;
+}
+
 void set_nation_settings(int nation, char* leader_name, int sex, int city_style) {
     if(client.conn.playing == NULL) errlog("set_nation_settings: client.conn.playing == NULL\n");
     dsend_packet_nation_select_req(&client.conn,

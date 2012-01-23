@@ -73,3 +73,16 @@ def get_meeting(counterpart):
     if counterpart not in c.meetings:
         c.meetings[counterpart] = c.create_meeting(counterpart)
     return c.meetings[counterpart]
+
+class Player(object):
+    def __init__(self, handle):
+        self.handle = handle
+    
+    def get_name(self):
+        return freeciv.func.player_name(self.handle)
+    
+    def __repr__(self):
+        return '<Player handle=%d name=%s>' % (self.handle, self.get_name())
+
+def get_players():
+    return map(Player, freeciv.func.get_players())

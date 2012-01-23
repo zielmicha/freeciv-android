@@ -1069,6 +1069,24 @@ static PyObject* python_authenticate(PyObject* self, PyObject* args) {
 	authenticate(arg_password);
 	return Py_BuildValue("i", 0);
 }
+// PyObject* get_players()
+PyObject* get_players();
+
+static PyObject* python_get_players(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	PyObject* retval = get_players();
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// const char *player_name(const struct player *pplayer);
+const char *player_name(const struct player *pplayer);;
+
+static PyObject* python_player_name(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	const char* retval = player_name((struct player*)arg_pplayer);
+	return Py_BuildValue("s", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1287,4 +1305,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_unit_image", (int)ptr);
 	ptr = python_authenticate;
 	PY_CALL("ssi", "add_function", "authenticate", (int)ptr);
+	ptr = python_get_players;
+	PY_CALL("ssi", "add_function", "get_players", (int)ptr);
+	ptr = python_player_name;
+	PY_CALL("ssi", "add_function", "player_name", (int)ptr);
 }

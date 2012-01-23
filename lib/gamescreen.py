@@ -133,7 +133,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client)
         self.end_turn_button = ui.Button('End turn', self.client.end_turn)
-        self.empire_button = ui.Button('Empire', self.research_dialog)
+        self.empire_button = ui.Button('Empire', self.empire_dialog)
         self.taxes_panel = TaxesPanel(client)
         
         self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True)
@@ -161,18 +161,8 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.console.scroll.width = width
         self.console.scroll.height = 100
     
-    def research_dialog(self):
-        def set_goal(tech):
-            tech.set_as_goal()
-            ui.back()
-        
-        techs = ui.LinearLayoutWidget()
-        
-        techs.add(ui.Label(', '.join(self.client.get_current_tech())))
-        for tech in self.client.get_techs():
-            techs.add(ui.Button(tech.name, functools.partial(set_goal, tech)))
-        
-        ui.set(ui.ScrollWrapper(techs))
+    def empire_dialog(self):
+        empiredlg.EmpireDialog(self.client).show()
     
     def tick(self):
         self.map.size = ui.screen_width - self.overview.size[0], ui.screen_height

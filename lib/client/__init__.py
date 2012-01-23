@@ -24,6 +24,7 @@ import dialogs
 import common
 import window
 import actions
+import diplomacy
 import city
 import key
 import misc
@@ -233,6 +234,9 @@ class Client(object):
     
     def authenticate(self, password):
         freeciv.func.authenticate(password)
+    
+    def get_players(self):
+        return diplomacy.get_players()
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

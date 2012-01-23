@@ -1,1 +1,1 @@
-grep -n "$1" $(find | grep "\\.$2\$")
+grep -E -n "$1" $(find | grep "\\.$2\$")

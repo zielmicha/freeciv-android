@@ -129,3 +129,6 @@ PyObject* get_built_improvements_in_city(struct city* pCity)
 struct sprite* get_unit_image(const struct unit* u)
 
 void authenticate(const char* password)
+
+PyObject* get_players()
+const char *player_name(const struct player *pplayer);
