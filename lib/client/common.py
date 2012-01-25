@@ -35,9 +35,10 @@ class SpriteSurface(pygame.Surface):
 
 @freeciv.register
 def load_gfxfile(fn):
-    #if 'flags' not in fn:
-    #    print 'loading', fn
-    return pygame.image.load(fn).convert_alpha()
+    if fn.startswith('flags/'):
+        return load_flag(fn[len('flags/'):])
+    else:
+        return pygame.image.load(fn).convert_alpha()
 
 @freeciv.register
 def get_sprite_dimensions(image):
@@ -168,10 +169,31 @@ def split_sprites(img, start, each, size, num):
         y += each[1]
     return a
 
+FONT_CITY_NAME, FONT_CITY_PROD, FONT_REQTREE_TEXT, FONT_COUNT = range(4)
+
+flag_index = {}
+
 def init():
     global fonts
     fonts = [ pygame.font.Font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
+    init_flags()
 
-FONT_CITY_NAME, FONT_CITY_PROD, FONT_REQTREE_TEXT, FONT_COUNT = range(4)
+def init_flags():
+    names = ['large', 'shield', 'shield-large', 'flags']
+    for name in names:
+        load_flags_file(name)
 
+def load_flags_file(name):
+    img = pygame.image.load('data/flags/%s-output.png' % name).convert_alpha()
+    for line in open('data/flags/%s.index' % name):
+        name, rect = line.split(' ', 1)
+        rect = map(int, rect.split())
+        flag = pygame.Surface(rect[2:], pygame.SRCALPHA)
+        flag.blit(img, (0, 0), rect)
+        flag_index[name] = flag
+
+def load_flag(name):
+    if not name.endswith('.png'):
+        name += '.png'
+    return flag_index[name]
 
