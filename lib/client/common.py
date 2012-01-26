@@ -55,7 +55,7 @@ def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
 mask_i = 0
 masking_shown = 0
 
-mask_numbers = [173, 264]
+mask_numbers = [652, 270]
 mask_stage = 0
 
 def show_masking_progress():

@@ -22,6 +22,7 @@ import tarfile
 import copy
 import functools
 import traceback
+import time
 import thread
 
 import progress
@@ -42,7 +43,7 @@ from sync import lzma
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
 features.add_feature('app.forcesize')
-features.add_feature('app.resume', default=True, type=bool)
+features.add_feature('app.resume', default=False, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
@@ -103,39 +104,23 @@ def run_autoupdate():
     try:
         sync.client().updates(install_time)
     except sync.civsync.UpdateRequiredError as err:
-        with ui.execute_later_lock:
-            ui.execute_later.append(lambda: notify_update(err.url))
+        notify_update(err.url)
     except Exception as err:
         print 'Failed to autoupdate:', err
 
 def notify_update(url):
     print 'update found at', url
     
-    if not main_menu:
-        # game was started by "load" command
-        return
+    time.sleep(1)
     
-    def callback():
-        button.set_text('Loading...')
-        button.callback = None
-        with ui.execute_later_lock:
-            ui.execute_later.append(lambda: uidialog.open_url(url))
-    
-    global main_menu_update_shown
-    if main_menu_update_shown:
-        return
-    main_menu_update_shown = True
-    panel = ui.LinearLayoutWidget()
-    panel.add(ui.Label('There is an update available!'))
-    button = ui.Button('Update', callback)
-    panel.add(button)
-    main_menu.items.append(panel)
+    with ui.execute_later_lock:
+        ui.execute_later.append(lambda: menus.notify_update(url))
 
 client.main = client_main
 
 def unpack_data():
     last_flipped = time.time()
-    all_files_count = 955
+    all_files_count = 455
     i = 0
     if os.path.exists('data.tgz'):
         tar = tarfile.open('data.tgz')
@@ -166,7 +151,7 @@ def pause():
         client.client.chat('/save %s/pause_save.sav.gz' % save.get_save_dir())
         with open(pause_file, 'w') as f:
             f.write('version=1\n')
-        time.sleep(featues.get('app.shutdown'))
+        time.sleep(features.get('app.shutdown'))
         if not osutil.is_paused():
             remove_pause_file()
             return
@@ -189,7 +174,8 @@ def resume():
     if name:
         remove_pause_file()
         try:
-            show_main_menu()
+            menus.main_menu()
+            ui.set(ui.Label('dummy'))
             save.load_game(name)
         except IOError:
             # loading save failed
@@ -227,7 +213,6 @@ def main(size=None, init=True):
     setup_freeciv_config()
     size = size or check_force_size()
     
-    start_autoupdate()
     maybe_start_remote_debug()
     
     monitor.start()
@@ -241,6 +226,9 @@ def main(size=None, init=True):
     ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
     client.window.init()
     gamescreen.init()
+    
+    start_autoupdate()
+    
     if init:
         client.freeciv.run()
     else:

@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import ui
+import uidialog
 import pygame
 
 import sync
@@ -73,7 +74,7 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
     def load_background(self):
         img = ui.load_image('data/user/intro.jpg')
         img_size = img.get_size()
-        surf_size = pygame.display.get_surface().get_size()
+        surf_size = ui._fill_image.get_size()
         new_height = float(surf_size[0]) / img_size[0] * img_size[1]
         self.background_margin_top = (new_height - surf_size[1]) / -2.5
         self.background = pygame.transform.smoothscale(img, (surf_size[0], int(new_height)))
@@ -94,6 +95,9 @@ class MenuButton(ui.Button):
         if '\n' not in label:
             label += '\n '
         ui.Button.set_text(self, label)
+
+class RedMenuButton(MenuButton):
+    bg = (220, 150, 50, 110)
 
 class Balloon(ui.AbsoluteLayoutWidget):
     margin = 10
@@ -120,8 +124,12 @@ class _D(ui.Label):
         print pos, '(clip=%r)' % surf.get_clip()
         ui.Label.draw(self, surf, pos)
 
+main_menu_item = None
+main_menu_update_shown = False
+
 def main_menu():
-    menu = PrettyMenu()
+    global main_menu_item
+    main_menu_item = menu = PrettyMenu()
     
     menu.left.add(MenuButton('New\ngame', save.new_game))
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
@@ -131,7 +139,7 @@ def main_menu():
     
     menu.right.add(MenuButton('Feed\nback', feedback))
     menu.right.add(MenuButton('Sett\nings', options.show_options))
-    menu.right.add(MenuButton('Exit', None))
+    menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))
     
     #balloon = Balloon()
@@ -140,6 +148,27 @@ def main_menu():
     
     ui.replace(menu)
 
+def notify_update(url):
+    if not main_menu_item:
+        # game was started by "load" command
+        print 'not showing update button'
+        return
+    
+    def callback():
+        button.set_text('Loading...')
+        button.callback = None
+        with ui.execute_later_lock:
+            ui.execute_later.append(lambda: uidialog.open_url(url))
+    
+    global main_menu_update_shown
+    if main_menu_update_shown:
+        return
+    main_menu_update_shown = True
+    #panel = ui.LinearLayoutWidget()
+    #panel.add(ui.Label('There is an update available!'))
+    button = RedMenuButton('  New\nversion!', callback)
+    #panel.add(button)
+    main_menu_item.left.add(button)
 
 def feedback():
     panel = ui.LinearLayoutWidget()

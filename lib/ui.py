@@ -469,13 +469,13 @@ def set_autoscale(surf):
     global autoscale_enabled, _fill_image, autoscale_scale
     autoscale_enabled = True
     
-    h = surf.get_height() * 600 / surf.get_width()
-    autoscale_scale = 600.0 / surf.get_width()
+    h = surf.get_height() * 800 / surf.get_width()
+    autoscale_scale = 800.0 / surf.get_width()
     
     if _fill_image:
-        _fill_image = pygame.transform.smoothscale(_fill_image_not_resized, (600, h))
+        _fill_image = pygame.transform.smoothscale(_fill_image_not_resized, (800, h))
     
-    dest = pygame.Surface((600, h))
+    dest = pygame.Surface((800, h))
     
     return dest
     
