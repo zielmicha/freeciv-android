@@ -104,7 +104,7 @@ int get_tax_value(bool luxury)
 int get_gold_amount()
 int get_gold_income()
 
-PyObject* get_techs()
+PyObject* get_techs(int level)
 void set_tech_goal(int index)
 PyObject* get_current_tech()
 
@@ -132,3 +132,5 @@ void authenticate(const char* password)
 
 PyObject* get_players()
 const char *player_name(const struct player *pplayer);
+
+void set_tech_research(int index)

@@ -919,12 +919,14 @@ static PyObject* python_get_gold_income(PyObject* self, PyObject* args) {
 	int retval = get_gold_income();
 	return Py_BuildValue("i", retval);
 }
-// PyObject* get_techs()
-PyObject* get_techs();
+// PyObject* get_techs(int level)
+PyObject* get_techs(int level);
 
 static PyObject* python_get_techs(PyObject* self, PyObject* args) {
-	if(PyArg_ParseTuple(args, "") == 0) return NULL;
-	PyObject* retval = get_techs();
+	int arg_level;
+	if(PyArg_ParseTuple(args, "i", &arg_level) == 0) return NULL;
+
+	PyObject* retval = get_techs(arg_level);
 	return Py_BuildValue("O", py_get_pyobject(retval));
 }
 // void set_tech_goal(int index)
@@ -1086,6 +1088,16 @@ static PyObject* python_player_name(PyObject* self, PyObject* args) {
 
 	const char* retval = player_name((struct player*)arg_pplayer);
 	return Py_BuildValue("s", retval);
+}
+// void set_tech_research(int index)
+void set_tech_research(int index);
+
+static PyObject* python_set_tech_research(PyObject* self, PyObject* args) {
+	int arg_index;
+	if(PyArg_ParseTuple(args, "i", &arg_index) == 0) return NULL;
+
+	set_tech_research(arg_index);
+	return Py_BuildValue("i", 0);
 }
 void py_setup_callglue() {
 void* ptr;
@@ -1309,4 +1321,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_players", (int)ptr);
 	ptr = python_player_name;
 	PY_CALL("ssi", "add_function", "player_name", (int)ptr);
+	ptr = python_set_tech_research;
+	PY_CALL("ssi", "add_function", "set_tech_research", (int)ptr);
 }

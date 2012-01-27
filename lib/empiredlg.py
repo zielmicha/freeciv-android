@@ -24,23 +24,40 @@ class EmpireDialog(ui.LinearLayoutWidget):
     
     def setup_ui(self):
         self.items = []
-        self.add(ui.Label(', '.join(self.client.get_current_tech())))
-        tech_panel = ui.HorizontalLayoutWidget()
+        self.tech_label = ui.Label('')
+        self.add(self.tech_label)
+        tech_panel = ui.HorizontalLayoutWidget(spacing=10)
         tech_panel.add(ui.Button('Change tech goal', self.research_goal_dialog))
+        tech_panel.add(ui.Button('Change current tech', self.research_current_dialog))
         self.add(tech_panel)
         self.add(ui.Label('Players'))
         self.add(ui.Button('Player list', self.player_list))
+        self.update_layout()
+    
+    def update_tech_label(self):
+        self.tech_label.set_text(', '.join(self.client.get_current_tech()))
+    
+    def tick(self):
+        super(EmpireDialog, self).tick()
+        self.client.tick() # important
+        self.update_tech_label()
     
     def research_goal_dialog(self):
+        self.research_list_dialog('set_as_goal', 11)
+    
+    def research_current_dialog(self):
+        self.research_list_dialog('set_as_current', 2)
+    
+    def research_list_dialog(self, func, level):
         def set_goal(tech):
-            tech.set_as_goal()
+            getattr(tech, func)()
             self.setup_ui()
             ui.back()
         
         techs = ui.LinearLayoutWidget()
         
         techs.add(ui.Label(', '.join(self.client.get_current_tech())))
-        for tech in self.client.get_techs():
+        for tech in self.client.get_techs(level):
             techs.add(ui.Button(tech.name, functools.partial(set_goal, tech)))
         
         ui.set_dialog(techs, scroll=True)

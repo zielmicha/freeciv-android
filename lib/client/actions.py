@@ -106,6 +106,7 @@ class Unit(object):
             ACTIVITY_TRANSFORM,
             #BASE_GUI_FORTRESS,
             ACTIVITY_FORTIFYING,
+            ACTIVITY_FORTRESS,
             ACTIVITY_POLLUTION,
             ACTIVITY_FALLOUT,
             ACTIVITY_SENTRY,

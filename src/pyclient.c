@@ -404,14 +404,14 @@ int get_playable_nation_count() {
   
 }
 
-PyObject* get_techs() {
+PyObject* get_techs(int level) {
     PyObject* list = PyList_New(0);
     
     int num, i;
     advance_index_iterate(A_FIRST, i) {
         if (player_invention_reachable(client.conn.playing, i, FALSE)
             && TECH_KNOWN != player_invention_state(client.conn.playing, i)
-            && (11 > (num = num_unknown_techs_for_goal(client.conn.playing, i))
+            && (level > (num = num_unknown_techs_for_goal(client.conn.playing, i))
                 /*|| player_research_get(client.conn.playing) == research->tech_goal*/)) {
             
             PyList_Append(list, Py_BuildValue("isi", i, advance_name_translation(advance_by_number(i)), num));
@@ -429,6 +429,10 @@ PyObject* get_current_tech() {
 
 void set_tech_goal(int index) {
     dsend_packet_player_tech_goal(&client.conn, index);
+}
+
+void set_tech_research(int index) {
+    dsend_packet_player_research(&client.conn, index);
 }
 
 struct unit_list* get_units_present_in_city(struct city* pCity) {
