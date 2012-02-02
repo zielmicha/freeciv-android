@@ -14,9 +14,13 @@ import os
 import sys
 import pygame
 import time
+import features
+
+features.add_feature("app.disable_android_pause", type=bool, default=False)
 
 try:
     import android
+    import pyjni
 except ImportError:
     android = None
 
@@ -41,7 +45,10 @@ def get_android_data(append=''):
 
 def is_paused():
     if is_android:
-        return android.check_pause()
+        if features.get("app.disable_android_pause"):
+            return False
+        else:
+            return android.check_pause()
     else:
         return sig_state == PAUSED
 
@@ -51,6 +58,35 @@ def wait_for_resume():
     else:
         while sig_state == PAUSED:
             time.sleep(0.3)
+
+def get_android_version():
+    if is_android:
+        return pyjni.get_android_version()
+    else:
+        return None
+
+version_map = {
+    None: ('desktop', None),
+    10000: ('devel', 'dev'),
+    1: ('base', '1.0'),
+    2: ('base', '1.1'),
+    3: ('cupcake', '1.5'),
+    4: ('donut', '1.6'),
+    5: ('eclair', '2.0'),
+    6: ('eclair', '2.0.1'),
+    7: ('eclair', '2.1'),
+    8: ('froyo', '2.2'),
+    9: ('gingerbread', '2.3'),
+    10: ('gingerbread', '2.3.3'),
+    11: ('honeycomb', '3.0'),
+    12: ('honeycomb', '3.1'),
+    13: ('honeycomb', '3.2'),
+    14: ('icecream sandwich', '4.0'),
+    15: ('icecream sandwich', '4.0.3'),
+}
+
+def get_android_version_info():
+    return version_map.get(get_android_version(), ('unknown', ''))
 
 if is_desktop:
     import signal

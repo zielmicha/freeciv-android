@@ -3,6 +3,7 @@ import android.content.*;
 import android.net.*;
 import java.io.*;
 import org.tukaani.xz.*;
+import android.os.*;
 
 public class MyHardware {
 	public static Object open_intent(String type, String url) {
@@ -37,5 +38,9 @@ public class MyHardware {
 			ex.printStackTrace();
 			return null;
 		}
+	}
+	
+	public static int get_android_version() {
+		return Build.VERSION.SDK_INT;
 	}
 }

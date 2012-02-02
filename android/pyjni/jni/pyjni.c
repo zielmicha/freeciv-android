@@ -124,11 +124,25 @@ PyObject* open_intent(PyObject* self, PyObject* args) {
     return Py_BuildValue("i", 0);
 }
 
+PyObject* get_android_version(PyObject* self, PyObject* args) {
+    JNIEnv* env = SDL_ANDROID_GetJNIEnv();
+    aassert(env);
+    
+    jclass cls = (*env)->FindClass(env, "org/renpy/android/MyHardware");
+    aassert(cls);
+    jmethodID mid = (*env)->GetStaticMethodID(env, cls, "get_android_version", "()I");
+    aassert(mid);
+    int ver = (*env)->CallStaticIntMethod(env, cls, mid);
+    
+    return Py_BuildValue("i", ver);
+}
+
 static PyMethodDef PyjniMethods[] = {
     {"make_input_dialog", make_input_dialog, METH_VARARGS, ""},
     {"get_dialog_retval", get_dialog_retval, METH_VARARGS, ""},
     {"encode_or_decode_xz", encode_or_decode_xz, METH_VARARGS, ""},
     {"open_intent", open_intent, METH_VARARGS, ""},
+    {"get_android_version", get_android_version, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

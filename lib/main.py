@@ -206,11 +206,22 @@ def maybe_start_remote_debug():
         import remote_shell
         remote_shell.start()
         
+def setup_version():
+    vernum = osutil.get_android_version()
+    if vernum >= 14: # icecream sandwich causes bug
+        features.add_feature("app.disable_android_pause", type=bool, default=True)
+    name, version = osutil.get_android_version_info()
+    if osutil.is_desktop:
+        info_string = 'Desktop'
+    else:
+        info_string = 'Android %s %s' % (name.capitalize(), version)
+    print 'running', info_string, '(code=%s)' % vernum
 
 def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     setup_freeciv_config()
+    setup_version()
     size = size or check_force_size()
     
     maybe_start_remote_debug()
