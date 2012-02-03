@@ -45,6 +45,9 @@ ACTIVITY_CHANGE_HOMECITY = 1008
 ACTIVITY_LOAD = 1009
 ACTIVITY_UNLOAD = 1010
 
+BASE_GUI_FORTRESS = 0
+BASE_GUI_AIRBASE = 1
+
 activities = dict( (k,v) for k,v in globals().items() if k.startswith('ACTIVITY_' ) )
 activity_names = dict( (v, k) for k,v in activities.items() )
 
@@ -97,6 +100,34 @@ class Unit(object):
         # TODO: nuke
         # TODO: airlift
         
+#        /common/unit.h:21:#include "base.h"
+#./common/unit.h:122:  Base_type_id base;            /* Only valid for activity ACTIVITY_BASE */
+#./common/unit.h:150:  Base_type_id           activity_base;
+#./common/unit.h:157:  Base_type_id           changed_from_base;
+#./common/unit.h:269:                                   Base_type_id base);
+#./common/unit.h:274:                                      Base_type_id base);
+#./common/unit.h:275:bool can_unit_do_activity_base(const struct unit *punit,
+#./common/unit.h:276:                               Base_type_id base);
+#./common/unit.h:281:                                Base_type_id base);
+#./common/unit.h:282:void set_unit_activity_base(struct unit *punit,
+#./common/unit.h:283:                            Base_type_id base);
+#./common/unit.h:294:bv_bases get_unit_tile_pillage_base_set(const struct tile *ptile);
+#./common/unittype.h:87:  int hp_loss_pct;         /* Percentage of hitpoints lost each turn not in city or airbase */
+#./common/tile.h:118:bool tile_has_base_flag_for_unit(const struct tile *ptile,
+#./common/unitlist.h:65:bool can_units_do_base(const struct unit_list *punits,
+#./common/unitlist.h:66:                       Base_type_id base);
+#./common/unitlist.h:67:bool can_units_do_base_gui(const struct unit_list *punits,
+#./common/unitlist.h:68:                           enum base_gui_type base_gui);
+#./common/combat.h:53:int base_get_attack_power(const struct unit_type *punittype,
+#./common/combat.h:55:int base_get_defense_power(const struct unit *punit);
+#./common/base.h:100:bool can_build_base(const struct unit *punit, const struct base_type *pbase,
+#./common/packets_gen.h:1791:int dsend_packet_unit_change_activity(struct connection *pc, int unit_id, enum unit_activity activity, enum tile_special_type activity_target, Base_type_id activity_base);
+
+        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
+            yield ACTIVITY_AIRBASE
+        
+        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_FORTRESS):
+            yield ACTIVITY_FORTRESS
         
         standard_activities = [
             ACTIVITY_RAILROAD,
@@ -104,9 +135,7 @@ class Unit(object):
             ACTIVITY_IRRIGATE,
             ACTIVITY_MINE,
             ACTIVITY_TRANSFORM,
-            #BASE_GUI_FORTRESS,
             ACTIVITY_FORTIFYING,
-            ACTIVITY_FORTRESS,
             ACTIVITY_POLLUTION,
             ACTIVITY_FALLOUT,
             ACTIVITY_SENTRY,
@@ -152,6 +181,7 @@ class Unit(object):
         freeciv.func.set_unit_focus(self.unit_id)
     
     def perform_activity(self, ident):
+        id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
             freeciv.func.key_unit_goto()
         elif ident == ACTIVITY_ROAD:
@@ -168,12 +198,8 @@ class Unit(object):
             freeciv.func.key_unit_mine()
         elif ident == ACTIVITY_TRANSFORM:
             freeciv.func.key_unit_transform()
-        elif ident == ACTIVITY_FORTRESS:
-            freeciv.func.key_unit_fortress()
         elif ident == ACTIVITY_FORTIFYING:
             freeciv.func.key_unit_fortify()
-        elif ident == ACTIVITY_AIRBASE:
-            freeciv.func.key_unit_airbase()
         elif ident == ACTIVITY_POLLUTION:
             freeciv.func.key_unit_pollution()
         elif ident == ACTIVITY_PARADROP:
@@ -196,6 +222,10 @@ class Unit(object):
             freeciv.func.key_unit_disband()
         elif ident == ACTIVITY_CHANGE_HOMECITY:
             freeciv.func.key_unit_homecity()
+        elif ident == ACTIVITY_FORTRESS:
+            freeciv.func.key_unit_fortress()
+        elif ident == ACTIVITY_AIRBASE:
+            freeciv.func.key_unit_airbase()
         else:
             print 'Unsupported action ', ident
 

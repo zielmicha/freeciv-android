@@ -1099,6 +1099,30 @@ static PyObject* python_set_tech_research(PyObject* self, PyObject* args) {
 	set_tech_research(arg_index);
 	return Py_BuildValue("i", 0);
 }
+// bool can_unit_do_activity_base(const struct unit *punit, int base);
+bool can_unit_do_activity_base(const struct unit *punit, int base);;
+
+static PyObject* python_can_unit_do_activity_base(PyObject* self, PyObject* args) {
+	int arg_punit;
+	int arg_base;
+	if(PyArg_ParseTuple(args, "ii", &arg_punit, &arg_base) == 0) return NULL;
+
+
+	bool retval = can_unit_do_activity_base((struct unit*)arg_punit, arg_base);
+	return Py_BuildValue("i", (int)retval);
+}
+// void set_unit_activity_base(struct unit *punit, int base);
+void set_unit_activity_base(struct unit *punit, int base);;
+
+static PyObject* python_set_unit_activity_base(PyObject* self, PyObject* args) {
+	int arg_punit;
+	int arg_base;
+	if(PyArg_ParseTuple(args, "ii", &arg_punit, &arg_base) == 0) return NULL;
+
+
+	set_unit_activity_base((struct unit*)arg_punit, arg_base);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1323,4 +1347,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "player_name", (int)ptr);
 	ptr = python_set_tech_research;
 	PY_CALL("ssi", "add_function", "set_tech_research", (int)ptr);
+	ptr = python_can_unit_do_activity_base;
+	PY_CALL("ssi", "add_function", "can_unit_do_activity_base", (int)ptr);
+	ptr = python_set_unit_activity_base;
+	PY_CALL("ssi", "add_function", "set_unit_activity_base", (int)ptr);
 }
