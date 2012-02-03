@@ -116,6 +116,7 @@ def debug_menu():
     menu.add('Change feature', change_feature)
     menu.add('Pernament feature', pernament_feature)
     menu.add('Show features', show_features)
+    menu.add('Cause exception', lambda: 1/0)
     
     ui.set(ui.ScrollWrapper(menu))
 

@@ -217,11 +217,24 @@ def setup_version():
         info_string = 'Android %s %s' % (name.capitalize(), version)
     print 'running', info_string, '(code=%s)' % vernum
 
+def setup_errors():
+    ui.except_callback = except_hook
+
+def except_hook():
+    type, value, tb = sys.exc_info()
+    tb_str = traceback.format_exception(type, value, tb, limit=20)
+    panel = ui.LinearLayoutWidget()
+    panel.add(ui.Label('error!', font=ui.consolefont))
+    panel.add(ui.Label(str(type) + ':\n' + str(value), font=ui.consolefont))
+    panel.add(ui.Label(''.join(tb_str), font=ui.consolefont))
+    ui.screen = ui.ScrollWrapper(panel)
+
 def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     setup_freeciv_config()
     setup_version()
+    setup_errors()    
     size = size or check_force_size()
     
     maybe_start_remote_debug()

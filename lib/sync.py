@@ -45,7 +45,7 @@ def apply_user_agent_change(ua):
     civsync.USER_AGENT = ua
 
 features.set_applier('civsync.ua', apply_user_agent_change)
-features.set('civsync.ua', 'CivSyncAndroid/1005')
+features.set('civsync.ua', 'CivSyncAndroid/1006')
 features.add_feature('civsync.enable', False, type=bool)
 
 session = None

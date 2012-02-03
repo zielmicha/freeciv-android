@@ -13,6 +13,7 @@
 import pygame
 import pygame.gfxdraw
 import time
+import traceback
 
 import uidialog
 import features
@@ -505,20 +506,11 @@ execute_later = []
 execute_later_lock = threading.Lock()
 
 def main():
-    global screen_width, screen_height, screen_size, execute_later
-    fps_label = None
-    fps_timeout = 0
-    lost_time = 0.0
-    per_frame = 1./FPS
-    frame_last = 0
-    surf = pygame.display.get_surface()
-    surf = maybe_set_autoscale(surf)
-    screen_width, screen_height = screen_size = surf.get_size()
-    while True:
-        frame_start = time.time()
+    
+    def main_tick():
         events = pygame.event.get()
         if not screen:
-            continue
+            return
         was_motion = False
         for event in events:
             ev_dict = event.dict
@@ -538,7 +530,7 @@ def main():
             else:
                 screen.event(Event(event.type, ev_dict))
         screen.tick()
-        
+    
         for overlay in overlays:
             overlay.tick()
         
@@ -561,13 +553,36 @@ def main():
         flip(surf)
         
         check_pause()
+    
+    global screen_width, screen_height, screen_size, execute_later
+    fps_label = None
+    fps_timeout = 0
+    lost_time = 0.0
+    per_frame = 1./FPS
+    frame_last = 0
+    surf = pygame.display.get_surface()
+    surf = maybe_set_autoscale(surf)
+    screen_width, screen_height = screen_size = surf.get_size()
+    while True:
+        frame_start = time.time()
         
         frame_last = time.time() - frame_start
         sleep = per_frame - frame_last
-        if sleep > 0:
-            time.sleep(sleep)
-        else:
-            lost_time += -sleep
+        try:
+            if sleep > 0:
+                time.sleep(sleep)
+            else:
+                lost_time += -sleep
+        
+            main_tick()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            traceback.print_exc()
+            if except_callback:
+                except_callback()
+            time.sleep(0.5)
+            continue
         
         if show_fps:
             if fps_timeout == 0:
@@ -576,6 +591,7 @@ def main():
             else:
                 fps_timeout -= 1
 
+except_callback = None
 pause_callback = None
 
 def check_pause():
