@@ -1123,6 +1123,40 @@ static PyObject* python_set_unit_activity_base(PyObject* self, PyObject* args) {
 	set_unit_activity_base((struct unit*)arg_punit, arg_base);
 	return Py_BuildValue("i", 0);
 }
+// int impr_sell_gold(const struct impr_type *pimprove)
+int impr_sell_gold(const struct impr_type *pimprove);
+
+static PyObject* python_impr_sell_gold(PyObject* self, PyObject* args) {
+	int arg_pimprove;
+	if(PyArg_ParseTuple(args, "i", &arg_pimprove) == 0) return NULL;
+
+	int retval = impr_sell_gold((struct impr_type*)arg_pimprove);
+	return Py_BuildValue("i", retval);
+}
+// bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove);
+bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove);;
+
+static PyObject* python_can_city_sell_building(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	int arg_pimprove;
+	if(PyArg_ParseTuple(args, "ii", &arg_pcity, &arg_pimprove) == 0) return NULL;
+
+
+	bool retval = can_city_sell_building((struct city*)arg_pcity, (struct impr_type*)arg_pimprove);
+	return Py_BuildValue("i", (int)retval);
+}
+// int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove)
+int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove);
+
+static PyObject* python_city_sell_improvement_type(PyObject* self, PyObject* args) {
+	int arg_pcity;
+	int arg_pimprove;
+	if(PyArg_ParseTuple(args, "ii", &arg_pcity, &arg_pimprove) == 0) return NULL;
+
+
+	int retval = city_sell_improvement_type((struct city*)arg_pcity, (struct impr_type*)arg_pimprove);
+	return Py_BuildValue("i", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1351,4 +1385,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "can_unit_do_activity_base", (int)ptr);
 	ptr = python_set_unit_activity_base;
 	PY_CALL("ssi", "add_function", "set_unit_activity_base", (int)ptr);
+	ptr = python_impr_sell_gold;
+	PY_CALL("ssi", "add_function", "impr_sell_gold", (int)ptr);
+	ptr = python_can_city_sell_building;
+	PY_CALL("ssi", "add_function", "can_city_sell_building", (int)ptr);
+	ptr = python_city_sell_improvement_type;
+	PY_CALL("ssi", "add_function", "city_sell_improvement_type", (int)ptr);
 }

@@ -60,7 +60,7 @@ class Dialog(ui.HorizontalLayoutWidget):
         prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
         #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
         self.prodpanel.add(prodbuttons)
-        self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=340, ways=ui.SCROLL_WIDTH))
+        self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=340, height=120, ways=ui.SCROLL_WIDTH))
         self.prodpanel.add(ui.Button('Buildings in city', self.show_buildings))
         
         #print self.city.get_buildable_improvements()
@@ -100,11 +100,24 @@ class Dialog(ui.HorizontalLayoutWidget):
         
         panel = ui.LinearLayoutWidget()
         for handle, name in buildings:
-            callback = functools.partial(lambda u: None, handle)
-            panel.add(ui.Button(name, callback))
+            callback = functools.partial(lambda info: self.sell_dialog(*info), (name, handle))
+            p = ui.HorizontalLayoutWidget()
+            p.add(ui.Label(name))
+            p.add(ui.Button('Sell', callback))
+            panel.add(p)
         ui.set_dialog(panel, scroll=True)
         
         #ui.not_implemented()
+    
+    def sell_dialog(self, name, handle):
+        if not self.city.can_sell(handle):
+            ui.message('Cannot sell %s' % name)
+        else:
+            def do_sell():
+                self.city.sell(handle)
+                ui.back()
+            cost = self.city.get_sell_price(handle)
+            ui.ask('Sell %s for %d?' % (name, cost), do_sell)
     
     def change_prod(self, add=True):
         panel = ui.LinearLayoutWidget()

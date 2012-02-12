@@ -137,3 +137,7 @@ void set_tech_research(int index)
 
 bool can_unit_do_activity_base(const struct unit *punit, int base);
 void set_unit_activity_base(struct unit *punit, int base);
+
+int impr_sell_gold(const struct impr_type *pimprove)
+bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove);
+int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove)

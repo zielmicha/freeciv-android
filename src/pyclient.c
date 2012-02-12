@@ -597,6 +597,10 @@ PyObject* get_cities() {
     
 }
 
+int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove) {
+    return city_sell_improvement(pcity, improvement_index(pimprove));
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);

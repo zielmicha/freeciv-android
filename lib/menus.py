@@ -85,7 +85,7 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
 
 class MenuButton(ui.Button):
     active_bg = (255, 255, 200, 20)
-    bg = (150, 150, 50, 20)
+    bg = (150, 150, 50, 80)
     fg = (150, 150, 50)
     
     def __init__(self, text, callback):

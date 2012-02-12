@@ -149,6 +149,12 @@ class City(object):
     def buy(self):
         freeciv.func.city_buy_production(self.handle)
 
-
+    def get_sell_price(self, handle):
+        return freeciv.func.impr_sell_gold(handle)
     
+    def can_sell(self, handle):
+        return freeciv.func.can_city_sell_building(self.handle, handle)
+    
+    def sell(self, handle):
+        freeciv.func.city_sell_improvement_type(self.handle, handle)
     

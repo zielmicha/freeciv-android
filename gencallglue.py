@@ -11,7 +11,7 @@ types = {
 }
 
 mappers = 'city player tile packet_game_load text_tag_list unit_list color packet_endgame_report message'.split()
-int_mappers = 'unit tile city player'.split()
+int_mappers = 'unit tile city player impr_type'.split()
 int_mappers = [ 'struct ' + s for s in int_mappers]
 
 def proc(type, name):
