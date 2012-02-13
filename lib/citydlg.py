@@ -129,11 +129,14 @@ class Dialog(ui.HorizontalLayoutWidget):
             self.city.set_production(type, handle)
             ui.back()
         
-        def add(handle, type, name, turns, stock, cost, ops):
-            panel.add(ui.Label('%s %s/%s %s' % (name, stock, cost, ops), functools.partial(change, type, handle)))
+        def add(handle, type, name, turns, stock, cost, ops, image):
+            c = ui.HorizontalLayoutWidget()
+            c.add(ui.Label('    ', image=image))
+            c.add(ui.Label('%s %s/%s %s' % (name, stock, cost, ops), functools.partial(change, type, handle)))
+            panel.add(c)
         
-        for handle, type, name, turns, stock, cost, ops in things:
-            add(handle, type, name, turns, stock, cost, ops or '')
+        for handle, type, name, turns, stock, cost, ops, img in things:
+            add(handle, type, name, turns, stock, cost, ops or '', img)
         
         ui.set_dialog(panel, scroll=True)
     

@@ -459,7 +459,8 @@ PyObject* get_buildable_improvements_in_city(struct city* pCity) {
             int cost = impr_build_shield_cost(pImprove);
             
             PyList_Append(list, Py_BuildValue(
-                "iisiii()", (int)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost
+                "iisiii()O", (int)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost,
+                (PyObject*)get_building_sprite(tileset, pImprove)
             ));
         }
         
@@ -501,8 +502,8 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
             int turns = -1; //city_turns_to_build(pCity, cid_production(cid_encode_unit(un)), TRUE)
             
             PyList_Append(list, Py_BuildValue(
-                "iisiii(iii)", (int)un, VUT_UTYPE, name, turns, stock, cost,
-                attack, defense, moves
+                "iisiii(iii)O", (int)un, VUT_UTYPE, name, turns, stock, cost,
+                attack, defense, moves, (PyObject*)get_unittype_sprite(tileset, un)
             ));
         }
         
