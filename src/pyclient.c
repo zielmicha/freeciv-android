@@ -18,7 +18,7 @@ PyObject* py_mapper_city(struct city* s) {
     return Py_BuildValue("i", (int)s);
 }
 PyObject* py_mapper_player(struct player* s){
-    return Py_BuildValue("i", 0);
+    return Py_BuildValue("i", (int)s);
 }
 PyObject* py_mapper_unit(struct unit* s){
     return Py_BuildValue("i", (int)s);
@@ -585,8 +585,16 @@ void py_init_meeting(int counterpart) {
     dsend_packet_diplomacy_init_meeting_req(&client.conn, counterpart);
 }
 
+void py_add_clause(int counterpart, int giver, int type, int value) {
+    dsend_packet_diplomacy_create_clause_req(&client.conn, counterpart, giver, type, value);
+}
+
 int py_get_player_number(struct player* p) {
     return player_slot_index(p->slot);
+}
+
+struct player* get_playing() {
+    return client.conn.playing;
 }
 
 void change_government(int gov) {
@@ -607,6 +615,10 @@ PyObject* get_cities() {
 
 int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove) {
     return city_sell_improvement(pcity, improvement_index(pimprove));
+}
+
+struct sprite* py_get_nation_flag(const struct player* p) {
+  return get_nation_flag_sprite(tileset, nation_of_player(p));
 }
 
 static void py_setup_const() {

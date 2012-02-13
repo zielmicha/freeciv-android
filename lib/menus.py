@@ -88,8 +88,8 @@ class MenuButton(ui.Button):
     bg = (150, 150, 50, 80)
     fg = (150, 150, 50)
     
-    def __init__(self, text, callback):
-        ui.Button.__init__(self, text, callback, force_width=100)
+    def __init__(self, text, callback, **kwargs):
+        ui.Button.__init__(self, text, callback, force_width=100, **kwargs)
     
     def set_text(self, label):
         if '\n' not in label:
@@ -131,6 +131,7 @@ def main_menu():
     global main_menu_item
     main_menu_item = menu = PrettyMenu()
     
+    menu.add(ui.Label('version %s' % features.get('app.version'), color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
     menu.left.add(MenuButton('New\ngame', save.new_game))
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
     menu.left.add(load_game_button)
@@ -138,7 +139,7 @@ def main_menu():
         menu.left.add(MenuButton('Connect', save.connect_dialog))
     
     menu.right.add(MenuButton('Feed\nback', feedback))
-    menu.right.add(MenuButton('Sett\nings', options.show_options))
+    menu.right.add(MenuButton('', options.show_options, image=ui.load_image('data/user/options.png').convert_alpha()))
     menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))
     

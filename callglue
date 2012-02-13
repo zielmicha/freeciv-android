@@ -143,9 +143,15 @@ bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove
 int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove)
 
 const char *nation_adjective_for_player(const struct player *pplayer)
+const char *nation_plural_for_player(const struct player *pplayer)
 bool can_meet_with_player(const struct player *pplayer)
 void py_init_meeting(int counterpart)
 
 struct player *player_by_number(const int player_id)
 #int py_get_player_number(struct player* p)
 int player_number(const struct player *pplayer)
+
+struct sprite *py_get_nation_flag(const struct player *pplayer)
+struct player* get_playing()
+
+void py_add_clause(int counterpart, int giver, int type, int value)

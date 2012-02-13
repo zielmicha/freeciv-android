@@ -74,6 +74,7 @@ class EmpireDialog(ui.LinearLayoutWidget):
             p = ui.HorizontalLayoutWidget()
             if player.can_meet():
                 p.add(ui.Button('Meet', functools.partial(meet, player)))
+            p.add(ui.Label('    ', image=player.get_flag()))
             p.add(ui.Label('%s (%s)' % (player.get_name(), player.get_nation_adj())))
             players.add(p)
         

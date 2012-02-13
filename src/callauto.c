@@ -1167,6 +1167,16 @@ static PyObject* python_nation_adjective_for_player(PyObject* self, PyObject* ar
 	const char* retval = nation_adjective_for_player((struct player*)arg_pplayer);
 	return Py_BuildValue("s", retval);
 }
+// const char *nation_plural_for_player(const struct player *pplayer)
+const char *nation_plural_for_player(const struct player *pplayer);
+
+static PyObject* python_nation_plural_for_player(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	const char* retval = nation_plural_for_player((struct player*)arg_pplayer);
+	return Py_BuildValue("s", retval);
+}
 // bool can_meet_with_player(const struct player *pplayer)
 bool can_meet_with_player(const struct player *pplayer);
 
@@ -1206,6 +1216,40 @@ static PyObject* python_player_number(PyObject* self, PyObject* args) {
 
 	int retval = player_number((struct player*)arg_pplayer);
 	return Py_BuildValue("i", retval);
+}
+// struct sprite *py_get_nation_flag(const struct player *pplayer)
+struct sprite *py_get_nation_flag(const struct player *pplayer);
+
+static PyObject* python_py_get_nation_flag(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	struct sprite* retval = py_get_nation_flag((struct player*)arg_pplayer);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// struct player* get_playing()
+struct player* get_playing();
+
+static PyObject* python_get_playing(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	struct player* retval = get_playing();
+	return Py_BuildValue("O", py_mapper_player(retval));
+}
+// void py_add_clause(int counterpart, int giver, int type, int value)
+void py_add_clause(int counterpart, int giver, int type, int value);
+
+static PyObject* python_py_add_clause(PyObject* self, PyObject* args) {
+	int arg_counterpart;
+	int arg_giver;
+	int arg_type;
+	int arg_value;
+	if(PyArg_ParseTuple(args, "iiii", &arg_counterpart, &arg_giver, &arg_type, &arg_value) == 0) return NULL;
+
+
+
+
+	py_add_clause(arg_counterpart, arg_giver, arg_type, arg_value);
+	return Py_BuildValue("i", 0);
 }
 void py_setup_callglue() {
 void* ptr;
@@ -1443,6 +1487,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "city_sell_improvement_type", (int)ptr);
 	ptr = python_nation_adjective_for_player;
 	PY_CALL("ssi", "add_function", "nation_adjective_for_player", (int)ptr);
+	ptr = python_nation_plural_for_player;
+	PY_CALL("ssi", "add_function", "nation_plural_for_player", (int)ptr);
 	ptr = python_can_meet_with_player;
 	PY_CALL("ssi", "add_function", "can_meet_with_player", (int)ptr);
 	ptr = python_py_init_meeting;
@@ -1451,4 +1497,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "player_by_number", (int)ptr);
 	ptr = python_player_number;
 	PY_CALL("ssi", "add_function", "player_number", (int)ptr);
+	ptr = python_py_get_nation_flag;
+	PY_CALL("ssi", "add_function", "py_get_nation_flag", (int)ptr);
+	ptr = python_get_playing;
+	PY_CALL("ssi", "add_function", "get_playing", (int)ptr);
+	ptr = python_py_add_clause;
+	PY_CALL("ssi", "add_function", "py_add_clause", (int)ptr);
 }

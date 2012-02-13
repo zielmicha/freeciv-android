@@ -144,7 +144,7 @@ class Animation(object):
         self.screen_background = 0xFFFFFF
         
         self.frame = 0
-        self.duration = 6
+        self.duration = 3
     
     def draw(self, surf, pos):
         width = screen_width * (self.spacing + 1)
@@ -611,13 +611,16 @@ class Event(object):
             setattr(self, k, v)
 
 class WithText(object):
-    def __init__(self, label, callback, font=None, color=None, padding=0, force_width=None):
+    def __init__(self, label, callback, font=None, color=None, padding=0, force_width=None, image=None):
         self.callback = callback
         self.font = font or mediumfont
         self.color = color or (0, 0, 0)
         self.label = None
         self.padding = padding
         self.force_width = force_width
+        self.image = image
+        self._scaled_image = None
+        self._scaled_size = None
         self.set_text(label)
     
     def set_text(self, label):
@@ -641,6 +644,18 @@ class WithText(object):
     
     def draw(self, surf, pos):
         surf.blit(self.label_image, (pos[0] + self.padding_left, pos[1] + self.padding_top))
+        if self.image:
+            if self._scaled_size != self.size:
+                scale_w = float(self.size[0]) / self.image.get_width()
+                scale_h = float(self.size[1]) / self.image.get_height()
+                scale = min(scale_w, scale_h)
+                w, h = self.image.get_size()
+                self._scaled_image = pygame.transform.smoothscale(self.image, (int(w*scale), int(h*scale)))
+                self._scaled_size = self.size
+            
+            iw, ih = self._scaled_image.get_size()
+            w, h = self.size
+            surf.blit(self._scaled_image, (pos[0] + (w - iw)/2, pos[1] + (h - ih)/2))
 
 def gfx_ellipse(surf, color, rect, width):
     if width == 0:
@@ -700,8 +715,8 @@ class Button(WithText):
     bg = (130, 100, 0, 90)
     fg = (150, 150, 50)
     
-    def __init__(self, label, callback, font=None, color=None, force_width=None, force_height=None):
-        WithText.__init__(self, label, callback, font, color, padding=4, force_width=force_width)
+    def __init__(self, label, callback, font=None, color=None, force_width=None, force_height=None, image=None):
+        WithText.__init__(self, label, callback, font, color, padding=4, force_width=force_width, image=image)
         self.active = False
     
     def draw(self, surf, pos):
@@ -743,8 +758,8 @@ class EditField(Button):
             return ''
 
 class Label(WithText):
-    def __init__(self, label, callback=None, font=None, color=None):
-        WithText.__init__(self, label, callback, font, color)
+    def __init__(self, label, callback=None, font=None, color=None, image=None):
+        WithText.__init__(self, label, callback, font, color, image=image)
 
 class Image(object):
     def __init__(self, image, callback=None):

@@ -69,7 +69,10 @@ class ScreenClient(client.Client):
         for unit in units:
             name = unit.get_name()
             callback = functools.partial(focus, unit)
-            panel.add(ui.Button(name, callback))
+            p = ui.HorizontalLayoutWidget()
+            p.add(ui.Image(unit.get_image(), callback)) # Label(' ' * 10, callback, image=
+            p.add(ui.Button(name, callback))
+            panel.add(p)
         ui.set_dialog(panel, scroll=True)
     
     def quit(self):

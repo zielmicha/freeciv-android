@@ -688,7 +688,7 @@ int player_number(const struct player *pplayer)
 struct player *player_by_number(const int player_id)
 {
   struct player_slot *pslot = player_slot_by_number(player_id);
-
+  
   return (NULL != pslot ? player_slot_get_player(pslot) : NULL);
 }
 

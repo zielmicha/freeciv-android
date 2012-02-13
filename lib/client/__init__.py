@@ -64,7 +64,10 @@ def remove_net_input():
 
 @freeciv.register
 def real_output_window_append(text, tags, connid):
-    client.console_line(text)
+    if client:
+        client.console_line(text)
+    else:
+        print 'outwindow: %s\n' % text,
 
 @freeciv.register
 def real_meswin_dialog_update():
@@ -240,6 +243,9 @@ class Client(object):
     
     def get_player_with_id(self, id):
         return diplomacy.Player(freeciv.func.player_by_number(id))
+    
+    def get_playing(self):
+        return diplomacy.Player(freeciv.func.get_playing())
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

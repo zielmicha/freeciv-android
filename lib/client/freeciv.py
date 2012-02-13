@@ -67,8 +67,11 @@ def _callback(funname, *args):
             return ret
         else:
             print 'no function named %s %s' % (name, args)
-    except:
-        traceback.print_exc(limit=200)
+    except Exception as ex:
+        if not isinstance(ex, (KeyboardInterrupt, SystemExit)):
+            traceback.print_exc(limit=200)
+        else:
+            print type(ex).__name__
         print 'Abort.'
         _end_callbacks()
         if hard_exit:

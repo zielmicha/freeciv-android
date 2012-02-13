@@ -11,6 +11,10 @@
 # GNU General Public License for more details.
 
 import client.diplomacy
+from client.diplomacy import (CLAUSE_ADVANCE, CLAUSE_GOLD, CLAUSE_MAP,
+CLAUSE_SEAMAP, CLAUSE_CITY, 
+CLAUSE_CEASEFIRE, CLAUSE_PEACE, CLAUSE_ALLIANCE,
+CLAUSE_VISION, CLAUSE_EMBASSY)
 
 import ui
 
@@ -28,7 +32,7 @@ class Meeting(client.diplomacy.Meeting):
         print 'remove_clause', giver, type, value
     
     def accept_treaty(self, me, other):
-        print 'accept_tready', me, other
+        print 'accept_treaty', me, other
         self.open_dialog()
         self.dialog.set_accept_treaty(me, other)
     
@@ -42,11 +46,15 @@ class MeetingDialog(ui.LinearLayoutWidget):
         super(MeetingDialog, self).__init__()
         self.meeting = meeting
         
-        self.left = ConditionsWidget()
-        self.right = ConditionsWidget()
+        self.left = ConditionsWidget(meeting.client.get_playing())
+        self.right = ConditionsWidget(meeting.counterpart)
+        
+        c = meeting.counterpart
         
         self.top = ui.HorizontalLayoutWidget()
-        self.top.add(ui.Label('Meeting with %d' % meeting.counterpart))
+        self.top.add(ui.Label('Meeting with '))
+        self.top.add(ui.Label('     ', image=c.get_flag()))
+        self.top.add(ui.Label(' %s (%s)' % (c.get_nation_pl(), c.get_name())))
         self.add(self.top)
         
         self.middle = ui.HorizontalLayoutWidget(spacing=10)
@@ -64,12 +72,25 @@ class MeetingDialog(ui.LinearLayoutWidget):
     
     def cancel_treaty(self):
         self.meeting.cancel()
+        ui.back()
     
     def accept_treaty(self):
         self.meeting.accept()
 
     def add_condition(self):
-        ui.not_implemented()
+        def ph(type): # pact handler
+            def handler():
+                ui.back()
+                self.meeting.pact(type)
+            return handler
+        
+        panel = ui.LinearLayoutWidget()
+        panel.add(ui.Button('Ceasefire', ph(CLAUSE_CEASEFIRE)))
+        panel.add(ui.Button('Peace', ph(CLAUSE_PEACE)))
+        panel.add(ui.Button('Alliance', ph(CLAUSE_ALLIANCE)))
+        panel.add(ui.Button('Shared vision', ph(CLAUSE_VISION)))
+        #panel.add(ui.Button('Alliance', ph(CLAUSE_EMBASSY)))
+        ui.set_dialog(panel)
     
     def add_clause(self, giver, type, value):
         if giver == self.meeting.counterpart:
@@ -84,10 +105,15 @@ class MeetingDialog(ui.LinearLayoutWidget):
         self.right.set_accept(other)
 
 class ConditionsWidget(ui.LinearLayoutWidget):
-    def __init__(self):
+    def __init__(self, player):
         super(ConditionsWidget, self).__init__()
-        self.accepting = ui.Label('-')
-        self.add(self.accepting)
+        p = ui.HorizontalLayoutWidget()
+        p.add(ui.Spacing(10, 0))
+        p.add(ui.Label('   ', image=player.get_flag()))
+        p.add(ui.Spacing(10, 0))
+        self.accepting = ui.Label('?')
+        p.add(self.accepting)
+        self.add(p)
         self.panel = ui.LinearLayoutWidget()
         self.add(self.panel)
     
