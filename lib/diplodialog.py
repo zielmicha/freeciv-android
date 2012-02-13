@@ -17,6 +17,7 @@ import ui
 class Meeting(client.diplomacy.Meeting):
     def init(self):
         self.dialog = None
+        self.open_dialog()
     
     def create_clause(self, giver, type, value):
         self.open_dialog()

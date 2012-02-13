@@ -186,7 +186,7 @@ def get_save_username(path):
             return name[len('name='):].strip().strip('"')
     return 'player'
 
-def load_game(path):
+def load_game(path, user_callback=None):
     def out_callback(line):
         if 'Established control over the server. You have command access level' in line:
             ui.back(anim=False)
@@ -206,7 +206,11 @@ def load_game(path):
         ui.message('Failed to connect to game server, try again', type='error')
         return
     
-    callback = lambda: load_game_now(port, get_save_username(path))
+    def callback():
+        load_game_now(port, get_save_username(path))
+        
+        if user_callback:
+            user_callback()
     
     ui.replace(client.client.ui)
     ui.message('Loading...')
@@ -214,6 +218,7 @@ def load_game(path):
 def load_game_now(port, username):
     client.client.chat('/take "%s"' % username)
     client.client.chat('/start')
+    client.client.tick()
     ui.back(allow_override=False)
 
 def start_client():

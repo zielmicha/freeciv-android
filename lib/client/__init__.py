@@ -237,6 +237,9 @@ class Client(object):
     
     def get_players(self):
         return diplomacy.get_players()
+    
+    def get_player_with_id(self, id):
+        return diplomacy.Player(freeciv.func.player_by_number(id))
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

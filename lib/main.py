@@ -47,6 +47,7 @@ features.add_feature('app.resume', default=False, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
+features.add_feature('app.version')
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
@@ -85,8 +86,16 @@ def app_main():
         host, port, username = sys.argv[2:]
         save.connect(host, int(port), username)
     elif action == 'eval':
-        exec sys.argv[2]
+        exec sys.argv[2] in globals()
+    elif action == 'loadmeet':
+        savename = sys.argv[2]
+        ident = int(sys.argv[3])
+        def callback():
+            client.freeciv.func.py_init_meeting(ident)
+        save.load_game(savename, callback)
     else:
+        if action:    
+            print 'unknown action %r, see lib/main.py for actions' % action
         menus.main_menu()
 
 def profile_main():
@@ -206,7 +215,7 @@ def maybe_start_remote_debug():
         import remote_shell
         remote_shell.start()
         
-def setup_version():
+def setup_android_version():
     vernum = osutil.get_android_version()
     if vernum >= 14: # icecream sandwich causes bug
         features.add_feature("app.disable_android_pause", type=bool, default=True)
@@ -216,6 +225,13 @@ def setup_version():
     else:
         info_string = 'Android %s %s' % (name.capitalize(), version)
     print 'running', info_string, '(code=%s)' % vernum
+
+def setup_game_version():
+    code = features.get('civsync.ua').split('/')[1]
+    a, b, c, d = map(int, code)
+    version = '%d.%d.%d' % (a, b, c*10 + d)
+    print 'Freeciv for Android', version
+    features.set('app.version', version)
 
 def setup_errors():
     ui.except_callback = except_hook
@@ -233,7 +249,8 @@ def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     setup_freeciv_config()
-    setup_version()
+    setup_game_version()
+    setup_android_version()
     setup_errors()    
     size = size or check_force_size()
     

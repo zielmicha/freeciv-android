@@ -1157,6 +1157,56 @@ static PyObject* python_city_sell_improvement_type(PyObject* self, PyObject* arg
 	int retval = city_sell_improvement_type((struct city*)arg_pcity, (struct impr_type*)arg_pimprove);
 	return Py_BuildValue("i", retval);
 }
+// const char *nation_adjective_for_player(const struct player *pplayer)
+const char *nation_adjective_for_player(const struct player *pplayer);
+
+static PyObject* python_nation_adjective_for_player(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	const char* retval = nation_adjective_for_player((struct player*)arg_pplayer);
+	return Py_BuildValue("s", retval);
+}
+// bool can_meet_with_player(const struct player *pplayer)
+bool can_meet_with_player(const struct player *pplayer);
+
+static PyObject* python_can_meet_with_player(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	bool retval = can_meet_with_player((struct player*)arg_pplayer);
+	return Py_BuildValue("i", (int)retval);
+}
+// void py_init_meeting(int counterpart)
+void py_init_meeting(int counterpart);
+
+static PyObject* python_py_init_meeting(PyObject* self, PyObject* args) {
+	int arg_counterpart;
+	if(PyArg_ParseTuple(args, "i", &arg_counterpart) == 0) return NULL;
+
+	py_init_meeting(arg_counterpart);
+	return Py_BuildValue("i", 0);
+}
+// struct player *player_by_number(const int player_id)
+struct player *player_by_number(const int player_id);
+
+static PyObject* python_player_by_number(PyObject* self, PyObject* args) {
+	int arg_player_id;
+	if(PyArg_ParseTuple(args, "i", &arg_player_id) == 0) return NULL;
+
+	struct player* retval = player_by_number(arg_player_id);
+	return Py_BuildValue("O", py_mapper_player(retval));
+}
+// int player_number(const struct player *pplayer)
+int player_number(const struct player *pplayer);
+
+static PyObject* python_player_number(PyObject* self, PyObject* args) {
+	int arg_pplayer;
+	if(PyArg_ParseTuple(args, "i", &arg_pplayer) == 0) return NULL;
+
+	int retval = player_number((struct player*)arg_pplayer);
+	return Py_BuildValue("i", retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1391,4 +1441,14 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "can_city_sell_building", (int)ptr);
 	ptr = python_city_sell_improvement_type;
 	PY_CALL("ssi", "add_function", "city_sell_improvement_type", (int)ptr);
+	ptr = python_nation_adjective_for_player;
+	PY_CALL("ssi", "add_function", "nation_adjective_for_player", (int)ptr);
+	ptr = python_can_meet_with_player;
+	PY_CALL("ssi", "add_function", "can_meet_with_player", (int)ptr);
+	ptr = python_py_init_meeting;
+	PY_CALL("ssi", "add_function", "py_init_meeting", (int)ptr);
+	ptr = python_player_by_number;
+	PY_CALL("ssi", "add_function", "player_by_number", (int)ptr);
+	ptr = python_player_number;
+	PY_CALL("ssi", "add_function", "player_number", (int)ptr);
 }

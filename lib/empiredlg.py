@@ -63,9 +63,19 @@ class EmpireDialog(ui.LinearLayoutWidget):
         ui.set_dialog(techs, scroll=True)
     
     def player_list(self):
+        def meet(player):
+            ui.back()
+            ui.back()
+            player.meet()
+        
         players = ui.LinearLayoutWidget()
         
         for player in self.client.get_players():
-            players.add(ui.Label(player.get_name()))
+            p = ui.HorizontalLayoutWidget()
+            if player.can_meet():
+                p.add(ui.Button('Meet', functools.partial(meet, player)))
+            p.add(ui.Label('%s (%s)' % (player.get_name(), player.get_nation_adj())))
+            players.add(p)
         
         ui.set_dialog(players, scroll=True)
+

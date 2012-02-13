@@ -581,6 +581,14 @@ void py_cancel_treaty(int counterpart) {
     dsend_packet_diplomacy_cancel_meeting_req(&client.conn, counterpart);
 }
 
+void py_init_meeting(int counterpart) {
+    dsend_packet_diplomacy_init_meeting_req(&client.conn, counterpart);
+}
+
+int py_get_player_number(struct player* p) {
+    return player_slot_index(p->slot);
+}
+
 void change_government(int gov) {
     set_government_choice((struct government *)gov);
 }
