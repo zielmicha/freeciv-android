@@ -36,6 +36,10 @@ def real_city_dialog_refresh(city):
     return client.client.refresh_city_dialog(City(city))
 
 @freeciv.register
+def real_city_report_update_city(city):
+    return client.client.refresh_city_dialog(City(city))
+
+@freeciv.register
 def city_report_dialog_update_city(city):
     return client.client.refresh_city_dialog(City(city))
 

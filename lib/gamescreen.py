@@ -96,17 +96,21 @@ class ScreenClient(client.Client):
         ui.set_dialog(menu, scroll=True)
     
     def city_dialog_is_open(self, city):
-        if not isinstance(ui.screen, ui.ScrollWrapper):
-            return False
-        item = ui.screen.item
-        if isinstance(item, citydlg.Dialog) and item.city == city:
-            return True
-        else:
-            return False
+        return bool(self.get_city_dialog(city))
     
     def refresh_city_dialog(self, city):
         if self.city_dialog_is_open(city):
-            ui.screen.item.refresh()
+            self.get_city_dialog(city).refresh()
+    
+    def get_city_dialog(self, city):
+        if isinstance(ui.screen, ui.ScrollWrapper):
+            item = ui.screen.item
+        else:
+            item = ui.screen
+        if isinstance(item, citydlg.Dialog) and item.city == city:
+            return item
+        else:
+            return None
     
     def update_taxes(self):
         return self.ui.taxes_panel.update()
