@@ -19,6 +19,9 @@ CLAUSE_SEAMAP, CLAUSE_CITY,
 CLAUSE_CEASEFIRE, CLAUSE_PEACE, CLAUSE_ALLIANCE,
 CLAUSE_VISION, CLAUSE_EMBASSY, CLAUSE_LAST) = range(11)
 
+for i in 'DS_WAR DS_ARMISTICE DS_CEASEFIRE DS_ALLIANCE DS_PEACE'.split():
+    globals()[i] = getattr(freeciv.const, i)
+    
 names = 'Advance', 'Gold', 'Map', 'Seamap', 'City', 'Ceasefire', 'Peace', 'Alliance', \
         'Shared vision', 'Embassy', '<nothing>'
 
@@ -106,6 +109,15 @@ class Player(object):
     
     def meet(self):
         freeciv.func.py_init_meeting(freeciv.func.player_number(self.handle))
+    
+    def get_state(self):
+        return freeciv.func.py_get_dipl_state(self.handle)
+    
+    def gives_shared_vision(self):
+        return freeciv.func.py_gives_shared_vision(self.handle)
+    
+    def cancel_pact(self, type):
+        return freeciv.func.py_cancel_pact(self.handle, type)
     
     def __repr__(self):
         return '<Player handle=%d name=%s>' % (self.handle, self.get_name())

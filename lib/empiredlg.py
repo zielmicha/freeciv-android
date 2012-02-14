@@ -12,6 +12,12 @@
 import ui
 import functools
 
+from client.diplomacy import (CLAUSE_ADVANCE, CLAUSE_GOLD, CLAUSE_MAP,
+    CLAUSE_SEAMAP, CLAUSE_CITY, 
+    CLAUSE_CEASEFIRE, CLAUSE_PEACE, CLAUSE_ALLIANCE,
+    CLAUSE_VISION, CLAUSE_EMBASSY,
+    DS_WAR, DS_ARMISTICE, DS_CEASEFIRE, DS_ALLIANCE, DS_PEACE)
+
 class EmpireDialog(ui.LinearLayoutWidget):
     def __init__(self, client):
         super(EmpireDialog, self).__init__()
@@ -68,14 +74,30 @@ class EmpireDialog(ui.LinearLayoutWidget):
             ui.back()
             player.meet()
         
+        def do_break_treaty(player, type):
+            player.cancel_pact(type)
+            ui.back()
+            ui.back()
+        
+        def break_treaty(player, type, ask):
+            ui.ask(ask % dict(name=player.get_name()), lambda: do_break_treaty(player, type))
+        
         players = ui.LinearLayoutWidget()
         
         for player in self.client.get_players():
             p = ui.HorizontalLayoutWidget()
+            
             if player.can_meet():
                 p.add(ui.Button('Meet', functools.partial(meet, player)))
             p.add(ui.Label('    ', image=player.get_flag()))
             p.add(ui.Label('%s (%s)' % (player.get_name(), player.get_nation_adj())))
+            
+            if player.gives_shared_vision():
+                p.add(ui.Button('Withdraw vision', functools.partial(break_treaty, player, CLAUSE_VISION, 'Withdraw vision?')))
+            
+            if player.get_state() in (DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE):
+                p.add(ui.Button('Break treaty', functools.partial(break_treaty, player, CLAUSE_CEASEFIRE, 'Break treaty with %(name)s?')))
+            
             players.add(p)
         
         ui.set_dialog(players, scroll=True)

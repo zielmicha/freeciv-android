@@ -1251,6 +1251,38 @@ static PyObject* python_py_add_clause(PyObject* self, PyObject* args) {
 	py_add_clause(arg_counterpart, arg_giver, arg_type, arg_value);
 	return Py_BuildValue("i", 0);
 }
+// void py_cancel_pact(struct player* p, int clause)
+void py_cancel_pact(struct player* p, int clause);
+
+static PyObject* python_py_cancel_pact(PyObject* self, PyObject* args) {
+	int arg_p;
+	int arg_clause;
+	if(PyArg_ParseTuple(args, "ii", &arg_p, &arg_clause) == 0) return NULL;
+
+
+	py_cancel_pact((struct player*)arg_p, arg_clause);
+	return Py_BuildValue("i", 0);
+}
+// int py_get_dipl_state(struct player* p)
+int py_get_dipl_state(struct player* p);
+
+static PyObject* python_py_get_dipl_state(PyObject* self, PyObject* args) {
+	int arg_p;
+	if(PyArg_ParseTuple(args, "i", &arg_p) == 0) return NULL;
+
+	int retval = py_get_dipl_state((struct player*)arg_p);
+	return Py_BuildValue("i", retval);
+}
+// bool py_gives_shared_vision(struct player* p)
+bool py_gives_shared_vision(struct player* p);
+
+static PyObject* python_py_gives_shared_vision(PyObject* self, PyObject* args) {
+	int arg_p;
+	if(PyArg_ParseTuple(args, "i", &arg_p) == 0) return NULL;
+
+	bool retval = py_gives_shared_vision((struct player*)arg_p);
+	return Py_BuildValue("i", (int)retval);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1503,4 +1535,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "get_playing", (int)ptr);
 	ptr = python_py_add_clause;
 	PY_CALL("ssi", "add_function", "py_add_clause", (int)ptr);
+	ptr = python_py_cancel_pact;
+	PY_CALL("ssi", "add_function", "py_cancel_pact", (int)ptr);
+	ptr = python_py_get_dipl_state;
+	PY_CALL("ssi", "add_function", "py_get_dipl_state", (int)ptr);
+	ptr = python_py_gives_shared_vision;
+	PY_CALL("ssi", "add_function", "py_gives_shared_vision", (int)ptr);
 }

@@ -28,5 +28,6 @@ rm bin/*.ap?
 cd ../..
 mv build/pygame/bin/${PKG_NAME_NOSPACE}Debug-0.9.0-debug.apk build/apk/
 if [ "$1" = "install" ]; then
+	adb uninstall $PKG_PACKAGE.debug
 	./adb.sh install -r build/apk/${PKG_NAME_NOSPACE}Debug-0.9.0-debug.apk
 fi

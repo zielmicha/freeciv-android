@@ -12,9 +12,10 @@
 
 import client.diplomacy
 from client.diplomacy import (CLAUSE_ADVANCE, CLAUSE_GOLD, CLAUSE_MAP,
-CLAUSE_SEAMAP, CLAUSE_CITY, 
-CLAUSE_CEASEFIRE, CLAUSE_PEACE, CLAUSE_ALLIANCE,
-CLAUSE_VISION, CLAUSE_EMBASSY)
+    CLAUSE_SEAMAP, CLAUSE_CITY, 
+    CLAUSE_CEASEFIRE, CLAUSE_PEACE, CLAUSE_ALLIANCE,
+    CLAUSE_VISION, CLAUSE_EMBASSY,
+    DS_WAR, DS_ARMISTICE, DS_CEASEFIRE, DS_ALLIANCE, DS_PEACE)
 
 import ui
 
@@ -52,6 +53,7 @@ class MeetingDialog(ui.LinearLayoutWidget):
         c = meeting.counterpart
         
         self.top = ui.HorizontalLayoutWidget()
+        # Sir!, the %s ambassador has arrived \nWhat are your wishes?
         self.top.add(ui.Label('Meeting with '))
         self.top.add(ui.Label('     ', image=c.get_flag()))
         self.top.add(ui.Label(' %s (%s)' % (c.get_nation_pl(), c.get_name())))
@@ -85,11 +87,21 @@ class MeetingDialog(ui.LinearLayoutWidget):
             return handler
         
         panel = ui.LinearLayoutWidget()
-        panel.add(ui.Button('Ceasefire', ph(CLAUSE_CEASEFIRE)))
-        panel.add(ui.Button('Peace', ph(CLAUSE_PEACE)))
-        panel.add(ui.Button('Alliance', ph(CLAUSE_ALLIANCE)))
-        panel.add(ui.Button('Shared vision', ph(CLAUSE_VISION)))
-        #panel.add(ui.Button('Alliance', ph(CLAUSE_EMBASSY)))
+        c = self.meeting.counterpart
+        state = c.get_state()
+        
+        if state not in (DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE):
+            panel.add(ui.Button('Ceasefire', ph(CLAUSE_CEASEFIRE)))
+        
+        if state not in (DS_CEASEFIRE, DS_PEACE):
+            panel.add(ui.Button('Peace', ph(CLAUSE_PEACE)))
+        
+        if state not in (DS_ALLIANCE, ):
+            panel.add(ui.Button('Alliance', ph(CLAUSE_ALLIANCE)))
+        
+        if not c.gives_shared_vision():
+            panel.add(ui.Button('Shared vision', ph(CLAUSE_VISION)))
+        
         ui.set_dialog(panel)
     
     def add_clause(self, giver, type, value):

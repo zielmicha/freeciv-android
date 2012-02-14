@@ -594,6 +594,18 @@ int py_get_player_number(struct player* p) {
     return player_slot_index(p->slot);
 }
 
+void py_cancel_pact(struct player* p, int clause) {
+    dsend_packet_diplomacy_cancel_pact(&client.conn, player_number(p), clause);
+}
+
+int py_get_dipl_state(struct player* p) {
+    return player_diplstate_get(client.conn.playing, p)->type;
+}
+
+bool py_gives_shared_vision(struct player* p) {
+    return gives_shared_vision(client.conn.playing, p);
+}
+
 struct player* get_playing() {
     return client.conn.playing;
 }
@@ -666,6 +678,12 @@ static void py_setup_const() {
     PY_SETUP_CONST(CITIZEN_CONTENT);
     PY_SETUP_CONST(CITIZEN_UNHAPPY);
     PY_SETUP_CONST(CITIZEN_ANGRY);
+    
+    PY_SETUP_CONST(DS_WAR);
+    PY_SETUP_CONST(DS_ARMISTICE);
+    PY_SETUP_CONST(DS_CEASEFIRE);
+    PY_SETUP_CONST(DS_PEACE);
+    PY_SETUP_CONST(DS_ALLIANCE);
 }
 
 static PyObject* set_callback(PyObject* self, PyObject* args) {

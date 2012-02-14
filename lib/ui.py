@@ -922,8 +922,8 @@ class ScrollWrapper(object):
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.was_dragged:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
-                self.vx += _scroll_speed_func(dx)
-                self.vy += _scroll_speed_func(dy)
+                self.vx = _scroll_speed_func(self.vx, dx)
+                self.vy = _scroll_speed_func(self.vy, dy)
                 self.y += dy
                 self.x += dx
             else:
@@ -941,12 +941,17 @@ class ScrollWrapper(object):
     
     def post_mouse_event(self, ev):
         pos = ev.pos
-        ev.pos = (pos[0], pos[1] + self.y)
+        ev.pos = (pos[0] + self.x, pos[1] + self.y)
         self.item.event(ev)
         ev.pos = pos
 
-def _scroll_speed_func(k):
-    return min(k * 10, 30)
+def _scroll_speed_func(v, k):
+    if abs(k) < 3:
+        return v / 3
+    else:
+        if abs(k) > 5:
+            k = 5 if k > 0 else -5
+        return v + (k * 5)
 
 def _sgn(f):
     return 1 if f>0 else (0 if f==0 else -1)
