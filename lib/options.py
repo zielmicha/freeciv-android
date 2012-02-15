@@ -71,7 +71,8 @@ def show_options():
     options = OptionsPanel()
     options.add(ui.Label('Touch an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
-    options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
+    #options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
+    options.add(ui.Button('Change joystick', change_joystick))
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
@@ -134,3 +135,15 @@ def change_ruleset():
     
     ui.set_dialog(panel)
 
+def change_joystick():
+    def set_type(name):
+        features.set_perm('app.joystick', name)
+        ui.back()
+    
+    types = ['new', 'tile', 'old']
+    panel = ui.LinearLayoutWidget()
+    
+    for type in types:
+        panel.add(ui.Button(type.capitalize(), functools.partial(set_type, type)))
+    
+    ui.set_dialog(panel)

@@ -16,10 +16,25 @@ import client
 import math
 import time
 import features
+import functools
 
 from client import freeciv
 
-features.add_feature('app.new_joystick', default=True, type=bool)
+features.add_feature('app.new_joystick', default=None, type=bool)
+features.add_feature('app.joystick', default=None)
+
+def get_joystick_type():
+    sel = features.get('app.joystick')
+    if sel:
+        return sel
+    else:
+        new = features.get('app.new_joystick')
+        if new == None:
+            return 'tile'
+        elif new:
+            return 'new'
+        else:
+            return 'old'
 
 order_sprites_names = ('auto attack,auto connect,auto explore,'
     'auto settlers,build city,cutdown forest,plant forest,'
@@ -47,9 +62,13 @@ class Menu(ui.LinearLayoutWidget):
         self.items = [self.panel]
         if actions:
             joystick_layout = ui.LinearLayoutWidget()
-            if features.get('app.new_joystick'):
+            j_type = get_joystick_type()
+            if j_type == 'new':
                 joystick = NewJoystick(client)
                 joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
+            elif j_type == 'tile':
+                joystick = TileJoystick(client)
+                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 20
             else:
                 joystick = Joystick(client)
                 joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
@@ -247,9 +266,86 @@ class Joystick(object):
     def tick(self):
         pass
 
+
+class TileJoystick(ui.LinearLayoutWidget):
+    @staticmethod
+    def init():
+        pass
+    
+    def __init__(self, client):
+        self.hidden = False
+        spacing = 10
+        
+        super(TileJoystick, self).__init__(spacing=spacing)
+        self.client = client
+        
+        b = functools.partial(TileButton, self)
+        
+        top = ui.HorizontalLayoutWidget(spacing=spacing)
+        top.add(b(freeciv.const.DIR8_NORTHWEST))
+        top.add(b(freeciv.const.DIR8_NORTH))
+        top.add(b(freeciv.const.DIR8_NORTHEAST))
+        self.add(top)
+        
+        center = ui.HorizontalLayoutWidget(spacing=spacing)
+        center.add(b(freeciv.const.DIR8_WEST))
+        center.add(b(None))
+        center.add(b(freeciv.const.DIR8_EAST))
+        self.add(center)
+        
+        bottom = ui.HorizontalLayoutWidget(spacing=spacing)
+        bottom.add(b(freeciv.const.DIR8_SOUTHWEST))
+        bottom.add(b(freeciv.const.DIR8_SOUTH))
+        bottom.add(b(freeciv.const.DIR8_SOUTHEAST))
+        self.add(bottom)
+        
+        self.update_layout()
+
+class TileButton(object):
+    active_bg = (255, 255, 200, 150)
+    bg = (130, 100, 0, 90)
+    fg = (150, 150, 50)
+    
+    def __init__(self, joystick, dir):
+        self.size = (60, 60)
+        self.dir = dir
+        self.active = False
+        self.joystick = joystick
+    
+    def draw(self, surf, pos):
+        if self.dir != None and self.joystick.hidden:
+            return 
+        if self.active:
+            color = self.active_bg
+        else:
+            color = self.bg
+        ui.round_rect(surf, color, self.fg, pos + self.size)
+    
+    def tick(self):
+        pass
+    
+    def unhover(self):
+        self.active = False
+    
+    def event(self, event):
+        if self.dir != None and self.joystick.hidden:
+            return False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.active = False
+            self.click()
+    
+    def click(self):
+        if self.dir == None:
+            self.joystick.hidden = not self.joystick.hidden
+        else:    
+            freeciv.func.key_unit_move_direction(self.dir)
+
 def init():
     NewJoystick.init()
     Joystick.init()
+    TileJoystick.init()
     init_orders()
 
 def init_orders():

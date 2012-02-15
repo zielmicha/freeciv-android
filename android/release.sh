@@ -28,5 +28,6 @@ rm bin/*.ap?
 cd ../..
 mv build/pygame/bin/${PKG_NAME_NOSPACE}-$RELEASE_VERSION-release.apk build/apk/
 if [ "$1" = "install" ]; then
+	./adb.sh uninstall ${PKG_PACKAGE}
 	./adb.sh install -r build/apk/${PKG_NAME_NOSPACE}-$RELEASE_VERSION-release.apk
 fi
