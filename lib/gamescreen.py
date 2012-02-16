@@ -393,7 +393,7 @@ class MapWidget(object):
             #if self.last_frame_updated == 3:
             #    self.last_frame_updated = 0
             
-            self.client.update_map_canvas_visible()
+            #self.client.update_map_canvas_visible()
         
         self.client.draw_map(surf, pos)
     
