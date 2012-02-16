@@ -508,10 +508,10 @@ execute_later_lock = threading.Lock()
 def main():
     
     def main_tick():
-        events = pygame.event.get()
+        events = merge_mouse_events(pygame.event.get())
         if not screen:
             return
-        was_motion = False
+        
         for event in events:
             ev_dict = event.dict
             if 'pos' in ev_dict:
@@ -524,9 +524,7 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 back()
             elif event.type == pygame.MOUSEMOTION:
-                if not was_motion:
-                    was_motion = True
-                    screen.event(Event(event.type, ev_dict))
+                screen.event(Event(event.type, ev_dict))
             else:
                 screen.event(Event(event.type, ev_dict))
         screen.tick()
@@ -564,17 +562,17 @@ def main():
     surf = maybe_set_autoscale(surf)
     screen_width, screen_height = screen_size = surf.get_size()
     while True:
-        frame_start = time.time()
-        
-        frame_last = time.time() - frame_start
-        sleep = per_frame - frame_last
         try:
+            frame_start = time.time()
+            
+            main_tick()
+            
+            frame_last = time.time() - frame_start
+            sleep = per_frame - frame_last
             if sleep > 0:
                 time.sleep(sleep)
             else:
                 lost_time += -sleep
-        
-            main_tick()
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
@@ -583,6 +581,7 @@ def main():
                 except_callback()
             time.sleep(0.5)
             continue
+        
         
         if show_fps:
             if fps_timeout == 0:
@@ -593,6 +592,18 @@ def main():
 
 except_callback = None
 pause_callback = None
+
+def merge_mouse_events(events):
+    mouse = None
+    res = []
+    for ev in events:
+        if ev.type == pygame.MOUSEMOTION:
+            mouse = ev
+        else:
+            res.append(ev)
+    if mouse:
+        res.append(mouse)
+    return res
 
 def check_pause():
     if osutil.is_paused():
