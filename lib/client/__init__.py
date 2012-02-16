@@ -135,6 +135,9 @@ class Client(object):
         surf.blit(dest_surf, pos)
         pygame.draw.rect(surf, (255, 255, 255), pos + scale, 1)
     
+    def overview_click(self, x, y):
+        freeciv.func.py_overview_click(x, y)
+    
     def set_map_size(self, size):
         freeciv.func.map_canvas_resized(*size)
     

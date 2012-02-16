@@ -634,6 +634,12 @@ struct sprite* py_get_nation_flag(const struct player* p) {
   return get_nation_flag_sprite(tileset, nation_of_player(p));
 }
 
+void py_overview_click(int x, int y) {
+    int map_x, map_y;
+    overview_to_map_pos(&map_x, &map_y, x, y);
+    center_tile_mapcanvas(map_pos_to_tile(map_x, map_y));
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);

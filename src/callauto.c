@@ -1283,6 +1283,18 @@ static PyObject* python_py_gives_shared_vision(PyObject* self, PyObject* args) {
 	bool retval = py_gives_shared_vision((struct player*)arg_p);
 	return Py_BuildValue("i", (int)retval);
 }
+// void py_overview_click(int x, int y)
+void py_overview_click(int x, int y);
+
+static PyObject* python_py_overview_click(PyObject* self, PyObject* args) {
+	int arg_x;
+	int arg_y;
+	if(PyArg_ParseTuple(args, "ii", &arg_x, &arg_y) == 0) return NULL;
+
+
+	py_overview_click(arg_x, arg_y);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1541,4 +1553,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_get_dipl_state", (int)ptr);
 	ptr = python_py_gives_shared_vision;
 	PY_CALL("ssi", "add_function", "py_gives_shared_vision", (int)ptr);
+	ptr = python_py_overview_click;
+	PY_CALL("ssi", "add_function", "py_overview_click", (int)ptr);
 }

@@ -158,3 +158,5 @@ void py_add_clause(int counterpart, int giver, int type, int value)
 void py_cancel_pact(struct player* p, int clause)
 int py_get_dipl_state(struct player* p)
 bool py_gives_shared_vision(struct player* p)
+
+void py_overview_click(int x, int y)

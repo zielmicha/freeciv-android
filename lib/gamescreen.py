@@ -314,7 +314,10 @@ class OverviewWidget(object):
         pass
     
     def event(self, ev):
-        pass
+        if ev.type == pygame.MOUSEBUTTONDOWN:
+            w, h = self.client.get_overview_size()
+            scale = float(w) / self.scale_width
+            self.client.overview_click(int(ev.pos[0] * scale), int(ev.pos[1] * scale))
     
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
@@ -422,6 +425,7 @@ class MapWidget(object):
             else:
                 #print 'start_drag'
                 self.start_drag = ev.pos
+            return ui.LOCK_MOUSE_EVENT
         elif ev.type == pygame.MOUSEBUTTONUP:
             if self.was_dragged:
                 self.drag(ev.pos)
@@ -431,7 +435,6 @@ class MapWidget(object):
                 freeciv.func.action_button_pressed(x, y, SELECT_POPUP)
             self.start_drag = None
             self.last_drag_pos = None
-            return ui.LOCK_MOUSE_EVENT
         elif ev.type in (pygame.KEYDOWN, pygame.KEYUP):
             self.client.key_event(ev.type, ev.key)
     
