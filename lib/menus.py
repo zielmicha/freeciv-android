@@ -71,6 +71,12 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
         pos = self.get_position_of(over)
         self.add(baloon, (pos[0], pos[1] - baloon.size[1] - self.balloon_margin))
     
+    def toggle_balloon(self, over, baloon):
+        if baloon in self.items:
+            self.items.remove(baloon)
+        else:
+            self.show_balloon(over, baloon)
+    
     def load_background(self):
         img = ui.load_image('data/user/intro.jpg')
         img_size = img.get_size()
@@ -98,6 +104,12 @@ class MenuButton(ui.Button):
 
 class RedMenuButton(MenuButton):
     bg = (220, 150, 50, 110)
+
+class BalloonButton(ui.Button):
+    bg = (220, 150, 0, 110)
+    
+    def __init__(self, text, callback, **kwargs):
+        ui.Button.__init__(self, text, callback, force_width=100, **kwargs)
 
 class Balloon(ui.AbsoluteLayoutWidget):
     margin = 10
@@ -132,7 +144,8 @@ def main_menu():
     main_menu_item = menu = PrettyMenu()
     
     menu.add(ui.Label('version %s' % features.get('app.version'), color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
-    menu.left.add(MenuButton('New\ngame', save.new_game))
+    new_game_button = MenuButton('New\ngame', new_game_menu)
+    menu.left.add(new_game_button)
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
     menu.left.add(load_game_button)
     if features.get('app.multiplayer'):
@@ -143,11 +156,16 @@ def main_menu():
     menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))
     
-    #balloon = Balloon()
-    #balloon.content.add(ui.Label('hello'))
-    #menu.show_balloon(load_game_button, balloon)
-    
     ui.replace(menu)
+
+def new_game_menu():
+    menu = ui.Menu(center=0.7)
+    
+    menu.add('Tutorial', None)    
+    menu.add('Random', save.new_game)
+    menu.add('Scenario', save.load_scenario)
+    
+    ui.set_dialog(menu, scroll=True)
 
 def notify_update(url):
     if not main_menu_item:

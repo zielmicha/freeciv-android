@@ -49,7 +49,7 @@ def run():
                 log('log', 'monitor stopped because of pause')
                 osutil.wait_for_resume()
         
-        time.sleep(3)
+        time.sleep(6)
         log('mem_self', get_mem_usage('self'))
         try:
             servpid = get_server_pid()

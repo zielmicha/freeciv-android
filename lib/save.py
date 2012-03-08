@@ -150,6 +150,22 @@ def server_command_dialog():
         print cmd
         client.client.chat(cmd)
 
+def load_scenario():
+    menu = ui.LinearLayoutWidget()
+    
+    for name, path in get_scenarios():
+        callback = functools.partial(load_game, path)
+        menu.add(ui.Button(name, callback))
+    
+    ui.set(ui.ScrollWrapper(menu))
+
+def get_scenarios():
+    #f = [ line.split(':') for line in open('data/scenario/list.txt').read().splitlines() ]
+    #return [ (name, 'scenarion/' + fn) for name, fn in f ]
+    return [ (name.split('.')[0], 'data/scenario/' + name)
+        for name in os.listdir('data/scenario')
+        if '.sav' in name ]
+
 def load_dialog():
     menu = ui.LinearLayoutWidget()
     was_any = False
