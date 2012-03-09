@@ -12,6 +12,7 @@
 
 import time
 import select
+import shutil
 import pygame
 import sys
 import osutil
@@ -208,7 +209,9 @@ def remove_pause_file():
         print 'Failed to remove pause file'
 
 def setup_freeciv_config():
-    os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3'
+    path = os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3-1'
+    if not os.path.exists(path):
+        shutil.copy('data/civrc-2.3-default', path)
 
 def maybe_start_remote_debug():
     if features.get('debug.remote'):

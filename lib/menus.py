@@ -18,6 +18,7 @@ import sync
 import save
 import features
 import options
+import tutorial
 
 class SpacingLayoutWidget(ui.LayoutWidget):
     def __init__(self, item1, item2, size):
@@ -161,7 +162,7 @@ def main_menu():
 def new_game_menu():
     menu = ui.Menu(center=0.7)
     
-    menu.add('Tutorial', None)    
+    menu.add('Tutorial', tutorial.start)    
     menu.add('Random', save.new_game)
     menu.add('Scenario', save.load_scenario)
     

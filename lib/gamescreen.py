@@ -129,6 +129,12 @@ class ScreenClient(client.Client):
         password = uidialog.inputbox(prompt)
         if password:
             self.authenticate(password)
+    
+    def popup_notify(self, text):
+        panel = ui.LinearLayoutWidget()
+        panel.add(ui.Label(text, font=ui.consolefont))
+        panel.add(ui.Button('Okay', ui.back))
+        ui.set_dialog(panel)
 
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):

@@ -31,6 +31,7 @@ def init():
     if android:
         android.init()
         android.map_key(android.KEYCODE_BACK, pygame.K_ESCAPE)
+        android.map_key(android.KEYCODE_MENU, pygame.K_F1)
 
 def get_android_data(append=''):
     chdir = os.getcwd()

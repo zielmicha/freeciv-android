@@ -86,6 +86,10 @@ def update_turn_done_button(restore):
 def handle_authentication_req(type, prompt):
     client.handle_authentication_req(prompt)
 
+@freeciv.register
+def popup_notify_goto_dialog(title, text, a, b):
+    client.popup_notify(text)
+
 class Client(object):
     def __init__(self, no_quit=False):
         global client
