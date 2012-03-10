@@ -118,8 +118,7 @@ greater defense strength, replace the obsolete units with new \
 ones to ensure your cities have maximum defense.  The units most \
 often used for defense are (in order of strength):  Warrior, \
 Phalanx, Pikemen, Musketeers, and Riflemen.\
-"), ; /* xgettext:no-c-format */
-_("\
+"), _("\
     Keep in mind that with some types of government, military units \
 inside or outside cities can reduce or create unhappiness. \
 Also remember that when a unit is inside a city, it gets a 50% \

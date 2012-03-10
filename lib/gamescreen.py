@@ -26,6 +26,7 @@ import sync
 import features
 import diplodialog
 import empiredlg
+import help
 
 SELECT_POPUP = 0
 
@@ -88,11 +89,15 @@ class ScreenClient(client.Client):
         def save_and_sync():
             sync.save_and_sync(self)
         
+        def show_help():
+            help.show()
+        
         menu = ui.Menu(center=0.7)
         menu.add('Quit', quit)
         menu.add('Save', save)
         if features.get('civsync.enable'):
             menu.add('Save & sync', save_and_sync)
+        menu.add('Help', show_help)
         ui.set_dialog(menu, scroll=True)
     
     def city_dialog_is_open(self, city):
@@ -181,6 +186,12 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.map.size = ui.screen_width - self.overview.size[0], ui.screen_height
         self.client.tick()
         super(ScreenWidget, self).tick()
+    
+    def event(self, ev):
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F1:
+            self.client.quit()
+        else:
+            return super(ScreenWidget, self).event(ev)
     
     def back(self):
         self.map.back()

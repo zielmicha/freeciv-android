@@ -94,6 +94,9 @@ def app_main():
         def callback():
             client.freeciv.func.py_init_meeting(ident)
         save.load_game(savename, callback)
+    elif action == 'help':
+        import help
+        help.show()
     else:
         if action:    
             print 'unknown action %r, see lib/main.py for actions' % action
