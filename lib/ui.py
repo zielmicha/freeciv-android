@@ -637,13 +637,16 @@ class WithText(object):
     def set_text(self, label):
         if label != self.label:
             self.label = label
-            self.label_image = render_text(self.font, label, self.color)
-            size = self.label_image.get_size()
-            if self.force_width:
-                size = self.force_width, size[1]
-            self.size = size[0] + self.padding*2, size[1] + self.padding*2
-            self.padding_left = (self.size[0] - self.label_image.get_size()[0])/2
-            self.padding_top = (self.size[1] - self.label_image.get_size()[1])/2
+            self.redraw()
+    
+    def redraw(self):
+        self.label_image = render_text(self.font, self.label, self.color)
+        size = self.label_image.get_size()
+        if self.force_width:
+            size = self.force_width, size[1]
+        self.size = size[0] + self.padding*2, size[1] + self.padding*2
+        self.padding_left = (self.size[0] - self.label_image.get_size()[0])/2
+        self.padding_top = (self.size[1] - self.label_image.get_size()[1])/2
     
     def tick(self):
         pass

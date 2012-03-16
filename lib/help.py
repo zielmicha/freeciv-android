@@ -17,14 +17,24 @@ class HelpPanel(ui.HorizontalLayoutWidget):
         super(HelpPanel, self).__init__()
         topics_width = 150
         list = ui.LinearLayoutWidget()
+        self.labels = {}
         for name in help_topics:
-            list.add(ui.Label(format_name(name), functools.partial(self.open_topic, name), font=ui.consolefont))
+            label = ui.Label(format_name(name), functools.partial(self.open_topic, name), font=ui.consolefont)
+            self.labels[name] = label
+            list.add(label)
         self.add(ui.ScrollWrapper(list, width=topics_width))
         self.text = LongTextWidget('', ui.screen_width - topics_width, ui.consolefont)
         self.text_scroll = ui.ScrollWrapper(self.text)
         self.add(self.text_scroll)
+        self.last_open = None
     
     def open_topic(self, name):
+        if self.last_open:
+            self.labels[self.last_open].color = (0, 0, 0)
+            self.labels[self.last_open].redraw()
+        self.last_open = name
+        self.labels[name].color = (255, 0, 0)
+        self.labels[name].redraw()
         self.text_scroll.y = 0
         self.text.set_text(help_data[name])
 
