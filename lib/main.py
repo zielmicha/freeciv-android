@@ -254,7 +254,6 @@ def except_hook():
 def main(size=None, init=True):
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
-    setup_freeciv_config()
     setup_game_version()
     setup_android_version()
     setup_errors()    
@@ -271,6 +270,8 @@ def main(size=None, init=True):
     ui.set_fill_image(None)
     unpack_data()
     ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
+    
+    setup_freeciv_config()
     client.window.init()
     gamescreen.init()
     

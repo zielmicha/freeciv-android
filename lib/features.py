@@ -47,8 +47,11 @@ def add_feature(name, default=None, type=str):
 def load_config():
     try:
         for line in open(FEATURE_FILE_PATH):
-            k, v = _parse_arg(line.rstrip())
-            pernaments[k] = v
+            try:
+                k, v = _parse_arg(line.rstrip())
+                pernaments[k] = v
+            except Exception as err:
+                print 'failed to parse config line %r' % line
     except IOError:
         print 'feature config not read'
 
