@@ -18,6 +18,7 @@ import traceback
 import uidialog
 import features
 import osutil
+import os
 
 history = []
 screen = None
@@ -449,7 +450,7 @@ def back(allow_override=True, anim=True):
     if allow_override and hasattr(screen, 'back'):
         screen.back()
     elif not history:
-        raise SystemExit
+        os._exit(0)
     else:
         new_screen = history.pop()
         if anim:
