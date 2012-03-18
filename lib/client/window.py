@@ -102,7 +102,9 @@ cursor_mapping = {}
 
 def init_screen(size=None):
     global screen, surface, overview_surface, cursors, cursor_names
-    ask_for_size = size or ((0, 0) if osutil.is_android else (800, 480))
+    pygame.display.init()
+    max_size = pygame.display.Info().current_w, pygame.display.Info().current_h
+    ask_for_size = size or (max_size if osutil.is_android else (800, 480))
     screen = pygame.display.set_mode(ask_for_size, 0, 32) #((800, 480), 0, 32)
     pygame.display.set_caption("touchciv")
     surface = screen
