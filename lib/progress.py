@@ -12,8 +12,16 @@
 
 import pygame
 import ui
+import time
+
+last_draw = 0
+timeout = 0.3
 
 def draw_frame(title, name, perc):
+    global last_draw
+    if time.time() < last_draw + timeout:
+        return
+    
     frame = pygame.display.get_surface()
     w, h = frame.get_size()
     ui.fill(frame, (0, 0))
@@ -33,5 +41,5 @@ def draw_frame(title, name, perc):
     #pygame.draw.rect(frame, (0, 255, 0), barpos + (int(barwidth * perc), barheight))
     
     pygame.display.flip()
-
     
+    last_draw = time.time()

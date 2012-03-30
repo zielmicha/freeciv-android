@@ -754,23 +754,25 @@ class Button(WithText):
                 self.callback()
 
 class EditField(Button):
-    def __init__(self, label='', font=None, color=None):
+    def __init__(self, label='', font=None, color=None, placeholder=None):
         Button.__init__(self, label, self.callback, font, color)
-        self.was_changed = False
-        if not label:
-            self.set_text('<touch to change>')
+        self.placeholder = placeholder
+        self.set_value(label)
     
     def callback(self):
         data = uidialog.inputbox('')
         if data != None:
-            self.set_text(data)
-            self.was_changed = True
+            self.set_value(data)
+    
+    def set_value(self, data):
+        self.value = data
+        self.set_text(self.placeholder*len(data) if self.placeholder else data)
+        
+        if not self.value:    
+            self.set_text('<touch to change>')
     
     def get_value(self):
-        if self.was_changed:
-            return self.label
-        else:
-            return ''
+        return self.value
 
 class Label(WithText):
     def __init__(self, label, callback=None, font=None, color=None, image=None):

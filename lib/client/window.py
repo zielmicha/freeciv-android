@@ -12,6 +12,9 @@
 
 import pygame
 import freeciv
+import features
+
+features.add_feature('ui.fake_max_size')
 
 import osutil
 import common
@@ -101,10 +104,31 @@ current_cursor = None
 cursor_mapping = {}
 
 def init_screen(size=None):
+    def _get_max_size():
+        fake = features.get('ui.fake_max_size')
+        if fake:
+            return map(int, fake.split(','))
+        else:
+            return pygame.display.Info().current_w, pygame.display.Info().current_h
+    
+    def _get_request_size(max_size):
+        if osutil.is_desktop and not features.get('ui.fake_max_size'):
+            return (800, 480)
+        else:
+            w, h = max_size
+            MAX_W = 800
+            if w > MAX_W:
+                scale = h / float(w)
+                size = (MAX_W, int(MAX_W * scale))
+            else:
+                size = (w, h)
+            return size
+    
     global screen, surface, overview_surface, cursors, cursor_names
     pygame.display.init()
-    max_size = pygame.display.Info().current_w, pygame.display.Info().current_h
-    ask_for_size = size or (max_size if osutil.is_android else (800, 480))
+    max_size = _get_max_size()
+    ask_for_size = _get_request_size(max_size)
+    print 'screen size: max =', max_size, 'ask =', ask_for_size
     screen = pygame.display.set_mode(ask_for_size, 0, 32) #((800, 480), 0, 32)
     pygame.display.set_caption("touchciv")
     surface = screen

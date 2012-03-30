@@ -13,6 +13,7 @@
 import httplib
 import urllib
 import os
+import re
 import collections
 
 ListEntry = collections.namedtuple('ListEntry', 'sha1 source date size name')
@@ -37,6 +38,8 @@ class UpdateRequiredError(RequestError):
 class Session(object):
     def __init__(self, sessid=None):
         self._sessid = sessid
+        self._proxy_re = None
+        self._proxy_host = None
     
     @property
     def sessid(self):
@@ -62,7 +65,7 @@ class Session(object):
     
     def upload(self, source, name, content):
         url = '/sync/upload?source=%s&name=%s' % (source, name)
-        upload =  _Upload(url, content, 'fcsession=%s' % self.sessid)
+        upload =  _Upload(url, content, 'fcsession=%s' % self.sessid, host=self.get_host(url))
         upload.header()
         return upload
     
@@ -92,7 +95,7 @@ class Session(object):
         return request('/sync/updates?install_time=%d' % install_time, strict_update=True)
     
     def _login_or_register(self, url, payload):
-        set_cookie = request(url, payload, return_cookie=True)
+        set_cookie = request(url, payload, return_cookie=True, host=self.get_host(url))
         if not set_cookie.startswith('fcsession='):
             raise ValueError('Invalid set-cookie (%r).' % set_cookie)
         set_cookie = set_cookie[len('fcsession='):]
@@ -102,7 +105,18 @@ class Session(object):
         self._sessid = set_cookie
     
     def _request(self, url, payload=None):
-        return request(url, payload, self.sessid)
+        return request(url, payload, self.sessid, host=self.get_host(url))
+    
+    def get_host(self, url):
+        if url.startswith('/sync/updates'):
+            return HOST
+        if not self._proxy_re:
+            proxy_re, self._proxy_host = request('/sync/get_proxy', None, None, host=HOST).read().splitlines()
+            self._proxy_re = re.compile(proxy_re)
+        if self._proxy_re.match(url):
+            host = self._proxy_host
+        else:
+            host = HOST
 
 def check_response(response, headers, strict_update=False):
     if 'x-login-error' in headers:
@@ -126,8 +140,8 @@ def check_response(response, headers, strict_update=False):
         print '============================='
         raise RequestError('Invalid HTTP status code %d.' % response.status)
 
-def request(url, payload=None, sessid=None, return_cookie=False, strict_update=False):
-    conn = httplib.HTTPConnection(HOST)
+def request(url, payload=None, sessid=None, return_cookie=False, strict_update=False, host=None):
+    conn = httplib.HTTPConnection(host or HOST)
     headers = {}
     headers['x-user-agent'] = USER_AGENT
     headers['x-api-version'] = API_VERSION
@@ -161,14 +175,15 @@ def encode_multipart_formdata(value):
     return content_type, body
 
 class _Upload(object):
-    def __init__(self, url, data, cookie):
+    def __init__(self, url, data, cookie, host):
         self.url = url
         self.content_type, self.data = encode_multipart_formdata(data)
         self.cookie = cookie
+        self.host = host
         self.i = 0
     
     def header(self):
-        self.h = httplib.HTTPConnection(HOST)
+        self.h = httplib.HTTPConnection(self.host)
         self.h.putrequest('POST', self.url)
         self.h.putheader('content-type', self.content_type)
         self.h.putheader('content-length', str(len(self.data)))

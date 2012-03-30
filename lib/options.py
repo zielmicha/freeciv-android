@@ -85,7 +85,7 @@ def debug_menu():
     
     def fake_screen_size_menu():
         menu = ui.Menu(center=False)
-        for size in [(320, 240), (480, 320), (640, 480)]:
+        for size in [(320, 240), (480, 320), (640, 480), (1024, 800)]:
             menu.add(str(size), functools.partial(fake_screen_size, size))
         ui.set_dialog(menu, scroll=True)
     
@@ -118,6 +118,7 @@ def debug_menu():
     menu.add('Pernament feature', pernament_feature)
     menu.add('Show features', show_features)
     menu.add('Cause exception', lambda: 1/0)
+    menu.add('Test Market URL', lambda: uidialog.open_url('market://details?id=pl.org.zielinscy.freeciv'))
     
     ui.set(ui.ScrollWrapper(menu))
 

@@ -60,8 +60,8 @@ def show_list(entries):
         panel.add(ui.Button('%s - %dkB' % (entry.name, entry.size/1024), functools.partial(download_sync, entry.sha1)))
     if not entries:
         panel.add(ui.Label('You have not synced any saves...'))
-        panel.add(ui.Label('Install Freeciv Sync for Desktop'))
-        panel.add(ui.Label('from %s' % civsync.HOST))
+        panel.add(ui.Label('Install Freeciv Sync for Desktop from %s' % civsync.HOST))
+        panel.add(ui.Label('or save game with \'Save & Sync\''))
     panel.add(ui.Button('Logout', logout))
     ui.set(ui.ScrollWrapper(panel))
 
@@ -130,19 +130,62 @@ def downloaded(data):
     ui.back(anim=False)
     save.load_game(dl_path)
 
-def show_login_form(callback):
+def show_login_form(callback, msg=None):
     def logged(result):
         print 'Login successful'
         with open(save.get_save_dir() + '/civsync.sessid.txt', 'w') as f:
             f.write(session.sessid)
-        ui.back(anim=False)
         callback()
     
     def do_login():
+        ui.back(anim=False)
         request(logged, 'login', login_field.get_value(), passwd_field.get_value())
     
     def no_account():
-        ui.message('Download Freeciv Sync for Desktop\nfrom freeciv.zielinscy.org.pl')
+        def do_register():
+            login = login_field.get_value()
+            passwd = passwd_field.get_value()
+            mail = mail_field.get_value()
+            if not login or not passwd or not mail:
+                ui.message('Fill all fields.')
+            elif passwd != passwd_repeat_field.get_value():
+                ui.message('Passwords don\'t match.')
+            else:
+                request(logged, 'register', login, passwd, mail)        
+        
+        panel = ui.LinearLayoutWidget()
+        
+        login = ui.HorizontalLayoutWidget()
+        login.add(ui.Label('Login:'))
+        login_field = ui.EditField()
+        login.add(login_field)
+        panel.add(login)
+        
+        passwd = ui.HorizontalLayoutWidget()
+        passwd.add(ui.Label('Password:'))
+        passwd_field = ui.EditField(placeholder='*')
+        passwd.add(passwd_field)
+        panel.add(passwd)
+        
+        passwd_repeat = ui.HorizontalLayoutWidget()
+        passwd_repeat.add(ui.Label('Repeat password:'))
+        passwd_repeat_field = ui.EditField(placeholder='*')
+        passwd_repeat.add(passwd_repeat_field)
+        panel.add(passwd_repeat)
+        
+        mail = ui.HorizontalLayoutWidget()
+        mail.add(ui.Label('Mail:'))
+        mail_field = ui.EditField()
+        mail.add(mail_field)
+        panel.add(mail)
+        
+        butts = ui.HorizontalLayoutWidget(spacing=10)
+        butts.add(ui.Button('Register', do_register))
+        butts.add(ui.Button('Cancel', ui.back))
+        panel.add(butts)
+        
+        ui.set(panel)
+
     
     panel = ui.LinearLayoutWidget()
     
@@ -154,7 +197,7 @@ def show_login_form(callback):
     
     passwd = ui.HorizontalLayoutWidget()
     passwd.add(ui.Label('Password:'))
-    passwd_field = ui.EditField()
+    passwd_field = ui.EditField(placeholder='*')
     passwd.add(passwd_field)
     panel.add(passwd)
     
@@ -164,7 +207,10 @@ def show_login_form(callback):
     butts.add(ui.Button('Cancel', ui.back))
     panel.add(butts)
     
-    ui.set(panel)
+    ui.set(panel, anim=False)
+    
+    if msg and msg != 'Not logged':
+        ui.message(msg)
 
 def comment_upload(install_time):
     with ui.execute_later_lock:
@@ -220,7 +266,7 @@ def sync_request(callback, name, args, kwargs):
             print 'Login failed:', err
             ui.back(anim=False)
             self = lambda: request(callback, name, *args, **kwargs)
-            ui.execute_later.append(lambda: show_login_form(self))
+            ui.execute_later.append(lambda: show_login_form(self, str(err)))
             return
     except Exception as err:
         traceback.print_exc()
