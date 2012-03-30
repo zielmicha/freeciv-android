@@ -357,6 +357,14 @@ static PyObject* python_key_unit_disband(PyObject* self, PyObject* args) {
 	key_unit_disband();
 	return Py_BuildValue("i", 0);
 }
+// void key_unit_auto_explore()
+void key_unit_auto_explore();
+
+static PyObject* python_key_unit_auto_explore(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	key_unit_auto_explore();
+	return Py_BuildValue("i", 0);
+}
 // void action_button_pressed(int canvas_x, int canvas_y, int qtype)
 void action_button_pressed(int canvas_x, int canvas_y, int qtype);
 
@@ -1383,6 +1391,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "key_unit_done", (int)ptr);
 	ptr = python_key_unit_disband;
 	PY_CALL("ssi", "add_function", "key_unit_disband", (int)ptr);
+	ptr = python_key_unit_auto_explore;
+	PY_CALL("ssi", "add_function", "key_unit_auto_explore", (int)ptr);
 	ptr = python_action_button_pressed;
 	PY_CALL("ssi", "add_function", "action_button_pressed", (int)ptr);
 	ptr = python_free_ref;

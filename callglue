@@ -38,6 +38,7 @@ void key_unit_unload_all()
 void key_unit_wait()
 void key_unit_done()
 void key_unit_disband()
+void key_unit_auto_explore()
 
 void action_button_pressed(int canvas_x, int canvas_y, int qtype)
 void free_ref(struct sprite* ref)

@@ -226,6 +226,8 @@ class Unit(object):
             freeciv.func.key_unit_fortress()
         elif ident == ACTIVITY_AIRBASE:
             freeciv.func.key_unit_airbase()
+        elif ident == ACTIVITY_EXPLORE:
+            freeciv.func.key_unit_auto_explore()
         else:
             print 'Unsupported action ', ident
 
