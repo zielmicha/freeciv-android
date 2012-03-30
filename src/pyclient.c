@@ -147,8 +147,10 @@ bool city_dialog_is_open(struct city *pcity) {
 }
 void get_text_size(int *width, int *height, enum client_font font, const char *text) {
     PyObject* ret = PY_CALL("sis", "get_text_size", font, text);
-    if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");
-    //errlog("TODO: get_text_size\n");
+    int m_width, m_height;
+    if(PyArg_ParseTuple(ret, "ii", &m_width, &m_height) == 0) errlog("Type error\n");
+    if(width) *width = m_width;
+    if(height) *height = m_height;
 }
 void gui_set_rulesets(int num_rulesets, char **rulesets) {
     errlog("TODO: get_set_rulesets\n");

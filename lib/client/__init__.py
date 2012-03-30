@@ -253,6 +253,9 @@ class Client(object):
     
     def get_playing(self):
         return diplomacy.Player(freeciv.func.get_playing())
+    
+    def toggle_full_labels(self):
+        freeciv.func.request_toggle_city_full_bar()
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

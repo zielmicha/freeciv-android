@@ -160,3 +160,4 @@ int py_get_dipl_state(struct player* p)
 bool py_gives_shared_vision(struct player* p)
 
 void py_overview_click(int x, int y)
+void request_toggle_city_full_bar(void)

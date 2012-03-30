@@ -74,6 +74,8 @@ def show_options():
     #options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
     options.add(ui.Button('Change joystick', change_joystick))
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
+    st = 'Full city label toggle button:'
+    options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
     ui.set(options)
@@ -121,7 +123,6 @@ def debug_menu():
     menu.add('Test Market URL', lambda: uidialog.open_url('market://details?id=pl.org.zielinscy.freeciv'))
     
     ui.set(ui.ScrollWrapper(menu))
-
 
 def change_ruleset():
     def set_ruleset(name):

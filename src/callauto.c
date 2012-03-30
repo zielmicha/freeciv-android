@@ -1295,6 +1295,14 @@ static PyObject* python_py_overview_click(PyObject* self, PyObject* args) {
 	py_overview_click(arg_x, arg_y);
 	return Py_BuildValue("i", 0);
 }
+// void request_toggle_city_full_bar(void)
+void request_toggle_city_full_bar(void);
+
+static PyObject* python_request_toggle_city_full_bar(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	request_toggle_city_full_bar();
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1555,4 +1563,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_gives_shared_vision", (int)ptr);
 	ptr = python_py_overview_click;
 	PY_CALL("ssi", "add_function", "py_overview_click", (int)ptr);
+	ptr = python_request_toggle_city_full_bar;
+	PY_CALL("ssi", "add_function", "request_toggle_city_full_bar", (int)ptr);
 }
