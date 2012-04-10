@@ -57,8 +57,7 @@ class ScreenClient(client.Client):
         self.ui.resize_left_pane(self.ui.overview.size[0])
     
     def update_menus(self, unit):
-        actions = unit.get_actions()
-        self.ui.menu.update(actions)
+        self.ui.menu.update(unit)
     
     def disable_menus(self):
         self.ui.menu.update(None)

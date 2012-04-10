@@ -57,27 +57,52 @@ class Menu(ui.LinearLayoutWidget):
         self.add(self.panel)
         self.panel.add(ui.Label('loading...', color=(0, 255, 0)))
     
-    def update(self, actions):
+    def update(self, unit):
         self.panel.items = []
         self.items = [self.panel]
-        if actions:
-            joystick_layout = ui.LinearLayoutWidget()
-            j_type = get_joystick_type()
-            if j_type == 'new':
-                joystick = NewJoystick(client)
-                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
-            elif j_type == 'tile':
-                joystick = TileJoystick(client)
-                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 20
-            else:
-                joystick = Joystick(client)
-                joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
-            joystick_layout.add(joystick)
-            self.items.insert(0, joystick_layout)
-            for action_ident, action_name, action_length in actions:
-                self.panel.add(Button(self.client, action_ident, action_name))
-        
+        if unit:
+            self.update_joystick()
+            self.update_actions(unit)
+            
         self.update_layout()
+    
+    def update_joystick(self):
+        joystick_layout = ui.LinearLayoutWidget()
+        j_type = get_joystick_type()
+        if j_type == 'new':
+            joystick = NewJoystick(client)
+            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
+        elif j_type == 'tile':
+            joystick = TileJoystick(client)
+            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 20
+        else:
+            joystick = Joystick(client)
+            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
+        joystick_layout.add(joystick)
+        self.items.insert(0, joystick_layout)
+    
+    def update_actions(self, unit):
+        image = unit.get_image()
+        self.panel.add(ui.Button('', callback=lambda: self.show_action_list(unit),
+                                 image=image, force_width=image.get_width(), force_height=image.get_height()))
+        for action_ident, action_name, action_length in unit.get_actions():
+            self.panel.add(Button(self.client, action_ident, action_name))
+    
+    def show_action_list(self, unit):
+        def fcallback(action_ident):
+            self.client.get_unit_in_focus().perform_activity(action_ident)
+        
+        panel = ui.LinearLayoutWidget()
+        
+        for action_ident, action_name, action_length in unit.get_actions():
+            callback = functools.partial(fcallback, action_ident)
+            hor = ui.HorizontalLayoutWidget()
+            hor.add(ui.Image(get_order_sprite(action_name), callback))
+            hor.add(ui.Label('%s' % (action_name, ), callback))
+            panel.add(hor)
+        
+        ui.set_dialog(panel, scroll=True)
+        
 
 class Button(object):
     def __init__(self, client, action_ident, action_name):
