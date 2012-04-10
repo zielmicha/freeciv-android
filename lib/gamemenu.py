@@ -91,6 +91,7 @@ class Menu(ui.LinearLayoutWidget):
     def show_action_list(self, unit):
         def fcallback(action_ident):
             self.client.get_unit_in_focus().perform_activity(action_ident)
+            ui.back()
         
         panel = ui.LinearLayoutWidget()
         

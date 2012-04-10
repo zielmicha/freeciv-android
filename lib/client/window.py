@@ -126,9 +126,13 @@ def init_screen(size=None):
     
     global screen, surface, overview_surface, cursors, cursor_names
     pygame.display.init()
-    max_size = _get_max_size()
-    ask_for_size = _get_request_size(max_size)
-    print 'screen size: max =', max_size, 'ask =', ask_for_size
+    if not size:
+        max_size = _get_max_size()
+        ask_for_size = _get_request_size(max_size)
+        print 'screen size: max =', max_size, 'ask =', ask_for_size
+    else:
+        ask_for_size = size
+        print 'explicit size:', ask_for_size
     screen = pygame.display.set_mode(ask_for_size, 0, 32) #((800, 480), 0, 32)
     pygame.display.set_caption("touchciv")
     surface = screen

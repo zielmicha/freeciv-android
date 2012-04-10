@@ -76,9 +76,24 @@ def show_options():
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
+    options.add(ui.Button('Change zoom (experimental)', change_zoom))
+    
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
     ui.set(options)
+
+def change_zoom():
+    menu = ui.LinearLayoutWidget()
+    for size in [None, (320, 240), (480, 320), (640, 480), (1024, 800)]:
+        menu.add(ui.Button(str(size or 'Disabled'), functools.partial(change_screen_size, size)))
+    ui.set_dialog(menu, scroll=True)
+
+def change_screen_size(size):
+    features.set_perm('app.forcesize', ('%d,%d' % size) if size else '')
+    ui.history = []
+    ui.screen = None
+    import main
+    main.main(init=False)
 
 def debug_menu():
     def fake_screen_size(size):
