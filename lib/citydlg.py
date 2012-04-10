@@ -38,7 +38,10 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.citypanel.add(ui.Label(self.city.get_name()))
         self.citypanel.add(self.get_citizen_icons())
         self.citypanel.add(self.canvas)
-        self.citypanel.add(self.info_label)
+        self.citypanel.update_layout()
+        self.citypanel.add(ui.ScrollWrapper(self.info_label,
+                                            height=ui.screen_height - self.citypanel.size[1] - self.citypanel.spacing,
+                                            width=self.canvas.size[0]))
         
         self.ui = self # ui.ScrollWrapper(self)
         
@@ -66,6 +69,7 @@ class Dialog(ui.HorizontalLayoutWidget):
         #print self.city.get_buildable_improvements()
         #print self.city.get_buildable_units()
         
+        self.citypanel.update_layout()
         self.update_layout()
         #print self.city.get_production_cost()
     

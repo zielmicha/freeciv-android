@@ -429,6 +429,16 @@ static PyObject* python_finish_city_at_unit(PyObject* self, PyObject* args) {
 	finish_city_at_unit(arg_unit, arg_title);
 	return Py_BuildValue("i", 0);
 }
+// void cancel_city_at_unit(int unit)
+void cancel_city_at_unit(int unit);
+
+static PyObject* python_cancel_city_at_unit(PyObject* self, PyObject* args) {
+	int arg_unit;
+	if(PyArg_ParseTuple(args, "i", &arg_unit) == 0) return NULL;
+
+	cancel_city_at_unit(arg_unit);
+	return Py_BuildValue("i", 0);
+}
 // int canvas_pos_to_nearest_tile_id(int x, int y)
 int canvas_pos_to_nearest_tile_id(int x, int y);
 
@@ -1405,6 +1415,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "meswin_get_message", (int)ptr);
 	ptr = python_finish_city_at_unit;
 	PY_CALL("ssi", "add_function", "finish_city_at_unit", (int)ptr);
+	ptr = python_cancel_city_at_unit;
+	PY_CALL("ssi", "add_function", "cancel_city_at_unit", (int)ptr);
 	ptr = python_canvas_pos_to_nearest_tile_id;
 	PY_CALL("ssi", "add_function", "canvas_pos_to_nearest_tile_id", (int)ptr);
 	ptr = python_set_mapview_origin;

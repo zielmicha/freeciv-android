@@ -68,10 +68,12 @@ class ServerGUI(ui.LinearLayoutWidget):
         
         self.pick_nation_button = ui.Button('...', self.pick_nation)
         self.set_leader_name_button = ui.Button('...', self.set_leader_name)
+        self.difficulty_button = ui.Button('...', self.set_difficulty)
         
         self.add(ui.Button('Start game!', start_client))
         self.add(self.pick_nation_button)
         self.add(self.set_leader_name_button)
+        self.add(self.difficulty_button)
         self.add(ui.Button('Server command', server_command_dialog))
         
         self.aicount_button = ui.Button('...', self.set_aicount)
@@ -86,8 +88,10 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.leader_name = 'Player'
         self.city_style = 1
         self.leader_sex = 2
+        self.difficulty = 'easy'
         
         self.set_nation_settings()
+        self.set_difficulty_settings()
     
     def back(self):
         client.client.disconnect()
@@ -98,6 +102,17 @@ class ServerGUI(ui.LinearLayoutWidget):
         if name:
             self.leader_name = name
             self.set_nation_settings()
+    
+    def set_difficulty(self):
+        def set_do(name):
+            self.difficulty = name
+            self.set_difficulty_settings()
+        
+        ui.show_list_dialog(['novice', 'easy', 'normal', 'hard'], callback=set_do)
+    
+    def set_difficulty_settings(self):
+        client.client.chat('/%s' % self.difficulty)
+        self.difficulty_button.set_text('Difficulty: %s' % self.difficulty)
     
     def set_aicount(self, val=None):
         cmd = val or uidialog.inputbox('How many computer enemies will you fight?')

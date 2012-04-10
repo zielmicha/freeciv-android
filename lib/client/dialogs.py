@@ -63,6 +63,8 @@ def popup_newcity_dialog(unit, default_name):
             break
     if text:
         freeciv.func.finish_city_at_unit(unit, text)
+    else:
+        freeciv.func.cancel_city_at_unit(unit)
 
 @freeciv.register
 def popup_unit_select_dialog(tile):

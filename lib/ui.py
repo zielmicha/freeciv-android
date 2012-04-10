@@ -16,6 +16,7 @@ import time
 import traceback
 
 import uidialog
+import functools
 import features
 import osutil
 import os
@@ -84,6 +85,27 @@ def ask(msg, callback):
 
 def not_implemented():
     message('Sorry. This feature is not implemented.\nCheck civ.zielm.com for updates.')
+
+def show_list_dialog(items, callback=None, get_text_func=None):
+    def default_get_text_func(it):
+        if isinstance(it, tuple):
+            label, action = it
+            return label
+        else:
+            return it
+    
+    def default_callback(it):
+        return it[1]()
+    
+    def clicked(it):
+        back(anim=False)
+        (callback or default_callback)(it)
+    
+    ui = LinearLayoutWidget()
+    for item in items:
+        label = (get_text_func or default_get_text_func)(item)
+        ui.add(Button(label, functools.partial(clicked, item) ))
+    set_dialog(ui)
 
 class Dialog(object):
     def __init__(self, screen, item):

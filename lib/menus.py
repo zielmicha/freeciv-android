@@ -162,13 +162,13 @@ def main_menu():
     ui.replace(menu)
 
 def new_game_menu():
-    menu = ui.Menu(center=0.7)
+    menu = ui.Menu(force_full = False)
     
     menu.add('Tutorial', tutorial.start)    
     menu.add('Random', save.new_game)
     menu.add('Scenario', save.load_scenario)
     
-    ui.set_dialog(menu, scroll=True)
+    ui.set_dialog(menu)
 
 def notify_update(url):
     if not main_menu_item:

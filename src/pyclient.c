@@ -82,6 +82,11 @@ void finish_city_at_unit(int unit, char* title) {
     finish_city(u->tile, title);
 }
 
+void cancel_city_at_unit(int unit) {
+    struct unit* u = (struct unit*)unit;
+    cancel_city(u->tile);
+}
+
 void* py_alloc_struct(PyObject* stru) {
     /*PyObject* attr = PyObject_GetAttrString(stru, "_civstruct");
     if(!attr) errlog("No _civstruct member\n");
