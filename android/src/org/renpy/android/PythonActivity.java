@@ -175,7 +175,7 @@ public class PythonActivity extends Activity implements Runnable {
             target.mkdirs();
             
             if (!ae.extractTar(resource + ".mp3", target.getAbsolutePath())) {                                
-                toastError("Could not extract " + resource + " data.");
+                toastError("Failed to extract " + resource + ". Make sure that you have SD card inserted.");
             }
 
             try {

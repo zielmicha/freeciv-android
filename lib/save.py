@@ -217,7 +217,7 @@ def get_save_username(path):
             return name[len('name='):].strip().strip('"')
     return 'player'
 
-def load_game(path, user_callback=None):
+def load_game(path, user_callback=None, before_callback=None):
     def out_callback(line):
         if 'Established control over the server. You have command access level' in line:
             ui.back(anim=False)
@@ -238,7 +238,8 @@ def load_game(path, user_callback=None):
         return
     
     def callback():
-        load_game_now(port, get_save_username(path))
+        if before_callback() if before_callback else True:
+            load_game_now(port, get_save_username(path))
         
         if user_callback:
             user_callback()
