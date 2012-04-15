@@ -398,7 +398,8 @@ class MapWidget(object):
         self.client = client
         self.last_size = (0, 0)
         self.size = (0, 0)
-        
+        self.zoom = 1
+        self.dest_surf = pygame.Surface(self.get_real_size())
         self.last_recentered_at = None
         self.start_drag = None
         self.last_drag_pos = None
@@ -410,9 +411,11 @@ class MapWidget(object):
         pass
     
     def draw(self, surf, pos):
-        if self.size != self.last_size:
-            self.client.set_map_size(self.size)
-            self.last_size = self.size
+        if self.get_real_size() != self.last_size:
+            real = self.get_real_size()
+            self.client.set_map_size(real)
+            self.last_size = real
+            self.dest_surf = pygame.Surface(self.get_real_size())
             
             #self.last_frame_updated += 1
             #if self.last_frame_updated == 3:
@@ -420,12 +423,26 @@ class MapWidget(object):
             
             #self.client.update_map_canvas_visible()
         
-        self.client.draw_map(surf, pos)
+        if self.zoom != 1:
+            self.client.draw_map(self.dest_surf, (0,0))
+            try:
+                scale_dest = surf.subsurface(pos + self.size)
+                pygame.transform.scale(self.dest_surf, self.size, scale_dest)
+            except ValueError:
+                pass
+        else:
+            self.client.draw_map(surf, pos)
+    
+    def get_real_size(self):
+        x, y = self.size
+        return int(x / self.zoom), int(y / self.zoom)
     
     def back(self):
         self.client.escape()
     
     def event(self, ev):
+        if hasattr(ev, 'pos'):
+            ev.pos = (int(ev.pos[0] / self.zoom), int(ev.pos[1] / self.zoom))
         if ev.type == pygame.MOUSEMOTION:
             if self.start_drag:
                 if not self.was_dragged:
