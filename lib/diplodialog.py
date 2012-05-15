@@ -90,10 +90,10 @@ class MeetingDialog(ui.LinearLayoutWidget):
         c = self.meeting.counterpart
         state = c.get_state()
         
-        if state not in (DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE):
+        if state not in (DS_ARMISTICE, DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE):
             panel.add(ui.Button('Ceasefire', ph(CLAUSE_CEASEFIRE)))
         
-        if state not in (DS_CEASEFIRE, DS_PEACE):
+        if state not in (DS_PEACE, DS_ALLIANCE):
             panel.add(ui.Button('Peace', ph(CLAUSE_PEACE)))
         
         if state not in (DS_ALLIANCE, ):

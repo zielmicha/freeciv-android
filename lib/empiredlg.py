@@ -95,7 +95,7 @@ class EmpireDialog(ui.LinearLayoutWidget):
             if player.gives_shared_vision():
                 p.add(ui.Button('Withdraw vision', functools.partial(break_treaty, player, CLAUSE_VISION, 'Withdraw vision?')))
             
-            if player.get_state() in (DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE):
+            if player.get_state() in (DS_CEASEFIRE, DS_PEACE, DS_ALLIANCE, DS_ARMISTICE):
                 p.add(ui.Button('Break treaty', functools.partial(break_treaty, player, CLAUSE_CEASEFIRE, 'Break treaty with %(name)s?')))
             
             players.add(p)
