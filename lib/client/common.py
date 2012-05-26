@@ -28,7 +28,7 @@ def set_debug(flag):
 
 features.set_applier('debug.makesurf', set_debug, type=bool, default=False)
 
-DO_MASK = False
+PURE_MASK = True
 
 class SpriteSurface(pygame.Surface):
     pass
@@ -46,6 +46,7 @@ def get_sprite_dimensions(image):
 
 @freeciv.register
 def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
+    print 'boooo!'
     surf = pygame.Surface((w, h), pygame.SRCALPHA)
     surf.blit(img, (0, 0), (x, y, w, h))
     if mask:
@@ -72,6 +73,8 @@ def show_masking_progress():
 
 def mask_sprite(surf, mask, mx, my):
     show_masking_progress()
+    if PURE_MASK:
+        return py_mask_sprite(sur, mask, mx, my)
     assert mask.get_width() >= surf.get_width() + mx
     assert mask.get_height() >= surf.get_height() + my
     assert mask.get_bitsize() == 32
@@ -81,9 +84,6 @@ def mask_sprite(surf, mask, mx, my):
     freeciv.mask_sprite(surf_b, surf.get_width(), surf.get_height(), mask_b, mask.get_width(), mx, my)
 
 def py_mask_sprite(surf, mask, mx, my):
-    if not DO_MASK:
-        return
-    
     global mask_i
     mask_i += 1
     msg = 'masking %s' % mask_i

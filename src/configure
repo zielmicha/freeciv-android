@@ -1,6 +1,6 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
-GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -Ipython2.7 -I. -DHAVE_CONFIG_H"
+GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -I/usr/include/python2.7 -I. -DHAVE_CONFIG_H -fPIC"
 EXCLUDE_FILES="client/audio_sdl.c"
 ADD_SYMBOLS="pyclient.c|clientauto.c|callauto.c"
 ADD_SYMBOLS_FLAGS=""
@@ -31,7 +31,7 @@ echo "objectfiles.a: $ev
 	ar r objectfiles.a objectfiles/*.o
 " >> client.mk
 echo "freecivclient.so: objectfiles.a
-	gcc -shared -o freecivclient.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
+	gcc -shared -o freecivclient.so -lm -lz -fPIC -lpython2.7 objectfiles/*.o" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
 cat Makefile.tmp >> client.mk

@@ -8,6 +8,7 @@ types = {
     'int': 'i',
     'char*': 's',
     'double': 'd',
+    'nptr_t': 'L',
 }
 
 mappers = 'city player tile packet_game_load text_tag_list unit_list color packet_endgame_report message'.split()
@@ -51,7 +52,7 @@ def _proc_ret(type, name):
     if type.startswith('const '):
         type = type[len('const '):]
     if type.endswith('*') and type[:-1] in int_mappers:
-        return 'int', 'i', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
+        return 'nptr_t', 'L', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
     if type.endswith('*') and type[:-1] in structs:
         return 'PyObject*', 'O', '''
 \t%s argp_%s = py_alloc_struct(arg_%s);
@@ -63,7 +64,7 @@ def _proc_ret(type, name):
 #\targp_%s.py_object = arg_%s;
 #        ''' % (type, name, name, name), 'arg_%s' % name
     if type.startswith('enum '):
-        return 'int', 'i', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
+        return 'nptr_t', 'L', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
     if type == 'bool':
         return 'int', 'i', '', 'arg_%s' % name, '(bool)arg_%s' % name, name
     return type, types[type], '', 'arg_%s' % name, 'arg_%s' % name, name
@@ -172,7 +173,7 @@ for name, android in names:
     if android:
         print '#ifdef ANDROID'
     print '\tptr = python_%s;' % name
-    print '\tPY_CALL("ssi", "add_function", "%s", (int)ptr);' % name
+    print '\tPY_CALL("ssL", "add_function", "%s", (nptr_t)ptr);' % name
     if android:
         print '#endif'
 print '}'

@@ -23,6 +23,8 @@
 
 #define PY_CALL(TUPLE, VARARG...) PyObject_CallFunction(python_callback, TUPLE, ##VARARG)
 
+typedef long long nptr_t;
+
 extern PyObject* python_callback;
 
 struct canvas {

@@ -14,7 +14,12 @@ import osutil
 import time
 
 if osutil.is_desktop:
-    import easygui
+    try:
+        import easygui
+    except ImportError:
+        print '------------------------------'
+        print '--- import easygui failed ----'
+        print '------------------------------'
     import webbrowser
     
     def inputbox(text, default=''):
