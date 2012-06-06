@@ -269,7 +269,10 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
     print 'starting server - executable at', serverpath
     stat = os.stat(serverpath)
-    os.chmod(serverpath, 0o744) # octal!!!!
+    try:
+        os.chmod(serverpath, 0o744) # octal!!!!
+    except OSError as err:
+        print 'chmodding server failed', err
     piddir = get_save_dir()
     cmd = (serverpath, ) + args
     if osutil.is_desktop:

@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 import ui
 import functools
+import gamescreen
 
 from client.diplomacy import (CLAUSE_ADVANCE, CLAUSE_GOLD, CLAUSE_MAP,
     CLAUSE_SEAMAP, CLAUSE_CITY, 
@@ -38,6 +39,7 @@ class EmpireDialog(ui.LinearLayoutWidget):
         self.add(tech_panel)
         self.add(ui.Label('Players'))
         self.add(ui.Button('Player list', self.player_list))
+        self.add(ui.Button('Taxes & Government', lambda: ui.set_dialog(gamescreen.TaxesDialog(self.client))))
         self.update_layout()
     
     def update_tech_label(self):
