@@ -43,6 +43,8 @@ order_sprites_names = ('auto attack,auto connect,auto explore,'
     'forterss,fallout,pollutions,airbases,add to city,help build wonder,'
     'none,spy,none,return to,airlift,load'.split(','))
 
+confirm_actions = [client.actions.ACTIVITY_DISBAND]
+
 def get_order_sprite(name):
     if name not in order_sprites_names:
         name = 'none'
@@ -157,7 +159,13 @@ class Button(object):
         pass
     
     def click(self):
-        self.client.get_unit_in_focus().perform_activity(self.action_ident)
+        def do():
+            self.client.get_unit_in_focus().perform_activity(self.action_ident)
+
+        if self.action_ident in confirm_actions:
+            ui.ask('Really %s?' % self.action_name, do)
+        else:
+            do()
 
 class NewJoystick(object):
     small_radius = 35
