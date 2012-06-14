@@ -257,6 +257,12 @@ class Client(object):
     def toggle_full_labels(self):
         freeciv.func.request_toggle_city_full_bar()
 
+    def get_caravan_options(self, unit, homecity, destcity):
+        can_establish, can_trade, can_wonder = \
+            freeciv.func.py_get_caravan_options(unit.handle, homecity.handle, destcity.handle)
+        return can_establish, can_trade, can_wonder
+        
+
 class Gov(object):
     def __init__(self, (index, name, changable)):
         self.name = name

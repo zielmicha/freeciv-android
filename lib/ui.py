@@ -86,7 +86,7 @@ def ask(msg, callback):
 def not_implemented():
     message('Sorry. This feature is not implemented.\nCheck civ.zielm.com for updates.')
 
-def show_list_dialog(items, callback=None, get_text_func=None):
+def show_list_dialog(items, callback=None, get_text_func=None, title=None, titlefont=None):
     def default_get_text_func(it):
         if isinstance(it, tuple):
             label, action = it
@@ -102,6 +102,10 @@ def show_list_dialog(items, callback=None, get_text_func=None):
         (callback or default_callback)(it)
     
     ui = LinearLayoutWidget()
+
+    if title:
+        ui.add(Label(title, font=titlefont))
+    
     for item in items:
         label = (get_text_func or default_get_text_func)(item)
         ui.add(Button(label, functools.partial(clicked, item) ))

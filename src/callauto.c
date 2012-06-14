@@ -1321,6 +1321,40 @@ static PyObject* python_request_toggle_city_full_bar(PyObject* self, PyObject* a
 	request_toggle_city_full_bar();
 	return Py_BuildValue("i", 0);
 }
+// PyObject* py_get_caravan_options(struct unit *punit, struct city *phomecity, struct city *pdestcity)
+PyObject* py_get_caravan_options(struct unit *punit, struct city *phomecity, struct city *pdestcity);
+
+static PyObject* python_py_get_caravan_options(PyObject* self, PyObject* args) {
+	int arg_punit;
+	int arg_phomecity;
+	int arg_pdestcity;
+	if(PyArg_ParseTuple(args, "iii", &arg_punit, &arg_phomecity, &arg_pdestcity) == 0) return NULL;
+
+
+
+	PyObject* retval = py_get_caravan_options((struct unit*)arg_punit, (struct city*)arg_phomecity, (struct city*)arg_pdestcity);
+	return Py_BuildValue("O", py_get_pyobject(retval));
+}
+// void py_caravan_help_build_wonder(struct unit* punit)
+void py_caravan_help_build_wonder(struct unit* punit);
+
+static PyObject* python_py_caravan_help_build_wonder(PyObject* self, PyObject* args) {
+	int arg_punit;
+	if(PyArg_ParseTuple(args, "i", &arg_punit) == 0) return NULL;
+
+	py_caravan_help_build_wonder((struct unit*)arg_punit);
+	return Py_BuildValue("i", 0);
+}
+// void py_caravan_establish_trade(struct unit* punit)
+void py_caravan_establish_trade(struct unit* punit);
+
+static PyObject* python_py_caravan_establish_trade(PyObject* self, PyObject* args) {
+	int arg_punit;
+	if(PyArg_ParseTuple(args, "i", &arg_punit) == 0) return NULL;
+
+	py_caravan_establish_trade((struct unit*)arg_punit);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1587,4 +1621,10 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_overview_click", (int)ptr);
 	ptr = python_request_toggle_city_full_bar;
 	PY_CALL("ssi", "add_function", "request_toggle_city_full_bar", (int)ptr);
+	ptr = python_py_get_caravan_options;
+	PY_CALL("ssi", "add_function", "py_get_caravan_options", (int)ptr);
+	ptr = python_py_caravan_help_build_wonder;
+	PY_CALL("ssi", "add_function", "py_caravan_help_build_wonder", (int)ptr);
+	ptr = python_py_caravan_establish_trade;
+	PY_CALL("ssi", "add_function", "py_caravan_establish_trade", (int)ptr);
 }

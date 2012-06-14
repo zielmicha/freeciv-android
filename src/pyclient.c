@@ -199,6 +199,29 @@ bool caravan_dialog_is_open(int *unit_id, int *city_id) {
     errlog("TODO: caravan_dialog_is_open\n");
     return false;
 }
+
+PyObject* py_get_caravan_options(struct unit *punit,
+			  struct city *phomecity, struct city *pdestcity)
+{
+  bool can_establish, can_trade, can_wonder;
+  
+  can_trade = can_cities_trade(phomecity, pdestcity);
+  can_establish = can_trade
+  		  && can_establish_trade_route(phomecity, pdestcity);
+
+  return Py_BuildValue("iii", can_establish, can_trade, can_wonder);
+}
+
+void py_caravan_establish_trade(struct unit* punit)
+{
+  dsend_packet_unit_establish_trade(&client.conn, punit->id);
+}
+
+void py_caravan_help_build_wonder(struct unit* punit)
+{
+  dsend_packet_unit_help_build_wonder(&client.conn, punit->id);
+}
+
 void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases) {
     errlog("TODO: popup_pillage_dialog\n");
 }

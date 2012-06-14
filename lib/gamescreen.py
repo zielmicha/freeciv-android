@@ -61,6 +61,30 @@ class ScreenClient(client.Client):
     
     def disable_menus(self):
         self.ui.menu.update(None)
+
+    def popup_caravan_dialog(self, unit, home, dest):
+        can_establish, can_trade, can_wonder = self.get_caravan_options(unit, home, dest)
+        def establish_trade_route():
+            unit.perform_activity(client.actions.ACTIVITY_ESTABLISH_TRADE_ROUTE)
+
+        def help_wonder():
+            unit.perform_activity(client.actions.ACTIVITY_HELP_BUILD_WONDER)
+
+        items = []
+
+        if not can_establish and not can_wonder:
+            return
+        
+        if can_establish:
+            items.append(('Establish trade route', establish_trade_route))
+
+        if can_wonder:
+            items.append(('Help building wonder', help_wonder))
+
+        items.append(('Do nothing', lambda: None))
+        
+        ui.show_list_dialog(items, title='Your %s from %s has arrived to city %s' % (unit.get_name(), home.get_name(), dest.get_name()), titlefont=ui.consolefont)
+
     
     def popup_unit_select_dialog(self, units):
         def focus(unit):

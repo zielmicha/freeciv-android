@@ -45,6 +45,9 @@ ACTIVITY_CHANGE_HOMECITY = 1008
 ACTIVITY_LOAD = 1009
 ACTIVITY_UNLOAD = 1010
 
+ACTIVITY_ESTABLISH_TRADE_ROUTE = 2001
+ACTIVITY_HELP_BUILD_WONDER = 2002
+
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
 
@@ -58,11 +61,11 @@ action_names = {
 }
 
 class Unit(object):
-    def __init__(self, unit_id):
-        self.unit_id = unit_id
+    def __init__(self, handle):
+        self.handle = handle
     
     def get_properties(self):
-        return freeciv.func.get_unit_properties(self.unit_id)
+        return freeciv.func.get_unit_properties(self.handle)
     
     def iter_actions(self):
         id, tileid, city, terrain_name = self.get_properties()
@@ -121,7 +124,7 @@ class Unit(object):
 #./common/combat.h:53:int base_get_attack_power(const struct unit_type *punittype,
 #./common/combat.h:55:int base_get_defense_power(const struct unit *punit);
 #./common/base.h:100:bool can_build_base(const struct unit *punit, const struct base_type *pbase,
-#./common/packets_gen.h:1791:int dsend_packet_unit_change_activity(struct connection *pc, int unit_id, enum unit_activity activity, enum tile_special_type activity_target, Base_type_id activity_base);
+#./common/packets_gen.h:1791:int dsend_packet_unit_change_activity(struct connection *pc, int handle, enum unit_activity activity, enum tile_special_type activity_target, Base_type_id activity_base);
 
         if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
             yield ACTIVITY_AIRBASE
@@ -171,14 +174,14 @@ class Unit(object):
         return terrain_name
     
     def get_name(self):
-        return freeciv.func.get_unit_name(self.unit_id)
+        return freeciv.func.get_unit_name(self.handle)
     
     def get_image(self):
-        return freeciv.func.get_unit_image(self.unit_id)
+        return freeciv.func.get_unit_image(self.handle)
     
     def focus(self):
-        freeciv.func.request_new_unit_activity(self.unit_id, ACTIVITY_IDLE)
-        freeciv.func.set_unit_focus(self.unit_id)
+        freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
+        freeciv.func.set_unit_focus(self.handle)
     
     def perform_activity(self, ident):
         id, tileid, city, terrain_name = self.get_properties()
@@ -228,6 +231,10 @@ class Unit(object):
             freeciv.func.key_unit_airbase()
         elif ident == ACTIVITY_EXPLORE:
             freeciv.func.key_unit_auto_explore()
+        elif ident == ACTIVITY_HELP_BUILD_WONDER:
+            freeciv.func.py_caravan_help_build_wonder(self.handle)
+        elif ident == ACTIVITY_ESTABLISH_TRADE_ROUTE:
+            freeciv.func.py_caravan_establish_trade(self.handle)
         else:
             print 'Unsupported action ', ident
 

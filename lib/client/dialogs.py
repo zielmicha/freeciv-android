@@ -14,6 +14,7 @@ import freeciv
 import client
 import uidialog
 
+import city
 import actions
 
 client_page = 0
@@ -70,3 +71,7 @@ def popup_newcity_dialog(unit, default_name):
 def popup_unit_select_dialog(tile):
     units = freeciv.func.get_units_at_tile(tile)
     client.client.popup_unit_select_dialog(map(actions.Unit, units))
+
+@freeciv.register
+def popup_caravan_dialog(unit, home_city, dest_city):
+    client.client.popup_caravan_dialog(actions.Unit(unit), city.City(home_city), city.City(dest_city))
