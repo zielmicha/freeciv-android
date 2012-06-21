@@ -43,7 +43,11 @@ class ScreenClient(client.Client):
     
     #def console_line(self, line):
     #    self.ui.console.line(line)
-    
+
+    def end_turn(self):
+        self.update_meswin([('Ending turn...', None, None)])
+        super(ScreenClient, self).end_turn()
+        
     def update_meswin(self, lines):
         self.ui.console.clear()
         for line, attrs, tile in lines:
