@@ -147,6 +147,11 @@ class Dialog(object):
         if hasattr(ev, 'pos'):
             pos = self.get_pos()
             ev.pos = _subpoints(ev.pos, pos)
+            if ev.pos[0] < 0 or ev.pos[1] < 0:
+                return
+            size = self.item.size
+            if ev.pos[1] > size[1] or ev.pos[0] > size[0]:
+                return
             result = self.item.event(ev)
             ev.pos = _addpoints(ev.pos, pos)
             return result
