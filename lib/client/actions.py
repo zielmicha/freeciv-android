@@ -47,6 +47,7 @@ ACTIVITY_UNLOAD = 1010
 
 ACTIVITY_ESTABLISH_TRADE_ROUTE = 2001
 ACTIVITY_HELP_BUILD_WONDER = 2002
+ACTIVITY_CENTER_ON_UNIT = 2003
 
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
@@ -69,7 +70,8 @@ class Unit(object):
     
     def iter_actions(self):
         id, tileid, city, terrain_name = self.get_properties()
-        
+
+        yield ACTIVITY_CENTER_ON_UNIT
         yield ACTIVITY_GOTO
         yield ACTIVITY_DISBAND
         yield ACTIVITY_WAIT
@@ -184,6 +186,7 @@ class Unit(object):
         freeciv.func.set_unit_focus(self.handle)
     
     def perform_activity(self, ident):
+        # Warning! Safe to use only when `self` is in focus.
         id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
             freeciv.func.key_unit_goto()
@@ -235,6 +238,8 @@ class Unit(object):
             freeciv.func.py_caravan_help_build_wonder(self.handle)
         elif ident == ACTIVITY_ESTABLISH_TRADE_ROUTE:
             freeciv.func.py_caravan_establish_trade(self.handle)
+        elif ident == ACTIVITY_CENTER_ON_UNIT:
+            freeciv.func.request_center_focus_unit()
         else:
             print 'Unsupported action ', ident
 

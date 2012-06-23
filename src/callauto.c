@@ -1355,6 +1355,14 @@ static PyObject* python_py_caravan_establish_trade(PyObject* self, PyObject* arg
 	py_caravan_establish_trade((struct unit*)arg_punit);
 	return Py_BuildValue("i", 0);
 }
+// void request_center_focus_unit(void)
+void request_center_focus_unit(void);
+
+static PyObject* python_request_center_focus_unit(PyObject* self, PyObject* args) {
+	if(PyArg_ParseTuple(args, "") == 0) return NULL;
+	request_center_focus_unit();
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1627,4 +1635,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_caravan_help_build_wonder", (int)ptr);
 	ptr = python_py_caravan_establish_trade;
 	PY_CALL("ssi", "add_function", "py_caravan_establish_trade", (int)ptr);
+	ptr = python_request_center_focus_unit;
+	PY_CALL("ssi", "add_function", "request_center_focus_unit", (int)ptr);
 }

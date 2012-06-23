@@ -167,3 +167,5 @@ void request_toggle_city_full_bar(void)
 PyObject* py_get_caravan_options(struct unit *punit, struct city *phomecity, struct city *pdestcity)
 void py_caravan_help_build_wonder(struct unit* punit)
 void py_caravan_establish_trade(struct unit* punit)
+
+void request_center_focus_unit(void)

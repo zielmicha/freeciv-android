@@ -40,14 +40,16 @@ order_sprites_names = ('auto attack,auto connect,auto explore,'
     'auto settlers,build city,cutdown forest,plant forest,'
     'mine,irrigate,no orders,disband,fortify,goto,goto city,home city,nuke,'
     'paradrop,partol,pillage,railroad,road,sentry,unload,wait,'
-    'forterss,fallout,pollutions,airbases,add to city,help build wonder,'
+    'forterss,fallout,pollutions,airbases,transforms,add to city,help build wonder,'
     'none,spy,none,return to,airlift,load'.split(','))
 
 confirm_actions = [client.actions.ACTIVITY_DISBAND]
 
 def get_order_sprite(name):
-    if name not in order_sprites_names:
+    if name == 'center on unit':
         name = 'none'
+    if name not in order_sprites_names:
+        name = 'help build wonder'
     i = order_sprites_names.index(name)
     return order_sprites[i][0]
 

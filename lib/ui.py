@@ -992,7 +992,7 @@ class ScrollWrapper(object):
         ev.pos = (pos[0] + self.x, pos[1] + self.y)
         self.item.event(ev)
         ev.pos = pos
-
+        
 def _scroll_speed_func(v, k):
     if abs(k) < 3:
         return v / 3
