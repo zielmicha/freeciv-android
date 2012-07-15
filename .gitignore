@@ -15,7 +15,6 @@ objectfiles
 find
 gendoc.py
 /civsync/
-/server/android_impl.c
 /server/freeciv-server
 /pyclient.txt
 /count-lines
