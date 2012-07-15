@@ -1,9 +1,16 @@
-wget http://michal.zielinscy.org.pl/freeciv-android-dep.tgz -Ofreeciv-android-dep.tgz
+#!/bin/bash
+dlfail() {
+	echo Download failed. Check your internet connection or see http://users.v-lo.krakow.pl/~zlmch/mirror/
+	exit 1
+}
+
+wget http://michal.zielinscy.org.pl/freeciv-android-dep.tgz -Ofreeciv-android-dep.tgz || dlfail
 tar xvzf freeciv-android-dep.tgz
 cp -r dep/* ./
 rm -r dep
 
-wget http://pygame.renpy.org/dl/pygame-package-0.9.3.tar.bz2 -Opygame-package.tar.bz2
+
+wget http://pygame.renpy.org/dl/old/pygame-package-0.9.3.tar.bz2 -Opygame-package.tar.bz2 || dlfail
 tar xvjf pygame-package.tar.bz2
 mkdir android/build 2> /dev/null
 mv pygame-package-0.9.3/ android/build/pygame
