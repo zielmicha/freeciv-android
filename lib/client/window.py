@@ -95,7 +95,7 @@ def load_cursors():
 
 def draw_cursor(pos):
     if not current_cursor:
-        return 
+        return
     #x, y = pos
     #w, h = current_cursor.get_size()
     #screen.blit(current_cursor, (x - w/2, y - h/2))
@@ -110,7 +110,7 @@ def init_screen(size=None):
             return map(int, fake.split(','))
         else:
             return pygame.display.Info().current_w, pygame.display.Info().current_h
-    
+
     def _get_request_size(max_size):
         if osutil.is_desktop and not features.get('ui.fake_max_size'):
             return (800, 480)
@@ -123,7 +123,7 @@ def init_screen(size=None):
             else:
                 size = (w, h)
             return size
-    
+
     global screen, surface, overview_surface, cursors, cursor_names
     pygame.display.init()
     if not size:

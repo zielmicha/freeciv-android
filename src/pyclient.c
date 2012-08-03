@@ -140,7 +140,7 @@ const char* gfx_fileextensions_const[5] = {
 const char **gfx_fileextensions(void) {
     return gfx_fileextensions_const;
 }
-void get_sprite_dimensions(struct sprite *sprite, int *width, int *height) { 
+void get_sprite_dimensions(struct sprite *sprite, int *width, int *height) {
     PyObject* ret = PY_CALL("sO", "get_sprite_dimensions", py_get_pyobject(sprite));
     if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");
 }
@@ -204,7 +204,7 @@ PyObject* py_get_caravan_options(struct unit *punit,
 			  struct city *phomecity, struct city *pdestcity)
 {
   bool can_establish, can_trade, can_wonder;
-  
+
   can_trade = can_cities_trade(phomecity, pdestcity);
   can_establish = can_trade
   		  && can_establish_trade_route(phomecity, pdestcity);
@@ -279,27 +279,27 @@ PyObject* mask_sprite(PyObject* self, PyObject* args) {
     int* surf;
     int* mask;
     int w, h, mx, my, maskw;
-    
+
     if(PyArg_ParseTuple(args, "wiiwiii", &surf, &w, &h, &mask, &maskw, &mx, &my) == 0)
         return NULL;
-    
+
     int x, y;
     for(x=0; x<w; x++) {
         for(y=0; y<h; y++) {
             int rgba = surf[w * y + x];
             int rgb = rgba & 0xFFFFFF;
             int a = (rgba >> 24) & 0xFF;
-            
+
             int smx = x + mx, smy = y + my;
-            
+
             int mask_rgba = mask[smy * maskw + smx];
             int mask_a = (mask_rgba >> 24) & 0xFF;
             int dest_a = mask_a * a / 256;
-            
+
             surf[w * y + x] = (dest_a << 24) | rgb;
         }
     }
-    
+
     return Py_BuildValue("i", 0);
 }
 
@@ -319,7 +319,7 @@ static PyObject* call_freeciv(PyObject* self, PyObject* args) {
     PyObject* fargs;
     if(PyArg_ParseTuple(args, "iO", &fun, &fargs) == 0)
         return NULL;
-    
+
     python_func_type func = (python_func_type)fun;
     return func(NULL, fargs);
 }
@@ -422,32 +422,32 @@ char* get_name_of_nation_id(int id) {
 }
 
 int get_playable_nation_count() {
- 
+
   int playable_nation_count = 0;
-    
+
   nations_iterate(pnation) {
     if (pnation->is_playable && !pnation->player && pnation->is_available)
-      ++playable_nation_count;        
+      ++playable_nation_count;
   } nations_iterate_end;
 
   return playable_nation_count;
-  
+
 }
 
 PyObject* get_techs(int level) {
     PyObject* list = PyList_New(0);
-    
+
     int num, i;
     advance_index_iterate(A_FIRST, i) {
         if (player_invention_reachable(client.conn.playing, i, FALSE)
             && TECH_KNOWN != player_invention_state(client.conn.playing, i)
             && (level > (num = num_unknown_techs_for_goal(client.conn.playing, i))
                 /*|| player_research_get(client.conn.playing) == research->tech_goal*/)) {
-            
+
             PyList_Append(list, Py_BuildValue("isi", i, advance_name_translation(advance_by_number(i)), num));
         }
     } advance_index_iterate_end;
-    
+
     return list;
 }
 
@@ -481,35 +481,35 @@ PyObject* get_buildable_improvements_in_city(struct city* pCity) {
     improvement_iterate(pImprove) {
         can_build = can_player_build_improvement_now(client.conn.playing, pImprove);
         can_build = can_build && can_city_build_improvement_now(pCity, pImprove);
-        
+
         if(can_build) {
             const char* name = improvement_name_translation(pImprove);
             //int turns = city_turns_to_build(pCity, cid_production(cid_encode_building(pImprove)), TRUE);
             int stock = pCity->shield_stock;
             int cost = impr_build_shield_cost(pImprove);
-            
+
             PyList_Append(list, Py_BuildValue(
                 "iisiii()O", (int)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost,
                 (PyObject*)get_building_sprite(tileset, pImprove)
             ));
         }
-        
+
     } improvement_iterate_end;
-    
+
     return list;
 }
 
 PyObject* get_built_improvements_in_city(struct city* pCity) {
     PyObject* list = PyList_New(0);
-    
+
     city_built_iterate(pCity, pImprove) {
         const char* name = improvement_name_translation(pImprove);
-        
+
         PyList_Append(list, Py_BuildValue(
             "is", (int)pImprove, name
         ));
     } city_built_iterate_end;
-    
+
     return list;
 }
 
@@ -517,11 +517,11 @@ PyObject* get_built_improvements_in_city(struct city* pCity) {
 PyObject* get_buildable_units_in_city(struct city* pCity) {
     PyObject* list = PyList_New(0);
     bool can_build;
-    
+
     unit_type_iterate(un) {
         can_build = can_player_build_unit_now(client.conn.playing, un);
         can_build = can_build && can_city_build_unit_now(pCity, un);
-        
+
         if (can_build) {
             const char* name = utype_name_translation(un);
             int attack = un->attack_strength;
@@ -530,15 +530,15 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
             int stock = pCity->shield_stock;
             int cost = utype_build_shield_cost(un);
             int turns = -1; //city_turns_to_build(pCity, cid_production(cid_encode_unit(un)), TRUE)
-            
+
             PyList_Append(list, Py_BuildValue(
                 "iisiii(iii)O", (int)un, VUT_UTYPE, name, turns, stock, cost,
                 attack, defense, moves, (PyObject*)get_unittype_sprite(tileset, un)
             ));
         }
-        
+
     } unit_type_iterate_end;
-    
+
     return list;
 }
 
@@ -589,18 +589,18 @@ char* get_current_year_name() {
 }
 
 PyObject* get_governments() {
-    
+
     PyObject* list = PyList_New(0);
-    
+
     governments_iterate(pGov) {
-        
+
         PyList_Append(list, Py_BuildValue(
             "isi", (int)pGov, government_name_translation(pGov),
                 can_change_to_government(client.conn.playing, pGov)?1:0
         ));
-        
+
     } governments_iterate_end;
-    
+
     return list;
 }
 
@@ -653,7 +653,7 @@ PyObject* get_cities() {
     city_list_iterate(client.conn.playing->cities, pcity) {
 	PyList_Append(list, Py_BuildValue("i", pcity));
     } city_list_iterate_end;
-    
+
 }
 
 int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove) {
@@ -670,11 +670,19 @@ void py_overview_click(int x, int y) {
     center_tile_mapcanvas(map_pos_to_tile(map_x, map_y));
 }
 
+int py_get_city_id(struct city* city) {
+  return city->id;
+}
+
+int py_get_unit_id(struct unit* unit) {
+  return unit->id;
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);
     PY_SETUP_CONST(PAGE_GAME);
-    
+
     PY_SETUP_CONST(CURSOR_GOTO);
     PY_SETUP_CONST(CURSOR_PATROL);
     PY_SETUP_CONST(CURSOR_PARADROP);
@@ -687,7 +695,7 @@ static void py_setup_const() {
     PY_SETUP_CONST(CURSOR_WAIT);
     PY_SETUP_CONST(CURSOR_LAST);
     PY_SETUP_CONST(CURSOR_DEFAULT);
-    
+
     PY_SETUP_CONST(DIR8_NORTH);
     PY_SETUP_CONST(DIR8_EAST);
     PY_SETUP_CONST(DIR8_WEST);
@@ -696,30 +704,45 @@ static void py_setup_const() {
     PY_SETUP_CONST(DIR8_NORTHWEST);
     PY_SETUP_CONST(DIR8_SOUTHEAST);
     PY_SETUP_CONST(DIR8_SOUTHWEST);
-    
+
     PY_SETUP_CONST(O_FOOD);
     PY_SETUP_CONST(O_SHIELD);
     PY_SETUP_CONST(O_TRADE);
     PY_SETUP_CONST(O_GOLD);
     PY_SETUP_CONST(O_SCIENCE);
     PY_SETUP_CONST(O_LUXURY);
-    
+
     PY_SETUP_CONST(MODE_PROD);
     PY_SETUP_CONST(MODE_SURPLUS);
     PY_SETUP_CONST(MODE_WASTE);
-    
+
     PY_SETUP_CONST(FC_INFINITY);
-    
+
     PY_SETUP_CONST(CITIZEN_HAPPY);
     PY_SETUP_CONST(CITIZEN_CONTENT);
     PY_SETUP_CONST(CITIZEN_UNHAPPY);
     PY_SETUP_CONST(CITIZEN_ANGRY);
-    
+
     PY_SETUP_CONST(DS_WAR);
     PY_SETUP_CONST(DS_ARMISTICE);
     PY_SETUP_CONST(DS_CEASEFIRE);
     PY_SETUP_CONST(DS_PEACE);
     PY_SETUP_CONST(DS_ALLIANCE);
+
+    PY_SETUP_CONST(DIPLOMAT_MOVE);
+    PY_SETUP_CONST(DIPLOMAT_EMBASSY);
+    PY_SETUP_CONST(DIPLOMAT_BRIBE);
+    PY_SETUP_CONST(DIPLOMAT_INCITE);
+    PY_SETUP_CONST(DIPLOMAT_INVESTIGATE);
+    PY_SETUP_CONST(DIPLOMAT_SABOTAGE);
+    PY_SETUP_CONST(DIPLOMAT_STEAL);
+    PY_SETUP_CONST(SPY_POISON);
+    PY_SETUP_CONST(SPY_SABOTAGE_UNIT);
+    PY_SETUP_CONST(DIPLOMAT_ANY_ACTION);
+
+    PY_SETUP_CONST(F_SPY);
+    PY_SETUP_CONST(B_LAST);
+    PY_SETUP_CONST(INCITE_IMPOSSIBLE_COST);
 }
 
 static PyObject* set_callback(PyObject* self, PyObject* args) {
@@ -763,4 +786,3 @@ PyMODINIT_FUNC initfreecivclient(void)
 #endif
     (void) Py_InitModule("freecivclient", FreecivClientMethods);
 }
-

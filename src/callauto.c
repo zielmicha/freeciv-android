@@ -1363,6 +1363,94 @@ static PyObject* python_request_center_focus_unit(PyObject* self, PyObject* args
 	request_center_focus_unit();
 	return Py_BuildValue("i", 0);
 }
+// struct city *tile_city(const struct tile *ptile)
+struct city *tile_city(const struct tile *ptile);
+
+static PyObject* python_tile_city(PyObject* self, PyObject* args) {
+	int arg_ptile;
+	if(PyArg_ParseTuple(args, "i", &arg_ptile) == 0) return NULL;
+
+	struct city* retval = tile_city((struct tile*)arg_ptile);
+	return Py_BuildValue("O", py_mapper_city(retval));
+}
+// bool diplomat_can_do_action(const struct unit *pdiplomat, enum diplomat_actions action, const struct tile *ptile)
+bool diplomat_can_do_action(const struct unit *pdiplomat, enum diplomat_actions action, const struct tile *ptile);
+
+static PyObject* python_diplomat_can_do_action(PyObject* self, PyObject* args) {
+	int arg_pdiplomat;
+	int arg_action;
+	int arg_ptile;
+	if(PyArg_ParseTuple(args, "iii", &arg_pdiplomat, &arg_action, &arg_ptile) == 0) return NULL;
+
+
+
+	bool retval = diplomat_can_do_action((struct unit*)arg_pdiplomat, (enum diplomat_actions)arg_action, (struct tile*)arg_ptile);
+	return Py_BuildValue("i", (int)retval);
+}
+// bool unit_has_type_flag(const struct unit *punit, enum unit_flag_id flag)
+bool unit_has_type_flag(const struct unit *punit, enum unit_flag_id flag);
+
+static PyObject* python_unit_has_type_flag(PyObject* self, PyObject* args) {
+	int arg_punit;
+	int arg_flag;
+	if(PyArg_ParseTuple(args, "ii", &arg_punit, &arg_flag) == 0) return NULL;
+
+
+	bool retval = unit_has_type_flag((struct unit*)arg_punit, (enum unit_flag_id)arg_flag);
+	return Py_BuildValue("i", (int)retval);
+}
+// void request_diplomat_action(enum diplomat_actions action, int dipl_id, int target_id, int value)
+void request_diplomat_action(enum diplomat_actions action, int dipl_id, int target_id, int value);
+
+static PyObject* python_request_diplomat_action(PyObject* self, PyObject* args) {
+	int arg_action;
+	int arg_dipl_id;
+	int arg_target_id;
+	int arg_value;
+	if(PyArg_ParseTuple(args, "iiii", &arg_action, &arg_dipl_id, &arg_target_id, &arg_value) == 0) return NULL;
+
+
+
+
+	request_diplomat_action((enum diplomat_actions)arg_action, arg_dipl_id, arg_target_id, arg_value);
+	return Py_BuildValue("i", 0);
+}
+// int py_get_city_id(struct city* city)
+int py_get_city_id(struct city* city);
+
+static PyObject* python_py_get_city_id(PyObject* self, PyObject* args) {
+	int arg_city;
+	if(PyArg_ParseTuple(args, "i", &arg_city) == 0) return NULL;
+
+	int retval = py_get_city_id((struct city*)arg_city);
+	return Py_BuildValue("i", retval);
+}
+// int py_get_unit_id(struct unit* unit)
+int py_get_unit_id(struct unit* unit);
+
+static PyObject* python_py_get_unit_id(PyObject* self, PyObject* args) {
+	int arg_unit;
+	if(PyArg_ParseTuple(args, "i", &arg_unit) == 0) return NULL;
+
+	int retval = py_get_unit_id((struct unit*)arg_unit);
+	return Py_BuildValue("i", retval);
+}
+// void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);
+void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);;
+
+static PyObject* python_request_diplomat_answer(PyObject* self, PyObject* args) {
+	int arg_action;
+	int arg_dipl_id;
+	int arg_target_id;
+	int arg_value;
+	if(PyArg_ParseTuple(args, "iiii", &arg_action, &arg_dipl_id, &arg_target_id, &arg_value) == 0) return NULL;
+
+
+
+
+	request_diplomat_answer((enum diplomat_actions)arg_action, arg_dipl_id, arg_target_id, arg_value);
+	return Py_BuildValue("i", 0);
+}
 void py_setup_callglue() {
 void* ptr;
 	ptr = python_call_idle_callbacks;
@@ -1637,4 +1725,18 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_caravan_establish_trade", (int)ptr);
 	ptr = python_request_center_focus_unit;
 	PY_CALL("ssi", "add_function", "request_center_focus_unit", (int)ptr);
+	ptr = python_tile_city;
+	PY_CALL("ssi", "add_function", "tile_city", (int)ptr);
+	ptr = python_diplomat_can_do_action;
+	PY_CALL("ssi", "add_function", "diplomat_can_do_action", (int)ptr);
+	ptr = python_unit_has_type_flag;
+	PY_CALL("ssi", "add_function", "unit_has_type_flag", (int)ptr);
+	ptr = python_request_diplomat_action;
+	PY_CALL("ssi", "add_function", "request_diplomat_action", (int)ptr);
+	ptr = python_py_get_city_id;
+	PY_CALL("ssi", "add_function", "py_get_city_id", (int)ptr);
+	ptr = python_py_get_unit_id;
+	PY_CALL("ssi", "add_function", "py_get_unit_id", (int)ptr);
+	ptr = python_request_diplomat_answer;
+	PY_CALL("ssi", "add_function", "request_diplomat_answer", (int)ptr);
 }

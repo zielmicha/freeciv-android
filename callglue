@@ -169,3 +169,13 @@ void py_caravan_help_build_wonder(struct unit* punit)
 void py_caravan_establish_trade(struct unit* punit)
 
 void request_center_focus_unit(void)
+
+struct city *tile_city(const struct tile *ptile)
+bool diplomat_can_do_action(const struct unit *pdiplomat, enum diplomat_actions action, const struct tile *ptile)
+bool unit_has_type_flag(const struct unit *punit, enum unit_flag_id flag)
+void request_diplomat_action(enum diplomat_actions action, int dipl_id, int target_id, int value)
+
+int py_get_city_id(struct city* city)
+int py_get_unit_id(struct unit* unit)
+
+void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);
