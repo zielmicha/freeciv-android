@@ -119,6 +119,7 @@ class ScreenClient(client.Client):
         simple_actions = [freeciv.const.DIPLOMAT_EMBASSY,
                           freeciv.const.DIPLOMAT_INVESTIGATE,
                           freeciv.const.DIPLOMAT_SABOTAGE,
+                          freeciv.const.DIPLOMAT_MOVE,
                           freeciv.const.SPY_POISON]
 
         def do_action(action):
@@ -128,6 +129,9 @@ class ScreenClient(client.Client):
                 # TODO: spy can choose building
                 diplomat_action.perform_simple_action(action,
                                                       value=freeciv.const.B_LAST+1)
+            elif action == freeciv.const.DIPLOMAT_STEAL:
+                # TODO: spy can choose technology
+                diplomat_action.perform_simple_action(action, value=freeciv.const.A_UNSET)
             elif action == freeciv.const.DIPLOMAT_INCITE:
                 diplomat_action.request_answer(action)
             else:

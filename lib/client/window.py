@@ -113,7 +113,7 @@ def init_screen(size=None):
 
     def _get_request_size(max_size):
         if osutil.is_desktop and not features.get('ui.fake_max_size'):
-            return (800, 480)
+            return (1280, 800)
         else:
             w, h = max_size
             MAX_W = 800

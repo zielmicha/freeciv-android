@@ -742,6 +742,7 @@ static void py_setup_const() {
 
     PY_SETUP_CONST(F_SPY);
     PY_SETUP_CONST(B_LAST);
+    PY_SETUP_CONST(A_UNSET);
     PY_SETUP_CONST(INCITE_IMPOSSIBLE_COST);
 }
 
