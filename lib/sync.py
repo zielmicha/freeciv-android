@@ -26,11 +26,11 @@ try:
     import lzma
 except:
     import pyjni
-    
+
     class lzma:
         def decompress(self, data):
             return pyjni.encode_or_decode_xz(1, data)
-        
+
         def compress(self, data):
             return pyjni.encode_or_decode_xz(0, data)
     lzma = lzma()
@@ -45,7 +45,7 @@ def apply_user_agent_change(ua):
     civsync.USER_AGENT = ua
 
 features.set_applier('civsync.ua', apply_user_agent_change)
-features.set('civsync.ua', 'CivSyncAndroid/1015')
+features.set('civsync.ua', 'CivSyncAndroid/1016')
 features.add_feature('civsync.enable', False, type=bool)
 
 session = None
@@ -136,11 +136,11 @@ def show_login_form(callback, msg=None):
         with open(save.get_save_dir() + '/civsync.sessid.txt', 'w') as f:
             f.write(session.sessid)
         callback()
-    
+
     def do_login():
         ui.back(anim=False)
         request(logged, 'login', login_field.get_value(), passwd_field.get_value())
-    
+
     def no_account():
         def do_register():
             login = login_field.get_value()
@@ -151,76 +151,76 @@ def show_login_form(callback, msg=None):
             elif passwd != passwd_repeat_field.get_value():
                 ui.message('Passwords don\'t match.')
             else:
-                request(logged, 'register', login, passwd, mail)        
-        
+                request(logged, 'register', login, passwd, mail)
+
         panel = ui.LinearLayoutWidget()
-        
+
         login = ui.HorizontalLayoutWidget()
         login.add(ui.Label('Login:'))
         login_field = ui.EditField()
         login.add(login_field)
         panel.add(login)
-        
+
         passwd = ui.HorizontalLayoutWidget()
         passwd.add(ui.Label('Password:'))
         passwd_field = ui.EditField(placeholder='*')
         passwd.add(passwd_field)
         panel.add(passwd)
-        
+
         passwd_repeat = ui.HorizontalLayoutWidget()
         passwd_repeat.add(ui.Label('Repeat password:'))
         passwd_repeat_field = ui.EditField(placeholder='*')
         passwd_repeat.add(passwd_repeat_field)
         panel.add(passwd_repeat)
-        
+
         mail = ui.HorizontalLayoutWidget()
         mail.add(ui.Label('Mail:'))
         mail_field = ui.EditField()
         mail.add(mail_field)
         panel.add(mail)
-        
+
         butts = ui.HorizontalLayoutWidget(spacing=10)
         butts.add(ui.Button('Register', do_register))
         butts.add(ui.Button('Cancel', ui.back))
         panel.add(butts)
-        
+
         ui.set(panel)
 
-    
+
     panel = ui.LinearLayoutWidget()
-    
+
     login = ui.HorizontalLayoutWidget()
     login.add(ui.Label('Login:'))
     login_field = ui.EditField()
     login.add(login_field)
     panel.add(login)
-    
+
     passwd = ui.HorizontalLayoutWidget()
     passwd.add(ui.Label('Password:'))
     passwd_field = ui.EditField(placeholder='*')
     passwd.add(passwd_field)
     panel.add(passwd)
-    
+
     butts = ui.HorizontalLayoutWidget(spacing=10)
     butts.add(ui.Button('Login', do_login))
     butts.add(ui.Button('No account?', no_account))
     butts.add(ui.Button('Cancel', ui.back))
     panel.add(butts)
-    
+
     ui.set(panel, anim=False)
-    
+
     if msg and msg != 'Not logged':
         ui.message(msg)
 
 def comment_upload(install_time):
     with ui.execute_later_lock:
         ui.execute_later.append(lambda: ui.message('Compressing log...'))
-    
+
     content = lzma.compress(open(save.get_save_dir() + '/more.log').read())
-    
+
     with ui.execute_later_lock:
         ui.execute_later.append(lambda: ui.back())
-    
+
     request(lambda result: comment_next(install_time), 'upload_log', content, install_time,
             banner="Uploading log (%dkB)" % (len(content)/1024))
 
@@ -237,14 +237,14 @@ def comment_next(install_time):
 
 def client():
     global session
-    
+
     if not session:
         try:
             sessid = open(save.get_save_dir() + '/civsync.sessid.txt').read().strip()
         except IOError:
             sessid = None
         session = civsync.Session(sessid)
-    
+
     return session
 
 def request(callback, name, *args, **kwargs):
@@ -287,4 +287,3 @@ def get_install_time():
         with open(path, 'w') as f:
             f.write('%d' % install_time)
     return install_time
-    
