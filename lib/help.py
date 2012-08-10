@@ -1,11 +1,10 @@
 import ui
 import functools
-import pygame
 
 def show():
     global help_topics, help_data
     help_topics, help_data = load_help()
-    
+
     ui.set(HelpPanel())
 
 class HelpPanel(ui.HorizontalLayoutWidget):
@@ -13,7 +12,7 @@ class HelpPanel(ui.HorizontalLayoutWidget):
         def format_name(name):
             space_count = len(name) - len(name.lstrip(' '))
             return ('   ' * space_count) + name
-        
+
         super(HelpPanel, self).__init__()
         topics_width = 150
         list = ui.LinearLayoutWidget()
@@ -27,7 +26,7 @@ class HelpPanel(ui.HorizontalLayoutWidget):
         self.text_scroll = ui.ScrollWrapper(self.text)
         self.add(self.text_scroll)
         self.last_open = None
-    
+
     def open_topic(self, name):
         if self.last_open:
             self.labels[self.last_open].color = (0, 0, 0)
@@ -62,17 +61,17 @@ class LongTextWidget(ui.LinearLayoutWidget):
         self.font = font
         self.color = (0, 0, 0)
         self.set_text(text)
-    
+
     def set_text(self, text):
         self.items[:] = []
         lines = text.split('\n')
         line_imgs = map(self.draw_text, lines)
-        
+
         for img in line_imgs:
             self.add(ui.Image(img))
-        
+
         self.update_layout()
-    
+
     def draw_text(self, text):
         spacing = self.font.render('l', 1, (0,0,0)).get_width()
         width = self.width
@@ -87,11 +86,11 @@ class LongTextWidget(ui.LinearLayoutWidget):
                 current_width = 0
             words.append(img)
             current_width += img.get_width() + spacing
-        
+
         height = sum( max([ word.get_height() for word in line ] + [0]) for line in lines )
-        
-        surf = pygame.Surface((width, height), pygame.SRCALPHA)
-        
+
+        surf = graphics.create_surface(width, height)
+
         y = 0
         for line in lines:
             if not line: continue
@@ -100,7 +99,7 @@ class LongTextWidget(ui.LinearLayoutWidget):
                 surf.blit(word, (x, y))
                 x += word.get_width() + spacing
             y += max( word.get_height() for word in line )
-        
+
         return surf
 
 if __name__ == '__main__':

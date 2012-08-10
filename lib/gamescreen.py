@@ -14,11 +14,11 @@ import ui
 import uidialog
 import client
 import pygame
-import pygame.gfxdraw
 import functools
 
 from client import freeciv
 
+import graphics
 import citydlg
 import gamemenu
 import icons
@@ -384,7 +384,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = pygame.transform.smoothscale(img, (30, 45))
+            img = img.scale((30, 45))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
@@ -442,7 +442,7 @@ class OverviewWidget(object):
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
+        surf.draw_rect((255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
@@ -464,7 +464,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
+            surf.gfx_rect((255, 255, 255, 170), pos + self._size, 0)
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
@@ -498,7 +498,7 @@ class MapWidget(object):
         self.last_size = (0, 0)
         self.size = (0, 0)
         self.zoom = 1
-        self.dest_surf = pygame.Surface(self.get_real_size())
+        self.dest_surf = graphics.create_surface(*self.get_real_size())
         self.last_recentered_at = None
         self.start_drag = None
         self.last_drag_pos = None
@@ -514,7 +514,7 @@ class MapWidget(object):
             real = self.get_real_size()
             self.client.set_map_size(real)
             self.last_size = real
-            self.dest_surf = pygame.Surface(self.get_real_size())
+            self.dest_surf = graphics.create_surface(*self.get_real_size())
 
             #self.last_frame_updated += 1
             #if self.last_frame_updated == 3:
@@ -526,7 +526,7 @@ class MapWidget(object):
             self.client.draw_map(self.dest_surf, (0,0))
             try:
                 scale_dest = surf.subsurface(pos + self.size)
-                pygame.transform.scale(self.dest_surf, self.size, scale_dest)
+                pygame.transform.scale(self.dest_surf._pg, self.size, scale_dest._pg) # TODO: scale_to
             except ValueError:
                 pass
         else:

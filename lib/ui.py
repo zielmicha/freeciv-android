@@ -10,11 +10,11 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import pygame
-import pygame.gfxdraw
 import time
 import traceback
+import pygame
 
+import graphics
 import uidialog
 import functools
 import features
@@ -118,17 +118,14 @@ class Dialog(object):
 
     def draw(self, surf, pos):
         self.screen.draw(surf, pos)
-        #pygame.gfxdraw.box(surf, (0, 0) + screen_size, (255, 255, 255, 100))
 
         x, y = self.get_pos()
         size = self.item.size
         spacing = 5
         rect = (x + pos[0] - spacing, y + pos[1] - spacing, size[0] + spacing*2, size[1] + spacing*2)
 
-        #pygame.draw.rect(surf, (255, 255, 255), rect)
         round_rect(surf, (255, 255, 255), (0, 0, 0), rect, 10)
         self.item.draw(surf, (x + pos[0], y + pos[1]))
-        #pygame.draw.rect(surf, (0, 0, 0), rect, 1)
 
     def get_pos(self):
         size = self.item.size
@@ -224,13 +221,13 @@ def set_fill_image(image):
 
     _fill_image_not_resized = image
     if image:
-        _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
+        _fill_image = image.scale(graphics.get_window().get_size())
     else:
         _fill_image = None
 
 def fill(surf, rect, screen=None):
     if not _fill_image:
-        surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else pygame.display.get_surface().get_size()))
+        surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else graphics.get_window().get_size()))
     else:
         surf.blit(_fill_image, rect)
 
@@ -337,8 +334,8 @@ class LayoutWidget(object):
             item.draw(surf, _addpoints(pos, itempos))
 
     def draw_clipped(self, surf, pos, rect):
+        rect = graphics.Rect(rect)
         last_clip = surf.get_clip()
-        rect = pygame.Rect(rect)
         surf.set_clip(rect)
         self.positions = list(self.get_positions())
 
@@ -360,7 +357,7 @@ def render_text(font, text, color=(0, 0, 0)):
         renders = [ font.render(line, True, color) for line in lines ]
         w = max( render.get_width() for render in renders )
         h = sum( render.get_height() for render in renders )
-        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        surf = graphics.create_surface(w, h)
         y = 0
         for render in renders:
             surf.blit(render, (0, y))
@@ -474,7 +471,7 @@ class Bordered(LinearLayoutWidget):
             return self._size
 
     def draw(self, surf, pos):
-        pygame.draw.rect(surf, (0, 0, 0), pos + self.size, 1)
+        surf.draw_rect((0, 0, 0), pos + self.size, 1)
         LinearLayoutWidget.draw(self, surf, pos)
 
 def back(allow_override=True, anim=True):
@@ -491,46 +488,9 @@ def back(allow_override=True, anim=True):
 
 FPS = 15
 
-autoscale_enabled = False
-autoscale_scale = 1
-
 def add_overlay(overlay, pos):
     overlay.pos = pos
     overlays.append(overlay)
-
-def set_autoscale(surf):
-    global autoscale_enabled, _fill_image, autoscale_scale
-    autoscale_enabled = True
-
-    h = surf.get_height() * 800 / surf.get_width()
-    autoscale_scale = 800.0 / surf.get_width()
-
-    if _fill_image:
-        _fill_image = pygame.transform.smoothscale(_fill_image_not_resized, (800, h))
-
-    dest = pygame.Surface((800, h))
-
-    return dest
-
-def autoscale_flip(surf):
-    display = pygame.display.get_surface()
-    pygame.transform.smoothscale(surf, display.get_size(), display)
-    pygame.display.flip()
-
-def flip(surf):
-    if autoscale_enabled:
-        autoscale_flip(surf)
-    else:
-        pygame.display.flip()
-
-def maybe_set_autoscale(surf):
-    if surf.get_width() < 600:
-        return set_autoscale(surf)
-    else:
-        global autoscale_scale, autoscale_enabled
-        autoscale_enabled = False
-        autoscale_scale = 1
-        return surf
 
 import threading
 
@@ -540,7 +500,7 @@ execute_later_lock = threading.Lock()
 def main():
 
     def main_tick():
-        events = merge_mouse_events(pygame.event.get())
+        events = merge_mouse_events(graphics.get_events())
         if not screen:
             return
 
@@ -549,16 +509,15 @@ def main():
             if 'pos' in ev_dict:
                 ev_dict = dict(ev_dict)
                 x, y = ev_dict['pos']
-                ev_dict['pos'] =int(x*autoscale_scale), int(y*autoscale_scale)
+                ev_dict['pos'] = x, y
                 ev_dict['abs_pos'] = ev_dict['pos']
             if event.type == pygame.QUIT:
                 back()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 back()
-            elif event.type == pygame.MOUSEMOTION:
-                screen.event(Event(event.type, ev_dict))
             else:
                 screen.event(Event(event.type, ev_dict))
+
         screen.tick()
 
         for overlay in overlays:
@@ -580,7 +539,7 @@ def main():
         if show_fps and fps_label:
             surf.blit(fps_label, (surf.get_width() - fps_label.get_width(), 0))
 
-        flip(surf)
+        graphics.flip()
 
         check_pause()
 
@@ -590,8 +549,7 @@ def main():
     lost_time = 0.0
     per_frame = 1./FPS
     frame_last = 0
-    surf = pygame.display.get_surface()
-    surf = maybe_set_autoscale(surf)
+    surf = graphics.get_window()
     screen_width, screen_height = screen_size = surf.get_size()
     while True:
         try:
@@ -696,58 +654,44 @@ class WithText(object):
                 scale_h = float(self.size[1]) / self.image.get_height()
                 scale = min(scale_w, scale_h)
                 w, h = self.image.get_size()
-                self._scaled_image = pygame.transform.smoothscale(self.image, (int(w*scale), int(h*scale)))
+                self._scaled_image = self.image.scale((int(w*scale), int(h*scale)))
                 self._scaled_size = self.size
 
             iw, ih = self._scaled_image.get_size()
             w, h = self.size
             surf.blit(self._scaled_image, (pos[0] + (w - iw)/2, pos[1] + (h - ih)/2))
 
-def gfx_ellipse(surf, color, rect, width):
-    if width == 0:
-        f = pygame.gfxdraw.filled_ellipse
-    else:
-        f = pygame.gfxdraw.aaellipse
-    f(surf, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
-
-def gfx_rect(surf, color, rect, width):
-    if width == 0:
-        pygame.gfxdraw.box(surf, rect, color)
-    else:
-        pygame.gfxdraw.rectangle(surf, rect, color)
-
 def _round_rect(surface, color, rect, width, xr, yr):
     clip = surface.get_clip()
-    rect = pygame.Rect(rect)
 
     # left and right
     surface.set_clip(clip.clip(rect.inflate(0, 5-yr*2)))
-    gfx_rect(surface, color, rect.inflate(1-width,0), width)
+    surface.gfx_rect(color, rect.inflate(1-width,0), width)
 
     # top and bottom, without center
     surface.set_clip(clip.clip(rect.inflate(5-xr*2, 0)))
     if width != 0:
-        gfx_rect(surface, color, rect.inflate(0, 1-width), width)
+        surface.gfx_rect(color, rect.inflate(0, 1-width), width)
     else: # fill
         x, y, w, h = rect
-        gfx_rect(surface, color, (x, y, w, yr - 3), width)
-        gfx_rect(surface, color, (x, y + h - yr + 2, w, yr - 1), width)
+        surface.gfx_rect(color, (x, y, w, yr - 3), width)
+        surface.gfx_rect(color, (x, y + h - yr + 2, w, yr - 1), width)
 
     # top left corner
     surface.set_clip(clip.clip(rect.left, rect.top, xr-3, yr-3))
-    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
 
     # top right corner
     surface.set_clip(clip.clip(rect.right-xr+2, rect.top, xr, yr-3))
-    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
 
     # bottom left
     surface.set_clip(clip.clip(rect.left, rect.bottom-yr+2, xr-3, yr))
-    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
 
     # bottom right
     surface.set_clip(clip.clip(rect.right-xr+2, rect.bottom-yr+2, xr, yr))
-    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, pygame.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
 
     surface.set_clip(clip)
 
@@ -856,7 +800,7 @@ class Menu(LinearLayoutWidget):
         self.font = font or bigfont
 
     def add(self, label, callback, color=(0, 0, 0)):
-        screen_width = pygame.display.get_surface().get_width()
+        screen_width = graphics.get_window().get_width()
         self.items.append(Button(label, callback, self.font, color=color, force_width=0.5*screen_width))
 
     @staticmethod
@@ -872,14 +816,14 @@ class Menu(LinearLayoutWidget):
         set(menu)
 
 def load_font(name, size):
-    return pygame.font.Font('fonts/ProcionoTT.ttf', size)
+    return graphics.load_font('fonts/ProcionoTT.ttf', size)
 
 def load_image(name):
-    return pygame.image.load(name).convert_alpha()
+    return graphics.load_image(name)
 
 def init():
     global font, smallfont, bigfont, mediumfont, consolefont
-    pygame.init()
+    graphics.init()
 
     consolefont = load_font(None, 20)
     smallfont = font = load_font(None, 25)
