@@ -11,7 +11,6 @@
 # GNU General Public License for more details.
 
 import time
-import select
 import shutil
 import sys
 import osutil
