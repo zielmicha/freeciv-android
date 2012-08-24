@@ -1,6 +1,6 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
-GCC_PARAMS="-Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Icommon -Icommon/aicore -Iutility -Iai -Ilua -Itolua -I. -DHAVE_CONFIG_H"
+GCC_PARAMS="-Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Icommon -Icommon/aicore -Iutility -Iai -Ilua -Itolua -Iparallel -I. -DHAVE_CONFIG_H"
 EXCLUDE_FILES="lua/luac.c"
 ADD_SYMBOLS="none"
 ADD_SYMBOLS_FLAGS="-g"
@@ -11,7 +11,7 @@ output() {
 echo > Makefile.tmp
 
 ev=""
-for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
+for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c parallel/*.c; do
 	if echo "$name" | grep "$EXCLUDE_FILES"; then
 		continue
 	fi
@@ -23,14 +23,14 @@ for name in common/*.c common/aicore/*.c server/*.c server/generator/*.c server/
     fi
     ev="$ev $objfile"
     output "$objfile: $name"
-    output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
+    output "	gcc $GCC_PARAMS $additional -g -c -o $objfile $name \$(FLAGS)"
 done
 
 echo "all: freeciv-server" > client.mk
 echo "objectfiles.a: $ev
 	ar r objectfiles.a objectfiles/*.o" >> client.mk
 echo "freeciv-server: objectfiles.a
-	gcc -o freeciv-server objectfiles/*.o -lm -lz" >> client.mk
+	gcc -pthread -o freeciv-server objectfiles/*.o -g -lm -lz \$(FLAGS)" >> client.mk
 cat Makefile.tmp >> client.mk
 mv client.mk Makefile
 rm Makefile.tmp

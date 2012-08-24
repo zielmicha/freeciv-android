@@ -93,7 +93,7 @@ static int unit_def_rating_sq(const struct unit *punit,
  * Cached values. Updated by update_simple_ai_types.
  *
  * This a hack to enable emulation of old loops previously hardwired
- * as 
+ * as
  *    for (i = U_WARRIORS; i <= U_BATTLESHIP; i++)
  *
  * (Could probably just adjust the loops themselves fairly simply,
@@ -140,7 +140,7 @@ static struct city *find_neediest_airlift_city(const struct player *pplayer)
 }
 
 /**************************************************************************
-  Move defenders around with airports. Since this expends all our 
+  Move defenders around with airports. Since this expends all our
   movement, a valid question is - why don't we do this on turn end?
   That's because we want to avoid emergency actions to protect the city
   during the turn if that isn't necessary.
@@ -192,7 +192,7 @@ static void ai_airlift(struct player *pplayer)
   Similar to is_my_zoc(), but with some changes:
   - destination (x0,y0) need not be adjacent?
   - don't care about some directions?
-  
+
   Note this function only makes sense for ground units.
 
   Fix to bizarre did-not-find bug.  Thanks, Katvrr -- Syela
@@ -213,7 +213,7 @@ static bool could_be_my_zoc(struct unit *myunit, struct tile *ptile)
       return FALSE;
     }
   } adjc_iterate_end;
-  
+
   return TRUE;
 }
 
@@ -229,7 +229,7 @@ int could_unit_move_to_tile(struct unit *punit, struct tile *dest_tile)
 {
   enum unit_move_result reason =
       unit_move_to_tile_test(unit_type(punit), unit_owner(punit),
-                             ACTIVITY_IDLE, punit->tile, 
+                             ACTIVITY_IDLE, punit->tile,
                              dest_tile, unit_has_type_flag(punit, F_IGZOC));
   switch (reason) {
   case MR_OK:
@@ -401,7 +401,7 @@ int kill_desire(int benefit, int attack, int loss, int vuln, int victim_count)
 {
   int desire;
 
-  /*         attractiveness     danger */ 
+  /*         attractiveness     danger */
   desire = ((benefit * attack - loss * vuln) * victim_count * SHIELD_WEIGHTING
             / (attack + vuln * victim_count));
 
@@ -412,8 +412,8 @@ int kill_desire(int benefit, int attack, int loss, int vuln, int victim_count)
   Compute how much we want to kill certain victim we've chosen, counted in
   SHIELDs.  See comment to kill_desire.
 
-  chance -- the probability the action will succeed, 
-  benefit -- the benefit (in shields) that we are getting in the case of 
+  chance -- the probability the action will succeed,
+  benefit -- the benefit (in shields) that we are getting in the case of
              success
   loss -- the loss (in shields) that we suffer in the case of failure
 
@@ -488,19 +488,19 @@ static bool is_my_turn(struct unit *punit, struct unit *pdef)
 }
 
 /*************************************************************************
-  This function appraises the location (x, y) for a quick hit-n-run 
+  This function appraises the location (x, y) for a quick hit-n-run
   operation.  We do not take into account reinforcements: rampage is for
   loners.
 
   Returns value as follows:
-    -RAMPAGE_FREE_CITY_OR_BETTER    
+    -RAMPAGE_FREE_CITY_OR_BETTER
              means undefended enemy city
-    -RAMPAGE_HUT_OR_BETTER    
+    -RAMPAGE_HUT_OR_BETTER
              means hut
-    RAMPAGE_ANYTHING ... RAMPAGE_HUT_OR_BETTER - 1  
+    RAMPAGE_ANYTHING ... RAMPAGE_HUT_OR_BETTER - 1
              is value of enemy unit weaker than our unit
     0        means nothing found or error
-  Here the minus indicates that you need to enter the target tile (as 
+  Here the minus indicates that you need to enter the target tile (as
   opposed to attacking it, which leaves you where you are).
 **************************************************************************/
 static int ai_rampage_want(struct unit *punit, struct tile *ptile)
@@ -524,7 +524,7 @@ static int ai_rampage_want(struct unit *punit, struct tile *ptile)
      * shouldn't send already injured units to useless suicide.
      * Note that we do not specially encourage attacks against
      * cities: rampage is a hit-n-run operation. */
-    if (!is_stack_vulnerable(ptile) 
+    if (!is_stack_vulnerable(ptile)
         && unit_list_size(ptile->units) > 1) {
       benefit = (benefit * punit->hp) / unit_type(punit)->hp;
     }
@@ -577,7 +577,7 @@ static struct pf_path *find_rampage_target(struct unit *punit,
   /* Want of the best target */
   int max_want = 0;
   struct player *pplayer = unit_owner(punit);
- 
+
   pft_fill_unit_attack_param(&parameter, punit);
   /* When trying to find rampage targets we ignore risks such as
    * enemy units because we are looking for trouble!
@@ -589,18 +589,18 @@ static struct pf_path *find_rampage_target(struct unit *punit,
     int want;
     bool move_needed;
     int thresh;
- 
+
     if (move_cost > punit->moves_left) {
       /* This is too far */
       break;
     }
 
-    if (ai_handicap(pplayer, H_TARGETS) 
+    if (ai_handicap(pplayer, H_TARGETS)
         && !map_is_known_and_seen(iter_tile, pplayer, V_MAIN)) {
       /* The target is under fog of war */
       continue;
     }
-    
+
     want = ai_rampage_want(punit, iter_tile);
 
     /* Negative want means move needed even though the tiles are adjacent */
@@ -611,7 +611,7 @@ static struct pf_path *find_rampage_target(struct unit *punit,
     want = (want < 0 ? -want : want);
 
     if (want > max_want && want > thresh) {
-      /* The new want exceeds both the previous maximum 
+      /* The new want exceeds both the previous maximum
        * and the relevant threshold, so it's worth recording */
       max_want = want;
       ptile = iter_tile;
@@ -625,15 +625,15 @@ static struct pf_path *find_rampage_target(struct unit *punit,
   }
 
   pf_map_destroy(tgt_map);
-  
+
   return path;
 }
 
 /*************************************************************************
   Find and kill anything reachable within this turn and worth more than
-  the relevant of the given thresholds until we have run out of juicy 
-  targets or movement.  The first threshold is for attacking which will 
-  leave us where we stand (attacking adjacent units), the second is for 
+  the relevant of the given thresholds until we have run out of juicy
+  targets or movement.  The first threshold is for attacking which will
+  leave us where we stand (attacking adjacent units), the second is for
   attacking distant (but within reach) targets.
 
   For example, if unit is a bodyguard on duty, it should call
@@ -643,13 +643,13 @@ static struct pf_path *find_rampage_target(struct unit *punit,
 
   Returns TRUE if survived the rampage session.
 **************************************************************************/
-bool ai_military_rampage(struct unit *punit, int thresh_adj, 
+bool ai_military_rampage(struct unit *punit, int thresh_adj,
 			 int thresh_move)
 {
   int count = punit->moves_left + 1; /* break any infinite loops */
   struct pf_path *path = NULL;
 
-  TIMING_LOG(AIT_RAMPAGE, TIMER_START);  
+  TIMING_LOG(AIT_RAMPAGE, TIMER_START);
   CHECK_UNIT(punit);
 
   fc_assert_ret_val(thresh_adj <= thresh_move, TRUE);
@@ -857,7 +857,7 @@ int look_for_charge(struct player *pplayer, struct unit *punit,
   return ((best_def * 100) / toughness);
 }
 
-/********************************************************************** 
+/**********************************************************************
   See if we have a specific job for the unit.
 ***********************************************************************/
 static void ai_military_findjob(struct player *pplayer,struct unit *punit)
@@ -895,9 +895,9 @@ static void ai_military_findjob(struct player *pplayer,struct unit *punit)
     /* Check if the city we are on our way to rescue is still in danger,
      * or the unit we should protect is still alive... */
     if ((aunit && (aiguard_has_guard(aunit) || aiguard_wanted(aunit))
-         && unit_def_rating_basic(punit) > unit_def_rating_basic(aunit)) 
+         && unit_def_rating_basic(punit) > unit_def_rating_basic(aunit))
         || (acity && city_owner(acity) == unit_owner(punit)
-            && city_data->urgency != 0 
+            && city_data->urgency != 0
             && city_data->danger > assess_defense_quadratic(acity))) {
       return; /* Yep! */
     } else {
@@ -936,7 +936,7 @@ static void ai_military_findjob(struct player *pplayer,struct unit *punit)
   TIMING_LOG(AIT_BODYGUARD, TIMER_STOP);
 }
 
-/********************************************************************** 
+/**********************************************************************
   Send a unit to the city it should defend. If we already have a city
   it should defend, use the punit->server.ai->charge field to denote this.
   Otherwise, it will stay put in the city it is in, or find a city
@@ -1139,7 +1139,7 @@ int find_something_to_kill(struct player *pplayer, struct unit *punit,
    * p_a_w isn't called, and we end up not wanting ironclads and therefore
    * never learning steam engine, even though ironclads would be very
    * useful. -- Syela */
-  int bk = 0; 
+  int bk = 0;
   int want;             /* Want (amortized) of the operaton. */
   int best = 0;         /* Best of all wants. */
   struct tile *goto_dest_tile = NULL;
@@ -1212,7 +1212,7 @@ int find_something_to_kill(struct player *pplayer, struct unit *punit,
 
           city_data->attack += unit_att_rating(aunit);
           city_data->bcost += unit_build_shield_cost(aunit);
-        } 
+        }
       }
       invasion_funct(aunit, FALSE, unit_move_rate(aunit) / SINGLE_MOVE,
                      (unit_can_take_over(aunit)
@@ -1425,7 +1425,7 @@ int find_something_to_kill(struct player *pplayer, struct unit *punit,
                               vulnerability, victim_count);
         }
       }
-      want -= move_time * (unhap ? SHIELD_WEIGHTING + 2 * TRADE_WEIGHTING 
+      want -= move_time * (unhap ? SHIELD_WEIGHTING + 2 * TRADE_WEIGHTING
                            : SHIELD_WEIGHTING);
       /* Build_cost of ferry. */
       needferry = (go_by_boat && NULL == ferryboat
@@ -1703,7 +1703,7 @@ static void ai_military_attack_barbarian(struct player *pplayer,
 /*************************************************************************
   This does the attack until we have used up all our movement, unless we
   should safeguard a city.  First we rampage nearby, then we go
-  looking for trouble elsewhere. If there is nothing to kill, sailing units 
+  looking for trouble elsewhere. If there is nothing to kill, sailing units
   go home, others explore while barbs go berserk.
 **************************************************************************/
 static void ai_military_attack(struct player *pplayer, struct unit *punit)
@@ -1720,12 +1720,12 @@ static void ai_military_attack(struct player *pplayer, struct unit *punit)
    * until it runs out of targets. */
   /* FIXME: 1. ai_military_rampage never checks if it should defend newly
    * conquered cities.
-   * FIXME: 2. would be more convenient if it returned FALSE if we run out 
+   * FIXME: 2. would be more convenient if it returned FALSE if we run out
    * of moves too.*/
   if (!ai_military_rampage(punit, RAMPAGE_ANYTHING, RAMPAGE_ANYTHING)) {
     return; /* we died */
   }
-  
+
   if (punit->moves_left <= 0) {
     return;
   }
@@ -1765,7 +1765,7 @@ static void ai_military_attack(struct player *pplayer, struct unit *punit)
         }
 
         /* Either we're adjacent or we sitting on the tile. We might be
-         * sitting on the tile if the enemy that _was_ sitting there 
+         * sitting on the tile if the enemy that _was_ sitting there
          * attacked us and died _and_ we had enough movement to get there */
         if (same_pos(punit->tile, dest_tile)) {
           UNIT_LOG(LOG_DEBUG, punit, "mil att made it -> (%d, %d)",
@@ -1863,7 +1863,7 @@ static void ai_caravan_goto(struct player *pplayer,
              punit->id,
              TILE_XY(punit->tile),
              help_wonder ? "help a wonder" : "trade", city_name(pcity));
-    alive = ai_unit_goto(punit, pcity->tile); 
+    alive = ai_unit_goto(punit, pcity->tile);
   }
 
   /* if moving didn't kill us, and we got to the destination, handle it. */
@@ -1954,7 +1954,7 @@ static void ai_manage_caravan(struct player *pplayer, struct unit *punit)
 }
 
 /*************************************************************************
- This function goes wait a unit in a city for the hitpoints to recover. 
+ This function goes wait a unit in a city for the hitpoints to recover.
  If something is attacking our city, kill it yeahhh!!!.
 **************************************************************************/
 static void ai_manage_hitpoint_recovery(struct unit *punit)
@@ -1969,7 +1969,7 @@ static void ai_manage_hitpoint_recovery(struct unit *punit)
   if (pcity) {
     /* rest in city until the hitpoints are recovered, but attempt
        to protect city from attack (and be opportunistic too)*/
-    if (ai_military_rampage(punit, RAMPAGE_ANYTHING, 
+    if (ai_military_rampage(punit, RAMPAGE_ANYTHING,
                             RAMPAGE_FREE_CITY_OR_BETTER)) {
       UNIT_LOG(LOGLEVEL_RECOVERY, punit, "recovering hit points.");
     } else {
@@ -1978,8 +1978,8 @@ static void ai_manage_hitpoint_recovery(struct unit *punit)
   } else {
     /* goto to nearest city to recover hit points */
     /* just before, check to see if we can occupy an undefended enemy city */
-    if (!ai_military_rampage(punit, RAMPAGE_FREE_CITY_OR_BETTER, 
-                             RAMPAGE_FREE_CITY_OR_BETTER)) { 
+    if (!ai_military_rampage(punit, RAMPAGE_FREE_CITY_OR_BETTER,
+                             RAMPAGE_FREE_CITY_OR_BETTER)) {
       return; /* oops, we died */
     }
 
@@ -2005,7 +2005,7 @@ static void ai_manage_hitpoint_recovery(struct unit *punit)
   if (punit->hp == punittype->hp) {
     /* we are ready to go out and kick ass again */
     UNIT_LOG(LOGLEVEL_RECOVERY, punit, "ready to kick ass again!");
-    ai_unit_new_role(punit, AIUNIT_NONE, NULL);  
+    ai_unit_new_role(punit, AIUNIT_NONE, NULL);
     return;
   } else {
     def_ai_unit_data(punit)->done = TRUE; /* sit tight */
@@ -2090,7 +2090,7 @@ void ai_manage_military(struct player *pplayer, struct unit *punit)
     ai_military_attack(pplayer, punit);
     TIMING_LOG(AIT_ATTACK, TIMER_STOP);
     break;
-  case AIUNIT_ESCORT: 
+  case AIUNIT_ESCORT:
     TIMING_LOG(AIT_BODYGUARD, TIMER_START);
     ai_military_bodyguard(pplayer, punit);
     TIMING_LOG(AIT_BODYGUARD, TIMER_STOP);
@@ -2207,7 +2207,7 @@ void ai_manage_unit(struct player *pplayer, struct unit *punit)
   if (!bodyguard && aiguard_has_guard(punit)) {
     UNIT_LOG(LOGLEVEL_BODYGUARD, punit, "lost bodyguard, asking for new");
     aiguard_request_guard(punit);
-  }  
+  }
 
   if (punit->moves_left <= 0) {
     /* Can do nothing */
@@ -2266,13 +2266,13 @@ void ai_manage_unit(struct player *pplayer, struct unit *punit)
 
     /* TODO: We can try using air-unit code for helicopters, just
      * pretend they have fuel = HP / 3 or something. */
-    def_ai_unit_data(punit)->done = TRUE; /* we did our best, which was ... 
+    def_ai_unit_data(punit)->done = TRUE; /* we did our best, which was ...
                                              nothing */
     return;
   } else if (is_military_unit(punit)) {
     TIMING_LOG(AIT_MILITARY, TIMER_START);
     UNIT_LOG(LOG_DEBUG, punit, "recruit unit for the military");
-    ai_manage_military(pplayer,punit); 
+    ai_manage_military(pplayer,punit);
     TIMING_LOG(AIT_MILITARY, TIMER_STOP);
     return;
   } else {
@@ -2356,7 +2356,8 @@ static void ai_set_defenders(struct player *pplayer)
   when its role has accomplished its mission or the manage function
   fails to have or no longer has any use for the unit.
 **************************************************************************/
-void ai_manage_units(struct player *pplayer) 
+#include <fcparallel.h>
+void ai_manage_units(struct player *pplayer)
 {
   TIMING_LOG(AIT_AIRLIFT, TIMER_START);
   ai_airlift(pplayer);
@@ -2374,13 +2375,15 @@ void ai_manage_units(struct player *pplayer)
    * allowed to leave home. */
   ai_set_defenders(pplayer);
 
+  fcparallel_start();
   unit_list_iterate_safe(pplayer->units, punit) {
     if (punit->transported_by <= 0 && !def_ai_unit_data(punit)->done) {
       /* Though it is usually the passenger who drives the transport,
        * the transporter is responsible for managing its passengers. */
-      ai_manage_unit(pplayer, punit);
+      fcparallel_add_task(ai_manage_unit, 2, pplayer, punit);
     }
   } unit_list_iterate_safe_end;
+  fcparallel_end();
 }
 
 /**************************************************************************
@@ -2429,10 +2432,10 @@ static void ai_manage_barbarian_leader(struct player *pplayer,
   if (is_boss_of_boat(leader)) {
     /* We are in charge. Of course, since we are the leader...
      * But maybe somebody more militaristic should lead our ship to battle! */
-  
+
     /* First release boat from leaders lead */
     aiferry_clear_boat(leader);
-  
+
     unit_list_iterate(leader_tile->units, warrior) {
       if (!unit_has_type_role(warrior, L_BARBARIAN_LEADER)
           && get_transporter_capacity(warrior) == 0
@@ -2563,7 +2566,7 @@ static void ai_manage_barbarian_leader(struct player *pplayer,
     UNIT_LOG(LOG_DEBUG, leader, "Barbarian leader: fleeing to (%d, %d).",
              TILE_XY(safest_tile));
     if (same_pos(leader->tile, safest_tile)) {
-      UNIT_LOG(LOG_DEBUG, leader, 
+      UNIT_LOG(LOG_DEBUG, leader,
                "Barbarian leader: reached the safest position.");
       unit_activity_handling(leader, ACTIVITY_IDLE);
       pf_map_destroy(pfm);
@@ -2608,7 +2611,7 @@ bool enemies_at(struct unit *punit, struct tile *ptile)
       continue;
     }
     unit_list_iterate(ptile1->units, enemy) {
-      if (pplayers_at_war(unit_owner(enemy), unit_owner(punit)) 
+      if (pplayers_at_war(unit_owner(enemy), unit_owner(punit))
           && can_unit_attack_unit_at_tile(enemy, punit, ptile)
           && can_unit_attack_units_at_tile(enemy, ptile)) {
         a += unit_att_rating(enemy);
