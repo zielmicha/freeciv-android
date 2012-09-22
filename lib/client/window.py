@@ -116,7 +116,7 @@ def init_screen(size=None):
             return (1280, 800)
         else:
             w, h = max_size
-            MAX_W = 800
+            MAX_W = 1000
             if w > MAX_W:
                 scale = h / float(w)
                 size = (MAX_W, int(MAX_W * scale))
