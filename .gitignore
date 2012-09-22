@@ -29,3 +29,16 @@ gendoc.py
 /server/common
 /profileout
 /showgtk.py
+/zlib-1.2.5
+/#TODO#
+/freeciv-android-dep.tgz
+/gmon.out
+/main-chroot
+/push-file
+/pygame-package.tar.bz2
+/server/gmon.out
+/src/python-include/
+/src/python2.6/
+/src/src
+/start-app
+/start-xserver
