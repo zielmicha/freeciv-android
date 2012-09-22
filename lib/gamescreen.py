@@ -15,11 +15,11 @@ import ui
 import uidialog
 import client
 import pygame
+import pygame.gfxdraw
 import functools
 
 from client import freeciv
 
-import graphics
 import citydlg
 import gamemenu
 import icons
@@ -385,7 +385,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = img.scale((30, 45))
+            img = pygame.transform.smoothscale(img, (30, 45))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
@@ -443,7 +443,7 @@ class OverviewWidget(object):
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        surf.draw_rect((255,255,255), pos + self.size, 1)
+        pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
@@ -465,7 +465,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            surf.gfx_rect((255, 255, 255, 170), pos + self._size, 0)
+            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
@@ -572,7 +572,7 @@ class MapDrawer(object):
         self.valid_for_origin = None # if get_map_view_origin() returns something else, redraw map
         self.user_corner = (0.0, 0.0) # this point should be painted in top-left corner
 
-        self.map_cache = graphics.create_surface(1, 1)
+        self.map_cache = pygame.Surface((1, 1), pygame.SRCALPHA)
         self.last_map_size = None
         self.widget_size = (0, 0)
         self.scrolling = False
@@ -608,7 +608,7 @@ class MapDrawer(object):
                 self.client.draw_map(self.map_cache, (0, 0))
                 rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
                                            self.map_cache.get_height() - self.user_corner[1])
-                surf.blit(self.map_cache.subsurface(rect).scale_by(self.zoom), (pos[0], pos[1]))
+                surf.blit(scale_by(self.map_cache.subsurface(rect), self.zoom), (pos[0], pos[1]))
         else:
             if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
@@ -628,7 +628,7 @@ class MapDrawer(object):
         #self.map_cache._pg.fill((100, 0, 100))
         self.client.draw_map(self.map_cache, (0, 0))
         if self.zoom != 1:
-            self.scaled_map_cache.blit(self.map_cache.scale_by(self.zoom), (0, 0))
+            self.scaled_map_cache.blit(scale_by(self.map_cache, self.zoom), (0, 0))
 
     def does_exceed(self):
         corner = (self.user_corner[0] * self.zoom, self.user_corner[1] * self.zoom)
@@ -652,9 +652,9 @@ class MapDrawer(object):
         size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
-            self.map_cache = graphics.create_surface(size[0], size[1])
+            self.map_cache = pygame.Surface((size[0], size[1]))
             if self.zoom != 1:
-                self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
+                self.scaled_map_cache = pygame.Surface((int(size_mul * w), int(size_mul * h)))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         self.valid_for_origin = freeciv.func.get_map_view_origin()
 
@@ -665,6 +665,10 @@ class MapDrawer(object):
 
     def coord_ui_to_map(self, pos):
         return pos[0] + self.user_corner[0], pos[1] + self.user_corner[1]
+
+def scale_by(img, zoom):
+    w, h = img.get_size()
+    return pygame.transform.smoothscale(img, (int(w * zoom), int(h * zoom)))
 
 def init():
     gamemenu.init()

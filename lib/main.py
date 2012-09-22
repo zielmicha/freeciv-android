@@ -12,6 +12,7 @@
 
 import time
 import shutil
+import pygame
 import sys
 import osutil
 import thread
@@ -36,7 +37,6 @@ import features
 import monitor
 import options
 import menus
-import graphics
 
 from sync import lzma
 
@@ -67,10 +67,10 @@ def client_main():
     if try_resume():
         ui.main()
         return
-
+    
     ui.set(ui.Label('loading...'))
     ui.execute_later.append(app_main)
-
+    
     if features.get('app.profile'):
         profile_main()
     else:
@@ -78,7 +78,7 @@ def client_main():
 
 def app_main():
     action = sys.argv[1] if sys.argv[1:] else None
-
+    
     if action == 'load':
         savename = sys.argv[2]
         save.load_game(savename)
@@ -97,7 +97,7 @@ def app_main():
         import help
         help.show()
     else:
-        if action:
+        if action:    
             print 'unknown action %r, see lib/main.py for actions' % action
         menus.main_menu()
 
@@ -122,9 +122,9 @@ def run_autoupdate():
 
 def notify_update(url):
     print 'update found at', url
-
+    
     time.sleep(1)
-
+    
     with ui.execute_later_lock:
         ui.execute_later.append(lambda: menus.notify_update(url))
 
@@ -143,7 +143,7 @@ def unpack_data():
                 last_flipped = time.time()
             if '..' in info.name or info.name.startswith('/'):
                 raise IOError('unsafe file name')
-
+            
             if info.isdir():
                 info = copy.copy(info)
                 info.mode = 0o700
@@ -222,7 +222,7 @@ def maybe_start_remote_debug():
     if features.get('debug.remote'):
         import remote_shell
         remote_shell.start()
-
+        
 def setup_android_version():
     vernum = osutil.get_android_version()
     if vernum >= 14: # icecream sandwich causes bug
@@ -258,27 +258,27 @@ def main(size=None, init=True):
     features.parse_options()
     setup_game_version()
     setup_android_version()
-    setup_errors()
+    setup_errors()    
     size = size or check_force_size()
-
+    
     maybe_start_remote_debug()
-
+    
     monitor.start()
-
+    
     client.window.init_screen(size)
     osutil.init()
-
+    
     ui.init()
     ui.set_fill_image(None)
     unpack_data()
-    ui.set_fill_image(graphics.load_image('data/user/background.jpg'))
-
+    ui.set_fill_image(pygame.image.load('data/user/background.jpg'))
+    
     setup_freeciv_config()
     client.window.init()
     gamescreen.init()
-
+    
     start_autoupdate()
-
+    
     if init:
         client.freeciv.run()
     else:

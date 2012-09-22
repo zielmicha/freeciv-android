@@ -28,7 +28,7 @@ class SpacingLayoutWidget(ui.LayoutWidget):
         self.items = (item1, item2)
         self.size = (0,0)
         self._asked_size = size
-
+    
     def get_positions(self):
         assert sum(map(lambda a:0 if a==0 else 1, self._asked_size)) == 1, 'exactly one value in tuple `size` should be zero'
         is_horizontal = self._asked_size[1] == 0
@@ -55,29 +55,29 @@ def create_aligned_widget(widget, align, size=None):
 class PrettyMenu(ui.AbsoluteLayoutWidget):
     def __init__(self):
         ui.AbsoluteLayoutWidget.__init__(self)
-
+        
         self.load_background()
-
+        
         self.left = ui.HorizontalLayoutWidget(spacing=10)
         self.left.add(ui.Spacing(0, 0))
         self.right = ui.HorizontalLayoutWidget(spacing=10)
         self.cont = SpacingLayoutWidget(self.left, self.right, (ui.screen_width, 0))
         self.add(create_aligned_widget(self.cont, ui.BOTTOM, (0, ui.screen_height - 10)), (0,0))
-
+    
     balloon_margin = 30
-
+    
     def show_balloon(self, over, baloon):
         self.update_layout()
         baloon.update_layout()
         pos = self.get_position_of(over)
         self.add(baloon, (pos[0], pos[1] - baloon.size[1] - self.balloon_margin))
-
+    
     def toggle_balloon(self, over, baloon):
         if baloon in self.items:
             self.items.remove(baloon)
         else:
             self.show_balloon(over, baloon)
-
+    
     def load_background(self):
         img = ui.load_image('data/user/intro.jpg')
         img_size = img.get_size()
@@ -86,8 +86,8 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
         if new_height < surf_size[1]:
             new_height = surf_size[1]
         self.background_margin_top = (new_height - surf_size[1]) / -2.5
-        self.background = img.scale((surf_size[0], int(new_height)))
-
+        self.background = pygame.transform.smoothscale(img, (surf_size[0], int(new_height)))
+    
     def draw(self, surf, (x, y)):
         surf.blit(self.background, (x, y + self.background_margin_top))
         super(PrettyMenu, self).draw(surf, (x, y))
@@ -96,10 +96,10 @@ class MenuButton(ui.Button):
     active_bg = (255, 255, 200, 20)
     bg = (150, 150, 50, 80)
     fg = (150, 150, 50)
-
+    
     def __init__(self, text, callback, **kwargs):
         ui.Button.__init__(self, text, callback, force_width=100, **kwargs)
-
+    
     def set_text(self, label):
         if '\n' not in label:
             label += '\n '
@@ -108,13 +108,44 @@ class MenuButton(ui.Button):
 class RedMenuButton(MenuButton):
     bg = (220, 150, 50, 110)
 
+class BalloonButton(ui.Button):
+    bg = (220, 150, 0, 110)
+    
+    def __init__(self, text, callback, **kwargs):
+        ui.Button.__init__(self, text, callback, force_width=100, **kwargs)
+
+class Balloon(ui.AbsoluteLayoutWidget):
+    margin = 10
+    
+    def __init__(self):
+        ui.AbsoluteLayoutWidget.__init__(self)
+        self.content = ui.HorizontalLayoutWidget()
+        self.add(self.content, (self.margin, self.margin))
+    
+    def draw(self, surf, pos):
+        rect = pos + (self.content.size[0] + self.margin*2, self.content.size[1] + self.margin*2)
+        tpos = (pos[0] + 10, pos[1] + self.content.size[1] + self.margin*2 - 1)
+        tw = th = 18
+        
+        ui._round_rect(surf, (255,255,255,255), rect, 0, 10, 10)
+        pygame.gfxdraw.trigon(surf, tpos[0], tpos[1], tpos[0]+tw, tpos[1], tpos[0], tpos[1]+th, (255,255,255))
+        pygame.gfxdraw.filled_trigon(surf, tpos[0], tpos[1], tpos[0]+tw, tpos[1], tpos[0], tpos[1]+th, (255,255,255))
+        ui._round_rect(surf, (255,255,0,255), rect, 1, 10, 10)
+        ui.AbsoluteLayoutWidget.draw(self, surf, pos)
+
+class _D(ui.Label):
+    'Label that prints its pos - for debugging'
+    def draw(self, surf, pos):
+        print pos, '(clip=%r)' % surf.get_clip()
+        ui.Label.draw(self, surf, pos)
+
 main_menu_item = None
 main_menu_update_shown = False
 
 def main_menu():
     global main_menu_item
     main_menu_item = menu = PrettyMenu()
-
+    
     menu.add(ui.Label('version %s' % features.get('app.version'), color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
     new_game_button = MenuButton('New\ngame', new_game_menu)
     menu.left.add(new_game_button)
@@ -122,21 +153,21 @@ def main_menu():
     menu.left.add(load_game_button)
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))
-
+    
     menu.right.add(MenuButton('Feed\nback', feedback))
-    menu.right.add(MenuButton('', options.show_options, image=ui.load_image('data/user/options.png')))
+    menu.right.add(MenuButton('', options.show_options, image=ui.load_image('data/user/options.png').convert_alpha()))
     menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))
-
+    
     ui.replace(menu)
 
 def new_game_menu():
     menu = ui.Menu(force_full = False)
-
-    menu.add('Tutorial', tutorial.start)
+    
+    menu.add('Tutorial', tutorial.start)    
     menu.add('Random', save.new_game)
     menu.add('Scenario', save.load_scenario)
-
+    
     ui.set_dialog(menu)
 
 def notify_update(url):
@@ -144,13 +175,13 @@ def notify_update(url):
         # game was started by "load" command
         print 'not showing update button'
         return
-
+    
     def callback():
         button.set_text('Loading...')
         button.callback = None
         with ui.execute_later_lock:
             ui.execute_later.append(lambda: uidialog.open_url(url))
-
+    
     global main_menu_update_shown
     if main_menu_update_shown:
         return
