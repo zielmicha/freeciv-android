@@ -9,16 +9,17 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+from __future__ import division
 
 import ui
 import uidialog
 import client
 import pygame
-import pygame.gfxdraw
 import functools
 
 from client import freeciv
 
+import graphics
 import citydlg
 import gamemenu
 import icons
@@ -332,7 +333,7 @@ class TaxesPanel(ui.LinearLayoutWidget):
         lux_img = icons.get_small_image('elvis')
 
         def add(value, img):
-            for i in xrange(value/10):
+            for i in xrange(int(value/10)):
                 panel.add(ui.Image(img))
 
         add(tax, tax_img)
@@ -384,7 +385,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = pygame.transform.smoothscale(img, (30, 45))
+            img = img.scale((30, 45))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
@@ -442,7 +443,7 @@ class OverviewWidget(object):
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
+        surf.draw_rect((255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
@@ -464,7 +465,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
+            surf.gfx_rect((255, 255, 255, 170), pos + self._size, 0)
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
@@ -495,53 +496,22 @@ class ConsoleScrollWrapper(ui.ScrollWrapper):
 class MapWidget(object):
     def __init__(self, client):
         self.client = client
-        self.last_size = (0, 0)
+
+        self.drawer = MapDrawer(client)
+
         self.size = (0, 0)
-        self.zoom = 1
-        self.dest_surf = pygame.Surface(self.get_real_size())
-        self.last_recentered_at = None
+        self.last_size = None
         self.start_drag = None
         self.last_drag_pos = None
         self.was_dragged = False
 
-        self.last_frame_updated = 0
-
     def tick(self):
         pass
-
-    def draw(self, surf, pos):
-        if self.get_real_size() != self.last_size:
-            real = self.get_real_size()
-            self.client.set_map_size(real)
-            self.last_size = real
-            self.dest_surf = pygame.Surface(self.get_real_size())
-
-            #self.last_frame_updated += 1
-            #if self.last_frame_updated == 3:
-            #    self.last_frame_updated = 0
-
-            #self.client.update_map_canvas_visible()
-
-        if self.zoom != 1:
-            self.client.draw_map(self.dest_surf, (0,0))
-            try:
-                scale_dest = surf.subsurface(pos + self.size)
-                pygame.transform.scale(self.dest_surf, self.size, scale_dest)
-            except ValueError:
-                pass
-        else:
-            self.client.draw_map(surf, pos)
-
-    def get_real_size(self):
-        x, y = self.size
-        return int(x / self.zoom), int(y / self.zoom)
 
     def back(self):
         self.client.escape()
 
     def event(self, ev):
-        if hasattr(ev, 'pos'):
-            ev.pos = (int(ev.pos[0] / self.zoom), int(ev.pos[1] / self.zoom))
         if ev.type == pygame.MOUSEMOTION:
             if self.start_drag:
                 if not self.was_dragged:
@@ -554,41 +524,147 @@ class MapWidget(object):
                 if self.was_dragged:
                     self.drag(ev.pos)
                     return
-            self.client.mouse_motion(ev.pos)
+
+            self.client.mouse_motion(self.drawer.coord_ui_to_map(ev.pos))
             return ui.LOCK_MOUSE_EVENT
+
         elif ev.type == pygame.MOUSEBUTTONDOWN:
             x, y = ev.pos
-            if ev.button == 3:
-                self.recenter_at(x, y)
-            else:
-                #print 'start_drag'
-                self.start_drag = ev.pos
+            self.start_drag = ev.pos
+            self.drawer.start_scrolling()
             return ui.LOCK_MOUSE_EVENT
+
         elif ev.type == pygame.MOUSEBUTTONUP:
             if self.was_dragged:
                 self.drag(ev.pos)
                 self.was_dragged = False
             elif ev.button == 1:
-                x, y = ev.pos
+                x, y = self.drawer.coord_ui_to_map(ev.pos)
                 freeciv.func.action_button_pressed(x, y, SELECT_POPUP)
+            self.drawer.end_scrolling()
             self.start_drag = None
             self.last_drag_pos = None
+
         elif ev.type in (pygame.KEYDOWN, pygame.KEYUP):
             self.client.key_event(ev.type, ev.key)
 
-    def recenter_at(self, x, y):
-        self.last_recentered_at = freeciv.func.canvas_pos_to_nearest_tile_id(x, y)
-        freeciv.func.recenter_button_pressed(x, y)
+    def draw(self, surf, pos):
+        if self.size != self.last_size:
+            self.drawer.set_size(self.size)
+            self.last_size = self.size
+        self.drawer.draw(surf, pos)
 
     def drag(self, pos):
         if not self.last_drag_pos:
             self.last_drag_pos = self.start_drag
         delta = ui._subpoints(self.last_drag_pos, pos)
-        x, y = freeciv.func.get_map_view_origin()
-        #print 'drag', x + delta[0], y + delta[1]
-        freeciv.func.set_mapview_origin(x + delta[0], y + delta[1])
         self.last_drag_pos = pos
 
+        self.drawer.move_map(delta)
+
+    def change_zoom(self, zoom):
+        self.drawer.change_zoom(zoom)
+
+class MapDrawer(object):
+    def __init__(self, client):
+        self.client = client
+
+        self.valid_for_origin = None # if get_map_view_origin() returns something else, redraw map
+        self.user_corner = (0.0, 0.0) # this point should be painted in top-left corner
+
+        self.map_cache = graphics.create_surface(1, 1)
+        self.last_map_size = None
+        self.widget_size = (0, 0)
+        self.scrolling = False
+        self.zoom = 1
+
+        self.MAP_CACHE_SIZE = 0.4
+
+    def start_scrolling(self):
+        self.scrolling = True
+        self.reload()
+
+    def end_scrolling(self):
+        self.scrolling = False
+        self.update_origin()
+        self.reload()
+
+    def set_size(self, size):
+        self.widget_size = size
+        self.reload()
+
+    def change_zoom(self, zoom):
+        self.zoom = zoom
+        self.reload()
+
+    def draw(self, surf, pos):
+        clip = surf.get_clip()
+        surf.set_clip(pos + self.widget_size)
+        if not self.scrolling:
+            target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
+            if self.zoom == 1:
+                self.client.draw_map(surf, target)
+            else:
+                self.client.draw_map(self.map_cache, (0, 0))
+                rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
+                                           self.map_cache.get_height() - self.user_corner[1])
+                surf.blit(self.map_cache.subsurface(rect).scale_by(self.zoom), (pos[0], pos[1]))
+        else:
+            if freeciv.func.get_map_view_origin() != self.valid_for_origin:
+                self.reload()
+            else:
+                if self.does_exceed():
+                    self.update_origin()
+                    self.reload()
+            if self.zoom == 1:
+                surf.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+            else:
+                surf.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
+                                                  int(pos[1] - self.user_corner[1] * self.zoom)))
+        surf.set_clip(clip)
+
+    def reload(self):
+        self.prepare_map_cache()
+        #self.map_cache._pg.fill((100, 0, 100))
+        self.client.draw_map(self.map_cache, (0, 0))
+        if self.zoom != 1:
+            self.scaled_map_cache.blit(self.map_cache.scale_by(self.zoom), (0, 0))
+
+    def does_exceed(self):
+        corner = (self.user_corner[0] * self.zoom, self.user_corner[1] * self.zoom)
+        if corner[0] < 0 or corner[1] < 0:
+            return True
+        if corner[0] > self.MAP_CACHE_SIZE * 2 * self.widget_size[0] \
+        or corner[1] > self.MAP_CACHE_SIZE * 2 * self.widget_size[1]:
+            return True
+        return False
+
+    def update_origin(self):
+        w, h = self.widget_size
+        zero_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
+        delta = self.user_corner[0] - zero_corner[0], self.user_corner[1] - zero_corner[1]
+        ox, oy = freeciv.func.get_map_view_origin()
+        freeciv.func.base_set_mapview_origin(ox + delta[0], oy + delta[1])
+
+    def prepare_map_cache(self):
+        w, h = self.widget_size
+        size_mul = self.MAP_CACHE_SIZE * 2 + 1
+        size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
+        if size != self.map_cache.get_size():
+            self.client.set_map_size(size)
+            self.map_cache = graphics.create_surface(size[0], size[1])
+            if self.zoom != 1:
+                self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
+        self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
+        self.valid_for_origin = freeciv.func.get_map_view_origin()
+
+    def move_map(self, delta):
+        dx, dy = delta
+        tx, ty = self.user_corner
+        self.user_corner = tx + dx, ty + dy
+
+    def coord_ui_to_map(self, pos):
+        return pos[0] + self.user_corner[0], pos[1] + self.user_corner[1]
 
 def init():
     gamemenu.init()

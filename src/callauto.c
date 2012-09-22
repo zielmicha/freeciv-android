@@ -463,6 +463,18 @@ static PyObject* python_set_mapview_origin(PyObject* self, PyObject* args) {
 	set_mapview_origin(arg_gui_x0, arg_gui_y0);
 	return Py_BuildValue("i", 0);
 }
+// void base_set_mapview_origin(int gui_x0, int gui_y0)
+void base_set_mapview_origin(int gui_x0, int gui_y0);
+
+static PyObject* python_base_set_mapview_origin(PyObject* self, PyObject* args) {
+	int arg_gui_x0;
+	int arg_gui_y0;
+	if(PyArg_ParseTuple(args, "ii", &arg_gui_x0, &arg_gui_y0) == 0) return NULL;
+
+
+	base_set_mapview_origin(arg_gui_x0, arg_gui_y0);
+	return Py_BuildValue("i", 0);
+}
 // PyObject* get_map_view_origin()
 PyObject* get_map_view_origin();
 
@@ -1551,6 +1563,8 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "canvas_pos_to_nearest_tile_id", (int)ptr);
 	ptr = python_set_mapview_origin;
 	PY_CALL("ssi", "add_function", "set_mapview_origin", (int)ptr);
+	ptr = python_base_set_mapview_origin;
+	PY_CALL("ssi", "add_function", "base_set_mapview_origin", (int)ptr);
 	ptr = python_get_map_view_origin;
 	PY_CALL("ssi", "add_function", "get_map_view_origin", (int)ptr);
 	ptr = python_get_units_in_focus;

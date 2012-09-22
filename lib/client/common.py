@@ -10,7 +10,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import pygame
+import graphics
 import freeciv
 import window
 import sys
@@ -18,27 +18,14 @@ import progress
 import time
 import features
 
-def set_debug(flag):
-    if flag:
-        realsurf = pygame.Surface
-        def make_surf(size, *args):
-            print 'make_surf', size
-            return realsurf(size, *args)
-        pygame.Surface = make_surf
-
-features.set_applier('debug.makesurf', set_debug, type=bool, default=False)
-
 DO_MASK = False
-
-class SpriteSurface(pygame.Surface):
-    pass
 
 @freeciv.register
 def load_gfxfile(fn):
     if fn.startswith('flags/'):
         return load_flag(fn[len('flags/'):])
     else:
-        return pygame.image.load(fn).convert_alpha()
+        return graphics.load_image(fn)
 
 @freeciv.register
 def get_sprite_dimensions(image):
@@ -46,7 +33,7 @@ def get_sprite_dimensions(image):
 
 @freeciv.register
 def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
-    surf = pygame.Surface((w, h), pygame.SRCALPHA)
+    surf = graphics.create_surface(w, h)
     surf.blit(img, (0, 0), (x, y, w, h))
     if mask:
         mask_sprite(surf, mask, x - mask_x, y - mask_y)
@@ -72,6 +59,8 @@ def show_masking_progress():
 
 def mask_sprite(surf, mask, mx, my):
     show_masking_progress()
+    surf = surf._pg
+    mask = mask._pg
     assert mask.get_width() >= surf.get_width() + mx
     assert mask.get_height() >= surf.get_height() + my
     assert mask.get_bitsize() == 32
@@ -83,25 +72,24 @@ def mask_sprite(surf, mask, mx, my):
 def py_mask_sprite(surf, mask, mx, my):
     if not DO_MASK:
         return
-    
+
     global mask_i
     mask_i += 1
     msg = 'masking %s' % mask_i
     print msg + '\r',
     sys.stdout.flush()
-    
+
     for x in xrange(surf.get_width()):
         for y in xrange(surf.get_height()):
             r, g, b, a = surf.get_at((x, y))
             mrgba = mask.get_at((x + mx, y + my))
             surf.set_at((x, y), (r, g, b, a * mrgba[3] / 255))
-    
+
     print '\r' + (' ' * len(msg)) + '\r',
 
 @freeciv.register
 def canvas_create(w, h):
-    return pygame.Surface((w, h))
-
+    return graphics.create_surface(w, h, alpha=False)
 
 def nulldebug(*a):
     pass
@@ -116,13 +104,13 @@ def canvas_copy(canvas, src, sx, sy, x, y, w, h):
 @freeciv.register
 def canvas_put_rectangle(canvas, color, x, y, w, h):
     if canvas:
-        pygame.draw.rect(canvas, color, (x, y, w, h), 0)
+        canvas.draw_rect(color, (x, y, w, h), 0)
     else:
         nulldebug('canvas_put_rectangle: canvas == NULL')
 
 @freeciv.register
 def canvas_put_line(canvas, color, ltype, x, y, dx, dy):
-    pygame.draw.line(canvas, color, (x, y), (x + dx, y + dy))
+    canvas.draw_line(color, (x, y), (x + dx, y + dy))
 
 @freeciv.register
 def canvas_put_sprite(canvas, x, y, sprite, ox, oy, w, h):
@@ -175,7 +163,7 @@ flag_index = {}
 
 def init():
     global fonts
-    fonts = [ pygame.font.Font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
+    fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
     init_flags()
 
 def init_flags():
@@ -184,11 +172,11 @@ def init_flags():
         load_flags_file(name)
 
 def load_flags_file(name):
-    img = pygame.image.load('data/flags/%s-output.png' % name).convert_alpha()
+    img = graphics.load_image('data/flags/%s-output.png' % name)
     for line in open('data/flags/%s.index' % name):
         name, rect = line.split(' ', 1)
         rect = map(int, rect.split())
-        flag = pygame.Surface(rect[2:], pygame.SRCALPHA)
+        flag = graphics.create_surface(rect[2], rect[3])
         flag.blit(img, (0, 0), rect)
         flag_index[name] = flag
 
@@ -196,4 +184,3 @@ def load_flag(name):
     if not name.endswith('.png'):
         name += '.png'
     return flag_index[name]
-

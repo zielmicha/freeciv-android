@@ -191,7 +191,7 @@ void map_to_gui_vector(const struct tileset *t,
      * Convert the map coordinates to isometric GUI
      * coordinates.  We'll make tile map(0,0) be the origin, and
      * transform like this:
-     * 
+     *
      *                     3
      * 123                2 6
      * 456 -> becomes -> 1 5 9
@@ -489,7 +489,7 @@ static void gui_distance_vector(const struct tileset *t,
   Move the GUI origin to the given normalized, clipped origin.  This may
   be called many times when sliding the mapview.
 ****************************************************************************/
-static void base_set_mapview_origin(int gui_x0, int gui_y0)
+void base_set_mapview_origin(int gui_x0, int gui_y0)
 {
   int old_gui_x0, old_gui_y0, dx, dy;
   const int width = mapview.width, height = mapview.height;
@@ -1643,7 +1643,7 @@ static void show_full_citybar(struct canvas *pcanvas,
   canvas_put_line(pcanvas, owner_color, LINE_NORMAL,
 		  canvas_x - *width / 2 + *width, canvas_y,
 		  0, *height);
-  
+
   /* Draw the dividing line if we drew both the
    * upper and lower parts. */
   if (draw_city_names && should_draw_lower_bar) {
@@ -1940,10 +1940,10 @@ void draw_segment(struct tile *src_tile, enum direction8 dir)
   This function is called to decrease a unit's HP smoothly in battle
   when combat_animation is turned on.
 ****************************************************************************/
-void decrease_unit_hp_smooth(struct unit *punit0, int hp0, 
+void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
 			     struct unit *punit1, int hp1)
 {
-  static struct timer *anim_timer = NULL; 
+  static struct timer *anim_timer = NULL;
   const struct sprite_vector *anim = get_unit_explode_animation(tileset);
   const int num_tiles_explode_unit = sprite_vector_size(anim);
   struct unit *losing_unit = (hp0 == 0 ? punit0 : punit1);
@@ -2148,7 +2148,7 @@ struct city *find_city_or_settler_near_tile(const struct tile *ptile,
        * city_can_work_tile() above), since it is possible that another
        * city (perhaps an UNSEEN city) may be working it!
        */
-      
+
       if (mapdeco_is_highlight_set(city_tile(pcity))) {
 	/* rule c */
 	return pcity;
@@ -2985,7 +2985,7 @@ void get_spaceship_dimensions(int *width, int *height)
 void put_spaceship(struct canvas *pcanvas, int canvas_x, int canvas_y,
 		   const struct player *pplayer)
 {
-  int i, x, y;  
+  int i, x, y;
   const struct player_spaceship *ship = &pplayer->spaceship;
   int w, h;
   struct sprite *sprite;
@@ -3071,7 +3071,7 @@ struct link_mark {
 
 static struct link_mark_list *link_marks = NULL;
 
-/********************************************************************** 
+/**********************************************************************
   Find a link mark in the list.
 ***********************************************************************/
 static struct link_mark *link_mark_find(enum text_link_type type, int id)
@@ -3085,7 +3085,7 @@ static struct link_mark *link_mark_find(enum text_link_type type, int id)
   return NULL;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Create a new link mark.
 ***********************************************************************/
 static struct link_mark *link_mark_new(enum text_link_type type,
@@ -3100,7 +3100,7 @@ static struct link_mark *link_mark_new(enum text_link_type type,
   return pmark;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Remove a link mark.
 ***********************************************************************/
 static void link_mark_destroy(struct link_mark *pmark)
@@ -3108,7 +3108,7 @@ static void link_mark_destroy(struct link_mark *pmark)
   free(pmark);
 }
 
-/********************************************************************** 
+/**********************************************************************
   Returns the location of the pointed mark.
 ***********************************************************************/
 static struct tile *link_mark_tile(const struct link_mark *pmark)
@@ -3130,7 +3130,7 @@ static struct tile *link_mark_tile(const struct link_mark *pmark)
   return NULL;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Returns the color of the pointed mark.
 ***********************************************************************/
 static struct color *link_mark_color(const struct link_mark *pmark)
@@ -3146,7 +3146,7 @@ static struct color *link_mark_color(const struct link_mark *pmark)
   return NULL;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Print a link mark.
 ***********************************************************************/
 static void link_mark_draw(const struct link_mark *pmark)
@@ -3170,18 +3170,18 @@ static void link_mark_draw(const struct link_mark *pmark)
 
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x0, y0, xlen, 0);
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x0, y0, 0, ylen);
-  
+
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x1, y0, -xlen, 0);
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x1, y0, 0, ylen);
-  
+
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x0, y1, xlen, 0);
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x0, y1, 0, -ylen);
-  
+
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x1, y1, -xlen, 0);
   canvas_put_line(mapview.store, pcolor, LINE_TILE_FRAME, x1, y1, 0, -ylen);
 }
 
-/********************************************************************** 
+/**********************************************************************
   Initialize the link marks.
 ***********************************************************************/
 void link_marks_init(void)
@@ -3193,7 +3193,7 @@ void link_marks_init(void)
   link_marks = link_mark_list_new_full(link_mark_destroy);
 }
 
-/********************************************************************** 
+/**********************************************************************
   Free the link marks.
 ***********************************************************************/
 void link_marks_free(void)
@@ -3206,7 +3206,7 @@ void link_marks_free(void)
   link_marks = NULL;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Draw all link marks.
 ***********************************************************************/
 void link_marks_draw_all(void)
@@ -3216,7 +3216,7 @@ void link_marks_draw_all(void)
   } link_marks_iterate_end;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Clear all visible links.
 ***********************************************************************/
 void link_marks_clear_all(void)
@@ -3225,7 +3225,7 @@ void link_marks_clear_all(void)
   update_map_canvas_visible();
 }
 
-/********************************************************************** 
+/**********************************************************************
   Clear all visible links.
 ***********************************************************************/
 void link_marks_decrease_turn_counters(void)
@@ -3239,7 +3239,7 @@ void link_marks_decrease_turn_counters(void)
   /* update_map_canvas_visible(); not needed here. */
 }
 
-/********************************************************************** 
+/**********************************************************************
   Add a visible link for 2 turns.
 ***********************************************************************/
 void link_mark_add_new(enum text_link_type type, int id)
@@ -3261,7 +3261,7 @@ void link_mark_add_new(enum text_link_type type, int id)
   }
 }
 
-/********************************************************************** 
+/**********************************************************************
   Add a visible link for 1 turn.
 ***********************************************************************/
 void link_mark_restore(enum text_link_type type, int id)
