@@ -72,7 +72,7 @@ class Menu(ui.LinearLayoutWidget):
     def incr_zoom(self, i=1):
         self.zoom_level += i
         self.zoom_level = max(0, min(len(ZOOM_LEVELS) - 1, self.zoom_level))
-        self.client.ui.map.zoom = ZOOM_LEVELS[self.zoom_level]
+        self.client.ui.map.change_zoom( ZOOM_LEVELS[self.zoom_level] )
 
     def decr_zoom(self):
         self.incr_zoom(-1)

@@ -9,6 +9,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+from __future__ import division
 
 import ui
 import uidialog
@@ -332,7 +333,7 @@ class TaxesPanel(ui.LinearLayoutWidget):
         lux_img = icons.get_small_image('elvis')
 
         def add(value, img):
-            for i in xrange(value/10):
+            for i in xrange(int(value/10)):
                 panel.add(ui.Image(img))
 
         add(tax, tax_img)
@@ -561,6 +562,9 @@ class MapWidget(object):
 
         self.drawer.move_map(delta)
 
+    def change_zoom(self, zoom):
+        self.drawer.change_zoom(zoom)
+
 class MapDrawer(object):
     def __init__(self, client):
         self.client = client
@@ -572,6 +576,7 @@ class MapDrawer(object):
         self.last_map_size = None
         self.widget_size = (0, 0)
         self.scrolling = False
+        self.zoom = 1
 
         self.MAP_CACHE_SIZE = 0.4
 
@@ -588,11 +593,22 @@ class MapDrawer(object):
         self.widget_size = size
         self.reload()
 
+    def change_zoom(self, zoom):
+        self.zoom = zoom
+        self.reload()
+
     def draw(self, surf, pos):
         clip = surf.get_clip()
         surf.set_clip(pos + self.widget_size)
         if not self.scrolling:
-            self.client.draw_map(surf, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+            target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
+            if self.zoom == 1:
+                self.client.draw_map(surf, target)
+            else:
+                self.client.draw_map(self.map_cache, (0, 0))
+                rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
+                                           self.map_cache.get_height() - self.user_corner[1])
+                surf.blit(self.map_cache.subsurface(rect).scale_by(self.zoom), (pos[0], pos[1]))
         else:
             if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
@@ -600,19 +616,26 @@ class MapDrawer(object):
                 if self.does_exceed():
                     self.update_origin()
                     self.reload()
-            surf.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+            if self.zoom == 1:
+                surf.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+            else:
+                surf.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
+                                                  int(pos[1] - self.user_corner[1] * self.zoom)))
         surf.set_clip(clip)
 
     def reload(self):
         self.prepare_map_cache()
         #self.map_cache._pg.fill((100, 0, 100))
         self.client.draw_map(self.map_cache, (0, 0))
+        if self.zoom != 1:
+            self.scaled_map_cache.blit(self.map_cache.scale_by(self.zoom), (0, 0))
 
     def does_exceed(self):
-        if self.user_corner[0] < 0 or self.user_corner[1] < 0:
+        corner = (self.user_corner[0] * self.zoom, self.user_corner[1] * self.zoom)
+        if corner[0] < 0 or corner[1] < 0:
             return True
-        if self.user_corner[0] > self.MAP_CACHE_SIZE * 2 * self.widget_size[0] \
-        or self.user_corner[1] > self.MAP_CACHE_SIZE * 2 * self.widget_size[1]:
+        if corner[0] > self.MAP_CACHE_SIZE * 2 * self.widget_size[0] \
+        or corner[1] > self.MAP_CACHE_SIZE * 2 * self.widget_size[1]:
             return True
         return False
 
@@ -626,10 +649,12 @@ class MapDrawer(object):
     def prepare_map_cache(self):
         w, h = self.widget_size
         size_mul = self.MAP_CACHE_SIZE * 2 + 1
-        size = (int(size_mul * w), int(size_mul * h))
+        size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
             self.map_cache = graphics.create_surface(size[0], size[1])
+            if self.zoom != 1:
+                self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         self.valid_for_origin = freeciv.func.get_map_view_origin()
 

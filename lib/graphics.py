@@ -81,6 +81,13 @@ class Image(object):
     def scale(self, size):
         return Image(pygame.transform.smoothscale(self._pg, size))
 
+    def scale_by(self, scale):
+        s = self.get_size()
+        return self.scale((int(s[0] * scale), int(s[1] * scale)))
+
+    def subsurface(self, subrect):
+        return Image(self._pg.subsurface(pygame.Rect(subrect)))
+
     def get_clip(self):
         return self._pg.get_clip()
 
