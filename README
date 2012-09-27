@@ -17,7 +17,6 @@ And run:
    python main.py
 
 Build Freeciv for Android for Android:
-   android/zlib.sh
    android/debug.sh
 
 APK which you can install on your device will be android/build/apk/FreecivDebug-0.9.0-debug.apk
