@@ -540,6 +540,7 @@ class MapWidget(object):
                 self.was_dragged = False
             elif ev.button == 1:
                 x, y = self.drawer.coord_ui_to_map(ev.pos)
+                print ev.pos, x, y
                 freeciv.func.action_button_pressed(x, y, SELECT_POPUP)
             self.drawer.end_scrolling()
             self.start_drag = None
@@ -664,7 +665,7 @@ class MapDrawer(object):
         self.user_corner = tx + dx, ty + dy
 
     def coord_ui_to_map(self, pos):
-        return pos[0] + self.user_corner[0], pos[1] + self.user_corner[1]
+        return int(pos[0] / self.zoom + self.user_corner[0]), int(pos[1] / self.zoom + self.user_corner[1])
 
 def scale_by(img, zoom):
     w, h = img.get_size()
