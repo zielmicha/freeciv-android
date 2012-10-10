@@ -1,9 +1,7 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
-GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -Ipython2.7 -I. -DHAVE_CONFIG_H"
-EXCLUDE_FILES="client/audio_sdl.c"
-ADD_SYMBOLS="pyclient.c|clientauto.c|callauto.c"
-ADD_SYMBOLS_FLAGS=""
+GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -Ipython2.7 -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H"
+EXCLUDE_FILES="client/audio_sdl.c lua/luac.c"
 
 output() {
     echo "$1" >> Makefile.tmp
@@ -11,29 +9,25 @@ output() {
 echo > Makefile.tmp
 
 ev=""
-for name in common/*.c common/aicore/*.c client/*.c *.c client/agents/*.c utility/*.c; do
-	if echo "$name" | grep "$EXCLUDE_FILES"; then
-		continue
-	fi
+for name in client/*.c *.c client/agents/*.c \
+    common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c \
+    server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
+
     objfile=objectfiles/$(basename $name .c).o
-    if echo "$name" | grep -P "$ADD_SYMBOLS"; then
-        additional="$ADD_SYMBOLS_FLAGS"
-    else
-        additional=""
-    fi
     ev="$ev $objfile"
     output "$objfile: $name"
     output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
 done
 
-echo "all: freecivclient.so" > client.mk
-echo "objectfiles.a: $ev
-	ar r objectfiles.a objectfiles/*.o
+echo "all: libapp.so" > client.mk
+echo "objectfiles: $ev
 " >> client.mk
-echo "freecivclient.so: objectfiles.a
-	gcc -shared -o freecivclient.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
+echo "libapp.so: objectfiles
+	gcc -shared -o libapp.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
+echo "clean:
+	rm objectfiles/* libapp.so callauto.c" >> client.mk
 cat Makefile.tmp >> client.mk
 mv client.mk Makefile
 rm Makefile.tmp
