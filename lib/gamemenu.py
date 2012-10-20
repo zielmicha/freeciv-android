@@ -17,6 +17,7 @@ import math
 import time
 import features
 import functools
+import graphics
 
 from client import freeciv
 
@@ -270,10 +271,10 @@ class Joystick(object):
 
     @staticmethod
     def init():
-        Joystick.gfx = client.common.load_gfxfile('data/user/joystick.png').convert_alpha()
-        Joystick.map = client.common.load_gfxfile('data/user/joystick-map.png').convert()
+        Joystick.gfx = graphics.load_image('data/user/joystick.png')
+        Joystick.map = graphics.load_image('data/user/joystick-map.png')
         Joystick.masks = dict(
-            (name, client.common.load_gfxfile('data/user/joystick-mask-%s.png' % name).convert_alpha())
+            (name, graphics.load_image('data/user/joystick-mask-%s.png' % name))
             for name in Joystick.colors.values() if name )
 
 
@@ -401,8 +402,8 @@ def init():
 
 def init_orders():
     global order_sprites
-    img_orders = client.common.load_gfxfile('data/user/theme_orders_buttons.png').convert_alpha()
+    img_orders = graphics.load_image('data/user/theme_orders_buttons.png')
     order_sprites = client.common.split_sprites(img_orders, start=(0, 1), each=(29, 31), size=(31, 29), num=(1, 38))
 
     for line in order_sprites:
-        line[0] = pygame.transform.smoothscale(line[0], (56, 56))
+        line[0] = line[0].scale((56, 56))

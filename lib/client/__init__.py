@@ -292,5 +292,3 @@ def get_nations():
 
 def get_nation_name(i):
     return freeciv.func.get_name_of_nation_id(i)
-
-

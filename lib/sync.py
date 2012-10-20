@@ -287,3 +287,4 @@ def get_install_time():
         with open(path, 'w') as f:
             f.write('%d' % install_time)
     return install_time
+

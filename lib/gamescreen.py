@@ -15,11 +15,11 @@ import ui
 import uidialog
 import client
 import pygame
-import pygame.gfxdraw
 import functools
 
 from client import freeciv
 
+import graphics
 import citydlg
 import gamemenu
 import icons
@@ -385,7 +385,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = pygame.transform.smoothscale(img, (30, 45))
+            img = img.scale((30, 45))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
@@ -443,7 +443,7 @@ class OverviewWidget(object):
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
+        surf.draw_rect((255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
@@ -465,7 +465,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
+            surf.gfx_rect((255, 255, 255, 170), pos + self._size, 0)
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):

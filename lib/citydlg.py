@@ -15,7 +15,6 @@ import ui
 import client
 import icons
 
-import pygame
 import functools
 
 class Dialog(ui.HorizontalLayoutWidget):
