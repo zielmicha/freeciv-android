@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -182,7 +182,7 @@ void handle_player_rates(struct player *pplayer,
                   _("Cannot change rates before game start."));
     return;
   }
-	
+
   if (tax + luxury + science != 100) {
     return;
   }
@@ -238,8 +238,8 @@ static void finish_revolution(struct player *pplayer)
             government_rule_name(government),
             pplayer->revolution_finishes, game.info.turn);
   notify_player(pplayer, NULL, E_REVOLT_DONE, ftc_server,
-                _("%s now governs the %s as a %s."), 
-                player_name(pplayer), 
+                _("%s now governs the %s as a %s."),
+                player_name(pplayer),
                 nation_plural_for_player(pplayer),
                 government_name_translation(government));
 
@@ -263,7 +263,7 @@ static void finish_revolution(struct player *pplayer)
       notify_player(pplayer, NULL, E_REVOLT_DONE, ftc_server,
                     _("The tax rates for the %s are changed from "
                       "%3d%%/%3d%%/%3d%% (tax/luxury/science) to "
-                      "%3d%%/%3d%%/%3d%%."), 
+                      "%3d%%/%3d%%/%3d%%."),
                     nation_plural_for_player(pplayer),
                     save_tax, save_luxury, save_science,
                     pplayer->economic.tax, pplayer->economic.luxury,
@@ -451,7 +451,7 @@ void update_players_after_alliance_breakup(struct player* pplayer,
    send_player_all_c(pplayer, NULL);
    send_player_all_c(pplayer2, NULL);
    remove_allied_visibility(pplayer, pplayer2);
-   remove_allied_visibility(pplayer2, pplayer);    
+   remove_allied_visibility(pplayer2, pplayer);
    resolve_unit_stacks(pplayer, pplayer2, TRUE);
 }
 
@@ -579,9 +579,9 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
     remove_allied_visibility(pplayer2, pplayer);
   }
 
-  /* 
+  /*
    * Refresh all cities which have a unit of the other side within
-   * city range. 
+   * city range.
    */
   city_map_update_all_cities_for_player(pplayer);
   city_map_update_all_cities_for_player(pplayer2);
@@ -620,7 +620,7 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
         handle_diplomacy_cancel_pact(other, player_number(pplayer),
                                      CLAUSE_ALLIANCE);
       } else {
-        /* We are in the same team as the agressor; we cannot break 
+        /* We are in the same team as the agressor; we cannot break
          * alliance with him. We trust our team mate and break alliance
          * with the attacked player */
         notify_player(other, NULL, E_TREATY_BROKEN, ftc_server,
@@ -870,7 +870,7 @@ static void package_player_info(struct player *plr,
     pgov = game.government_during_revolution;
   }
   packet->government = pgov ? government_number(pgov) : -1;
-   
+
   /* Send diplomatic status of the player to everyone they are in
    * contact with. */
   if (info_level >= INFO_EMBASSY
@@ -899,7 +899,7 @@ static void package_player_info(struct player *plr,
   }
 
   /* Make absolutely sure - in case you lose your embassy! */
-  if (info_level >= INFO_EMBASSY 
+  if (info_level >= INFO_EMBASSY
       || (receiver
 	  && player_diplstate_get(plr, receiver)->type == DS_TEAM)) {
     packet->bulbs_last_turn = plr->bulbs_last_turn;
@@ -911,7 +911,7 @@ static void package_player_info(struct player *plr,
    * embassy. */
   if (highest_team_level >= INFO_EMBASSY) {
     advance_index_iterate(A_FIRST, i) {
-      packet->inventions[i] = 
+      packet->inventions[i] =
         research->inventions[i].state + '0';
     } advance_index_iterate_end;
     packet->tax             = plr->economic.tax;
@@ -953,7 +953,7 @@ static void package_player_info(struct player *plr,
     packet->tech_goal       = A_UNSET;
   }
 
-  /* 
+  /*
    * This may be an odd time to check these values but we can be sure
    * to have a consistent state here.
    */
@@ -1097,7 +1097,7 @@ void server_player_init(struct player *pplayer,
   pplayer->score.units_lost = 0;
 }
 
-/********************************************************************** 
+/**********************************************************************
   Creates a new, uninitialized, used player slot. You should probably
   call server_player_init() to initialize it, and send_player_info_c()
   later to tell clients about it.
@@ -1131,7 +1131,7 @@ struct player *server_create_player(int player_id)
   return pplayer;
 }
 
-/********************************************************************** 
+/**********************************************************************
   This function does _not_ close any connections attached to this
   player. The function cut_connection() is used for that. Be sure
   to send_player_slot_info_c() afterwards to tell clients that the
@@ -1734,7 +1734,7 @@ void reset_all_start_commands(void)
 This function creates a new player and copies all of it's science
 research etc.  Players are both thrown into anarchy and gold is
 split between both players.
-                               - Kris Bubendorfer 
+                               - Kris Bubendorfer
 ***********************************************************************/
 static struct player *split_player(struct player *pplayer)
 {
@@ -1828,7 +1828,7 @@ static struct player *split_player(struct player *pplayer)
   advance_index_iterate(A_NONE, i) {
     cplayer->ai_common.tech_want[i] = pplayer->ai_common.tech_want[i];
   } advance_index_iterate_end;
-  
+
   /* change the original player */
   if (government_of_player(pplayer) != game.government_during_revolution) {
     pplayer->target_government = pplayer->government;
@@ -1865,10 +1865,10 @@ static struct player *split_player(struct player *pplayer)
   return cplayer;
 }
 
-/********************************************************************** 
+/**********************************************************************
 civil_war_triggered:
  * The capture of a capital is not a sure fire way to throw
-and empire into civil war.  Some governments are more susceptible 
+and empire into civil war.  Some governments are more susceptible
 than others, here are the base probabilities:
 Anarchy   	90%
 Despotism 	80%
@@ -1878,8 +1878,8 @@ Communism 	50%
 Republic  	40%
 Democracy 	30%
  * In addition each city in disorder adds 5%, each celebrating city
-subtracts 5% from the probability of a civil war.  
- * If you have at least 1 turns notice of the impending loss of 
+subtracts 5% from the probability of a civil war.
+ * If you have at least 1 turns notice of the impending loss of
 your capital, you can hike luxuries up to the hightest value,
 and by this reduce the chance of a civil war.  In fact by
 hiking the luxuries to 100% under Democracy, it is easy to
@@ -1888,7 +1888,7 @@ civil war.  Likewise, 3 cities in disorder under despotism
 guarantees a civil war.
  * This routine calculates these probabilities and returns true
 if a civil war is triggered.
-                                   - Kris Bubendorfer 
+                                   - Kris Bubendorfer
 ***********************************************************************/
 bool civil_war_triggered(struct player *pplayer)
 {
@@ -1898,7 +1898,7 @@ bool civil_war_triggered(struct player *pplayer)
   int prob = get_player_bonus(pplayer, EFT_CIVIL_WAR_CHANCE);
 
   /* Now compute the contribution of the cities. */
-  
+
   city_list_iterate(pplayer->cities, pcity)
     if (city_unhappy(pcity)) {
       prob += 5;
@@ -1910,35 +1910,35 @@ bool civil_war_triggered(struct player *pplayer)
 
   log_verbose("Civil war chance for %s: prob %d, dice %d",
               player_name(pplayer), prob, dice);
-  
+
   return (dice < prob);
 }
 
 /**********************************************************************
 Capturing a nation's capital is a devastating blow.  This function
 creates a new AI player, and randomly splits the original players
-city list into two.  Of course this results in a real mix up of 
+city list into two.  Of course this results in a real mix up of
 teritory - but since when have civil wars ever been tidy, or civil.
 
 Embassies:  All embassies with other players are lost.  Other players
             retain their embassies with pplayer.
  * Units:      Units inside cities are assigned to the new owner
-            of the city.  Units outside are transferred along 
+            of the city.  Units outside are transferred along
             with the ownership of their supporting city.
             If the units are in a unit stack with non rebel units,
             then whichever units are nearest an allied city
-            are teleported to that city.  If the stack is a 
-            transport at sea, then all rebel units on the 
+            are teleported to that city.  If the stack is a
+            transport at sea, then all rebel units on the
             transport are teleported to their nearest allied city.
 
 Cities:     Are split randomly into 2.  This results in a real
-            mix up of teritory - but since when have civil wars 
+            mix up of teritory - but since when have civil wars
             ever been tidy, or for any matter civil?
  *
 One caveat, since the spliting of cities is random, you can
 conceive that this could result in either the original player
 or the rebel getting 0 cities.  To prevent this, the hack below
-ensures that each side gets roughly half, which ones is still 
+ensures that each side gets roughly half, which ones is still
 determined randomly.
                                    - Kris Bubendorfer
 ***********************************************************************/
@@ -2046,7 +2046,7 @@ void civil_war(struct player *pplayer)
 /**************************************************************************
  The client has send as a chunk of the attribute block.
 **************************************************************************/
-void handle_player_attribute_chunk(struct player *pplayer,
+void handle_player_attribute_chunk_SERVER(struct player *pplayer,
                                    const struct packet_player_attribute_chunk
                                    *chunk)
 {

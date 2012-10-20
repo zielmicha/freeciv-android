@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -272,7 +272,7 @@ void handle_server_join_reply(bool you_can_join, const char *message,
     client_info.gui = get_gui_type();
     send_packet_client_info(&client.conn, &client_info);
 
-    /* we could always use hack, verify we're local */ 
+    /* we could always use hack, verify we're local */
     send_client_wants_hack(challenge_file);
 
     set_client_state(C_S_PREPARING);
@@ -335,7 +335,7 @@ void handle_unit_remove(int unit_id)
   if (!punit) {
     return;
   }
-  
+
   /* Close diplomat dialog if the diplomat is lost */
   if (diplomat_handled_in_diplomat_dialog() == punit->id) {
     close_diplomat_dialog();
@@ -569,9 +569,9 @@ void handle_city_info(const struct packet_city_info *packet)
               || pcity->surplus[O_FOOD] != packet->surplus[O_FOOD]))
       || (draw_city_trade_routes && trade_routes_changed);
   }
-  
+
   sz_strlcpy(pcity->name, packet->name);
-  
+
   /* check data */
   pcity->size = 0;
   for (i = 0; i < FEELING_LAST; i++) {
@@ -752,7 +752,7 @@ void handle_city_info(const struct packet_city_info *packet)
 
   /* Update the panel text (including civ population). */
   update_info_label();
-  
+
   /* update caravan dialog */
   if ((production_changed || shield_stock_changed)
       && caravan_dialog_is_open(NULL, &caravan_city_id)
@@ -795,7 +795,7 @@ static void city_packet_common(struct city *pcity, struct tile *pcenter,
     }
 
     players_iterate(pp) {
-      unit_list_iterate(pp->units, punit) 
+      unit_list_iterate(pp->units, punit)
 	if(punit->homecity==pcity->id)
 	  unit_list_prepend(pcity->units_supported, punit);
       unit_list_iterate_end;
@@ -928,7 +928,7 @@ void handle_city_short_info(const struct packet_city_short_info *packet)
     }
 
     sz_strlcpy(pcity->name, packet->name);
-    
+
     memset(pcity->feel, 0, sizeof(pcity->feel));
     memset(pcity->specialists, 0, sizeof(pcity->specialists));
   }
@@ -1121,8 +1121,8 @@ void play_sound_for_event(enum event_type type)
   if (sound_tag) {
     audio_play_sound(sound_tag, NULL);
   }
-}  
-  
+}
+
 /**************************************************************************
   Handle a message packet.  This includes all messages - both
   in-game messages and chats from other players.
@@ -1249,7 +1249,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       repaint_unit = TRUE;
 
       /* Wakeup Focus */
-      if (wakeup_focus 
+      if (wakeup_focus
           && NULL != client.conn.playing
           && !client.conn.playing->ai_controlled
           && unit_owner(punit) == client.conn.playing
@@ -1275,7 +1275,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
         need_menus_update = TRUE;
       }
       punit->occupy = packet_unit->occupy;
-    
+
       punit->has_orders = packet_unit->has_orders;
       punit->orders.length = packet_unit->orders.length;
       punit->orders.index = packet_unit->orders.index;
@@ -1308,7 +1308,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 	unit_list_remove(pcity->units_supported, punit);
 	refresh_city_dialog(pcity);
       }
-      
+
       punit->homecity = packet_unit->homecity;
       if ((pcity = game_city_by_number(punit->homecity))) {
 	unit_list_prepend(pcity->units_supported, punit);
@@ -1325,7 +1325,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
     if (punit->utype != unit_type(packet_unit)) {
       /* Unit type has changed (been upgraded) */
       struct city *pcity = tile_city(punit->tile);
-      
+
       punit->utype = unit_type(packet_unit);
       repaint_unit = TRUE;
       repaint_city = TRUE;
@@ -1345,7 +1345,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       check_focus = TRUE;
     }
 
-    if (!same_pos(punit->tile, packet_unit->tile)) { 
+    if (!same_pos(punit->tile, packet_unit->tile)) {
       /*** Change position ***/
       struct city *pcity = tile_city(punit->tile);
 
@@ -1375,7 +1375,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 	else
 	  refresh_city_dialog(pcity);
       }
-      
+
       if ((pcity = tile_city(unit_tile(punit)))) {
         if (can_player_see_units_in_city(client.conn.playing, pcity)) {
           /* Unit moved into a city - obviously it's occupied. */
@@ -1394,7 +1394,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 	  refresh_city_dialog(pcity);
 
         if (popup_caravan_arrival
-            && client_has_player() 
+            && client_has_player()
             && !client_player()->ai_controlled
             && can_client_issue_orders()
             && !unit_has_orders(punit)) {
@@ -1619,7 +1619,7 @@ void handle_game_info(const struct packet_game_info *pinfo)
   if (game.info.aifill != pinfo->aifill) {
     update_aifill_button = TRUE;
   }
-  
+
   if (game.info.is_edit_mode != pinfo->is_edit_mode) {
     popdown_all_city_dialogs();
     /* Clears the current goto command. */
@@ -1667,7 +1667,7 @@ void handle_game_info(const struct packet_game_info *pinfo)
   if (update_aifill_button) {
     update_start_page();
   }
-  
+
   if (can_client_change_view()) {
     update_info_label();
   }
@@ -1880,7 +1880,7 @@ void handle_player_info(const struct packet_player_info *pinfo)
    * only send the player info out at appropriate times - e.g., while the
    * game is running. */
   new_tech = read_player_info_techs(pplayer, pinfo->inventions);
-  
+
   research = player_research_get(pplayer);
 
   poptechup = (research->researching != pinfo->researching
@@ -1900,7 +1900,7 @@ void handle_player_info(const struct packet_player_info *pinfo)
   }
   research->future_tech = pinfo->future_tech;
   research->tech_goal = pinfo->tech_goal;
-  
+
   turn_done_changed = (pplayer->phase_done != pinfo->phase_done
                        || pplayer->ai_controlled != pinfo->ai);
   pplayer->phase_done = pinfo->phase_done;
@@ -2047,7 +2047,7 @@ void handle_conn_info(const struct packet_conn_info *pinfo)
             pinfo->observer, (int) pinfo->access_level);
   log_debug("conn_info \"%s\" \"%s\" \"%s\"",
             pinfo->username, pinfo->addr, pinfo->capability);
-  
+
   if (!pinfo->used) {
     /* Forget the connection */
     if (!pconn) {
@@ -2183,7 +2183,7 @@ static bool spaceship_autoplace(struct player *pplayer,
 {
   int i, num;
   enum spaceship_place_type type;
-  
+
   if (ship->modules > (ship->habitation + ship->life_support
 		       + ship->solar_panels)) {
     /* "nice" governments prefer to keep success 100%;
@@ -2235,7 +2235,7 @@ static bool spaceship_autoplace(struct player *pplayer,
        modules, or else finally in numerical order.
     */
     int req = -1;
-    
+
     if (!ship->structure[0]) {
       /* if we don't have the first structural, place that! */
       type = SSHIP_PLACE_STRUCTURAL;
@@ -2243,7 +2243,7 @@ static bool spaceship_autoplace(struct player *pplayer,
       dsend_packet_spaceship_place(&client.conn, type, num);
       return TRUE;
     }
-    
+
     if (ship->habitation >= 1
 	&& !ship->structure[modules_info[0].required]) {
       req = modules_info[0].required;
@@ -2288,7 +2288,7 @@ static bool spaceship_autoplace(struct player *pplayer,
     /* sanity: */
     fc_assert(req != -1);
     fc_assert(!ship->structure[req]);
-    
+
     /* Now we want to find a structural we can build which leads to req.
        This loop should bottom out, because everything leads back to s0,
        and we made sure above that we do s0 first.
@@ -2334,7 +2334,7 @@ void handle_spaceship_info(const struct packet_spaceship_info *p)
   ship->energy_rate  = p->energy_rate;
   ship->success_rate = p->success_rate;
   ship->travel_time  = p->travel_time;
-  
+
   for(i=0; i<NUM_SS_STRUCTURALS; i++) {
     if (p->structure[i] == '0') {
       ship->structure[i] = FALSE;
@@ -2533,7 +2533,7 @@ void handle_tile_info(const struct packet_tile_info *packet)
   map.num_continents = MAX(ptile->continent, map.num_continents);
 
   if (known_changed || tile_changed) {
-    /* 
+    /*
      * A tile can only change if it was known before and is still
      * known. In the other cases the tile is new or removed.
      */
@@ -2566,7 +2566,7 @@ void handle_tile_info(const struct packet_tile_info *packet)
 /****************************************************************************
   Received packet containing info about current scenario
 ****************************************************************************/
-void handle_scenario_info(const struct packet_scenario_info *packet)
+void handle_scenario_info_CLIENT(const struct packet_scenario_info *packet)
 {
   game.scenario.is_scenario = packet->is_scenario;
   sz_strlcpy(game.scenario.name, packet->name);
@@ -3190,7 +3190,7 @@ void handle_city_sabotage_list(int diplomat_id, int city_id,
 }
 
 /****************************************************************************
-  Pass the packet on to be displayed in a gui-specific endgame dialog. 
+  Pass the packet on to be displayed in a gui-specific endgame dialog.
 ****************************************************************************/
 void handle_endgame_report(const struct packet_endgame_report *packet)
 {
@@ -3201,7 +3201,7 @@ void handle_endgame_report(const struct packet_endgame_report *packet)
 /****************************************************************************
   Packet player_attribute_chunk handler.
 ****************************************************************************/
-void handle_player_attribute_chunk
+void handle_player_attribute_chunk_CLIENT
     (const struct packet_player_attribute_chunk *packet)
 {
   if (!client_has_player()) {
@@ -3347,7 +3347,7 @@ void handle_edit_object_created(int tag, int id)
  /****************************************************************************
   Handle start position creation/removal.
 ****************************************************************************/
-void handle_edit_startpos(const struct packet_edit_startpos *packet)
+void handle_edit_startpos_CLIENT(const struct packet_edit_startpos *packet)
 {
   struct tile *ptile = index_to_tile(packet->id);
   bool changed = FALSE;
@@ -3385,7 +3385,7 @@ void handle_edit_startpos(const struct packet_edit_startpos *packet)
 /****************************************************************************
   Handle start position internal information.
 ****************************************************************************/
-void handle_edit_startpos_full(const struct packet_edit_startpos_full *
+void handle_edit_startpos_full_CLIENT(const struct packet_edit_startpos_full *
                                packet)
 {
   struct tile *ptile = index_to_tile(packet->id);

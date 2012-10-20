@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 2005 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -772,7 +772,7 @@ void handle_edit_city_create(struct connection *pc, int owner, int tile,
     notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                 /* TRANS: ..." at <tile-coordinates> because"... */
                 _("Cannot create a city at %s because the "
-                  "given owner's player id %d is invalid"), 
+                  "given owner's player id %d is invalid"),
                 tile_link(ptile), owner);
     return;
 
@@ -914,7 +914,7 @@ void handle_edit_city(struct connection *pc,
       changed = TRUE;
     }
   } improvement_iterate_end;
- 
+
   /* Handle food stock change. */
   if (packet->food_stock != pcity->food_stock) {
     int max = city_granary_size(pcity->size);
@@ -952,7 +952,7 @@ void handle_edit_city(struct connection *pc,
     city_refresh_queue_processing();
 
     /* FIXME: city_refresh_queue_processing only sends to city owner? */
-    send_city_info(NULL, pcity);  
+    send_city_info(NULL, pcity);
 
     conn_list_do_unbuffer(game.est_connections);
   }
@@ -1062,7 +1062,7 @@ void handle_edit_player_remove(struct connection *pc, int id)
 /**************************************************************************
   Handle editing of any or all player properties.
 ***************************************************************************/
-void handle_edit_player(struct connection *pc, 
+void handle_edit_player(struct connection *pc,
                         const struct packet_edit_player *packet)
 {
   struct player *pplayer;
@@ -1139,7 +1139,7 @@ void handle_edit_player(struct connection *pc,
     changed = TRUE;
     update_research = TRUE;
   } advance_index_iterate_end;
-  
+
   /* Handle a change in the player's gold. */
   if (packet->gold != pplayer->economic.gold) {
     if (!(0 <= packet->gold && packet->gold <= 1000000)) {
@@ -1338,7 +1338,7 @@ void handle_edit_toggle_fogofwar(struct connection *pc, int plr_no)
 /****************************************************************************
   Create or remove a start position at a tile.
 ****************************************************************************/
-void handle_edit_startpos(struct connection *pconn,
+void handle_edit_startpos_SERVER(struct connection *pconn,
                           const struct packet_edit_startpos *packet)
 {
   struct tile *ptile = index_to_tile(packet->id);
@@ -1376,7 +1376,7 @@ void handle_edit_startpos(struct connection *pconn,
 /****************************************************************************
   Setup which nations can start at a start position.
 ****************************************************************************/
-void handle_edit_startpos_full(struct connection *pconn,
+void handle_edit_startpos_full_SERVER(struct connection *pconn,
                                const struct packet_edit_startpos_full *
                                packet)
 {
@@ -1486,7 +1486,7 @@ void handle_save_scenario(struct connection *pc, const char *name)
 /****************************************************************************
   Handle scenario information packet
 ****************************************************************************/
-void handle_scenario_info(struct connection *pc,
+void handle_scenario_info_SERVER(struct connection *pc,
                           const struct packet_scenario_info *packet)
 {
   game.scenario.is_scenario = packet->is_scenario;

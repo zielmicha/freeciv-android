@@ -133,7 +133,7 @@ static void signal_handler(int sig)
   1. Parses command-line arguments (possibly dialog, on mac).
   2. Calls the main server-loop routine.
 **************************************************************************/
-int main(int argc, char *argv[])
+int civserver_main(int argc, char *argv[])
 {
   int inx;
   bool showhelp = FALSE;

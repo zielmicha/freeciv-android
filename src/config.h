@@ -535,3 +535,5 @@
 
 /* Define as `fork' if `vfork' does not work. */
 /* #undef vfork */
+
+#include <pyclient_always.h>

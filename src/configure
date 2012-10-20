@@ -9,7 +9,11 @@ output() {
 echo > Makefile.tmp
 
 ev=""
-for name in client/*.c *.c client/agents/*.c \
+if [ -e callauto.c ]; then
+    rm callauto.c
+fi
+
+for name in callauto.c client/*.c *.c client/agents/*.c \
     common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c \
     server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
 
@@ -19,10 +23,12 @@ for name in client/*.c *.c client/agents/*.c \
     output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
 done
 
-echo "all: libapp.so" > client.mk
-echo "objectfiles: $ev
+echo "all: app" > client.mk
+echo "objectfiles_gen: $ev
 " >> client.mk
-echo "libapp.so: objectfiles
+echo "app: objectfiles_gen
+	gcc -lz -lpython2.7 objectfiles/*.o -o app" >> client.mk
+echo "libapp.so: objectfiles_gen
 	gcc -shared -o libapp.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
