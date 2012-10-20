@@ -678,6 +678,31 @@ int py_get_unit_id(struct unit* unit) {
   return unit->id;
 }
 
+void py_server_main(PyObject* cmd) {
+  char* cmdlist[2048];
+  int length = PyList_Size(cmd);
+  int i;
+  assert(length < 2048);
+  cmdlist[0] = strdup("freeciv-server");
+  for(i=0; i<length; i++) {
+    PyObject* str = PyList_GetItem(cmd, i);
+    char* buff = strdup(PyString_AsString(str));
+    cmdlist[i + 1] = buff;
+  }
+  int result = fork();
+  if(result == -1) {
+    perror("fork");
+    return;
+  }
+  if(result == 0) {
+    wait();
+  } else {
+    civserver_main(length + 1, cmdlist);
+  }
+  for(i=0; i<length+1; i++)
+    free(cmdlist[i]);
+}
+
 static void py_setup_const() {
     PY_SETUP_CONST(PAGE_START);
     PY_SETUP_CONST(PAGE_SCENARIO);

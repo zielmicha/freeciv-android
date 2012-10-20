@@ -1447,8 +1447,8 @@ static PyObject* python_py_get_unit_id(PyObject* self, PyObject* args) {
 	int retval = py_get_unit_id((struct unit*)arg_unit);
 	return Py_BuildValue("i", retval);
 }
-// void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);
-void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);;
+// void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value)
+void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value);
 
 static PyObject* python_request_diplomat_answer(PyObject* self, PyObject* args) {
 	int arg_action;
@@ -1461,6 +1461,18 @@ static PyObject* python_request_diplomat_answer(PyObject* self, PyObject* args) 
 
 
 	request_diplomat_answer((enum diplomat_actions)arg_action, arg_dipl_id, arg_target_id, arg_value);
+	return Py_BuildValue("i", 0);
+}
+// void py_server_main(PyObject* cmd)
+void py_server_main(PyObject* cmd);
+
+static PyObject* python_py_server_main(PyObject* self, PyObject* args) {
+	PyObject* arg_cmd;
+	if(PyArg_ParseTuple(args, "O", &arg_cmd) == 0) return NULL;
+
+	PyObject* argp_cmd = py_alloc_struct(arg_cmd);
+        
+	py_server_main(argp_cmd);
 	return Py_BuildValue("i", 0);
 }
 void py_setup_callglue() {
@@ -1753,4 +1765,6 @@ void* ptr;
 	PY_CALL("ssi", "add_function", "py_get_unit_id", (int)ptr);
 	ptr = python_request_diplomat_answer;
 	PY_CALL("ssi", "add_function", "request_diplomat_answer", (int)ptr);
+	ptr = python_py_server_main;
+	PY_CALL("ssi", "add_function", "py_server_main", (int)ptr);
 }

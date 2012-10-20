@@ -27,6 +27,8 @@ import gzip
 import features
 import subprocess
 
+from client import freeciv
+
 from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='default')
@@ -273,31 +275,50 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     else:
         serverpath = 'server/freeciv-server'
     args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
-    print 'starting server - executable at', serverpath
-    stat = os.stat(serverpath)
-    try:
-        os.chmod(serverpath, 0o744) # octal!!!!
-    except OSError as err:
-        print 'chmodding server failed', err
+
     piddir = get_save_dir()
-    cmd = (serverpath, ) + args
-    if osutil.is_desktop:
-        os.environ['LD_PRELOAD'] = ''
     if quit_on_disconnect:
         os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
     else:
         del os.environ['FREECIV_QUIT_ON_DISCONNECT']
-    print cmd
-    serv_in, stream = os.popen4(cmd, bufsize=1) # line buffering
 
-    p = subprocess.Popen(cmd, bufsize=1,
-          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
-    stream = p.stdout
+    print 'server args', args
+
+    stream = zygote_start_server(args)
 
     while True:
         line = stream.readline()
-        if not line:
+        if not line.startswith((':', '\n')):
             break
+        line = line[1:]
         if line_callback:
             line_callback(line)
         monitor.log('server', line.rstrip())
+
+def start_zygote():
+    global zygote_cmd_pipe, zygote_console_pipe
+    cmd_pipe_fd, zygote_cmd_pipe_fd = os.pipe()
+    zygote_console_pipe_fd, console_pipe_fd = os.pipe()
+    if os.fork() == 0:
+        zygote_main(os.fdopen(cmd_pipe_fd, 'r', 0),
+                    os.fdopen(console_pipe_fd, 'w', 0))
+    else:
+        zygote_cmd_pipe = os.fdopen(zygote_cmd_pipe_fd, 'w', 0)
+        zygote_console_pipe = os.fdopen(zygote_console_pipe_fd, 'r', 0)
+
+def zygote_start_server(cmd):
+    zygote_cmd_pipe.write('\0'.join(cmd) + '\n')
+    return zygote_console_pipe
+
+def zygote_main(cmd_pipe, console_pipe):
+    os.dup2(console_pipe.fileno(), 1)
+    os.dup2(console_pipe.fileno(), 2)
+    while True:
+        cmd = cmd_pipe.readline()
+        if not cmd:
+            print 'zygote: exiting'
+            return
+        cmd = cmd.rstrip('\n')
+        print 'zygote: starting server', ' '.join(cmd.split('\0'))
+        freeciv.func.py_server_main(cmd.split('\0'))
+        console_pipe.write('\neof\n')
