@@ -38,7 +38,8 @@ def init():
 
 def create_window(size, bits):
     global _window
-    _window = Image(pygame.display.set_mode(size, 0, bits))
+    surf = pygame.display.set_mode(size, 0, bits)
+    _window = Image(surf)
     pygame.display.set_caption("touchciv")
     return _window
 
