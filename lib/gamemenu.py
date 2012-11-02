@@ -203,10 +203,11 @@ class NewJoystick(object):
             size = self.size[0]/2
             angle = math.radians(self.current)
             x, y = size*math.cos(angle), size*math.sin(angle)
-            pygame.draw.line(surf, (255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
+            surf.draw_line((255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
 
     def _ellipse(self, surf, color, rect):
-        pygame.gfxdraw.filled_ellipse(surf, rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2, color)
+        # [rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2]
+        surf.gfx_ellipse(color, rect, width=0)
 
     def event(self, ev):
         if hasattr(ev, 'pos'):

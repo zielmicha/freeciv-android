@@ -668,7 +668,7 @@ class MapDrawer(object):
 
 def scale_by(img, zoom):
     w, h = img.get_size()
-    return pygame.transform.smoothscale(img, (int(w * zoom), int(h * zoom)))
+    return img.scale(int(w * zoom), int(h * zoom))
 
 def init():
     gamemenu.init()
