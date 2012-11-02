@@ -652,7 +652,7 @@ class MapDrawer(object):
         size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
-            self.map_cache = pygame.Surface((size[0], size[1]))
+            self.map_cache = graphics.create_surface(size[0], size[1])
             if self.zoom != 1:
                 self.scaled_map_cache = pygame.Surface((int(size_mul * w), int(size_mul * h)))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
