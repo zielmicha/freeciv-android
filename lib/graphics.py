@@ -68,6 +68,9 @@ class Image(object):
     def get_size(self):
         return self._pg.get_size()
 
+    def get_at(self, point):
+        return self._pg.get_at(point)
+
     def get_width(self):
         return self.get_size()[0]
 
