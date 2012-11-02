@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 
 import ui
-import pygame
+import graphics
 import client
 import math
 import time
@@ -141,14 +141,14 @@ class Button(object):
             surf.blit(self.image, pos)
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             self.click_at = time.time()
             x, y = ev.abs_pos
             y -= self.image.get_height()
             x -= self.image.get_width() / 2
             self.tooltip = ui.Tooltip(self.action_name, (x, y-40), color=(0, 255, 255))
             return ui.LOCK_MOUSE_EVENT
-        if ev.type == pygame.MOUSEBUTTONUP:
+        if ev.type == graphics.const.MOUSEBUTTONUP:
             if self.tooltip:
                 self.tooltip.remove()
             if time.time() - 0.5 > self.click_at:
@@ -212,12 +212,12 @@ class NewJoystick(object):
     def event(self, ev):
         if hasattr(ev, 'pos'):
             relpos = (ev.pos[0] - self.size[0]/2, ev.pos[1] - self.size[1]/2)
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             if abs(relpos[0]) <= self.small_radius and abs(relpos[1]) <= self.small_radius:
                 self.clicked = True
             else:
                 return False
-        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+        if ev.type in (graphics.const.MOUSEBUTTONDOWN, graphics.const.MOUSEMOTION):
             if self.clicked:
                 if abs(relpos[0]) > self.small_radius or abs(relpos[1]) > self.small_radius:
                     dir = self.get_direction(relpos)
@@ -227,7 +227,7 @@ class NewJoystick(object):
                 return ui.LOCK_MOUSE_EVENT
             else:
                 return False
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             if self.current is not None:
                 self.do_action(self.current)
             self.clicked = False
@@ -290,12 +290,12 @@ class Joystick(object):
             surf.blit(Joystick.masks[self.current], pos)
 
     def event(self, ev):
-        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+        if ev.type in (graphics.const.MOUSEBUTTONDOWN, graphics.const.MOUSEMOTION):
             dir = self.get_direction(ev.pos)
             self.current = dir
             if not dir:
                 return False
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             dir = self.get_direction(ev.pos)
             self.current = None
             if dir:
@@ -383,9 +383,9 @@ class TileButton(object):
     def event(self, event):
         if self.dir != None and self.joystick.hidden:
             return False
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.active = True
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             self.active = False
             self.click()
 

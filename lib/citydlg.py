@@ -229,7 +229,7 @@ class CityCanvas(object):
         surf.blit(self.image, pos)
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             self.city.map_click(*map(self._dev_to_map, ev.pos))
             # self.dialog.refresh()
 

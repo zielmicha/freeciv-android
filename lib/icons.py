@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 
 import client
-import pygame
+import graphics
 
 def get_small_image(name):
     try:

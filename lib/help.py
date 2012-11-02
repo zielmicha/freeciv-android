@@ -1,6 +1,6 @@
 import ui
 import functools
-import pygame
+import graphics
 
 def show():
     global help_topics, help_data
@@ -90,7 +90,7 @@ class LongTextWidget(ui.LinearLayoutWidget):
 
         height = sum( max([ word.get_height() for word in line ] + [0]) for line in lines )
 
-        surf = pygame.Surface((width, height), pygame.SRCALPHA)
+        surf = graphics.const.Surface((width, height), graphics.const.SRCALPHA)
 
         y = 0
         for line in lines:

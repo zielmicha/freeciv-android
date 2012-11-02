@@ -12,7 +12,7 @@
 
 import time
 import traceback
-import pygame
+import graphics
 
 import graphics
 import uidialog
@@ -274,7 +274,7 @@ class LayoutWidget(object):
                         self._call_unhover(self.last_hovered)
                         self.last_hovered = None
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.type == graphics.const.MOUSEBUTTONDOWN:
                         if result == LOCK_MOUSE_EVENT:
                             self.holds_mouse = item
                             self.holds_mouse_pos = itempos
@@ -283,7 +283,7 @@ class LayoutWidget(object):
                     handled = True
                     break
 
-            if event.type == pygame.MOUSEBUTTONUP:
+            if event.type == graphics.const.MOUSEBUTTONUP:
                 self.holds_mouse = None
 
             if not handled:
@@ -511,9 +511,9 @@ def main():
                 x, y = ev_dict['pos']
                 ev_dict['pos'] = x, y
                 ev_dict['abs_pos'] = ev_dict['pos']
-            if event.type == pygame.QUIT:
+            if event.type == graphics.const.QUIT:
                 back()
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
                 back()
             else:
                 screen.event(Event(event.type, ev_dict))
@@ -587,7 +587,7 @@ def merge_mouse_events(events):
     mouse = None
     res = []
     for ev in events:
-        if ev.type == pygame.MOUSEMOTION:
+        if ev.type == graphics.const.MOUSEMOTION:
             mouse = ev
         else:
             res.append(ev)
@@ -642,7 +642,7 @@ class WithText(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -679,24 +679,24 @@ def _round_rect(surface, color, rect, width, xr, yr):
 
     # top left corner
     surface.set_clip(clip.clip(rect.left, rect.top, xr-3, yr-3))
-    surface.gfx_ellipse(color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, graphics.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
 
     # top right corner
     surface.set_clip(clip.clip(rect.right-xr+2, rect.top, xr, yr-3))
-    surface.gfx_ellipse(color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, graphics.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
 
     # bottom left
     surface.set_clip(clip.clip(rect.left, rect.bottom-yr+2, xr-3, yr))
-    surface.gfx_ellipse(color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, graphics.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
 
     # bottom right
     surface.set_clip(clip.clip(rect.right-xr+2, rect.bottom-yr+2, xr, yr))
-    surface.gfx_ellipse(color, pygame.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
+    surface.gfx_ellipse(color, graphics.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
 
     surface.set_clip(clip)
 
 def round_rect(surf, bg, fg, rect, round=10):
-    rect = pygame.Rect(rect)
+    rect = graphics.Rect(rect)
     _round_rect(surf, bg, rect, 0, round, round)
     _round_rect(surf, fg, rect, 1, round, round)
 
@@ -721,9 +721,9 @@ class Button(WithText):
         self.active = False
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.active = True
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             self.active = False
             if self.callback:
                 self.callback()
@@ -762,7 +762,7 @@ class Image(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -787,7 +787,7 @@ class Image(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -895,7 +895,7 @@ class ScrollWrapper(object):
         self.item.tick()
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.vx = 0
             self.vy = 0
             self.start_dragging = event.pos
@@ -903,7 +903,7 @@ class ScrollWrapper(object):
             self.was_dragged = False
             self.canceled_event(event)
             return LOCK_MOUSE_EVENT
-        elif event.type == pygame.MOUSEMOTION:
+        elif event.type == graphics.const.MOUSEMOTION:
             if self.start_dragging:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
                 if (dx*dx+dy*dy) > 4:
@@ -911,7 +911,7 @@ class ScrollWrapper(object):
                     self.was_dragged = True
                     self.y += dy
                     self.x += dx
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             if self.was_dragged:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
                 self.vx = _scroll_speed_func(self.vx, dx)
@@ -920,7 +920,7 @@ class ScrollWrapper(object):
                 self.x += dx
             else:
                 if self.start_dragging:
-                    self.post_mouse_event(Event(pygame.MOUSEBUTTONDOWN, {'pos': self.start_dragging, 'abs_pos': self.start_dragging_abs}))
+                    self.post_mouse_event(Event(graphics.const.MOUSEBUTTONDOWN, {'pos': self.start_dragging, 'abs_pos': self.start_dragging_abs}))
                 self.post_mouse_event(event)
             self.start_dragging = None
             self.was_dragged = False

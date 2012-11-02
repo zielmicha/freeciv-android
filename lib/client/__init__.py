@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 
 import select
-import pygame
+import graphics
 import time
 
 import progress
@@ -177,7 +177,7 @@ class Client(object):
 
     def escape(self):
         if self.draw_patrol_lines:
-            self.key_event(pygame.KEYDOWN, pygame.K_ESCAPE)
+            self.key_event(graphics.const.KEYDOWN, graphics.const.K_ESCAPE)
             self.draw_patrol_lines = False
         else:
             self.quit()

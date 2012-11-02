@@ -14,7 +14,7 @@ from __future__ import division
 import ui
 import uidialog
 import client
-import pygame
+import graphics
 import functools
 
 from client import freeciv
@@ -293,7 +293,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         super(ScreenWidget, self).tick()
 
     def event(self, ev):
-        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F1:
+        if ev.type == graphics.const.KEYDOWN and ev.key == graphics.const.K_F1:
             self.client.quit()
         else:
             return super(ScreenWidget, self).event(ev)
@@ -347,7 +347,7 @@ class TaxesPanel(ui.LinearLayoutWidget):
         self.add(ui.Label('Year: ' + year, font=ui.consolefont))
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             self.callback()
 
     def callback(self):
@@ -436,7 +436,7 @@ class OverviewWidget(object):
         pass
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             w, h = self.client.get_overview_size()
             scale = float(w) / self.scale_width
             self.client.overview_click(int(ev.pos[0] * scale), int(ev.pos[1] * scale))
@@ -477,11 +477,11 @@ class ConsoleWidget(ui.LinearLayoutWidget):
         surf.set_clip(old_clip)
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             myabspos = ui._subpoints(ev.abs_pos, ev.pos)
             self.shown = True
             ui.add_overlay(self.scroll, myabspos)
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             self.shown = False
             if self.scroll in ui.overlays:
                 ui.overlays.remove(self.scroll)
@@ -512,7 +512,7 @@ class MapWidget(object):
         self.client.escape()
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEMOTION:
+        if ev.type == graphics.const.MOUSEMOTION:
             if self.start_drag:
                 if not self.was_dragged:
                     x, y = ev.pos
@@ -528,13 +528,13 @@ class MapWidget(object):
             self.client.mouse_motion(self.drawer.coord_ui_to_map(ev.pos))
             return ui.LOCK_MOUSE_EVENT
 
-        elif ev.type == pygame.MOUSEBUTTONDOWN:
+        elif ev.type == graphics.const.MOUSEBUTTONDOWN:
             x, y = ev.pos
             self.start_drag = ev.pos
             self.drawer.start_scrolling()
             return ui.LOCK_MOUSE_EVENT
 
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             if self.was_dragged:
                 self.drag(ev.pos)
                 self.was_dragged = False
@@ -545,7 +545,7 @@ class MapWidget(object):
             self.start_drag = None
             self.last_drag_pos = None
 
-        elif ev.type in (pygame.KEYDOWN, pygame.KEYUP):
+        elif ev.type in (graphics.const.KEYDOWN, graphics.const.KEYUP):
             self.client.key_event(ev.type, ev.key)
 
     def draw(self, surf, pos):
@@ -572,7 +572,7 @@ class MapDrawer(object):
         self.valid_for_origin = None # if get_map_view_origin() returns something else, redraw map
         self.user_corner = (0.0, 0.0) # this point should be painted in top-left corner
 
-        self.map_cache = pygame.Surface((1, 1), pygame.SRCALPHA)
+        self.map_cache = graphics.create_surface(1, 1)
         self.last_map_size = None
         self.widget_size = (0, 0)
         self.scrolling = False
@@ -654,7 +654,7 @@ class MapDrawer(object):
             self.client.set_map_size(size)
             self.map_cache = graphics.create_surface(size[0], size[1])
             if self.zoom != 1:
-                self.scaled_map_cache = pygame.Surface((int(size_mul * w), int(size_mul * h)))
+                self.scaled_map_cache = graphics.const.Surface((int(size_mul * w), int(size_mul * h)))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         self.valid_for_origin = freeciv.func.get_map_view_origin()
 

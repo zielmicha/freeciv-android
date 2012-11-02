@@ -12,7 +12,7 @@
 
 import os
 import sys
-import pygame
+import graphics
 import time
 import features
 
@@ -30,8 +30,8 @@ is_desktop = not is_android
 def init():
     if android:
         android.init()
-        android.map_key(android.KEYCODE_BACK, pygame.K_ESCAPE)
-        android.map_key(android.KEYCODE_MENU, pygame.K_F1)
+        android.map_key(android.KEYCODE_BACK, graphics.const.K_ESCAPE)
+        android.map_key(android.KEYCODE_MENU, graphics.const.K_F1)
 
 def get_android_data(append=''):
     chdir = os.getcwd()

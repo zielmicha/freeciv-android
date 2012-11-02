@@ -12,7 +12,7 @@
 
 import ui
 import uidialog
-import pygame
+import graphics
 
 import sync
 import save

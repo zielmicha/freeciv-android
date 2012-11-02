@@ -12,8 +12,13 @@
 
 import pygame
 import pygame.gfxdraw
+import pygame.locals
 
 from pygame import Rect
+
+class const: pass
+const = const()
+const.__dict__.update(pygame.locals.__dict__)
 
 def load_image(fn):
     return Image(pygame.image.load(fn).convert_alpha())
