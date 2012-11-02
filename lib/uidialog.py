@@ -14,21 +14,30 @@ import osutil
 import time
 
 if osutil.is_desktop:
-    import easygui
+    try:
+        import easygui
+    except ImportError:
+        print '---------------------'
+        print 'import easygui FAILED'
+        print 'WILL USE raw_input!!'
+        print '----------------------'
+        def inputbox(text, default=''):
+            return raw_input('%s [%s]' % text_default) or default
+    else:
+        def inputbox(text, default=''):
+            return easygui.enterbox(text, default=default)
+
     import webbrowser
-    
-    def inputbox(text, default=''):
-        return easygui.enterbox(text, default=default)
-        
+
     def open_url(url):
         webbrowser.open_new_tab(url)
-    
+
 elif osutil.is_android:
     import pyjni
-    
+
     def inputbox(text, default='', title=''):
         pyjni.make_input_dialog(title, text, default)
-        
+
         while True:
             data = pyjni.get_dialog_retval()
             if data:
@@ -39,6 +48,6 @@ elif osutil.is_android:
                 else:
                     return None
             time.sleep(0.1)
-    
+
     def open_url(url):
         pyjni.open_intent("android.intent.action.VIEW", url)

@@ -15,22 +15,22 @@ enum city_get_mode {
 };
 
 PyObject* py_mapper_city(struct city* s) {
-    return Py_BuildValue("i", (int)s);
+    return Py_BuildValue("l", (long)s);
 }
 PyObject* py_mapper_player(struct player* s){
-    return Py_BuildValue("i", (int)s);
+    return Py_BuildValue("l", (long)s);
 }
 PyObject* py_mapper_unit(struct unit* s){
-    return Py_BuildValue("i", (int)s);
+    return Py_BuildValue("l", (long)s);
 }
 PyObject* get_unit_properties(struct unit* s) {
     struct terrain* t = tile_terrain(s->tile);
-    return Py_BuildValue("iiOs", (int)s, (int)s->tile, py_mapper_city(tile_city(s->tile)),
+    return Py_BuildValue("l;Os", (long)s, (long)s->tile, py_mapper_city(tile_city(s->tile)),
                 terrain_rule_name(t));
 }
 
 PyObject* py_mapper_tile(struct tile* s){
-    return Py_BuildValue("i", (int)s);
+    return Py_BuildValue("l", (long)s);
 }
 PyObject* py_mapper_packet_game_load(struct packet_game_load* s){
     return Py_BuildValue("i", 0);
@@ -58,7 +58,7 @@ PyObject* py_mapper_packet_endgame_report(struct packet_endgame_report* s) {
     return Py_BuildValue("i", 0);
 }
 PyObject* py_mapper_message(struct message* s) {
-    return Py_BuildValue("(s(iii)i)", s->descr, B2I(s->location_ok), B2I(s->city_ok), B2I(s->visited), (int)s->tile);
+    return Py_BuildValue("(s(iii)l)", s->descr, B2I(s->location_ok), B2I(s->city_ok), B2I(s->visited), (long)s->tile);
 }
 PyObject* py_mapper_option(struct message* s) {
     return Py_BuildValue("");
@@ -67,22 +67,22 @@ PyObject* py_mapper_option_set(struct message* s) {
     return Py_BuildValue("");
 }
 
-void recenter_at_tile_int(int tile) {
+void recenter_at_tile_int(long tile) {
     if(tile == 0)
         errlog("recenter_at_tile_int: tile == 0\n");
     center_tile_mapcanvas((struct tile*)tile);
 }
 
-struct unit_list* get_units_at_tile(int tile) {
+struct unit_list* get_units_at_tile(long tile) {
     return ((struct tile*)tile)->units;
 }
 
-void finish_city_at_unit(int unit, char* title) {
+void finish_city_at_unit(long unit, char* title) {
     struct unit* u = (struct unit*)unit;
     finish_city(u->tile, title);
 }
 
-void cancel_city_at_unit(int unit) {
+void cancel_city_at_unit(long unit) {
     struct unit* u = (struct unit*)unit;
     cancel_city(u->tile);
 }
@@ -165,8 +165,8 @@ void control_mouse_cursor_pos(int x, int y) {
     control_mouse_cursor(canvas_pos_to_tile(x, y));
 }
 
-int canvas_pos_to_nearest_tile_id(int x, int y) {
-    return (int)canvas_pos_to_nearest_tile(x, y);
+long canvas_pos_to_nearest_tile_id(int x, int y) {
+    return (long)canvas_pos_to_nearest_tile(x, y);
 }
 
 PyObject* get_map_view_origin() {
@@ -315,9 +315,9 @@ PyObject* python_callback;
 typedef PyObject* (*python_func_type)(PyObject*, PyObject*);
 
 static PyObject* call_freeciv(PyObject* self, PyObject* args) {
-    int fun;
+    long fun;
     PyObject* fargs;
-    if(PyArg_ParseTuple(args, "iO", &fun, &fargs) == 0)
+    if(PyArg_ParseTuple(args, "lO", &fun, &fargs) == 0)
         return NULL;
 
     python_func_type func = (python_func_type)fun;
@@ -489,7 +489,7 @@ PyObject* get_buildable_improvements_in_city(struct city* pCity) {
             int cost = impr_build_shield_cost(pImprove);
 
             PyList_Append(list, Py_BuildValue(
-                "iisiii()O", (int)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost,
+                "lisiii()O", (long)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost,
                 (PyObject*)get_building_sprite(tileset, pImprove)
             ));
         }
@@ -506,7 +506,7 @@ PyObject* get_built_improvements_in_city(struct city* pCity) {
         const char* name = improvement_name_translation(pImprove);
 
         PyList_Append(list, Py_BuildValue(
-            "is", (int)pImprove, name
+            "ls", (long)pImprove, name
         ));
     } city_built_iterate_end;
 
@@ -532,7 +532,7 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
             int turns = -1; //city_turns_to_build(pCity, cid_production(cid_encode_unit(un)), TRUE)
 
             PyList_Append(list, Py_BuildValue(
-                "iisiii(iii)O", (int)un, VUT_UTYPE, name, turns, stock, cost,
+                "lisiii(iii)O", (long)un, VUT_UTYPE, name, turns, stock, cost,
                 attack, defense, moves, (PyObject*)get_unittype_sprite(tileset, un)
             ));
         }
@@ -545,7 +545,7 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
 PyObject* get_players() {
     PyObject* list = PyList_New(0);
     players_iterate(pl) {
-        PyList_Append(list, Py_BuildValue("i", (int)pl));
+        PyList_Append(list, Py_BuildValue("l", (long)pl));
     } players_iterate_end;
     return list;
 }
@@ -595,7 +595,7 @@ PyObject* get_governments() {
     governments_iterate(pGov) {
 
         PyList_Append(list, Py_BuildValue(
-            "isi", (int)pGov, government_name_translation(pGov),
+            "lsi", (long)pGov, government_name_translation(pGov),
                 can_change_to_government(client.conn.playing, pGov)?1:0
         ));
 
@@ -640,7 +640,7 @@ struct player* get_playing() {
     return client.conn.playing;
 }
 
-void change_government(int gov) {
+void change_government(long gov) {
     set_government_choice((struct government *)gov);
 }
 

@@ -17,6 +17,7 @@ import traceback
 import functools
 import features
 
+import osutil
 import civsync
 import ui
 import uidialog
@@ -25,15 +26,21 @@ import save
 try:
     import lzma
 except:
-    import pyjni
+    if osutil.is_desktop:
+        print '---------------------'
+        print 'import lzma FAILED'
+        print '----------------------'
+        lzma = None
+    else:
+        import pyjni
 
-    class lzma:
-        def decompress(self, data):
-            return pyjni.encode_or_decode_xz(1, data)
+        class lzma:
+            def decompress(self, data):
+                return pyjni.encode_or_decode_xz(1, data)
 
-        def compress(self, data):
-            return pyjni.encode_or_decode_xz(0, data)
-    lzma = lzma()
+            def compress(self, data):
+                return pyjni.encode_or_decode_xz(0, data)
+        lzma = lzma()
 
 def apply_host_change(host):
     print 'using civsync host', host
@@ -287,4 +294,3 @@ def get_install_time():
         with open(path, 'w') as f:
             f.write('%d' % install_time)
     return install_time
-

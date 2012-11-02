@@ -1,6 +1,7 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
-GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -Ipython2.7 -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H"
+PYTHON=python2.7 # python2.7_d
+GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -I/usr/include/$PYTHON -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H"
 EXCLUDE_FILES="client/audio_sdl.c lua/luac.c"
 
 output() {
@@ -27,15 +28,15 @@ echo "all: app" > client.mk
 echo "objectfiles_gen: $ev
 " >> client.mk
 echo "app: objectfiles_gen
-	gcc -lz -lpython2.7 objectfiles/*.o -o app" >> client.mk
+	gcc -lz -lm -l$PYTHON objectfiles/*.o -o app" >> client.mk
 echo "_graphics.so: _graphicsmodule.h _graphicsmodule.c
-	gcc -I/usr/include/python2.7 -lpython2.7 _graphicsmodule.c -shared -o _graphics.so" >> client.mk
+	gcc -I/usr/include/python2.7 -l$PYTHON _graphicsmodule.c -shared -o _graphics.so" >> client.mk
 echo "libapp.so: objectfiles_gen
-	gcc -shared -o libapp.so -lm -lz -lpython2.7 objectfiles/*.o" >> client.mk
+	gcc -shared -o libapp.so -lm -lz -l$PYTHON objectfiles/*.o" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
 echo "clean:
-	rm objectfiles/* libapp.so callauto.c" >> client.mk
+	rm objectfiles/* libapp.so app callauto.c" >> client.mk
 cat Makefile.tmp >> client.mk
 mv client.mk Makefile
 rm Makefile.tmp
