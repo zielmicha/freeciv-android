@@ -140,7 +140,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             pass
 
     def set_barbarians(self):
-        self.barbarians = self.barbarians
+        self.barbarians = not self.barbarians
         word = ('normal' if self.barbarians else 'disabled')
         self.barbarians_button.set_text('Barbarians: %s' % word)
         client.client.chat('/set barbarians %s' % word)
