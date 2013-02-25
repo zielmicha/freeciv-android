@@ -84,6 +84,11 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_mapsize(5)
         self.add(self.mapsize_button)
 
+        self.barbarians_button = ui.Button('...', self.set_barbarians)
+        self.barbarians = False
+        self.set_barbarians()
+        self.add(self.barbarians_button)
+
         self.nation_id = 1 #random.choice(client.get_nations())[2]
         self.leader_name = 'Player'
         self.city_style = 1
@@ -133,6 +138,12 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.mapsize_button.set_text('Map size: %dk' % count)
         except (ValueError, TypeError):
             pass
+
+    def set_barbarians(self):
+        self.barbarians = self.barbarians
+        word = ('normal' if self.barbarians else 'disabled')
+        self.barbarians_button.set_text('Barbarians: %s' % word)
+        client.client.chat('/set barbarians %s' % word)
 
     def tick(self):
         super(ServerGUI, self).tick()
