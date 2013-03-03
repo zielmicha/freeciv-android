@@ -28,11 +28,11 @@ echo "all: app" > client.mk
 echo "objectfiles_gen: $ev
 " >> client.mk
 echo "app: objectfiles_gen
-	gcc -lz -lm -l$PYTHON objectfiles/*.o -o app" >> client.mk
+	gcc objectfiles/*.o -o app -lz -lm -l$PYTHON" >> client.mk
 echo "_graphics.so: _graphicsmodule.h _graphicsmodule.c
 	gcc -I/usr/include/python2.7 -l$PYTHON _graphicsmodule.c -shared -o _graphics.so" >> client.mk
 echo "libapp.so: objectfiles_gen
-	gcc -shared -o libapp.so -lm -lz -l$PYTHON objectfiles/*.o" >> client.mk
+	gcc -shared -o libapp.so -l$PYTHON objectfiles/*.o -lm -lz" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
 echo "clean:
