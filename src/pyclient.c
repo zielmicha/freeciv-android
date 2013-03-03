@@ -25,7 +25,7 @@ PyObject* py_mapper_unit(struct unit* s){
 }
 PyObject* get_unit_properties(struct unit* s) {
     struct terrain* t = tile_terrain(s->tile);
-    return Py_BuildValue("l;Os", (long)s, (long)s->tile, py_mapper_city(tile_city(s->tile)),
+    return Py_BuildValue("llOs", (long)s, (long)s->tile, py_mapper_city(tile_city(s->tile)),
                 terrain_rule_name(t));
 }
 
@@ -410,10 +410,10 @@ int city_style_of_nation_id(int id) {
     return city_style_of_nation(nation_by_number(id));
 }
 
-void city_change_production_type(struct city* pCity, int type, int value) {
+void city_change_production_type(struct city* pCity, int type, long value) {
     struct universal u;
     u.kind = type;
-    u.value = (universals_u)value;
+    u.value = (universals_u)((struct impr_type *)value);
     city_change_production(pCity, u);
 }
 

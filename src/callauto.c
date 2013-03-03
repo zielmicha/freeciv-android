@@ -813,14 +813,14 @@ static PyObject* python_city_map_click(PyObject* self, PyObject* args) {
 	city_map_click((struct city*)arg_pCity, arg_canvas_x, arg_canvas_y);
 	return Py_BuildValue("i", 0);
 }
-// void city_change_production_type(struct city* pCity, int type, int value)
-void city_change_production_type(struct city* pCity, int type, int value);
+// void city_change_production_type(struct city* pCity, int type, long value)
+void city_change_production_type(struct city* pCity, int type, long value);
 
 static PyObject* python_city_change_production_type(PyObject* self, PyObject* args) {
 	long arg_pCity;
 	int arg_type;
-	int arg_value;
-	if(PyArg_ParseTuple(args, "lii", &arg_pCity, &arg_type, &arg_value) == 0) return NULL;
+	long arg_value;
+	if(PyArg_ParseTuple(args, "lil", &arg_pCity, &arg_type, &arg_value) == 0) return NULL;
 
 
 

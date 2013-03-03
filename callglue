@@ -88,7 +88,7 @@ char* city_get_production_name(struct city* pCity)
 int city_get_citizen_count(struct city* pCity, bool specialist, int type)
 void city_rotate_specialist(struct city *pcity, int citizen_index)
 void city_map_click(struct city* pCity, int canvas_x, int canvas_y)
-void city_change_production_type(struct city* pCity, int type, int value)
+void city_change_production_type(struct city* pCity, int type, long value)
 struct unit_list* get_units_present_in_city(struct city* pCity)
 
 int get_playable_nation_count()
