@@ -4,7 +4,7 @@ dlfail() {
 	exit 1
 }
 
-wget http://michal.zielinscy.org.pl/freeciv-android-dep.tgz -Ofreeciv-android-dep.tgz || dlfail
+wget http://users.v-lo.krakow.pl/~zlmch/mirror/freeciv-android-dep.tgz -Ofreeciv-android-dep.tgz || dlfail
 tar xvzf freeciv-android-dep.tgz
 cp -r dep/* ./
 rm -r dep
