@@ -4,17 +4,16 @@ If you don't need to change source code and don't need latest version simply dow
 
 == DEPENDENCIES ==
 Building Freeciv for Android is currently only possible on Linux. On Ubuntu/Debian you need:
-   sudo apt-get install python-lzma python-tk python-pygame zlib1g-dev python2.7-dev
+   sudo apt-get install python-lzma python-tk python-pygame zlib1g-dev python2.7-dev libpython2.7
 
 Then configure:
    bash ./build.sh
 
 Build Freeciv for Android to run on desktop (for debugging):
    make -Csrc
-   make -Cserver
 
 And run:
-   python main.py
+   ./main.sh
 
 Build Freeciv for Android for Android:
    android/debug.sh
