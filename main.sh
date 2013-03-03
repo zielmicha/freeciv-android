@@ -1,1 +1,1 @@
-PYTHONPATH=lib src/app
+PYTHONPATH=lib:src python lib/main.py
