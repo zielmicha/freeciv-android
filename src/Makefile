@@ -8,7 +8,7 @@ freecivclient.so: objectfiles_gen
 callauto.c: ../callglue
 	python ../gencallglue.py
 clean:
-	rm objectfiles/* libapp.so app callauto.c
+	rm objectfiles/* freecivclient.so callauto.c
 
 objectfiles/callauto.o: callauto.c
 	gcc -g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -I/usr/include/python2.7 -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H -fPIC  -c -o objectfiles/callauto.o callauto.c

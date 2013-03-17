@@ -21,9 +21,7 @@ cp build.xml.template build/pygame/templates/build.xml
 . info.sh || exit 1
 export PATH="$PATH:$ANDROID_PATH"
 
-cd build/server
-ndk-build -j5 || exit 1
-cd ../..
+make -C ../src callauto.c || exit 1
 
 cd build/client
 ndk-build -j5 || exit 1

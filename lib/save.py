@@ -277,11 +277,6 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
 
     piddir = get_save_dir()
-    if quit_on_disconnect:
-        os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
-    else:
-        del os.environ['FREECIV_QUIT_ON_DISCONNECT']
-
     print 'server args', args
 
     stream = zygote_start_server(args)
@@ -311,6 +306,7 @@ def zygote_start_server(cmd):
     return zygote_console_pipe
 
 def zygote_main(cmd_pipe, console_pipe):
+    os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
     os.dup2(console_pipe.fileno(), 1)
     os.dup2(console_pipe.fileno(), 2)
     while True:
@@ -322,3 +318,4 @@ def zygote_main(cmd_pipe, console_pipe):
         print 'zygote: starting server', ' '.join(cmd.split('\0'))
         freeciv.func.py_server_main(cmd.split('\0'))
         console_pipe.write('\neof\n')
+        print 'zygote: server exited'
