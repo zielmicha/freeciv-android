@@ -119,7 +119,7 @@
 #define HAVE_GETHOSTNAME 1
 
 /* Define to 1 if you have the `getline' function. */
-#define HAVE_GETLINE 1
+/* #define HAVE_GETLINE 0 */
 
 /* Define to 1 if you have the `getnameinfo' function. */
 #define HAVE_GETNAMEINFO 1
