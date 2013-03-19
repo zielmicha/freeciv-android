@@ -44,3 +44,6 @@ gendoc.py
 /start-xserver
 /src/app
 /pygame-package-0.9.3/
+/src/Makefile
+/lib/graphics.c
+/lib/graphics.so
