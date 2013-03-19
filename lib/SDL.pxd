@@ -6,49 +6,49 @@ cdef extern from "SDL.h":
     ctypedef signed long long Sint64
     ctypedef signed short Sint16
     ctypedef unsigned short Uint16
- 
+
     ctypedef enum:
         SDL_PIXELFORMAT_ARGB8888
- 
+
     ctypedef enum SDL_BlendMode:
         SDL_BLENDMODE_NONE = 0x00000000
         SDL_BLENDMODE_BLEND = 0x00000001
         SDL_BLENDMODE_ADD = 0x00000002
         SDL_BLENDMODE_MOD = 0x00000004
- 
+
     ctypedef enum SDL_TextureAccess:
         SDL_TEXTUREACCESS_STATIC
         SDL_TEXTUREACCESS_STREAMING
         SDL_TEXTUREACCESS_TARGET
- 
+
     ctypedef enum SDL_RendererFlags:
         SDL_RENDERER_SOFTWARE = 0x00000001
         SDL_RENDERER_ACCELERATED = 0x00000002
         SDL_RENDERER_PRESENTVSYNC = 0x00000004
- 
+
     ctypedef enum SDL_bool:
         SDL_FALSE = 0
         SDL_TRUE = 1
- 
+
     cdef struct SDL_Rect:
         int x, y
         int w, h
- 
+
     ctypedef struct SDL_Point:
         int x, y
- 
+
     cdef struct SDL_Color:
         Uint8 r
         Uint8 g
         Uint8 b
         Uint8 unused
- 
+
     cdef struct SDL_Palette:
         int ncolors
         SDL_Color *colors
         Uint32 version
         int refcount
- 
+
     cdef struct SDL_PixelFormat:
         Uint32 format
         SDL_Palette *palette
@@ -69,9 +69,9 @@ cdef extern from "SDL.h":
         Uint8 Ashift
         int refcount
         SDL_PixelFormat *next
- 
+
     cdef struct SDL_BlitMap
- 
+
     cdef struct SDL_Surface:
         Uint32 flags
         SDL_PixelFormat *format
@@ -84,7 +84,7 @@ cdef extern from "SDL.h":
         SDL_Rect clip_rect
         SDL_BlitMap *map
         int refcount
- 
+
     ctypedef enum SDL_EventType:
         SDL_FIRSTEVENT     = 0,
         SDL_QUIT           = 0x100
@@ -123,7 +123,7 @@ cdef extern from "SDL.h":
         SDL_EVENT_COMPAT3
         SDL_USEREVENT    = 0x8000
         SDL_LASTEVENT    = 0xFFFF
- 
+
     ctypedef enum SDL_WindowEventID:
         SDL_WINDOWEVENT_NONE           #< Never used */
         SDL_WINDOWEVENT_SHOWN          #< Window has been shown */
@@ -144,7 +144,7 @@ cdef extern from "SDL.h":
         SDL_WINDOWEVENT_FOCUS_LOST     #< Window has lost keyboard focus */
         SDL_WINDOWEVENT_CLOSE           #< The window manager requests that the
                                         # window be closed */
- 
+
     ctypedef enum SDL_WindowFlags:
         SDL_WINDOW_FULLSCREEN = 0x00000001
         SDL_WINDOW_OPENGL = 0x00000002
@@ -158,12 +158,12 @@ cdef extern from "SDL.h":
         SDL_WINDOW_INPUT_FOCUS = 0x00000200
         SDL_WINDOW_MOUSE_FOCUS = 0x00000400
         SDL_WINDOW_FOREIGN = 0x00000800
- 
+
     ctypedef enum SDL_RendererFlip:
         SDL_FLIP_NONE = 0x00000000
         SDL_FLIP_HORIZONTAL = 0x00000001
         SDL_FLIP_VERTICAL = 0x00000002
- 
+
     cdef struct SDL_MouseMotionEvent:
         Uint32 type
         Uint32 windowID
@@ -175,7 +175,7 @@ cdef extern from "SDL.h":
         int y
         int xrel
         int yrel
- 
+
     cdef struct SDL_MouseButtonEvent:
         Uint32 type
         Uint32 windowID
@@ -185,7 +185,7 @@ cdef extern from "SDL.h":
         Uint8 padding2
         int x
         int y
- 
+
     cdef struct SDL_WindowEvent:
         Uint32 type
         Uint32 windowID
@@ -195,10 +195,10 @@ cdef extern from "SDL.h":
         Uint8 padding3
         int data1
         int data2
- 
+
     ctypedef Sint64 SDL_TouchID
     ctypedef Sint64 SDL_FingerID
- 
+
     cdef struct SDL_TouchFingerEvent:
         Uint32 type
         Uint32 windowID
@@ -213,7 +213,7 @@ cdef extern from "SDL.h":
         Sint16 dx
         Sint16 dy
         Uint16 pressure
- 
+
     cdef struct SDL_KeyboardEvent:
         pass
     cdef struct SDL_TextEditingEvent:
@@ -225,7 +225,7 @@ cdef extern from "SDL.h":
         Uint32 windowID
         int x
         int y
- 
+
     cdef struct SDL_JoyAxisEvent:
         pass
     cdef struct SDL_JoyBallEvent:
@@ -248,7 +248,7 @@ cdef extern from "SDL.h":
         pass
     cdef struct SDL_DollarGestureEvent:
         pass
- 
+
     cdef union SDL_Event:
         Uint32 type
         SDL_WindowEvent window
@@ -269,7 +269,7 @@ cdef extern from "SDL.h":
         SDL_TouchButtonEvent tbutton
         SDL_MultiGestureEvent mgesture
         SDL_DollarGestureEvent dgesture
- 
+
     cdef struct SDL_RendererInfo:
         char *name
         Uint32 flags
@@ -277,7 +277,7 @@ cdef extern from "SDL.h":
         Uint32 texture_formats[16]
         int max_texture_width
         int max_texture_height
- 
+
     ctypedef struct SDL_Texture
     ctypedef struct SDL_Renderer
     ctypedef struct SDL_Window
@@ -287,13 +287,13 @@ cdef extern from "SDL.h":
         int h
         int refresh_rate
         void *driverdata
- 
+
     cdef struct SDL_RWops:
         long (* seek) (SDL_RWops * context, long offset,int whence)
         size_t(* read) ( SDL_RWops * context, void *ptr, size_t size, size_t maxnum)
         size_t(* write) (SDL_RWops * context, void *ptr,size_t size, size_t num)
         int (* close) (SDL_RWops * context)
- 
+
     cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
     cdef SDL_Texture * SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
     cdef SDL_Texture * SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
@@ -301,6 +301,8 @@ cdef extern from "SDL.h":
     cdef int SDL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect * srcrect, SDL_Rect * dstrect)
     cdef int SDL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect * srcrect, SDL_Rect * dstrect, double angle, SDL_Point *center, SDL_RendererFlip flip)
     cdef void SDL_RenderPresent(SDL_Renderer * renderer)
+    cdef int SDL_RenderDrawRect(SDL_Renderer * renderer, SDL_Rect * rect)
+    cdef int SDL_RenderFillRect(SDL_Renderer * renderer, SDL_Rect * rect)
     cdef SDL_bool SDL_RenderTargetSupported(SDL_Renderer *renderer)
     cdef int SDL_SetTargetTexture(SDL_Texture *texture)
     cdef SDL_bool SDL_ResetTargetTexture(SDL_Renderer *renderer)
@@ -331,10 +333,10 @@ cdef extern from "SDL.h":
     cdef int SDL_SetTextureColorMod(SDL_Texture * texture, Uint8 r, Uint8 g, Uint8 b)
     cdef int SDL_SetTextureAlphaMod(SDL_Texture * texture, Uint8 alpha)
     cdef char * SDL_GetError()
- 
+
 cdef extern from "SDL_image.h":
     cdef SDL_Surface *IMG_Load(char *file)
- 
+
 cdef extern from "SDL_ttf.h":
     ctypedef struct TTF_Font
     cdef int TTF_Init()
@@ -352,7 +354,7 @@ cdef extern from "SDL_ttf.h":
     cdef void  TTF_SetFontStyle(TTF_Font *font, int style)
     cdef int  TTF_GetFontOutline( TTF_Font *font)
     cdef void  TTF_SetFontOutline(TTF_Font *font, int outline)
- 
+
     #Set and retrieve FreeType hinter settings */
     #define TTF_HINTING_NORMAL    0
     #define TTF_HINTING_LIGHT     1
@@ -360,49 +362,49 @@ cdef extern from "SDL_ttf.h":
     #define TTF_HINTING_NONE      3
     cdef int  TTF_GetFontHinting( TTF_Font *font)
     cdef void  TTF_SetFontHinting(TTF_Font *font, int hinting)
- 
+
     #Get the total height of the font - usually equal to point size
     cdef int  TTF_FontHeight( TTF_Font *font)
- 
+
     ## Get the offset from the baseline to the top of the font
     #This is a positive value, relative to the baseline.
     #*/
     cdef int  TTF_FontAscent( TTF_Font *font)
- 
+
     ## Get the offset from the baseline to the bottom of the font
     #   This is a negative value, relative to the baseline.
     # */
     cdef int  TTF_FontDescent( TTF_Font *font)
- 
+
     ## Get the recommended spacing between lines of text for this font */
     cdef int  TTF_FontLineSkip( TTF_Font *font)
- 
+
     ## Get/Set whether or not kerning is allowed for this font */
     cdef int  TTF_GetFontKerning( TTF_Font *font)
     cdef void  TTF_SetFontKerning(TTF_Font *font, int allowed)
- 
+
     ## Get the number of faces of the font */
     cdef long  TTF_FontFaces( TTF_Font *font)
- 
+
     ## Get the font face attributes, if any */
     cdef int  TTF_FontFaceIsFixedWidth( TTF_Font *font)
     cdef char *  TTF_FontFaceFamilyName( TTF_Font *font)
     cdef char *  TTF_FontFaceStyleName( TTF_Font *font)
- 
+
     ## Check wether a glyph is provided by the font or not */
     cdef int  TTF_GlyphIsProvided( TTF_Font *font, Uint16 ch)
- 
+
     ## Get the metrics (dimensions) of a glyph
     #   To understand what these metrics mean, here is a useful link:
     #    http://freetype.sourceforge.net/freetype2/docs/tutorial/step2.html
     # */
     cdef int  TTF_GlyphMetrics(TTF_Font *font, Uint16 ch,int *minx, int *maxx, int *miny, int *maxy, int *advance)
- 
+
     ## Get the dimensions of a rendered string of text */
     cdef int  TTF_SizeText(TTF_Font *font,  char *text, int *w, int *h)
     cdef int  TTF_SizeUTF8(TTF_Font *font,  char *text, int *w, int *h)
     cdef int  TTF_SizeUNICODE(TTF_Font *font,  Uint16 *text, int *w, int *h)
- 
+
     # Create an 8-bit palettized surface and render the given text at
     #   fast quality with the given font and color.  The 0 pixel is the
     #   colorkey, giving a transparent background, and the 1 pixel is set
@@ -412,7 +414,7 @@ cdef extern from "SDL_ttf.h":
     cdef SDL_Surface *  TTF_RenderText_Solid(TTF_Font *font, char *text, SDL_Color fg)
     cdef SDL_Surface *  TTF_RenderUTF8_Solid(TTF_Font *font, char *text, SDL_Color fg)
     cdef SDL_Surface *  TTF_RenderUNICODE_Solid(TTF_Font *font, Uint16 *text, SDL_Color fg)
- 
+
     # Create an 8-bit palettized surface and render the given glyph at
     #   fast quality with the given font and color.  The 0 pixel is the
     #   colorkey, giving a transparent background, and the 1 pixel is set
@@ -421,7 +423,7 @@ cdef extern from "SDL_ttf.h":
     #   This function returns the new surface, or NULL if there was an error.
     #*/
     cdef SDL_Surface *  TTF_RenderGlyph_Solid(TTF_Font *font, Uint16 ch, SDL_Color fg)
- 
+
     # Create an 8-bit palettized surface and render the given text at
     #   high quality with the given font and colors.  The 0 pixel is background,
     #   while other pixels have varying degrees of the foreground color.
@@ -430,7 +432,7 @@ cdef extern from "SDL_ttf.h":
     cdef SDL_Surface *  TTF_RenderText_Shaded(TTF_Font *font, char *text, SDL_Color fg, SDL_Color bg)
     cdef SDL_Surface *  TTF_RenderUTF8_Shaded(TTF_Font *font, char *text, SDL_Color fg, SDL_Color bg)
     cdef SDL_Surface *  TTF_RenderUNICODE_Shaded(TTF_Font *font, Uint16 *text, SDL_Color fg, SDL_Color bg)
- 
+
     # Create an 8-bit palettized surface and render the given glyph at
     #   high quality with the given font and colors.  The 0 pixel is background,
     #   while other pixels have varying degrees of the foreground color.
@@ -440,7 +442,7 @@ cdef extern from "SDL_ttf.h":
     #
     cdef SDL_Surface *  TTF_RenderGlyph_Shaded(TTF_Font *font,
                     Uint16 ch, SDL_Color fg, SDL_Color bg)
- 
+
     # Create a 32-bit ARGB surface and render the given text at high quality,
     #   using alpha blending to dither the font with the given color.
     #   This function returns the new surface, or NULL if there was an error.
@@ -451,7 +453,7 @@ cdef extern from "SDL_ttf.h":
                      char *text, SDL_Color fg)
     cdef SDL_Surface *  TTF_RenderUNICODE_Blended(TTF_Font *font,
                      Uint16 *text, SDL_Color fg)
- 
+
     # Create a 32-bit ARGB surface and render the given glyph at high quality,
     #   using alpha blending to dither the font with the given color.
     #   The glyph is rendered without any padding or centering in the X
@@ -460,7 +462,7 @@ cdef extern from "SDL_ttf.h":
     #*/
     cdef SDL_Surface *  TTF_RenderGlyph_Blended(TTF_Font *font,
                             Uint16 ch, SDL_Color fg)
- 
+
     # For compatibility with previous versions, here are the old functions */
     #define TTF_RenderText(font, text, fg, bg)  \
     #    TTF_RenderText_Shaded(font, text, fg, bg)
@@ -468,15 +470,15 @@ cdef extern from "SDL_ttf.h":
     #    TTF_RenderUTF8_Shaded(font, text, fg, bg)
     #define TTF_RenderUNICODE(font, text, fg, bg)   \
     #    TTF_RenderUNICODE_Shaded(font, text, fg, bg)
- 
+
     # Close an opened font file */
     cdef void  TTF_CloseFont(TTF_Font *font)
- 
+
     # De-initialize the TTF engine */
     cdef void  TTF_Quit()
- 
+
     # Check if the TTF engine is initialized */
     cdef int  TTF_WasInit()
- 
+
     # Get the kerning size of two glyphs */
     cdef int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index)
