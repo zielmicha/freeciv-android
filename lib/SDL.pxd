@@ -1,4 +1,5 @@
-# Copyright (?) http://mdqinc.com/blog/2011/10/python-cython-wrapper-for-sdl-1-3/
+# Based on http://mdqinc.com/blog/2011/10/python-cython-wrapper-for-sdl-1-3/
+# Not copyrightable, I think.
 cdef extern from "SDL.h":
     ctypedef unsigned char Uint8
     ctypedef unsigned long Uint32
@@ -9,6 +10,39 @@ cdef extern from "SDL.h":
 
     ctypedef enum:
         SDL_PIXELFORMAT_ARGB8888
+        SDL_INIT_VIDEO
+
+    ctypedef enum:
+        SDLK_DOWN
+        SDLK_UP
+        SDLK_LEFT
+        SDLK_RIGHT
+        SDLK_SPACE
+        SDLK_a
+        SDLK_b
+        SDLK_c
+        SDLK_d
+        SDLK_e
+        SDLK_f
+        SDLK_g
+        SDLK_h
+        SDLK_i
+        SDLK_j
+        SDLK_k
+        SDLK_l
+        SDLK_m
+        SDLK_o
+        SDLK_p
+        SDLK_q
+        SDLK_r
+        SDLK_s
+        SDLK_t
+        SDLK_u
+        SDLK_v
+        SDLK_w
+        SDLK_x
+        SDLK_y
+        SDLK_z
 
     ctypedef enum SDL_BlendMode:
         SDL_BLENDMODE_NONE = 0x00000000
@@ -295,6 +329,7 @@ cdef extern from "SDL.h":
         int (* close) (SDL_RWops * context)
 
     cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
+    cdef SDL_Renderer * SDL_CreateSoftwareRenderer(SDL_Surface * surface)
     cdef SDL_Texture * SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
     cdef SDL_Texture * SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
     cdef SDL_Surface * SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
