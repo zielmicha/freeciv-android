@@ -59,15 +59,7 @@ def show_masking_progress():
 
 def mask_sprite(surf, mask, mx, my):
     show_masking_progress()
-    surf = surf._pg
-    mask = mask._pg
-    assert mask.get_width() >= surf.get_width() + mx
-    assert mask.get_height() >= surf.get_height() + my
-    assert mask.get_bitsize() == 32
-    assert surf.get_bitsize() == 32
-    surf_b = surf.get_buffer()
-    mask_b = mask.get_buffer()
-    freeciv.mask_sprite(surf_b, surf.get_width(), surf.get_height(), mask_b, mask.get_width(), mx, my)
+    # todo
 
 def py_mask_sprite(surf, mask, mx, my):
     if not DO_MASK:

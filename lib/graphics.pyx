@@ -18,10 +18,11 @@ class Font(object):
         self._pg = pg
 
     def render(self, text, antialias, fg, bg=None):
-        return Surface(self._pg.render(text, antialias, fg, *[bg] if bg else []))
+        surf = create_surface(10, 10)
+        return surf
 
     def size(self, text):
-        return self._pg.size(text)
+        return (10, 10)
 
 cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
     cdef SDL_Surface* surf
@@ -30,12 +31,17 @@ cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
         #surf = (<SoftwareSurface> item)._surf
         #return SDL_CreateTextureFromSurface(renderer, surf)
     else:
-        return item._tex
+        return (<Surface> item)._tex
 
 cdef class Surface(object):
     cdef SDL_Renderer* _sdl
     cdef SDL_Texture* _tex
     cdef object _size
+
+    def _set_target(self):
+        res = SDL_SetRenderTarget(self._sdl, self._tex)
+        if res < 0:
+            raise SDLError()
 
     def get_size(self):
         return self._size
@@ -61,6 +67,7 @@ cdef class Surface(object):
             raise SDLError()
 
     def draw_rect(self, color, rect, width=0):
+        self._set_target()
         r, g, b, a = _get_rgba(color)
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
         cdef SDL_Rect srect = _make_rect(rect)
@@ -78,14 +85,14 @@ cdef class Surface(object):
         return self # fixme
 
     def get_clip(self):
-        raise SDLError
+        return Rect((0, 0, 8000, 8000))
 
     def set_clip(self, clip):
-        raise SDLError
+        pass
 
     def gfx_ellipse(self, color, rect, width):
-        raise SDLError
-        f(self._pg, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
+        pass
+        #f(self._pg, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
 
     def gfx_rect(self, color, rect, width):
         self.draw_rect(color, rect, width)
@@ -95,6 +102,38 @@ cdef SDL_Window* _window_handle
 
 cdef class SoftwareSurface(Surface):
     cdef SDL_Surface* _surf
+
+class Rect(tuple):
+    def colliderect(self, point):
+        x, y, w, h = self
+        x1, y1 = point
+        return x1 >= x and x1 < x + w and y1 >= y and y1 < y + h
+
+    def inflate(self, W, H):
+        x, y, w, h = self
+        return x - W, y - H, w + W * 2, h + H * 2
+
+    def clip(self, other):
+        x, y, w, h = self
+        x1, y1, w1, h1 = other
+        return max(x, x1), max(y, y1), min(x + w, x1 + w1) - max(x, x1), \
+            min(y + h, y1 + h1) - max(y, y1)
+
+    @property
+    def left(self):
+        return self[0]
+
+    @property
+    def right(self):
+        return self[0] + self[2]
+
+    @property
+    def top(self):
+        return self[1]
+
+    @property
+    def bottom(self):
+        return self[1] + self[3]
 
 class SDLError(Exception):
     def __init__(self, msg=None):
@@ -106,8 +145,11 @@ def load_image(fn):
     cdef SDL_Surface* s = IMG_Load(fn)
     if not s:
         raise SDLError()
-    # todo: optimize
-    return _make_software_surface(s)
+    cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, s)
+    if not tex:
+        raise SDLError()
+    # todo: free s?
+    return _make_surface(NULL, tex, (s.w, s.h))
 
 def load_font(name, size):
     return Font(None)
@@ -115,19 +157,19 @@ def load_font(name, size):
 def create_surface(w, h, alpha=True):
     # todo: use texture
     tex = SDL_CreateTexture(_window._sdl, SDL_PIXELFORMAT_ARGB8888,
-                            SDL_TEXTUREACCESS_STREAMING, w, h)
-    renderer = SDL_CreateRenderer(_window_handle, -1, 0)
-    SDL_SetRenderTarget(renderer, tex)
-    if not s:
+                            SDL_TEXTUREACCESS_TARGET, max(1, w), max(1, h))
+    if not tex:
         raise SDLError()
-    return _make_surface(s, tex)
+    return _make_surface(_window._sdl, tex)
 
 def get_screen_size():
     return None
 
 def init():
     if SDL_Init(SDL_INIT_VIDEO) < 0:
-        raise SDLError('SDL_Init')
+        raise SDLError()
+    if TTF_Init() < 0:
+        raise SDLError()
 
 def create_window(size, bits):
     global _window, _window_handle
@@ -137,7 +179,7 @@ def create_window(size, bits):
     renderer = SDL_CreateRenderer(wnd, -1, 0)
     if not renderer:
         raise SDLError()
-    _window = _make_surface(renderer)
+    _window = _make_surface(renderer, NULL)
     _window._size = size
     return get_window()
 
@@ -145,7 +187,7 @@ def get_window():
     return _window
 
 def get_events():
-    pass
+    return []
 
 # CONSTRUCTORS
 
@@ -159,10 +201,11 @@ cdef SoftwareSurface _make_software_surface(SDL_Surface* surf):
         raise SDLError()
     return s
 
-cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex):
+cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex, _size=(0, 0)):
     cdef Surface s = Surface()
     s._sdl = renderer
     s._tex = tex
+    s._size = _size
     return s
 
 cdef SDL_Rect _make_rect(t):

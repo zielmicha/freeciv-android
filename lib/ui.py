@@ -678,20 +678,20 @@ def _round_rect(surface, color, rect, width, xr, yr):
         surface.gfx_rect(color, (x, y + h - yr + 2, w, yr - 1), width)
 
     # top left corner
-    surface.set_clip(clip.clip(rect.left, rect.top, xr-3, yr-3))
-    surface.gfx_ellipse(color, graphics.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
+    surface.set_clip(clip.clip((rect.left, rect.top, xr-3, yr-3)))
+    surface.gfx_ellipse(color, (rect.left, rect.top, 2*xr, 2*yr), width)
 
     # top right corner
-    surface.set_clip(clip.clip(rect.right-xr+2, rect.top, xr, yr-3))
-    surface.gfx_ellipse(color, graphics.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
+    surface.set_clip(clip.clip((rect.right-xr+2, rect.top, xr, yr-3)))
+    surface.gfx_ellipse(color, (rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
 
     # bottom left
-    surface.set_clip(clip.clip(rect.left, rect.bottom-yr+2, xr-3, yr))
-    surface.gfx_ellipse(color, graphics.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
+    surface.set_clip(clip.clip((rect.left, rect.bottom-yr+2, xr-3, yr)))
+    surface.gfx_ellipse(color, (rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
 
     # bottom right
-    surface.set_clip(clip.clip(rect.right-xr+2, rect.bottom-yr+2, xr, yr))
-    surface.gfx_ellipse(color, graphics.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
+    surface.set_clip(clip.clip((rect.right-xr+2, rect.bottom-yr+2, xr, yr)))
+    surface.gfx_ellipse(color, (rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
 
     surface.set_clip(clip)
 

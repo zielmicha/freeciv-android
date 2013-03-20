@@ -329,6 +329,7 @@ cdef extern from "SDL.h":
         int (* close) (SDL_RWops * context)
 
     cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
+    cdef int SDL_SetRenderTarget(SDL_Renderer * renderer, SDL_Texture * texture)
     cdef SDL_Renderer * SDL_CreateSoftwareRenderer(SDL_Surface * surface)
     cdef SDL_Texture * SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
     cdef SDL_Texture * SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
