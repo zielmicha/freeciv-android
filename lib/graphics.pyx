@@ -18,30 +18,30 @@ class Font(object):
         self._pg = pg
 
     def render(self, text, antialias, fg, bg=None):
-        surf = create_surface(10, 10)
+        surf = create_surface(70, 20)
         return surf
 
     def size(self, text):
-        return (10, 10)
+        return (70, 20)
 
 cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
     cdef SDL_Surface* surf
-    if isinstance(item, SoftwareSurface):
-        raise SDLError('would need convert')
-        #surf = (<SoftwareSurface> item)._surf
-        #return SDL_CreateTextureFromSurface(renderer, surf)
-    else:
-        return (<Surface> item)._tex
+    return (<Surface> item)._tex
 
 cdef class Surface(object):
     cdef SDL_Renderer* _sdl
     cdef SDL_Texture* _tex
     cdef object _size
+    cdef object _filename
 
     def _set_target(self):
         res = SDL_SetRenderTarget(self._sdl, self._tex)
         if res < 0:
             raise SDLError()
+
+    cdef void _finish(self):
+        if self._tex != NULL:
+            pass # SDL_RenderPresent(self._sdl)
 
     def get_size(self):
         return self._size
@@ -55,16 +55,23 @@ cdef class Surface(object):
     def get_at(self, pos):
         pass
 
-    def blit(self, image, position=(0, 0), rectangle=(0, 0, 8000, 8000)):
+    def blit(self, image, src=(0, 0), dest=None):
+        cdef SDL_Rect srect, drect
+        cdef SDL_Texture* blit_src
+        self._set_target()
+        if not dest:
+            size = image.get_size()
+            dest = (0, 0, size[0], size[1])
         blit_src = _sdl_get_texture(self._sdl, image)
-        srect = _make_rect((position[0], position[1], rectangle[2], rectangle[3]))
-        drect = _make_rect(rectangle)
-        err = SDL_RenderCopy(self._sdl, blit_src,
-                       &srect, &drect)
-        if isinstance(image, SoftwareSurface):
-            SDL_DestroyTexture(blit_src)
+        if len(src) == 2:
+            srect = _make_rect((src[0], src[1], dest[2], dest[3]))
+        else:
+            srect = _make_rect(src)
+        drect = _make_rect(dest)
+        err = SDL_RenderCopy(self._sdl, blit_src, &srect, &drect)
         if err < 0:
             raise SDLError()
+        self._finish()
 
     def draw_rect(self, color, rect, width=0):
         self._set_target()
@@ -72,17 +79,23 @@ cdef class Surface(object):
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
         cdef SDL_Rect srect = _make_rect(rect)
         SDL_RenderDrawRect(self._sdl, &srect)
+        self._finish()
 
     def fill(self, color=(128, 0, 128)):
+        self._set_target()
         r, g, b, a = _get_rgba(color)
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
         SDL_RenderClear(self._sdl)
+        self._finish()
 
     def draw_line(self, color, start, end):
-        pass
+        self._set_target()
+        self._finish()
 
     def scale(self, size):
-        return self # fixme
+        dest = create_surface(size[0], size[1])
+        dest.blit(self, dest=(0, 0, size[0], size[1]))
+        return dest
 
     def get_clip(self):
         return Rect((0, 0, 8000, 8000))
@@ -97,11 +110,15 @@ cdef class Surface(object):
     def gfx_rect(self, color, rect, width):
         self.draw_rect(color, rect, width)
 
+    def __repr__(self):
+        return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
+
+    def __dealloc__(self):
+        if self._tex != NULL:
+            print 'surface leaked'
+
 cdef Surface _window
 cdef SDL_Window* _window_handle
-
-cdef class SoftwareSurface(Surface):
-    cdef SDL_Surface* _surf
 
 class Rect(tuple):
     def colliderect(self, point):
@@ -149,7 +166,7 @@ def load_image(fn):
     if not tex:
         raise SDLError()
     # todo: free s?
-    return _make_surface(NULL, tex, (s.w, s.h))
+    return _make_surface(NULL, tex, (s.w, s.h), fn)
 
 def load_font(name, size):
     return Font(None)
@@ -160,7 +177,7 @@ def create_surface(w, h, alpha=True):
                             SDL_TEXTUREACCESS_TARGET, max(1, w), max(1, h))
     if not tex:
         raise SDLError()
-    return _make_surface(_window._sdl, tex)
+    return _make_surface(_window._sdl, tex, (w, h))
 
 def get_screen_size():
     return None
@@ -191,24 +208,17 @@ def get_events():
 
 # CONSTRUCTORS
 
-cdef SoftwareSurface _make_software_surface(SDL_Surface* surf):
-    if not surf:
-        raise ValueError('passing NULL to _make_software_surface')
-    s = SoftwareSurface()
-    s._surf = surf
-    s._sdl = SDL_CreateSoftwareRenderer(s._surf)
-    if not s._sdl:
-        raise SDLError()
-    return s
-
-cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex, _size=(0, 0)):
+cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex,
+                           _size=(0, 0), _filename=None):
     cdef Surface s = Surface()
     s._sdl = renderer
     s._tex = tex
     s._size = _size
+    s._filename = _filename
     return s
 
-cdef SDL_Rect _make_rect(t):
+cdef SDL_Rect _make_rect(t) except *:
+    assert isinstance(t, (tuple, list)), 'invalid rect %r' % t
     cdef SDL_Rect r
     x, y, w, h = t
     r.x = x
