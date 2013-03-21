@@ -13,16 +13,36 @@
 from libc.stdlib cimport malloc, free
 from SDL cimport *
 
-class Font(object):
-    def __init__(self, pg):
-        self._pg = pg
+cdef class Font(object):
+    cdef TTF_Font* font
+
+    def __init__(self, name, size):
+        self.font = TTF_OpenFont(name, size)
+        if not self.font:
+            raise TTFError()
 
     def render(self, text, antialias, fg, bg=None):
-        surf = create_surface(70, 20)
-        return surf
+        if len(text) == 0:
+            return create_surface(0, 0)
+        # todo: antialias and bg
+        cdef SDL_Surface* s
+        cdef SDL_Color fgcolor
+        fgcolor.r, fgcolor.g, fgcolor.b, _ = _get_rgba(fg)
+        surf = TTF_RenderUTF8_Solid(self.font, text, fgcolor)
+        if not surf:
+            raise TTFError()
+        cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, surf)
+        if not tex:
+            raise SDLError()
+        size = (surf.w, surf.h)
+        SDL_FreeSurface(surf)
+        return _make_surface(NULL, tex, size, "render of %s" % text)
 
     def size(self, text):
-        return (70, 20)
+        cdef int w, h
+        if TTF_SizeUTF8(self.font, text, &w, &h):
+            raise TTFError()
+        return (w, h)
 
 cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
     cdef SDL_Surface* surf
@@ -115,7 +135,8 @@ cdef class Surface(object):
 
     def __dealloc__(self):
         if self._tex != NULL:
-            print 'surface leaked'
+            SDL_DestroyTexture(self._tex)
+            self._tex = NULL
 
 cdef Surface _window
 cdef SDL_Window* _window_handle
@@ -158,6 +179,12 @@ class SDLError(Exception):
             msg = SDL_GetError()
         Exception.__init__(self, msg)
 
+class TTFError(Exception):
+    def __init__(self, msg=None):
+        if not msg:
+            msg = TTF_GetError()
+        Exception.__init__(self, msg)
+
 def load_image(fn):
     cdef SDL_Surface* s = IMG_Load(fn)
     if not s:
@@ -165,11 +192,12 @@ def load_image(fn):
     cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, s)
     if not tex:
         raise SDLError()
-    # todo: free s?
-    return _make_surface(NULL, tex, (s.w, s.h), fn)
+    size = (s.w, s.h)
+    SDL_FreeSurface(s)
+    return _make_surface(NULL, tex, size, fn)
 
 def load_font(name, size):
-    return Font(None)
+    return Font(name, size)
 
 def create_surface(w, h, alpha=True):
     # todo: use texture

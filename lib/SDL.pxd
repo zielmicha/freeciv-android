@@ -376,6 +376,7 @@ cdef extern from "SDL_image.h":
 cdef extern from "SDL_ttf.h":
     ctypedef struct TTF_Font
     cdef int TTF_Init()
+    cdef char *TTF_GetError()
     cdef TTF_Font *  TTF_OpenFont( char *file, int ptsize)
     cdef TTF_Font *  TTF_OpenFontIndex( char *file, int ptsize, long index)
     cdef TTF_Font *  TTF_OpenFontRW(SDL_RWops *src, int freesrc, int ptsize)
