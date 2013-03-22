@@ -4,7 +4,7 @@ src:
 lib:
 	$(MAKE) -C lib
 run: all
-	./main.sh
+	./main.sh lib/main.py $(ARG0) $(ARG1)
 g_test: all
 	./main.sh lib/graphics_test.py
 .PHONY: src lib run

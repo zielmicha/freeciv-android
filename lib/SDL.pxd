@@ -12,12 +12,16 @@ cdef extern from "SDL.h":
         SDL_PIXELFORMAT_ARGB8888
         SDL_INIT_VIDEO
 
-    ctypedef enum:
+    ctypedef enum SDLMod:
+        pass
+
+    ctypedef enum SDLKey:
         SDLK_DOWN
         SDLK_UP
         SDLK_LEFT
         SDLK_RIGHT
         SDLK_SPACE
+        SDLK_ESCAPE
         SDLK_a
         SDLK_b
         SDLK_c
@@ -248,8 +252,17 @@ cdef extern from "SDL.h":
         Sint16 dy
         Uint16 pressure
 
+    cdef struct SDL_keysym:
+        Uint8 scancode
+        SDLKey sym
+        SDLMod mod
+        Uint16 unicode
+
     cdef struct SDL_KeyboardEvent:
-        pass
+        Uint8 type
+        Uint8 state
+        SDL_keysym keysym
+
     cdef struct SDL_TextEditingEvent:
         pass
     cdef struct SDL_TextInputEvent:
@@ -350,6 +363,7 @@ cdef extern from "SDL.h":
     cdef void SDL_GetWindowSize(SDL_Window * window, int *w, int *h)
     cdef SDL_Window * SDL_CreateWindow(char *title, int x, int y, int w, int h, Uint32 flags)
     cdef int SDL_SetRenderDrawColor(SDL_Renderer * renderer, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
+    cdef int SDL_SetRenderDrawBlendMode(SDL_Renderer* renderer, SDL_BlendMode blendMode)
     cdef int SDL_RenderClear(SDL_Renderer * renderer)
     cdef int SDL_SetTextureBlendMode(SDL_Texture * texture, SDL_BlendMode blendMode)
     cdef int SDL_GetTextureBlendMode(SDL_Texture * texture, SDL_BlendMode *blendMode)

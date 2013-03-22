@@ -714,7 +714,8 @@ class Button(WithText):
             color = self.active_bg
         else:
             color = self.bg
-        round_rect(surf, color, self.fg, pos + self.size)
+        surf.draw_rect(color, pos + self.size, width=0)
+        surf.draw_rect(self.fg, pos + self.size, width=1)
         WithText.draw(self, surf, pos)
 
     def unhover(self):

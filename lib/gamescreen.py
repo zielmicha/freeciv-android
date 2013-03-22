@@ -654,7 +654,7 @@ class MapDrawer(object):
             self.client.set_map_size(size)
             self.map_cache = graphics.create_surface(size[0], size[1])
             if self.zoom != 1:
-                self.scaled_map_cache = graphics.const.Surface((int(size_mul * w), int(size_mul * h)))
+                self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         self.valid_for_origin = freeciv.func.get_map_view_origin()
 

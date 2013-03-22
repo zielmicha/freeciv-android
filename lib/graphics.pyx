@@ -23,12 +23,12 @@ cdef class Font(object):
 
     def render(self, text, antialias, fg, bg=None):
         if len(text) == 0:
-            return create_surface(0, 0)
+            return create_surface(0, self.size('l')[1])
         # todo: antialias and bg
         cdef SDL_Surface* s
         cdef SDL_Color fgcolor
         fgcolor.r, fgcolor.g, fgcolor.b, _ = _get_rgba(fg)
-        surf = TTF_RenderUTF8_Solid(self.font, text, fgcolor)
+        surf = TTF_RenderUTF8_Blended(self.font, text, fgcolor)
         if not surf:
             raise TTFError()
         cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, surf)
@@ -75,18 +75,16 @@ cdef class Surface(object):
     def get_at(self, pos):
         pass
 
-    def blit(self, image, src=(0, 0), dest=None):
+    def blit(self, image, dest=(0, 0), src=None):
         cdef SDL_Rect srect, drect
         cdef SDL_Texture* blit_src
         self._set_target()
-        if not dest:
-            size = image.get_size()
-            dest = (0, 0, size[0], size[1])
+        if not src:
+            src = (0, 0, image.get_width(), image.get_height())
+        if len(dest) == 2:
+            dest = (dest[0], dest[1], src[2], src[3])
         blit_src = _sdl_get_texture(self._sdl, image)
-        if len(src) == 2:
-            srect = _make_rect((src[0], src[1], dest[2], dest[3]))
-        else:
-            srect = _make_rect(src)
+        srect = _make_rect(src)
         drect = _make_rect(dest)
         err = SDL_RenderCopy(self._sdl, blit_src, &srect, &drect)
         if err < 0:
@@ -98,7 +96,10 @@ cdef class Surface(object):
         r, g, b, a = _get_rgba(color)
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
         cdef SDL_Rect srect = _make_rect(rect)
-        SDL_RenderDrawRect(self._sdl, &srect)
+        if width == 0:
+            SDL_RenderFillRect(self._sdl, &srect)
+        else:
+            SDL_RenderDrawRect(self._sdl, &srect)
         self._finish()
 
     def fill(self, color=(128, 0, 128)):
@@ -222,17 +223,46 @@ def create_window(size, bits):
     wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, 0)
     _window_handle = wnd
     renderer = SDL_CreateRenderer(wnd, -1, 0)
+    _prepare_renderer(renderer)
     if not renderer:
         raise SDLError()
     _window = _make_surface(renderer, NULL)
     _window._size = size
     return get_window()
 
+cdef _prepare_renderer(SDL_Renderer* renderer):
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD)
+
 def get_window():
     return _window
 
 def get_events():
-    return []
+    events = []
+    cdef SDL_Event ev
+    while SDL_PollEvent(&ev):
+        events.append(_translate_event(&ev))
+    return events
+
+cdef object _translate_event(SDL_Event* ev):
+    if ev.type == SDL_MOUSEMOTION:
+        return Event(ev.type, pos=(ev.motion.x, ev.motion.y))
+    elif ev.type in (SDL_MOUSEBUTTONUP, SDL_MOUSEBUTTONDOWN):
+        return Event(ev.type, pos=(ev.button.x, ev.button.y),
+                     button=ev.button.button)
+    elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
+        return Event(ev.type, key=ev.key.keysym.sym)
+    else:
+        return Event(ev.type)
+
+class Event:
+    def __init__(self, type, **dict):
+        self.type = type
+        for k, v in dict.items():
+            setattr(self, k, v)
+
+    @property
+    def dict(self):
+        return self.__dict__
 
 # CONSTRUCTORS
 
@@ -267,11 +297,16 @@ def flip():
 class const:
     MOUSEBUTTONUP = SDL_MOUSEBUTTONUP
     MOUSEBUTTONDOWN = SDL_MOUSEBUTTONDOWN
+    MOUSEMOTION = SDL_MOUSEMOTION
+    QUIT = SDL_QUIT
+    KEYDOWN = SDL_KEYDOWN
+    KEYUP = SDL_KEYUP
     K_UP = SDLK_UP
     K_DOWN = SDLK_DOWN
     K_LEFT = SDLK_LEFT
     K_RIGHT = SDLK_RIGHT
     K_SPACE = SDLK_SPACE
+    K_ESCAPE = SDLK_ESCAPE
     K_a = SDLK_a
     K_b = SDLK_b
     K_c = SDLK_c
