@@ -15,15 +15,18 @@ from SDL cimport *
 
 cdef class Font(object):
     cdef TTF_Font* font
+    cdef object name, font_size
 
     def __init__(self, name, size):
+        self.name = name
+        self.font_size = size
         self.font = TTF_OpenFont(name, size)
         if not self.font:
             raise TTFError()
 
     def render(self, text, antialias, fg, bg=None):
         if len(text) == 0:
-            return create_surface(0, self.size('l')[1])
+            text = ' '
         # todo: antialias and bg
         cdef SDL_Surface* s
         cdef SDL_Color fgcolor
@@ -114,7 +117,8 @@ cdef class Surface(object):
         self._finish()
 
     def scale(self, size):
-        dest = create_surface(size[0], size[1])
+        cdef Surface dest = create_surface(size[0], size[1])
+        dest._filename = 'scaled %s' % self._filename
         dest.blit(self, dest=(0, 0, size[0], size[1]))
         return dest
 
@@ -201,11 +205,12 @@ def load_font(name, size):
     return Font(name, size)
 
 def create_surface(w, h, alpha=True):
-    # todo: use texture
+    cdef SDL_Texture* tex
     tex = SDL_CreateTexture(_window._sdl, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_TARGET, max(1, w), max(1, h))
     if not tex:
         raise SDLError()
+    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND)
     return _make_surface(_window._sdl, tex, (w, h))
 
 def get_screen_size():
@@ -231,7 +236,7 @@ def create_window(size, bits):
     return get_window()
 
 cdef _prepare_renderer(SDL_Renderer* renderer):
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD)
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND)
 
 def get_window():
     return _window
