@@ -469,12 +469,13 @@ class ConsoleWidget(ui.LinearLayoutWidget):
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
-        old_clip = surf.get_clip()
-        surf.set_clip(clip)
+        rect = graphics.Rect(clip)
+        cliptex = graphics.create_surface(rect[2], rect[3])
+        relpos = ui._subpoints(pos, (rect[0], rect[1]))
 
-        self.draw(surf, pos)
+        self.draw(cliptex, relpos)
 
-        surf.set_clip(old_clip)
+        surf.blit(cliptex, (rect[0], rect[1]))
 
     def event(self, ev):
         if ev.type == graphics.const.MOUSEBUTTONDOWN:
@@ -597,18 +598,18 @@ class MapDrawer(object):
         self.zoom = zoom
         self.reload()
 
-    def draw(self, surf, pos):
-        clip = surf.get_clip()
-        surf.set_clip(pos + self.widget_size)
+    def draw(self, surf, clip_pos):
+        pos = (0, 0)
+        cliptex = graphics.create_surface(*self.widget_size)
         if not self.scrolling:
             target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
             if self.zoom == 1:
-                self.client.draw_map(surf, target)
+                self.client.draw_map(cliptex, target)
             else:
                 self.client.draw_map(self.map_cache, (0, 0))
                 rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
                                            self.map_cache.get_height() - self.user_corner[1])
-                surf.blit(scale_by(self.map_cache.subsurface(rect), self.zoom), (pos[0], pos[1]))
+                cliptex.blit(scale_by(self.map_cache.suburface(rect), self.zoom), (pos[0], pos[1]))
         else:
             if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
@@ -617,11 +618,11 @@ class MapDrawer(object):
                     self.update_origin()
                     self.reload()
             if self.zoom == 1:
-                surf.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+                cliptex.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
             else:
-                surf.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
+                cliptex.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
                                                   int(pos[1] - self.user_corner[1] * self.zoom)))
-        surf.set_clip(clip)
+        surf.blit(cliptex, clip_pos)
 
     def reload(self):
         self.prepare_map_cache()
@@ -668,7 +669,7 @@ class MapDrawer(object):
 
 def scale_by(img, zoom):
     w, h = img.get_size()
-    return img.scale(int(w * zoom), int(h * zoom))
+    return img.scale((int(w * zoom), int(h * zoom)))
 
 def init():
     gamemenu.init()

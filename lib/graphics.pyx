@@ -122,18 +122,15 @@ cdef class Surface(object):
         dest.blit(self, dest=(0, 0, size[0], size[1]))
         return dest
 
-    def get_clip(self):
-        return Rect((0, 0, 8000, 8000))
-
-    def set_clip(self, clip):
-        pass
-
     def gfx_ellipse(self, color, rect, width):
         pass
         #f(self._pg, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
 
     def gfx_rect(self, color, rect, width):
         self.draw_rect(color, rect, width)
+
+    def get_clip(self):
+        return Rect((0, 0, 8000, 8000))
 
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
@@ -211,7 +208,9 @@ def create_surface(w, h, alpha=True):
     if not tex:
         raise SDLError()
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND)
-    return _make_surface(_window._sdl, tex, (w, h))
+    surf = _make_surface(_window._sdl, tex, (w, h))
+    surf.fill((0, 0, 0, 0))
+    return surf
 
 def get_screen_size():
     return None
@@ -221,6 +220,7 @@ def init():
         raise SDLError()
     if TTF_Init() < 0:
         raise SDLError()
+    SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear")
 
 def create_window(size, bits):
     global _window, _window_handle
@@ -312,6 +312,7 @@ class const:
     K_RIGHT = SDLK_RIGHT
     K_SPACE = SDLK_SPACE
     K_ESCAPE = SDLK_ESCAPE
+    K_F1 = SDLK_F1
     K_a = SDLK_a
     K_b = SDLK_b
     K_c = SDLK_c

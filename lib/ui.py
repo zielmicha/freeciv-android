@@ -335,15 +335,15 @@ class LayoutWidget(object):
 
     def draw_clipped(self, surf, pos, rect):
         rect = graphics.Rect(rect)
-        last_clip = surf.get_clip()
-        surf.set_clip(rect)
+        cliptex = graphics.create_surface(rect[2], rect[3])
+        relpos = _subpoints(pos, (rect[0], rect[1]))
         self.positions = list(self.get_positions())
 
         for itempos, item in zip(self.positions, self.items):
             bpos = itempos[0] + pos[0], itempos[1] + pos[1]
-            if rect.colliderect((bpos, item.size)):
-                item.draw(surf, _addpoints(pos, itempos))
-        surf.set_clip(last_clip)
+            item.draw(cliptex, _addpoints(relpos, itempos))
+
+        surf.blit(cliptex, (rect[0], rect[1]))
 
 def _addpoints(a, b):
     return a[0] + b[0], a[1] + b[1]
@@ -662,38 +662,8 @@ class WithText(object):
             surf.blit(self._scaled_image, (pos[0] + (w - iw)/2, pos[1] + (h - ih)/2))
 
 def _round_rect(surface, color, rect, width, xr, yr):
-    clip = surface.get_clip()
-
-    # left and right
-    surface.set_clip(clip.clip(rect.inflate(0, 5-yr*2)))
-    surface.gfx_rect(color, rect.inflate(1-width,0), width)
-
-    # top and bottom, without center
-    surface.set_clip(clip.clip(rect.inflate(5-xr*2, 0)))
-    if width != 0:
-        surface.gfx_rect(color, rect.inflate(0, 1-width), width)
-    else: # fill
-        x, y, w, h = rect
-        surface.gfx_rect(color, (x, y, w, yr - 3), width)
-        surface.gfx_rect(color, (x, y + h - yr + 2, w, yr - 1), width)
-
-    # top left corner
-    surface.set_clip(clip.clip((rect.left, rect.top, xr-3, yr-3)))
-    surface.gfx_ellipse(color, (rect.left, rect.top, 2*xr, 2*yr), width)
-
-    # top right corner
-    surface.set_clip(clip.clip((rect.right-xr+2, rect.top, xr, yr-3)))
-    surface.gfx_ellipse(color, (rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
-
-    # bottom left
-    surface.set_clip(clip.clip((rect.left, rect.bottom-yr+2, xr-3, yr)))
-    surface.gfx_ellipse(color, (rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
-
-    # bottom right
-    surface.set_clip(clip.clip((rect.right-xr+2, rect.bottom-yr+2, xr, yr)))
-    surface.gfx_ellipse(color, (rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
-
-    surface.set_clip(clip)
+    # draw normal rect
+    surface.draw_rect(color, rect, width)
 
 def round_rect(surf, bg, fg, rect, round=10):
     rect = graphics.Rect(rect)
@@ -854,20 +824,15 @@ class ScrollWrapper(object):
         return (self.width, self.height)
 
     def draw(self, surf, pos):
-        x, y = pos
-        fx, fy = pos
+        fx, fy = 0, 0
         if self.use_x:
             fx -= self.x
         if self.use_y:
             fy -= self.y
 
-        last = surf.get_clip()
-        if hasattr(self.item, 'draw_clipped'):
-            self.item.draw_clipped(surf, (fx, fy), self.get_clip(pos))
-        else:
-            surf.set_clip(self.get_clip(pos))
-            self.item.draw(surf, (fx, fy))
-            surf.set_clip(last)
+        cliptex = graphics.create_surface(self.width, self.height)
+        self.item.draw(cliptex, (fx, fy))
+        surf.blit(cliptex, pos)
 
     def get_clip(self, pos):
         return pos + self.size

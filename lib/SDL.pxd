@@ -22,6 +22,7 @@ cdef extern from "SDL.h":
         SDLK_RIGHT
         SDLK_SPACE
         SDLK_ESCAPE
+        SDLK_F1
         SDLK_a
         SDLK_b
         SDLK_c
@@ -341,6 +342,7 @@ cdef extern from "SDL.h":
         size_t(* write) (SDL_RWops * context, void *ptr,size_t size, size_t num)
         int (* close) (SDL_RWops * context)
 
+    cdef int SDL_SetHint(char* name, char* value)
     cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
     cdef int SDL_SetRenderTarget(SDL_Renderer * renderer, SDL_Texture * texture)
     cdef SDL_Renderer * SDL_CreateSoftwareRenderer(SDL_Surface * surface)
