@@ -1,5 +1,9 @@
 all: src lib
-src:
+src/Makefile:
+	cd src; ./configure
+src/objectfiles:
+	mkdir src/objectfiles
+src: src/Makefile src/objectfiles
 	$(MAKE) -C src
 lib:
 	$(MAKE) -C lib
