@@ -10,7 +10,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 	$(LOCAL_PATH)/../python/Include $(LOCAL_PATH)/../python/
 
 LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
-	entrypoint.c
+	entrypoint.c unarchive.c
 
 LOCAL_SHARED_LIBRARIES := SDL2 python2.7
 

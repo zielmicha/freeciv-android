@@ -1,22 +1,32 @@
 #include <Python.h>
+#include <SDL.h>
 #include <android/log.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include "unarchive.h"
 
-int SDL_main() {
-  __android_log_write(ANDROID_LOG_ERROR, "freeciv_entrypoint", "all ok, testing");
-  char cwd[1024];
-  getcwd(cwd, 1024);
-  fprintf(stderr, "pwd %s\n", cwd);
-  //putenv("PYTHONHOME", "", 1);
+int SDL_main(int argc, char** argv) {
+  __android_log_write(ANDROID_LOG_INFO, "freeciv", "starting SDL_main");
+  const char* storage = SDL_AndroidGetInternalStoragePath();
+  setenv("PYTHONHOME", storage, 1);
+  char* pythonpath = malloc(strlen(storage) + 100);
+  strcpy(pythonpath, storage);
+  strcat(pythonpath, "/lib/python2.7");
+  setenv("PYTHONPATH", pythonpath, 1);
 
-  Py_SetProgramName("android");
+  SDL_RWops* ops = SDL_RWFromFile("code.archive", "rb");
+  if(ops == NULL) {
+    __android_log_write(ANDROID_LOG_INFO, "freeciv", "opening assets failed");
+  }
+  unarchive(ops, storage);
+  SDL_RWclose(ops);
+
   Py_Initialize();
   PyRun_SimpleString("print 'foobar'");
   Py_Finalize();
 
-  __android_log_write(ANDROID_LOG_ERROR, "freeciv_entrypoint", "Python ran");
+  __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");
 
   exit(0);
 }
