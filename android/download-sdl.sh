@@ -1,5 +1,5 @@
-wget -c http://www.libsdl.org/tmp/SDL-1.3.tar.gz
+wget -c http://www.libsdl.org/tmp/SDL-2.0.tar.gz
 mkdir _unpack
-tar -C _unpack/ -xf SDL-1.3.tar.gz
+tar -C _unpack/ -xf SDL-2.0.tar.gz
 mv _unpack/* project/jni/SDL
 rmdir _unpack
