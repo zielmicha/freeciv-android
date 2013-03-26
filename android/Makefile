@@ -8,7 +8,7 @@ debuginstall: debugapk
 builddep: project/jni/SDL/Android.mk project/jni/python/Android.mk
 project/jni/SDL/Android.mk:
 	./download-sdl.sh
-python4android/prepare.sh:
+../python4android/prepare.sh:
 	cd ..; git submodule init; git submodule update
 project/jni/python/Android.mk: ../python4android/prepare.sh
 	cd ../python4android; ./prepare.sh

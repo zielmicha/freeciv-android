@@ -203,7 +203,7 @@ def load_font(name, size):
 
 def create_surface(w, h, alpha=True):
     cdef SDL_Texture* tex
-    tex = SDL_CreateTexture(_window._sdl, SDL_PIXELFORMAT_ARGB8888,
+    tex = SDL_CreateTexture(_window._sdl, 0,
                             SDL_TEXTUREACCESS_TARGET, max(1, w), max(1, h))
     if not tex:
         raise SDLError()
@@ -268,6 +268,9 @@ class Event:
     @property
     def dict(self):
         return self.__dict__
+
+    def __repr__(self):
+        return 'Event(%s, %s)' % (self.type, self.__dict__)
 
 # CONSTRUCTORS
 
