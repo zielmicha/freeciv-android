@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include "unarchive.h"
 
+
+
 int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "starting SDL_main");
   const char* storage = SDL_AndroidGetInternalStoragePath();
@@ -17,13 +19,15 @@ int SDL_main(int argc, char** argv) {
 
   SDL_RWops* ops = SDL_RWFromFile("code.archive", "rb");
   if(ops == NULL) {
-    __android_log_write(ANDROID_LOG_INFO, "freeciv", "opening assets failed");
+    __android_log_write(ANDROID_LOG_ERROR, "freeciv", "opening assets failed");
   }
   unarchive(ops, storage);
   SDL_RWclose(ops);
 
   Py_Initialize();
   PyRun_SimpleString("print 'foobar'");
+  initgraphics();
+  PyRun_SimpleString("import graphics; print graphics");
   Py_Finalize();
 
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");

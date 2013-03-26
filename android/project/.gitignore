@@ -4,3 +4,5 @@
 /obj
 /jni/SDL
 /jni/python
+/jni/SDL_image
+/jni/SDL_ttf
