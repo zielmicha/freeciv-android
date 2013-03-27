@@ -23,25 +23,6 @@ import ui
 import uidialog
 import save
 
-try:
-    import lzma
-except:
-    if osutil.is_desktop:
-        print '---------------------'
-        print 'import lzma FAILED'
-        print '----------------------'
-        lzma = None
-    else:
-        import pyjni
-
-        class lzma:
-            def decompress(self, data):
-                return pyjni.encode_or_decode_xz(1, data)
-
-            def compress(self, data):
-                return pyjni.encode_or_decode_xz(0, data)
-        lzma = lzma()
-
 def apply_host_change(host):
     print 'using civsync host', host
     civsync.HOST = host

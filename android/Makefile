@@ -3,6 +3,14 @@ debugapk: build assets
 	cd project; ant debug
 debuginstall: debugapk
 	cd project; ant installd
+debugrun: debuginstall
+	$(MAKE) run
+run:
+	adb shell am start -n pl.org.zielinscy.freeciv.debug/org.libsdl.app.SDLActivity
+debugrunlog: debuginstall
+	$(MAKE) runlog
+runlog: run
+	adb logcat
 
 # ASSETS
 assets: copyassets
@@ -12,14 +20,20 @@ copyassets:
 
 # BUILD
 
-build: builddep cython
+build: builddep cython project/jni/freeciv
 	ndk-build -C project -j4
 
-cython: project/jni/src/graphics.c
+cython: project/jni/src/graphics.c project/jni/src/android.c
 
-project/jni/src/graphics.c:
+project/jni/freeciv:
+	ln -s $(PWD)/../src project/jni/freeciv
+
+project/jni/src/graphics.c: ../lib/graphics.pyx
 	make -C ../lib graphics.c
 	cp ../lib/graphics.c project/jni/src/graphics.c
+
+project/jni/src/android.c: ../lib/android.pyx
+	cython ../lib/android.pyx -o project/jni/src/android.c
 
 # DEPENDENCIES
 

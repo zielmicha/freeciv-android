@@ -65,9 +65,9 @@ public class SDLActivity extends Activity {
     static {
         System.loadLibrary("SDL2");
         System.loadLibrary("SDL2_image");
-        //System.loadLibrary("SDL2_mixer");
         System.loadLibrary("SDL2_ttf");
         System.loadLibrary("python2.7");
+        System.loadLibrary("freeciv");
         System.loadLibrary("main");
     }
 

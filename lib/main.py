@@ -36,8 +36,6 @@ import options
 import menus
 import graphics
 
-from sync import lzma
-
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
 features.add_feature('app.forcesize')

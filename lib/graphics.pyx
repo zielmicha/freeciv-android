@@ -20,7 +20,8 @@ cdef class Font(object):
     def __init__(self, name, size):
         self.name = name
         self.font_size = size
-        self.font = TTF_OpenFont(name, size)
+        cdef SDL_RWops* res = SDL_RWFromFile(name, 'rb')
+        self.font = TTF_OpenFontRW(res, True, size)
         if not self.font:
             raise TTFError()
 
@@ -188,7 +189,10 @@ class TTFError(Exception):
         Exception.__init__(self, msg)
 
 def load_image(fn):
-    cdef SDL_Surface* s = IMG_Load(fn)
+    cdef SDL_RWops* res = SDL_RWFromFile(fn, "rb")
+    if not res:
+        raise SDLError()
+    cdef SDL_Surface* s = IMG_Load_RW(res, True)
     if not s:
         raise SDLError()
     cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, s)
@@ -213,7 +217,7 @@ def create_surface(w, h, alpha=True):
     return surf
 
 def get_screen_size():
-    return None
+    return (800, 600) # TODO
 
 def init():
     if SDL_Init(SDL_INIT_VIDEO) < 0:

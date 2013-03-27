@@ -4,7 +4,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE    := freecivclient
+LOCAL_MODULE    := freeciv
 LOCAL_SRC_FILES := common/ai.c common/base.c common/borders.c common/capstr.c common/city.c \
     common/combat.c common/connection.c common/dataio.c common/diptreaty.c common/effects.c \
     common/events.c common/fc_interface.c common/featured_text.c common/game.c common/government.c \
@@ -49,10 +49,10 @@ LOCAL_SRC_FILES := common/ai.c common/base.c common/borders.c common/capstr.c co
 	lua/linit.c lua/liolib.c lua/llex.c lua/lmathlib.c lua/lmem.c lua/loadlib.c lua/lobject.c lua/lopcodes.c lua/loslib.c \
 	lua/lparser.c lua/lstate.c lua/lstring.c lua/lstrlib.c lua/ltable.c lua/ltablib.c lua/ltm.c lua/lundump.c lua/lvm.c \
 	lua/lzio.c lua/print.c android_server_impl.c
-LOCAL_LDLIBS    := -L../.. -L.. -lpython2.7 -lz -lm
-LOCAL_CFLAGS    := -Ijni/client -Ijni/client/include -Ijni/client/agents -Ijni/common -I jni/ai \
-    -Ijni/common/aicore -Ijni/utility -Ijni/server -Ijni/server/advisors -Ijni/server/generator -Ijni/server/scripting \
-	-Ijni/lua -Ijni/tolua \
-	-Ijni/python2.7 -Ijni -DHAVE_CONFIG_H
+
+LOCAL_LDLIBS    := -lz -lm
+LOCAL_SHARED_LIBRARIES := python2.7
+LOCAL_C_INCLUDES    := $(LOCAL_PATH)/client $(LOCAL_PATH)/client/include $(LOCAL_PATH)/client/agents $(LOCAL_PATH)/common $(LOCAL_PATH)/ai $(LOCAL_PATH)/common/aicore $(LOCAL_PATH)/utility $(LOCAL_PATH)/server $(LOCAL_PATH)/server/advisors $(LOCAL_PATH)/server/generator $(LOCAL_PATH)/server/scripting $(LOCAL_PATH)/lua $(LOCAL_PATH)/tolua $(LOCAL_PATH) jni/python/Include jni/python
+LOCAL_CFLAGS	:= -DHAVE_CONFIG_H
 
 include $(BUILD_SHARED_LIBRARY)

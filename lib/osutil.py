@@ -20,29 +20,25 @@ features.add_feature("app.disable_android_pause", type=bool, default=False)
 
 try:
     import android
-    import pyjni
 except ImportError:
-    android = os.environ['PYTHONPATH'].startswith('/data')
+    android = None
+else:
+    from android import get_internal_storage
 
 is_android = bool(android)
 is_desktop = not is_android
 
 def init():
     if android:
-        android.init()
         android.map_key(android.KEYCODE_BACK, graphics.const.K_ESCAPE)
         android.map_key(android.KEYCODE_MENU, graphics.const.K_F1)
 
 def get_android_data(append=''):
-    chdir = os.getcwd()
-    if chdir.startswith('/sdcard/'):
-        chdir = chdir[len('/sdcard/'):]
-    if chdir.startswith('/mnt/sdcard/'):
-        chdir = chdir[len('/mnt/sdcard/'):]
-    if chdir.endswith('/'):
-        chdir = chdir[:-1]
-    id = chdir
-    return '/data/data/%s/%s' % (id, append)
+    return get_internal_storage() + '/' + append
+
+def get_external_storage():
+    ident = get_internal_storage().strip('/').split('/')[-2]
+    return '/mnt/sdcard/' + ident
 
 def is_paused():
     return False
@@ -52,7 +48,7 @@ def wait_for_resume():
 
 def get_android_version():
     if is_android:
-        return pyjni.get_android_version()
+        return 999 # TODO
     else:
         return None
 

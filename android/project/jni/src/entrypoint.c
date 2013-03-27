@@ -6,7 +6,9 @@
 #include <unistd.h>
 #include "unarchive.h"
 
-
+void initgraphics();
+void initandroid();
+void initfreecivclient();
 
 int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "starting SDL_main");
@@ -27,7 +29,9 @@ int SDL_main(int argc, char** argv) {
   Py_Initialize();
   PyRun_SimpleString("print 'Python running'");
   initgraphics();
-  PyRun_SimpleString("import main; main.main()");
+  initandroid();
+  initfreecivclient();
+  PyRun_SimpleString("import android; android.main()");
   Py_Finalize();
 
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");
