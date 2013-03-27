@@ -17,8 +17,6 @@ import osutil
 import thread
 import os
 import random
-import tarfile
-import copy
 import functools
 import traceback
 import time
@@ -129,28 +127,6 @@ def notify_update(url):
         ui.execute_later.append(lambda: menus.notify_update(url))
 
 client.main = client_main
-
-def unpack_data():
-    last_flipped = time.time()
-    all_files_count = 455
-    i = 0
-    if os.path.exists('data.tgz'):
-        tar = tarfile.open('data.tgz')
-        for info in tar:
-            i += 1
-            if (time.time() - last_flipped) > 0.1:
-                progress.draw_frame('installing...', info.name, float(i) / all_files_count)
-                last_flipped = time.time()
-            if '..' in info.name or info.name.startswith('/'):
-                raise IOError('unsafe file name')
-
-            if info.isdir():
-                info = copy.copy(info)
-                info.mode = 0o700
-            if osutil.is_android:
-                tar.extract(info, "")
-        os.remove('data.tgz')
-    progress.draw_frame('', 'starting...', 1)
 
 def check_force_size():
     if features.get('app.forcesize'):
@@ -270,8 +246,6 @@ def main(size=None, init=True):
     osutil.init()
 
     ui.init()
-    ui.set_fill_image(None)
-    unpack_data()
     ui.set_fill_image(graphics.load_image('data/user/background.jpg'))
 
     setup_freeciv_config()

@@ -33,21 +33,10 @@ if osutil.is_desktop:
         webbrowser.open_new_tab(url)
 
 elif osutil.is_android:
-    import pyjni
 
     def inputbox(text, default='', title=''):
-        pyjni.make_input_dialog(title, text, default)
-
-        while True:
-            data = pyjni.get_dialog_retval()
-            if data:
-                n, rest = data.split(':', 1)
-                print 'inputbox got:', rest
-                if n == 'ok':
-                    return rest
-                else:
-                    return None
-            time.sleep(0.1)
+        raise NotImplementedError
 
     def open_url(url):
-        pyjni.open_intent("android.intent.action.VIEW", url)
+        raise NotImplementedError
+        #pyjni.open_intent("android.intent.action.VIEW", url)

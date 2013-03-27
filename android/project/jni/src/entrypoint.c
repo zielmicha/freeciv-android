@@ -25,9 +25,9 @@ int SDL_main(int argc, char** argv) {
   SDL_RWclose(ops);
 
   Py_Initialize();
-  PyRun_SimpleString("print 'foobar'");
+  PyRun_SimpleString("print 'Python running'");
   initgraphics();
-  PyRun_SimpleString("import graphics; print graphics");
+  PyRun_SimpleString("import main; main.main()");
   Py_Finalize();
 
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");
