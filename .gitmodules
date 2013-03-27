@@ -1,9 +1,9 @@
 [submodule "python4android"]
 	path = python4android
 	url = https://github.com/zielmicha/python4android.git
-[submodule "android/project/jni/jpeg8d"]
-	path = android/project/jni/jpeg8d
-	url = git://github.com/folecr/jpeg8d.git
+[submodule "android/project/jni/jpeg"]
+	path = android/project/jni/jpeg
+	url = https://github.com/zielmicha/jpeg8d.git
 [submodule "android/project/jni/png"]
 	path = android/project/jni/png
-	url = https://github.com/julienr/libpng-android
+	url = https://github.com/zielmicha/libpng-android.git
