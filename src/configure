@@ -1,7 +1,7 @@
 #!/bin/bash
 #  -Iclient/gui-stub client/gui-stub/*.c
 PYTHON=python2.7 # python2.7_d
-GCC_PARAMS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -I/usr/include/$PYTHON -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H -fPIC"
+CC_FLAGS="-g -Iclient -Iclient/include -Iclient/agents -Icommon -Icommon/aicore -Iutility -I/usr/include/$PYTHON -I. -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Ilua -Itolua -DHAVE_CONFIG_H -fPIC"
 EXCLUDE_FILES="client/audio_sdl.c lua/luac.c"
 
 output() {
@@ -14,6 +14,8 @@ if [ -e callauto.c ]; then
     rm callauto.c
 fi
 
+output "CC_FLAGS=$CC_FLAGS"
+
 for name in callauto.c client/*.c *.c client/agents/*.c \
     common/*.c common/aicore/*.c server/*.c server/generator/*.c server/scripting/*.c \
     server/advisors/*.c ai/*.c utility/*.c lua/*.c tolua/*.c; do
@@ -21,7 +23,7 @@ for name in callauto.c client/*.c *.c client/agents/*.c \
     objfile=objectfiles/$(basename $name .c).o
     ev="$ev $objfile"
     output "$objfile: $name"
-    output "	gcc $GCC_PARAMS $additional -c -o $objfile $name"
+    output "	gcc \$(CC_FLAGS) $additional -c -o $objfile $name"
 done
 
 echo "all: freecivclient.so" > client.mk
