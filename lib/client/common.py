@@ -26,6 +26,12 @@ def load_gfxfile(fn):
     if fn.startswith('flags/'):
         return load_flag(fn[len('flags/'):])
     else:
+        if not fn.startswith('data/'):
+            fn = 'data/' + fn
+            try:
+                return graphics.load_image(fn + '.png')
+            except graphics.SDLError:
+                return graphics.load_image(fn + '.jpg')
         return graphics.load_image(fn)
 
 @freeciv.register

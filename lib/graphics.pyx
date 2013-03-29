@@ -252,6 +252,7 @@ def get_events():
     cdef SDL_Event ev
     while SDL_PollEvent(&ev):
         events.append(_translate_event(&ev))
+    if events: print events
     return events
 
 cdef object _translate_event(SDL_Event* ev):

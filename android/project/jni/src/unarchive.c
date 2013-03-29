@@ -4,17 +4,16 @@
 // WARNING: this library assumes that archive is trusted
 // FIXME: don't assume little endian
 
-char* read_str(SDL_RWops* archive, int* msize) {
-  uint32_t size;
-  SDL_RWread(archive, &size, 4, 1);
-  char* buff = malloc(size + 1);
-  SDL_RWread(archive, buff, 1, size);
-  buff[size] = 0;
-  if(msize != NULL) *msize = size;
-  return buff;
-}
+static char* read_str(SDL_RWops* archive, int* msize);
+static int64_t get_or_set_serial(const char* base, int64_t expected);
 
 void unarchive(SDL_RWops* archive, const char* base) {
+  uint64_t serial;
+  SDL_RWread(archive, &serial, 8, 1);
+  if(get_or_set_serial(base, serial)) {
+    fprintf(stderr, "not extracting serial == %lld\n", serial);
+    return;
+  }
   uint32_t count;
   SDL_RWread(archive, &count, 4, 1);
   while(count --) {
@@ -44,6 +43,43 @@ void unarchive(SDL_RWops* archive, const char* base) {
     free(name);
     free(content);
   }
+}
+
+static int64_t get_or_set_serial(const char* base, int64_t expected) {
+  const char* fn = "/_serial";
+  char* path = malloc(strlen(base) + strlen(fn) + 2);
+  strcpy(path, base);
+  strcat(path, fn);
+  FILE* f = fopen(path, "r");
+  int64_t serial = -1;
+  if(f != NULL) {
+    fread(&serial, 8, 1, f);
+    fclose(f);
+  }
+  if(serial == expected) {
+    free(path);
+    return 1;
+  }
+  f = fopen(path, "w");
+  if(f == NULL) {
+    perror("writing serial failed");
+    fprintf(stderr, "serial file: %s\n", path);
+    abort();
+  }
+  fwrite(&expected, 8, 1, f);
+  fclose(f);
+  free(path);
+  return 0;
+}
+
+static char* read_str(SDL_RWops* archive, int* msize) {
+  uint32_t size;
+  SDL_RWread(archive, &size, 4, 1);
+  char* buff = malloc(size + 1);
+  SDL_RWread(archive, buff, 1, size);
+  buff[size] = 0;
+  if(msize != NULL) *msize = size;
+  return buff;
 }
 
 #ifdef MAIN

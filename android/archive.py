@@ -1,8 +1,11 @@
 from struct import pack
 import os
 import sys
+import time
 
 def write(out, entries):
+    serial = int(time.time() * 1000)
+    out.write(pack('q', serial))
     entries = list(entries)
     out.write(pack('I', len(entries)))
     for type, name, content in entries:

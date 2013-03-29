@@ -1,5 +1,6 @@
 from graphics import SDLError
 import sys
+import os
 
 cdef extern from "SDL.h":
     cdef char* SDL_AndroidGetExternalStoragePath()
@@ -38,10 +39,10 @@ def info(line):
 
 def main():
     _keep_from_gc.extend([sys.stdout, sys.stderr])
-    print >>sys.stderr, 'foo'
     sys.argv = ['android']
     sys.stderr = LineStream(err)
     sys.stdout = LineStream(info)
+    os.chdir(get_internal_storage())
     import main
     main.main()
 

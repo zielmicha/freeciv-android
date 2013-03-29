@@ -1,3 +1,4 @@
+#!/bin/bash
 A=project/obj/code
 rm -r $A
 mkdir -p $A
@@ -21,5 +22,18 @@ rm -r project/assets/fonts
 mkdir project/assets/fonts
 cp ../fonts/*.ttf project/assets/fonts
 rm -r project/assets/data
-cp ../data -a project/assets
-true
+mkdir project/assets/data
+mkdir $A/data
+
+(cd ../data; find -type d) | while read line; do
+    mkdir -p $A/data/$line
+    mkdir -p project/assets/data/$line
+done
+
+(cd ../data; find -type f) | while read line; do
+    if [[ $line =~ \.(tilespec|ruleset|spec|serv)$ ]]; then
+        cp ../data/$line $A/data/$line || exit 1
+    else
+        cp ../data/$line project/assets/data/$line || exit 1
+    fi
+done

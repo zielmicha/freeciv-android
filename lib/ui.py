@@ -226,6 +226,7 @@ def set_fill_image(image):
         _fill_image = None
 
 def fill(surf, rect, screen=None):
+    surf.fill((0, 200, 0, 255))
     if not _fill_image:
         surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else graphics.get_window().get_size()))
     else:
