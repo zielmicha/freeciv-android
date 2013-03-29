@@ -17,6 +17,7 @@ import sys
 import progress
 import time
 import features
+import osutil
 
 DO_MASK = False
 
@@ -165,7 +166,7 @@ def init_flags():
 
 def load_flags_file(name):
     img = graphics.load_image('data/flags/%s-output.png' % name)
-    for line in open('data/flags/%s.index' % name):
+    for line in osutil.open_res('data/flags/%s.index' % name):
         name, rect = line.split(' ', 1)
         rect = map(int, rect.split())
         flag = graphics.create_surface(rect[2], rect[3])

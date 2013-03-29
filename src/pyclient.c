@@ -804,11 +804,6 @@ static PyMethodDef FreecivClientMethods[] = {
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
-PyMODINIT_FUNC initfreecivclient(void)
-{
-#ifdef ANDROID
-    freopen("error.log", "w", stderr);
-    setvbuf(stderr, NULL, _IOLBF, 50);
-#endif
+PyMODINIT_FUNC initfreecivclient(void) {
     (void) Py_InitModule("freecivclient", FreecivClientMethods);
 }

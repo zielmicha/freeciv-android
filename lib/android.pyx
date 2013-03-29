@@ -37,11 +37,15 @@ def info(line):
     __android_log_write(ANDROID_LOG_INFO, "freeciv", line)
 
 def main():
+    _keep_from_gc.extend([sys.stdout, sys.stderr])
+    print >>sys.stderr, 'foo'
     sys.argv = ['android']
     sys.stderr = LineStream(err)
     sys.stdout = LineStream(info)
     import main
     main.main()
+
+_keep_from_gc = []
 
 def map_key(src, dst):
     pass

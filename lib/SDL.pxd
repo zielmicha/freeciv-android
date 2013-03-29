@@ -380,6 +380,8 @@ cdef extern from "SDL.h":
     cdef void SDL_Delay(Uint32 ms)
     cdef int SDL_PollEvent(SDL_Event * event)
     cdef SDL_RWops * SDL_RWFromFile(char *file, char *mode)
+    cdef int SDL_RWclose(SDL_RWops* context)
+    cdef size_t SDL_RWread(SDL_RWops* context, void* ptr, size_t size, size_t maxnum)
     cdef void SDL_FreeRW(SDL_RWops *area)
     cdef int SDL_GetRendererInfo(SDL_Renderer *renderer, SDL_RendererInfo *info)
     cdef int SDL_RenderSetViewport(SDL_Renderer * renderer, SDL_Rect * rect)

@@ -12,6 +12,8 @@
 
 from libc.stdlib cimport malloc, free
 from SDL cimport *
+import io
+import os
 
 cdef class Font(object):
     cdef TTF_Font* font
@@ -20,7 +22,7 @@ cdef class Font(object):
     def __init__(self, name, size):
         self.name = name
         self.font_size = size
-        cdef SDL_RWops* res = SDL_RWFromFile(name, 'rb')
+        cdef SDL_RWops* res = open_file(name)
         self.font = TTF_OpenFontRW(res, True, size)
         if not self.font:
             raise TTFError()
@@ -189,7 +191,7 @@ class TTFError(Exception):
         Exception.__init__(self, msg)
 
 def load_image(fn):
-    cdef SDL_RWops* res = SDL_RWFromFile(fn, "rb")
+    cdef SDL_RWops* res = open_file(fn)
     if not res:
         raise SDLError()
     cdef SDL_Surface* s = IMG_Load_RW(res, True)
@@ -275,6 +277,25 @@ class Event:
 
     def __repr__(self):
         return 'Event(%s, %s)' % (self.type, self.__dict__)
+
+def sdl_open(path):
+    cdef char buf[8096]
+    cdef SDL_RWops* ops = open_file(path)
+    if not ops:
+        raise SDLError()
+    data = []
+    while True:
+        read = SDL_RWread(ops, buf, 1, sizeof(buf))
+        if read <= 0:
+            break
+        data.append(buf[:read])
+    SDL_RWclose(ops)
+    return io.BytesIO(''.join(data))
+
+cdef SDL_RWops* open_file(path):
+    if path.startswith('data') and os.environ.get('FC_DATA_PATH'):
+        path = os.environ['FC_DATA_PATH'] + '/' + path
+    return SDL_RWFromFile(path, "rb")
 
 # CONSTRUCTORS
 
