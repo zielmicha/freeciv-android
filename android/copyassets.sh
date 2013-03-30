@@ -31,9 +31,9 @@ mkdir $A/data
 done
 
 (cd ../data; find -type f) | while read line; do
-    if [[ $line =~ \.(tilespec|ruleset|spec|serv)$ ]]; then
+    if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua)$ ]]; then
         cp ../data/$line $A/data/$line || exit 1
-    else
+    elif [[ $line =~ \.(png|jpg|index)$ ]]; then
         cp ../data/$line project/assets/data/$line || exit 1
     fi
 done

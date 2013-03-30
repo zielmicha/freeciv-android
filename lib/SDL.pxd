@@ -22,6 +22,7 @@ cdef extern from "SDL.h":
         SDLK_RIGHT
         SDLK_SPACE
         SDLK_ESCAPE
+        SDLK_AC_BACK
         SDLK_F1
         SDLK_a
         SDLK_b

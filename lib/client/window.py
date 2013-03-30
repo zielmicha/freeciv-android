@@ -90,14 +90,7 @@ def init_screen(size=None):
         if osutil.is_desktop and not features.get('ui.fake_max_size'):
             return (1280, 800)
         else:
-            w, h = max_size
-            MAX_W = 1000
-            if w > MAX_W:
-                scale = h / float(w)
-                size = (MAX_W, int(MAX_W * scale))
-            else:
-                size = (w, h)
-            return size
+            return max_size
 
     global screen, surface, overview_surface
 

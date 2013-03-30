@@ -238,7 +238,7 @@ def main(size=None, init=True):
     maybe_start_remote_debug()
 
     monitor.start()
-    #save.start_zygote()
+    save.start_zygote()
 
     client.window.init_screen(size)
     osutil.init()

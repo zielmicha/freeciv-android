@@ -219,7 +219,10 @@ def create_surface(w, h, alpha=True):
     return surf
 
 def get_screen_size():
-    return (800, 600) # TODO
+    cdef SDL_DisplayMode mode
+    if SDL_GetDesktopDisplayMode(0, &mode) < 0:
+        raise SDLError()
+    return (mode.w, mode.h)
 
 def init():
     if SDL_Init(SDL_INIT_VIDEO) < 0:
@@ -252,7 +255,6 @@ def get_events():
     cdef SDL_Event ev
     while SDL_PollEvent(&ev):
         events.append(_translate_event(&ev))
-    if events: print events
     return events
 
 cdef object _translate_event(SDL_Event* ev):
@@ -262,9 +264,17 @@ cdef object _translate_event(SDL_Event* ev):
         return Event(ev.type, pos=(ev.button.x, ev.button.y),
                      button=ev.button.button)
     elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
-        return Event(ev.type, key=ev.key.keysym.sym)
+        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym))
     else:
         return Event(ev.type)
+
+def _translate_sym(n):
+    return key_map.get(n, n)
+
+key_map = {}
+
+def map_key(src, dst):
+    key_map[src] = dst
 
 class Event:
     def __init__(self, type, **dict):
@@ -341,6 +351,7 @@ class const:
     K_RIGHT = SDLK_RIGHT
     K_SPACE = SDLK_SPACE
     K_ESCAPE = SDLK_ESCAPE
+    K_AC_BACK = SDLK_AC_BACK
     K_F1 = SDLK_F1
     K_a = SDLK_a
     K_b = SDLK_b

@@ -220,17 +220,13 @@ def set_fill_image(image):
     global _fill_image, _fill_image_not_resized
 
     _fill_image_not_resized = image
-    if image:
-        _fill_image = image.scale(graphics.get_window().get_size())
-    else:
-        _fill_image = None
+    _fill_image = image
 
 def fill(surf, rect, screen=None):
-    surf.fill((0, 200, 0, 255))
-    if not _fill_image:
-        surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else graphics.get_window().get_size()))
-    else:
-        surf.blit(_fill_image, rect)
+    surf.fill((200, 200, 200, 255))
+    if _fill_image:
+        size = graphics.get_window().get_size()
+        surf.blit(_fill_image, dest=(rect[0], rect[1], size[0], size[1]))
 
 LOCK_MOUSE_EVENT = object() # constant
 

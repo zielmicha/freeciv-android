@@ -270,10 +270,7 @@ def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
     time.sleep(0.3)
 
 def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
-    if osutil.is_android:
-        serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
-    else:
-        serverpath = 'server/freeciv-server'
+    assert quit_on_disconnect
     args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
 
     piddir = get_save_dir()
@@ -283,12 +280,11 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
 
     while True:
         line = stream.readline()
-        if not line.startswith((':', '\n')):
+        if not line:
             break
-        line = line[1:]
         if line_callback:
             line_callback(line)
-        monitor.log('server', line.rstrip())
+        print 'server:', line.rstrip()
 
 def start_zygote():
     global zygote_cmd_pipe, zygote_console_pipe
@@ -307,8 +303,8 @@ def zygote_start_server(cmd):
 
 def zygote_main(cmd_pipe, console_pipe):
     os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
+    os.dup2(console_pipe.fileno(), 0)
     os.dup2(console_pipe.fileno(), 1)
-    os.dup2(console_pipe.fileno(), 2)
     while True:
         cmd = cmd_pipe.readline()
         if not cmd:

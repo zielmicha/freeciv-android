@@ -81,15 +81,17 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
     def load_background(self):
         img = ui.load_image('data/user/intro.jpg')
         img_size = img.get_size()
-        surf_size = ui._fill_image.get_size()
+        surf_size = graphics.get_window().get_size()
         new_height = float(surf_size[0]) / img_size[0] * img_size[1]
         if new_height < surf_size[1]:
             new_height = surf_size[1]
         self.background_margin_top = (new_height - surf_size[1]) / -2.5
-        self.background = img.scale((surf_size[0], int(new_height)))
+        self.background = img
+        self.background_size = surf_size[0], int(new_height)
 
     def draw(self, surf, (x, y)):
-        surf.blit(self.background, (x, y + self.background_margin_top))
+        surf.blit(self.background,
+                  (x, y + self.background_margin_top) + self.background_size)
         super(PrettyMenu, self).draw(surf, (x, y))
 
 class MenuButton(ui.Button):

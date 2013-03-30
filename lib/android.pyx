@@ -1,4 +1,4 @@
-from graphics import SDLError
+from graphics import SDLError, map_key, const
 import sys
 import os
 
@@ -48,10 +48,7 @@ def main():
 
 _keep_from_gc = []
 
-def map_key(src, dst):
-    pass
-
-KEYCODE_BACK = None
+KEYCODE_BACK = const.K_AC_BACK
 KEYCODE_MENU = None
 
 class LineStream:
