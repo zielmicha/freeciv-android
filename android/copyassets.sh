@@ -14,7 +14,8 @@ types posixpath genericpath warnings fnmatch collections
 functools threading httplib urllib string re UserDict _abcoll
 abc copy_reg sre_compile sre_constants sre_parse keyword
 heapq bisect random __future__ glob socket StringIO urlparse
-mimetools tempfile rfc822 gzip struct io subprocess pickle"
+mimetools tempfile rfc822 gzip struct io subprocess pickle
+atexit"
 for mod in $STDMODULES; do
     cp ../python4android/Python-2.7/Lib/$mod.py $A/lib/python2.7 || exit 1
 done

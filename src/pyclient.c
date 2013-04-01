@@ -7,6 +7,7 @@
 #include "repodlgs_common.h"
 #include "fc_types.h"
 #include "government.h"
+#include <sys/prctl.h>
 
 enum city_get_mode {
     MODE_PROD,
@@ -694,8 +695,10 @@ void py_server_main(PyObject* cmd) {
     perror("fork");
     return;
   }
+
+  prctl(PR_SET_PDEATHSIG, SIGKILL);
   if(result == 0) {
-    wait();
+    //
   } else {
     civserver_main(length + 1, cmdlist);
   }

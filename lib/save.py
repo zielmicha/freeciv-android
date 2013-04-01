@@ -26,6 +26,8 @@ import os
 import gzip
 import features
 import subprocess
+import atexit
+import sys
 
 from client import freeciv
 
@@ -272,7 +274,7 @@ def start_client():
 
 def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
     thread.start_new_thread(server_loop, (port, args, line_callback, quit_on_disconnect))
-    time.sleep(0.3)
+    time.sleep(0.4)
 
 def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     assert quit_on_disconnect
@@ -295,10 +297,13 @@ def start_zygote():
     global zygote_cmd_pipe, zygote_console_pipe
     cmd_pipe_fd, zygote_cmd_pipe_fd = os.pipe()
     zygote_console_pipe_fd, console_pipe_fd = os.pipe()
-    if os.fork() == 0:
+    pid = os.fork()
+    if pid == 0:
         zygote_main(os.fdopen(cmd_pipe_fd, 'r', 0),
                     os.fdopen(console_pipe_fd, 'w', 0))
     else:
+        print 'zygote spawned as', pid
+        atexit.register(os.kill, pid, 9) # no mercy!
         zygote_cmd_pipe = os.fdopen(zygote_cmd_pipe_fd, 'w', 0)
         zygote_console_pipe = os.fdopen(zygote_console_pipe_fd, 'r', 0)
 
@@ -313,10 +318,10 @@ def zygote_main(cmd_pipe, console_pipe):
     while True:
         cmd = cmd_pipe.readline()
         if not cmd:
-            print 'zygote: exiting'
+            print >>sys.stderr, 'zygote: exiting'
             return
         cmd = cmd.rstrip('\n')
-        print 'zygote: starting server', ' '.join(cmd.split('\0'))
+        print >>sys.stderr, 'zygote: starting server', ' '.join(cmd.split('\0'))
         freeciv.func.py_server_main(cmd.split('\0'))
         console_pipe.write('\neof\n')
-        print 'zygote: server exited'
+        print >>sys.stderr, 'zygote: server exited'

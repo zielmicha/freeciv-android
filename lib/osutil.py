@@ -75,24 +75,3 @@ version_map = {
 
 def get_android_version_info():
     return version_map.get(get_android_version(), ('unknown', ''))
-
-if is_desktop:
-    import signal
-
-    print 'PID for pausing is', os.getpid()
-
-    PAUSED = 1
-    NOT_PAUSED = 0
-
-    sig_state = NOT_PAUSED
-
-    def _sig_pause(a, b):
-        global sig_state
-        sig_state = PAUSED
-
-    def _sig_unpause(a, b):
-        global sig_state
-        sig_state = NOT_PAUSED
-
-    signal.signal(signal.SIGUSR1, _sig_pause)
-    signal.signal(signal.SIGUSR2, _sig_unpause)
