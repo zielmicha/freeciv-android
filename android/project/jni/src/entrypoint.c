@@ -10,9 +10,11 @@ void initgraphics();
 void initandroid();
 void initfreecivclient();
 
+static char* storage;
+
 int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "starting SDL_main");
-  const char* storage = SDL_AndroidGetInternalStoragePath();
+  storage = SDL_AndroidGetInternalStoragePath();
   setenv("PYTHONHOME", storage, 1);
   char* pythonpath = malloc(strlen(storage) + 100);
   strcpy(pythonpath, storage);
@@ -21,7 +23,7 @@ int SDL_main(int argc, char** argv) {
 
   SDL_RWops* ops = SDL_RWFromFile("code.archive", "rb");
   if(ops == NULL) {
-    __android_log_write(ANDROID_LOG_ERROR, "freeciv", "opening assets failed");
+    __android_log_write(ANDROID_LOG_ERROR, "freeciv", "opening code assets failed");
   }
   unarchive(ops, storage);
   SDL_RWclose(ops);
@@ -37,4 +39,18 @@ int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");
 
   exit(0);
+}
+
+void unpack_res() {
+  __android_log_write(ANDROID_LOG_INFO, "freeciv", "unpacking resources...");
+  SDL_RWops* ops = SDL_RWFromFile("res.archive", "rb");
+  if(ops == NULL) {
+    __android_log_write(ANDROID_LOG_ERROR, "freeciv", "opening resource assets failed");
+  }
+  char* res_storage = malloc(strlen(storage) + 20);
+  sprintf(res_storage, "%s/data", storage);
+  unarchive(ops, res_storage);
+  free(res_storage);
+  SDL_RWclose(ops);
+  __android_log_write(ANDROID_LOG_INFO, "freeciv", "unpacking resources done");
 }

@@ -14,8 +14,6 @@ import graphics
 import freeciv
 import features
 
-features.add_feature('ui.fake_max_size')
-
 import osutil
 import common
 import client
@@ -78,32 +76,15 @@ def create_line_at_mouse_pos():
     client.client.draw_patrol_lines = True
     freeciv.func.update_line(*mouse_pos)
 
-def init_screen(size=None):
-    def _get_max_size():
-        fake = features.get('ui.fake_max_size')
-        if fake:
-            return map(int, fake.split(','))
-        else:
-            return graphics.get_screen_size()
-
-    def _get_request_size(max_size):
-        if osutil.is_desktop and not features.get('ui.fake_max_size'):
-            return (1280, 800)
-        else:
-            return max_size
-
+def init_screen():
     global screen, surface, overview_surface
 
-    graphics.init()
+    if osutil.is_desktop:
+        # on Android android.pyx takes care of init
+        graphics.init()
+        graphics.create_window((1280, 800), 32)
 
-    if not size:
-        max_size = _get_max_size()
-        ask_for_size = _get_request_size(max_size)
-        print 'screen size: max =', max_size, 'ask =', ask_for_size
-    else:
-        ask_for_size = size
-        print 'explicit size:', ask_for_size
-    screen = graphics.create_window(ask_for_size, 32)
+    screen = graphics.get_window()
     surface = screen
 
 def init():

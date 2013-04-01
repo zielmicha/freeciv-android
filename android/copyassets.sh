@@ -23,16 +23,19 @@ mkdir project/assets/fonts
 cp ../fonts/*.ttf project/assets/fonts
 rm -r project/assets/data
 mkdir project/assets/data
-mkdir $A/data
+
+B=project/obj/res
+rm -r $B
+mkdir -p $B
 
 (cd ../data; find -type d) | while read line; do
-    mkdir -p $A/data/$line
+    mkdir -p $B/$line
     mkdir -p project/assets/data/$line
 done
 
 (cd ../data; find -type f) | while read line; do
     if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua)$ ]]; then
-        cp ../data/$line $A/data/$line || exit 1
+        cp ../data/$line $B/$line || exit 1
     elif [[ $line =~ \.(png|jpg|index)$ ]]; then
         cp ../data/$line project/assets/data/$line || exit 1
     fi

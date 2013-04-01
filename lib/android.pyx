@@ -1,4 +1,5 @@
 from graphics import SDLError, map_key, const
+import graphics
 import sys
 import os
 
@@ -31,6 +32,9 @@ cdef extern from "android/log.h":
         ANDROID_LOG_FATAL
         ANDROID_LOG_SILENT
 
+cdef extern:
+    cdef void unpack_res()
+
 def err(line):
     __android_log_write(ANDROID_LOG_ERROR, "freeciv", line)
 
@@ -42,9 +46,17 @@ def main():
     sys.argv = ['android']
     sys.stderr = LineStream(err)
     sys.stdout = LineStream(info)
+    init_screen()
+    unpack_res()
     os.chdir(get_internal_storage())
     import main
     main.main()
+
+def init_screen():
+    graphics.init()
+    wnd = graphics.create_window(graphics.get_screen_size())
+    wnd.fill((0, 128, 0))
+    graphics.flip()
 
 _keep_from_gc = []
 

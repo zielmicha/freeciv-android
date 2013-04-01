@@ -15,6 +15,7 @@ runlog: run
 # ASSETS
 assets: copyassets
 	python archive.py project/obj/code > project/assets/code.archive
+	python archive.py project/obj/res > project/assets/res.archive
 copyassets:
 	./copyassets.sh
 

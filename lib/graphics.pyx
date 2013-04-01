@@ -209,10 +209,11 @@ def load_font(name, size):
 
 def create_surface(w, h, alpha=True):
     cdef SDL_Texture* tex
+    MAX = 2048
     tex = SDL_CreateTexture(_window._sdl, 0,
-                            SDL_TEXTUREACCESS_TARGET, max(1, w), max(1, h))
+                            SDL_TEXTUREACCESS_TARGET, min(max(1, w), MAX), min(max(1, h), MAX))
     if not tex:
-        raise SDLError()
+        raise SDLError('create texture %dx%d' % (w, h))
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND)
     surf = _make_surface(_window._sdl, tex, (w, h))
     surf.fill((0, 0, 0, 0))
@@ -231,7 +232,7 @@ def init():
         raise SDLError()
     SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear")
 
-def create_window(size, bits):
+def create_window(size):
     global _window, _window_handle
     w, h = size
     wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, 0)

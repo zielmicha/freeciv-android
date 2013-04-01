@@ -10,6 +10,7 @@ static int64_t get_or_set_serial(const char* base, int64_t expected);
 void unarchive(SDL_RWops* archive, const char* base) {
   uint64_t serial;
   SDL_RWread(archive, &serial, 8, 1);
+  mkdir(base, 0700);
   if(get_or_set_serial(base, serial)) {
     fprintf(stderr, "not extracting serial == %lld\n", serial);
     return;

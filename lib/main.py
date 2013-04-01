@@ -227,20 +227,19 @@ def except_hook():
     panel.add(ui.Label(''.join(tb_str), font=ui.consolefont))
     ui.screen = ui.ScrollWrapper(panel)
 
-def main(size=None, init=True):
+def main():
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     setup_game_version()
     setup_android_version()
     setup_errors()
-    size = size or check_force_size()
 
     maybe_start_remote_debug()
 
     monitor.start()
     save.start_zygote()
 
-    client.window.init_screen(size)
+    client.window.init_screen()
     osutil.init()
 
     ui.init()
@@ -252,10 +251,7 @@ def main(size=None, init=True):
 
     start_autoupdate()
 
-    if init:
-        client.freeciv.run()
-    else:
-        client_main()
+    client.freeciv.run()
 
 if __name__ == '__main__':
     main()
