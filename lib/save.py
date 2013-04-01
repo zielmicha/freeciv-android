@@ -69,7 +69,10 @@ class ServerGUI(ui.LinearLayoutWidget):
         client.client.chat('/set pingtimeout 1800')
 
         self.pick_nation_button = ui.Button('...', self.pick_nation)
-        self.set_leader_name_button = ui.Button('...', self.set_leader_name)
+        self.set_leader_name_button = ui.Button('...',
+                                                lambda:
+                                                uidialog.inputbox('What will be your name?',
+                                                                  finish=self.set_leader_name))
         self.difficulty_button = ui.Button('...', self.set_difficulty)
 
         self.add(ui.Button('Start game!', start_client))
@@ -78,11 +81,17 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.add(self.difficulty_button)
         self.add(ui.Button('Server command', server_command_dialog))
 
-        self.aicount_button = ui.Button('...', self.set_aicount)
+        self.aicount_button = ui.Button('...',
+                                        lambda:
+                                        uidialog.inputbox('How many computer enemies will you fight?',
+                                                          finish=self.set_aicount))
         self.set_aicount(4)
         self.add(self.aicount_button)
 
-        self.mapsize_button = ui.Button('...', self.set_mapsize)
+        self.mapsize_button = ui.Button('...',
+                                        lambda:
+                                        uidialog.inputbox('How large your map will be? (1-20)',
+                                                          finish=self.set_mapsize))
         self.set_mapsize(5)
         self.add(self.mapsize_button)
 
@@ -99,8 +108,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         client.client.disconnect()
         ui.back(allow_override=False)
 
-    def set_leader_name(self):
-        name = uidialog.inputbox('What will be your name?')
+    def set_leader_name(self, name):
         if name:
             self.leader_name = name
             self.set_nation_settings()
@@ -117,7 +125,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.difficulty_button.set_text('Difficulty: %s' % self.difficulty)
 
     def set_aicount(self, val=None):
-        cmd = val or uidialog.inputbox('How many computer enemies will you fight?')
+        cmd = val
         try:
             count = int(cmd)
             client.client.chat('/set aifill %d' % (count + 1))
@@ -126,7 +134,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             pass
 
     def set_mapsize(self, val=None):
-        cmd = val or uidialog.inputbox('How large your map will be? (1-20)')
+        cmd = val
         try:
             count = int(cmd)
             if count < 1 or count > 20:
@@ -162,10 +170,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         ui.set_dialog(nations, scroll=True)
 
 def server_command_dialog():
-    cmd = uidialog.inputbox('Command')
-    if cmd:
-        print cmd
-        client.client.chat(cmd)
+    uidialog.inputbox('Command', finish=client.client.chat)
 
 def load_scenario():
     menu = ui.LinearLayoutWidget()

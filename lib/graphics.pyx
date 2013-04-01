@@ -232,6 +232,12 @@ def init():
         raise SDLError()
     SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear")
 
+def start_text_input():
+    SDL_StartTextInput()
+
+def stop_text_input():
+    SDL_StopTextInput()
+
 def create_window(size):
     global _window, _window_handle
     w, h = size
@@ -267,6 +273,11 @@ cdef object _translate_event(SDL_Event* ev):
     elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
         return Event(ev.type, key=_translate_sym(ev.key.keysym.sym),
                      unicode=unichr(ev.key.keysym.unicode))
+    elif ev.type == SDL_TEXTINPUT:
+        return Event(ev.type, text=str(ev.text.text))
+    elif ev.type == SDL_TEXTEDITING:
+        return Event(ev.type, text=str(ev.edit.text), start=ev.edit.start,
+                     length=ev.edit.length)
     else:
         return Event(ev.type)
 
@@ -344,6 +355,8 @@ class const:
     MOUSEBUTTONUP = SDL_MOUSEBUTTONUP
     MOUSEBUTTONDOWN = SDL_MOUSEBUTTONDOWN
     MOUSEMOTION = SDL_MOUSEMOTION
+    TEXTEDITING = SDL_TEXTEDITING
+    TEXTINPUT = SDL_TEXTINPUT
     QUIT = SDL_QUIT
     KEYDOWN = SDL_KEYDOWN
     KEYUP = SDL_KEYUP
@@ -353,6 +366,7 @@ class const:
     K_RIGHT = SDLK_RIGHT
     K_SPACE = SDLK_SPACE
     K_ESCAPE = SDLK_ESCAPE
+    K_BACKSPACE = SDLK_BACKSPACE
     K_AC_BACK = SDLK_AC_BACK
     K_F1 = SDLK_F1
     K_a = SDLK_a

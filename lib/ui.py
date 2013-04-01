@@ -15,11 +15,11 @@ import traceback
 import graphics
 
 import graphics
-import uidialog
 import functools
 import features
 import osutil
 import os
+import sys
 
 history = []
 screen = None
@@ -475,6 +475,8 @@ def back(allow_override=True, anim=True):
     if allow_override and hasattr(screen, 'back'):
         screen.back()
     elif not history:
+        if hasattr(sys, 'exitfunc'):
+            sys.exitfunc()
         os._exit(0)
     else:
         new_screen = history.pop()
@@ -703,6 +705,7 @@ class EditField(Button):
         self.set_value(label)
 
     def callback(self):
+        import uidialog
         data = uidialog.inputbox('')
         if data != None:
             self.set_value(data)

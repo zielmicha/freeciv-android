@@ -30,13 +30,14 @@ class OptionsButton(ui.Button):
         self.set_text(text)
 
     def _callback(self):
-        val = uidialog.inputbox('Value for %s' % self.feature_key)
-        if val is None: return
-        try:
-            features.set_perm(self.feature_key, val)
-        except ValueError as e:
-            ui.message(str(e), type='error')
-        self.make_button()
+        def finish(val):
+            try:
+                features.set_perm(self.feature_key, val)
+            except ValueError as e:
+                ui.message(str(e), type='error')
+            self.make_button()
+
+        uidialog.inputbox('Value for %s' % self.feature_key, finish=finish)
 
 class BoolOptionsButton(ui.Button):
     def __init__(self, label_t, label_f, key):
@@ -107,25 +108,39 @@ def debug_menu():
         ui.set_dialog(menu, scroll=True)
 
     def change_feature():
-        arg = uidialog.inputbox('name=key')
-        try:
-            features._parse_arg(arg)
-        except Exception as e:
-            traceback.print_exc()
-            ui.message(str(e))
+        def finish(arg):
+            try:
+                features._parse_arg(arg)
+            except Exception as e:
+                traceback.print_exc()
+                ui.message(str(e))
+
+        uidialog.inputbox('name=key', finish=finish)
 
     def pernament_feature():
-        arg = uidialog.inputbox('name=key')
-        try:
-            k, v = arg.split('=', 1)
-            features.set_perm(k, v)
-        except Exception as e:
-            traceback.print_exc()
-            ui.message(str(e))
+        def finish():
+            try:
+                k, v = arg.split('=', 1)
+                features.set_perm(k, v)
+            except Exception as e:
+                traceback.print_exc()
+                ui.message(str(e))
+
+        uidialog.inputbox('name=key', finish=finish)
 
     def show_features():
         s = '\n'.join( '%s=%s' % (k,v) for k, v in sorted(features.features.items()) )
         ui.set_dialog(ui.Label(s), scroll=True)
+
+    def test_inputbox():
+        import uidialog
+        def finish(text):
+            print 'got', text
+
+        def cancel():
+            print 'cancel'
+
+        uidialog.inputbox('Query?', 'defaultval', finish=finish, cancel=cancel)
 
     menu = ui.Menu()
 
@@ -136,6 +151,7 @@ def debug_menu():
     menu.add('Show features', show_features)
     menu.add('Cause exception', lambda: 1/0)
     menu.add('Test Market URL', lambda: uidialog.open_url('market://details?id=pl.org.zielinscy.freeciv'))
+    menu.add('Test inputbox', test_inputbox)
 
     ui.set(ui.ScrollWrapper(menu))
 

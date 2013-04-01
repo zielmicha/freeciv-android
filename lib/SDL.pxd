@@ -22,6 +22,7 @@ cdef extern from "SDL.h":
         SDLK_RIGHT
         SDLK_SPACE
         SDLK_ESCAPE
+        SDLK_BACKSPACE
         SDLK_AC_BACK
         SDLK_F1
         SDLK_a
@@ -265,10 +266,21 @@ cdef extern from "SDL.h":
         Uint8 state
         SDL_keysym keysym
 
+    ctypedef enum:
+        SDL_TEXTINPUTEVENT_TEXT_SIZE
+        SDL_TEXTEDITINGEVENT_TEXT_SIZE
+
     cdef struct SDL_TextEditingEvent:
-        pass
+        Uint32 type
+        Uint32 windowID
+        char text[SDL_TEXTEDITINGEVENT_TEXT_SIZE]
+        int start
+        int length
+
     cdef struct SDL_TextInputEvent:
-        pass
+        Uint32 type
+        Uint32 windowID
+        char text[SDL_TEXTINPUTEVENT_TEXT_SIZE]
     cdef struct SDL_MouseWheelEvent:
         Uint32 type
         Uint32 windowID
@@ -376,7 +388,8 @@ cdef extern from "SDL.h":
     cdef SDL_Surface * SDL_CreateRGBSurfaceFrom(void *pixels, int width, int height, int depth, int pitch, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
     cdef int SDL_Init(Uint32 flags)
     cdef void SDL_Quit()
-    cdef int SDL_EnableUNICODE(int enable)
+    cdef void SDL_StartTextInput()
+    cdef void SDL_StopTextInput()
     cdef Uint32 SDL_GetTicks()
     cdef void SDL_Delay(Uint32 ms)
     cdef int SDL_PollEvent(SDL_Event * event)
