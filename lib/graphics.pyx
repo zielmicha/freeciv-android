@@ -265,7 +265,8 @@ cdef object _translate_event(SDL_Event* ev):
         return Event(ev.type, pos=(ev.button.x, ev.button.y),
                      button=ev.button.button)
     elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
-        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym))
+        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym),
+                     unicode=unichr(ev.key.keysym.unicode))
     else:
         return Event(ev.type)
 

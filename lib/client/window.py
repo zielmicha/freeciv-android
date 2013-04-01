@@ -82,7 +82,7 @@ def init_screen():
     if osutil.is_desktop:
         # on Android android.pyx takes care of init
         graphics.init()
-        graphics.create_window((1280, 800), 32)
+        graphics.create_window((1280, 800))
 
     screen = graphics.get_window()
     surface = screen

@@ -12,5 +12,5 @@ As you probably won't find them in your disto, use http://www.libsdl.org/tmp/SDL
 Build and run on desktop (for debugging):
    make run
 
-Build for Android (doesn't work yet):
+Build for Android:
    make -C android debug
