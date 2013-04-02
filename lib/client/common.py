@@ -42,6 +42,7 @@ def get_sprite_dimensions(image):
 def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
     surf = graphics.create_surface(w, h)
     surf.blit(img, (0, 0), (x, y, w, h))
+    surf.filename = '%s[%d,%d,%d,%d]' % (img.filename, x, y, w, h)
     if mask:
         mask_sprite(surf, mask, x - mask_x, y - mask_y)
     return surf
@@ -65,8 +66,8 @@ def show_masking_progress():
         progress.draw_frame('masking sprites...', '%s/%s' % (mask_i, mask_number), mask_i / float(mask_number))
 
 def mask_sprite(surf, mask, mx, my):
-    show_masking_progress()
-    # todo
+    print surf, mask
+    surf.blit(mask, src=(mx, my) + surf.get_size(), blend=graphics.MODE_MOD)
 
 def py_mask_sprite(surf, mask, mx, my):
     if not DO_MASK:

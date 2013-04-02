@@ -54,6 +54,11 @@ cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
     cdef SDL_Surface* surf
     return (<Surface> item)._tex
 
+MODE_BLEND = SDL_BLENDMODE_BLEND
+MODE_MOD = SDL_BLENDMODE_MOD
+MODE_NONE = SDL_BLENDMODE_NONE
+MODE_ADD = SDL_BLENDMODE_ADD
+
 cdef class Surface(object):
     cdef SDL_Renderer* _sdl
     cdef SDL_Texture* _tex
@@ -81,7 +86,7 @@ cdef class Surface(object):
     def get_at(self, pos):
         pass
 
-    def blit(self, image, dest=(0, 0), src=None):
+    def blit(self, image, dest=(0, 0), src=None, blend=MODE_BLEND):
         cdef SDL_Rect srect, drect
         cdef SDL_Texture* blit_src
         self._set_target()
@@ -92,15 +97,18 @@ cdef class Surface(object):
         blit_src = _sdl_get_texture(self._sdl, image)
         srect = _make_rect(src)
         drect = _make_rect(dest)
+        SDL_SetTextureBlendMode(blit_src, blend)
         err = SDL_RenderCopy(self._sdl, blit_src, &srect, &drect)
         if err < 0:
             raise SDLError()
+        #self._filename = 'last blit was from %s' % (<Surface>image)._filename
         self._finish()
 
-    def draw_rect(self, color, rect, width=0):
+    def draw_rect(self, color, rect, width=0, blend=MODE_BLEND):
         self._set_target()
         r, g, b, a = _get_rgba(color)
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
+        SDL_SetRenderDrawBlendMode(self._sdl, blend)
         cdef SDL_Rect srect = _make_rect(rect)
         if width == 0:
             SDL_RenderFillRect(self._sdl, &srect)
@@ -108,10 +116,11 @@ cdef class Surface(object):
             SDL_RenderDrawRect(self._sdl, &srect)
         self._finish()
 
-    def fill(self, color=(128, 0, 128)):
+    def fill(self, color=(128, 0, 128), blend=MODE_BLEND):
         self._set_target()
         r, g, b, a = _get_rgba(color)
         SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
+        SDL_SetRenderDrawBlendMode(self._sdl, blend)
         SDL_RenderClear(self._sdl)
         self._finish()
 
@@ -134,6 +143,10 @@ cdef class Surface(object):
 
     def get_clip(self):
         return Rect((0, 0, 8000, 8000))
+
+    property filename:
+        def __set__(self, val): self._filename = val
+        def __get__(self): return self._filename
 
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
@@ -214,9 +227,8 @@ def create_surface(w, h, alpha=True):
                             SDL_TEXTUREACCESS_TARGET, min(max(1, w), MAX), min(max(1, h), MAX))
     if not tex:
         raise SDLError('create texture %dx%d' % (w, h))
-    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND)
     surf = _make_surface(_window._sdl, tex, (w, h))
-    surf.fill((0, 0, 0, 0))
+    surf.fill((0, 0, 0, 0), blend=MODE_NONE)
     return surf
 
 def get_screen_size():
@@ -244,15 +256,11 @@ def create_window(size):
     wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, 0)
     _window_handle = wnd
     renderer = SDL_CreateRenderer(wnd, -1, 0)
-    _prepare_renderer(renderer)
     if not renderer:
         raise SDLError()
     _window = _make_surface(renderer, NULL)
     _window._size = size
     return get_window()
-
-cdef _prepare_renderer(SDL_Renderer* renderer):
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND)
 
 def get_window():
     return _window
