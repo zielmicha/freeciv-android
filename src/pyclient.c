@@ -697,7 +697,7 @@ void py_server_main(PyObject* cmd) {
   }
 
   prctl(PR_SET_PDEATHSIG, SIGKILL);
-  if(result == 0) {
+  if(result != 0) {
     //
   } else {
     civserver_main(length + 1, cmdlist);
