@@ -609,7 +609,9 @@ class MapDrawer(object):
                 self.client.draw_map(self.map_cache, (0, 0))
                 rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
                                            self.map_cache.get_height() - self.user_corner[1])
-                cliptex.blit(scale_by(self.map_cache.suburface(rect), self.zoom), (pos[0], pos[1]))
+                #cliptex.blit(scale_by(self.map_cache.suburface(rect), self.zoom), (pos[0], pos[1]))
+                cliptex.blit(self.map_cache, src=rect,
+                             dest=(pos[0], pos[1], rect[2] * self.zoom, rect[3] * self.zoom))
         else:
             if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
@@ -629,7 +631,9 @@ class MapDrawer(object):
         #self.map_cache._pg.fill((100, 0, 100))
         self.client.draw_map(self.map_cache, (0, 0))
         if self.zoom != 1:
-            self.scaled_map_cache.blit(scale_by(self.map_cache, self.zoom), (0, 0))
+            self.scaled_map_cache.blit(self.map_cache, dest=(0, 0,
+                                                             self.map_cache.get_width() * self.zoom,
+                                                             self.map_cache.get_height() * self.zoom))
 
     def does_exceed(self):
         corner = (self.user_corner[0] * self.zoom, self.user_corner[1] * self.zoom)
@@ -650,7 +654,10 @@ class MapDrawer(object):
     def prepare_map_cache(self):
         w, h = self.widget_size
         size_mul = self.MAP_CACHE_SIZE * 2 + 1
-        size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
+        size = (size_mul * w / self.zoom, size_mul * h / self.zoom)
+        if size[0] > 2048: size = (2048, size[1] * 2048 / size[0])
+        if size[1] > 2048: size = (size[0] * 2048 / size[1], 2048)
+        size = (int(size[0]), int(size[1]))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
             self.map_cache = graphics.create_surface(size[0], size[1], alpha=False)
