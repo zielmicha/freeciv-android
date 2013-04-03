@@ -42,10 +42,12 @@ def get_sprite_dimensions(image):
 def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
     surf = graphics.create_surface(w, h)
     surf.blit(img, (0, 0), (x, y, w, h))
-    surf.filename = '%s[%d,%d,%d,%d]' % (img.filename, x, y, w, h)
+    surf.filename = '%s%s[%d,%d,%d,%d]' % (img.filename,
+                                           ',masked' if mask else '', x, y, w, h)
     if mask:
-        mask_sprite(surf, mask, x - mask_x, y - mask_y)
-    return surf
+        return mask_sprite(surf, mask, x - mask_x, y - mask_y)
+    else:
+        return surf
 
 mask_i = 0
 masking_shown = 0
@@ -66,26 +68,25 @@ def show_masking_progress():
         progress.draw_frame('masking sprites...', '%s/%s' % (mask_i, mask_number), mask_i / float(mask_number))
 
 def mask_sprite(surf, mask, mx, my):
-    print surf, mask
-    surf.blit(mask, src=(mx, my) + surf.get_size(), blend=graphics.MODE_MOD)
+    mask = get_white_mask(mask)
+    newsurf = graphics.create_surface(*surf.get_size())
+    newsurf.blit(surf)
+    newsurf.blit(mask, src=(mx, my) + surf.get_size(), blend=graphics.MODE_MOD)
+    return newsurf
 
-def py_mask_sprite(surf, mask, mx, my):
-    if not DO_MASK:
-        return
+mask_cache = {}
 
-    global mask_i
-    mask_i += 1
-    msg = 'masking %s' % mask_i
-    print msg + '\r',
-    sys.stdout.flush()
-
-    for x in xrange(surf.get_width()):
-        for y in xrange(surf.get_height()):
-            r, g, b, a = surf.get_at((x, y))
-            mrgba = mask.get_at((x + mx, y + my))
-            surf.set_at((x, y), (r, g, b, a * mrgba[3] / 255))
-
-    print '\r' + (' ' * len(msg)) + '\r',
+def get_white_mask(mask):
+    # HACK: SDL doesn't allow us to access raw pixel data of textures
+    # so load modified image from disk based on surface _filename
+    name, params = mask.filename[:-1].split('[', 1)
+    params = tuple(map(int, params.split(',')))
+    base, ext = name.split('.')
+    name = base + '_white.' + ext
+    if (name, params) not in mask_cache:
+        base_img = graphics.load_image(name)
+        mask_cache[name, params] = crop_sprite(base_img, *params)
+    return mask_cache[name, params]
 
 @freeciv.register
 def canvas_create(w, h):

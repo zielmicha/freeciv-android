@@ -9,7 +9,11 @@ cdef extern from "SDL.h":
     ctypedef unsigned short Uint16
 
     ctypedef enum:
+        SDL_PIXELFORMAT_BGRX8888
+        SDL_PIXELFORMAT_BGRX4444
         SDL_PIXELFORMAT_ARGB8888
+        SDL_PIXELFORMAT_ARGB4444
+        SDL_PIXELFORMAT_RGB888
         SDL_INIT_VIDEO
 
     ctypedef enum SDLMod:
@@ -367,6 +371,7 @@ cdef extern from "SDL.h":
     cdef void SDL_RenderPresent(SDL_Renderer * renderer)
     cdef int SDL_RenderDrawRect(SDL_Renderer * renderer, SDL_Rect * rect)
     cdef int SDL_RenderFillRect(SDL_Renderer * renderer, SDL_Rect * rect)
+    cdef int SDL_RenderDrawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2)
     cdef int SDL_FillRect(SDL_Surface * dst,  SDL_Rect* rect, Uint32 color)
     cdef Uint32 SDL_MapRGBA(SDL_PixelFormat* format, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
     cdef int SDL_UpdateTexture(SDL_Texture * texture, SDL_Rect* rect, void* pixels, int pitch)

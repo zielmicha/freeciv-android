@@ -830,12 +830,12 @@ class ScrollWrapper(object):
         if self.use_y:
             fy -= self.y
 
-        cliptex = graphics.create_surface(self.width, self.height)
+        cliptex = graphics.create_surface(*self.get_clip())
         self.item.draw(cliptex, (fx, fy))
         surf.blit(cliptex, pos)
 
-    def get_clip(self, pos):
-        return pos + self.size
+    def get_clip(self):
+        return self.size
 
     def tick(self):
         self.x += self.vx

@@ -465,7 +465,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            surf.gfx_rect((255, 255, 255, 170), pos + self._size, 0)
+            surf.draw_rect((255, 255, 255, 170), pos + self._size, 0, blend=graphics.MODE_NONE)
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
@@ -488,8 +488,8 @@ class ConsoleWidget(ui.LinearLayoutWidget):
                 ui.overlays.remove(self.scroll)
 
 class ConsoleScrollWrapper(ui.ScrollWrapper):
-    def get_clip(self, pos):
-        return pos + (self.item._size[0], self.size[1])
+    def get_clip(self):
+        return (self.item._size[0], self.size[1])
 
     def canceled_event(self, event):
         self.item.event(event)
@@ -653,7 +653,7 @@ class MapDrawer(object):
         size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
-            self.map_cache = graphics.create_surface(size[0], size[1])
+            self.map_cache = graphics.create_surface(size[0], size[1], alpha=False)
             if self.zoom != 1:
                 self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))

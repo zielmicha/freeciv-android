@@ -51,8 +51,8 @@ project/jni/SDL_ttf/Android.mk:
 project/jni/SDL_ttf/freetype: project/jni/SDL_ttf/Android.mk
 	git clone git://github.com/LuaDist/freetype.git project/jni/SDL_ttf/freetype
 
-project/jni/SDL/Android.mk:
-	./download-sdl.sh
+submodules: ../python4android/prepare.sh
+project/jni/SDL/Android.mk: submodules
 
 ../python4android/prepare.sh:
 	cd ..; git submodule init; git submodule update

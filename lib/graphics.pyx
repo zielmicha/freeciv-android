@@ -64,6 +64,7 @@ cdef class Surface(object):
     cdef SDL_Texture* _tex
     cdef object _size
     cdef object _filename
+    cdef int _alpha
 
     def _set_target(self):
         res = SDL_SetRenderTarget(self._sdl, self._tex)
@@ -124,8 +125,14 @@ cdef class Surface(object):
         SDL_RenderClear(self._sdl)
         self._finish()
 
-    def draw_line(self, color, start, end):
+    def draw_line(self, color, start, end, blend=MODE_BLEND):
         self._set_target()
+        r, g, b, a = _get_rgba(color)
+        SDL_SetRenderDrawColor(self._sdl, r, g, b, a)
+        SDL_SetRenderDrawBlendMode(self._sdl, blend)
+        x1, y1 = start
+        x2, y2 = end
+        SDL_RenderDrawLine(self._sdl, x1, y1, x2, y2)
         self._finish()
 
     def scale(self, size):
@@ -135,11 +142,11 @@ cdef class Surface(object):
         return dest
 
     def gfx_ellipse(self, color, rect, width):
-        pass
+        raise NotImplementedError
         #f(self._pg, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
 
-    def gfx_rect(self, color, rect, width):
-        self.draw_rect(color, rect, width)
+    def gfx_rect(self, color, rect, width, **kwargs):
+        self.draw_rect(color, rect, width, **kwargs)
 
     def get_clip(self):
         return Rect((0, 0, 8000, 8000))
@@ -227,8 +234,11 @@ def create_surface(w, h, alpha=True):
                             SDL_TEXTUREACCESS_TARGET, min(max(1, w), MAX), min(max(1, h), MAX))
     if not tex:
         raise SDLError('create texture %dx%d' % (w, h))
-    surf = _make_surface(_window._sdl, tex, (w, h))
-    surf.fill((0, 0, 0, 0), blend=MODE_NONE)
+    surf = _make_surface(_window._sdl, tex, (w, h), "created", alpha)
+    if alpha:
+        surf.fill((0, 0, 0, 0), blend=MODE_NONE)
+    else:
+        surf.fill((255, 0, 0, 255), blend=MODE_NONE)
     return surf
 
 def get_screen_size():
@@ -258,7 +268,7 @@ def create_window(size):
     renderer = SDL_CreateRenderer(wnd, -1, 0)
     if not renderer:
         raise SDLError()
-    _window = _make_surface(renderer, NULL)
+    _window = _make_surface(renderer, NULL, size, "window")
     _window._size = size
     return get_window()
 
@@ -332,12 +342,13 @@ cdef SDL_RWops* open_file(path):
 # CONSTRUCTORS
 
 cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex,
-                           _size=(0, 0), _filename=None):
+                           _size=(0, 0), _filename=None, _alpha=True):
     cdef Surface s = Surface()
     s._sdl = renderer
     s._tex = tex
     s._size = _size
     s._filename = _filename
+    s._alpha = _alpha
     return s
 
 cdef SDL_Rect _make_rect(t) except *:
