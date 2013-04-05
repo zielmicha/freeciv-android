@@ -19,7 +19,7 @@ import features
 import functools
 import graphics
 
-from client import freeciv
+from freeciv.client import _freeciv as freeciv
 
 features.add_feature('app.new_joystick', default=None, type=bool)
 features.add_feature('app.joystick', default=None)

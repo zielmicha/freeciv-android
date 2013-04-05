@@ -29,7 +29,7 @@ import subprocess
 import atexit
 import sys
 
-from client import freeciv
+from freeciv.client import _freeciv as freeciv
 
 from monitor import get_save_dir
 

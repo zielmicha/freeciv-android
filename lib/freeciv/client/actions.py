@@ -10,9 +10,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import freeciv
-
-import client
+from freeciv.client import _freeciv as freeciv
+from freeciv import client
 
 ACTIVITY_IDLE = 0
 ACTIVITY_POLLUTION = 1
@@ -64,10 +63,10 @@ action_names = {
 class Unit(object):
     def __init__(self, handle):
         self.handle = handle
-    
+
     def get_properties(self):
         return freeciv.func.get_unit_properties(self.handle)
-    
+
     def iter_actions(self):
         id, tileid, city, terrain_name = self.get_properties()
 
@@ -76,35 +75,35 @@ class Unit(object):
         yield ACTIVITY_DISBAND
         yield ACTIVITY_WAIT
         yield ACTIVITY_DONE
-        
+
         if freeciv.func.unit_can_add_or_build_city(id):
             if city:
                 yield ACTIVITY_ADD_TO_CITY
             else:
                 yield ACTIVITY_BUILD_CITY
-        
+
         if freeciv.func.unit_can_help_build_wonder_here(id):
             yield ACTIVITY_HELP_BUILD_WONDER
-        
+
         if freeciv.func.can_unit_paradrop(id):
             yield ACTIVITY_PARADROP
-        
+
         if freeciv.func.can_unit_change_homecity(id):
             yield ACTIVITY_CHANGE_HOMECITY
-        
+
         # TODO: unload transporter
-        
+
         #if freeciv.func.units_can_load(id):
         #    yield ACTIVITY_LOAD
         #
         #if freeciv.func.units_can_unload(id):
         #    yield ACTIVITY_UNLOAD
-        
+
         # TODO: wakup others
         # TODO: autosettlers
         # TODO: nuke
         # TODO: airlift
-        
+
 #        /common/unit.h:21:#include "base.h"
 #./common/unit.h:122:  Base_type_id base;            /* Only valid for activity ACTIVITY_BASE */
 #./common/unit.h:150:  Base_type_id           activity_base;
@@ -130,10 +129,10 @@ class Unit(object):
 
         if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
             yield ACTIVITY_AIRBASE
-        
+
         if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_FORTRESS):
             yield ACTIVITY_FORTRESS
-        
+
         standard_activities = [
             ACTIVITY_RAILROAD,
             ACTIVITY_ROAD,
@@ -147,44 +146,44 @@ class Unit(object):
             ACTIVITY_PILLAGE,
             ACTIVITY_EXPLORE
         ]
-        
+
         for a_ident in standard_activities:
             if freeciv.func.can_unit_do_activity(id, a_ident):
                 yield a_ident
-    
+
     def get_actions(self):
         return [ (ident, self.get_action_name(ident), self.get_action_time(ident)) for ident in self.iter_actions() ]
-    
+
     def get_action_time(self, type):
         if type > 1000:
             return 0
         else:
             return freeciv.func.tile_activity_time(type, self.get_tile())
-    
+
     def get_action_name(self, type):
         def_name = activity_names[type][len('ACTIVITY_'):].lower().replace('_', ' ')
         if def_name in action_names:
             return action_names[def_name]
         return def_name
-    
+
     def get_tile(self):
         id, tileid, city, terrain_name = self.get_properties()
         return tileid
-    
+
     def get_terrain_name(self):
         id, tileid, city, terrain_name = self.get_properties()
         return terrain_name
-    
+
     def get_name(self):
         return freeciv.func.get_unit_name(self.handle)
-    
+
     def get_image(self):
         return freeciv.func.get_unit_image(self.handle)
-    
+
     def focus(self):
         freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
         freeciv.func.set_unit_focus(self.handle)
-    
+
     def perform_activity(self, ident):
         # Warning! Safe to use only when `self` is in focus.
         id, tileid, city, terrain_name = self.get_properties()

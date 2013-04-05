@@ -22,7 +22,6 @@ import traceback
 import time
 import thread
 
-import progress
 import save
 import osutil
 import uidialog

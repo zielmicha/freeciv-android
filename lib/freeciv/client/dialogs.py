@@ -10,12 +10,15 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import freeciv
-import client
-import uidialog
+import freeciv.client, sys
+freeciv.client = sys.modules['freeciv.client'] # hack?
+from freeciv import client
+from freeciv import uidialog
 
 import city
 import actions
+
+from freeciv.client import _freeciv as freeciv
 
 client_page = 0
 

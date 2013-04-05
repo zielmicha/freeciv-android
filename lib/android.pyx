@@ -49,7 +49,7 @@ def main():
     init_screen()
     unpack_res()
     os.chdir(get_internal_storage())
-    import main
+    from freeciv import main
     main.main()
 
 def init_screen():

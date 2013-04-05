@@ -11,13 +11,12 @@
 # GNU General Public License for more details.
 
 import graphics
-import freeciv
+from freeciv.client import _freeciv as freeciv
 import window
 import sys
-import progress
 import time
-import features
-import osutil
+from freeciv import features
+from freeciv import osutil
 
 DO_MASK = False
 
@@ -54,18 +53,6 @@ masking_shown = 0
 
 mask_numbers = [652, 270]
 mask_stage = 0
-
-def show_masking_progress():
-    global masking_shown, mask_i, mask_stage
-    mask_i += 1
-    if mask_i > mask_numbers[mask_stage]:
-        mask_i -= mask_numbers[mask_stage]
-        if mask_stage + 1 < len(mask_numbers):
-            mask_stage += 1
-    mask_number = mask_numbers[mask_stage]
-    if (time.time() - 0.1) > masking_shown:
-        masking_shown = time.time()
-        progress.draw_frame('masking sprites...', '%s/%s' % (mask_i, mask_number), mask_i / float(mask_number))
 
 def mask_sprite(surf, mask, mx, my):
     mask = get_white_mask(mask)

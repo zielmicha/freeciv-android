@@ -5,9 +5,9 @@ mkdir -p $A
 mkdir $A/lib
 mkdir $A/lib/python2.7
 echo > $A/lib/python2.7/site.py
-cp ../lib/*.py $A/lib/python2.7
-mkdir $A/lib/python2.7/client
-cp ../lib/client/*.py $A/lib/python2.7/client
+mkdir -p $A/lib/python2.7/freeciv/client
+cp ../lib/freeciv/*.py $A/lib/python2.7/freeciv
+cp ../lib/freeciv/client/*.py $A/lib/python2.7/freeciv/client
 echo 'array = str' > $A/lib/python2.7/array.py
 STDMODULES="shutil stat os posixpath traceback linecache
 types posixpath genericpath warnings fnmatch collections

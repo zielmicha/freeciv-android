@@ -11,12 +11,12 @@
 # GNU General Public License for more details.
 
 import graphics
-import freeciv
-import features
+from freeciv.client import _freeciv as freeciv
+from freeciv import features
+from freeciv import osutil
+from freeciv import client
 
-import osutil
 import common
-import client
 
 @freeciv.register
 def get_overview_window():

@@ -11,14 +11,16 @@
 # GNU General Public License for more details.
 
 import select
-import graphics
 import time
+import graphics
 
-import progress
-import monitor
-import features
+import freeciv.client
 
-import freeciv
+from freeciv import progress
+from freeciv import monitor
+from freeciv import features
+
+from freeciv.client import _freeciv as freeciv
 
 import dialogs
 import common
@@ -40,7 +42,6 @@ class ConnectionError(Exception):
 
 @freeciv.register
 def ui_main():
-    progress.draw_frame('', 'loading tileset...', 1)
     freeciv.func.init_things()
     freeciv.func.init_mapcanvas_and_overview()
     main()

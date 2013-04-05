@@ -13,7 +13,7 @@
 Callbacks that do nothing.
 '''
 
-import freeciv
+from freeciv.client import _freeciv as freeciv
 
 @freeciv.register
 def get_gui_specific_themes_directories():
