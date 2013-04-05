@@ -26,6 +26,10 @@ import os
 import gzip
 import features
 import subprocess
+import atexit
+import sys
+
+from client import freeciv
 
 from monitor import get_save_dir
 
@@ -67,7 +71,10 @@ class ServerGUI(ui.LinearLayoutWidget):
         client.client.chat('/set pingtimeout 1800')
 
         self.pick_nation_button = ui.Button('...', self.pick_nation)
-        self.set_leader_name_button = ui.Button('...', self.set_leader_name)
+        self.set_leader_name_button = ui.Button('...',
+                                                lambda:
+                                                uidialog.inputbox('What will be your name?',
+                                                                  finish=self.set_leader_name))
         self.difficulty_button = ui.Button('...', self.set_difficulty)
 
         self.add(ui.Button('Start game!', start_client))
@@ -76,11 +83,17 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.add(self.difficulty_button)
         self.add(ui.Button('Server command', server_command_dialog))
 
-        self.aicount_button = ui.Button('...', self.set_aicount)
+        self.aicount_button = ui.Button('...',
+                                        lambda:
+                                        uidialog.inputbox('How many computer enemies will you fight?',
+                                                          finish=self.set_aicount))
         self.set_aicount(4)
         self.add(self.aicount_button)
 
-        self.mapsize_button = ui.Button('...', self.set_mapsize)
+        self.mapsize_button = ui.Button('...',
+                                        lambda:
+                                        uidialog.inputbox('How large your map will be? (1-20)',
+                                                          finish=self.set_mapsize))
         self.set_mapsize(5)
         self.add(self.mapsize_button)
 
@@ -102,8 +115,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         client.client.disconnect()
         ui.back(allow_override=False)
 
-    def set_leader_name(self):
-        name = uidialog.inputbox('What will be your name?')
+    def set_leader_name(self, name):
         if name:
             self.leader_name = name
             self.set_nation_settings()
@@ -120,7 +132,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.difficulty_button.set_text('Difficulty: %s' % self.difficulty)
 
     def set_aicount(self, val=None):
-        cmd = val or uidialog.inputbox('How many computer enemies will you fight?')
+        cmd = val
         try:
             count = int(cmd)
             client.client.chat('/set aifill %d' % (count + 1))
@@ -129,7 +141,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             pass
 
     def set_mapsize(self, val=None):
-        cmd = val or uidialog.inputbox('How large your map will be? (1-20)')
+        cmd = val
         try:
             count = int(cmd)
             if count < 1 or count > 20:
@@ -171,10 +183,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         ui.set_dialog(nations, scroll=True)
 
 def server_command_dialog():
-    cmd = uidialog.inputbox('Command')
-    if cmd:
-        print cmd
-        client.client.chat(cmd)
+    uidialog.inputbox('Command', finish=client.client.chat)
 
 def load_scenario():
     menu = ui.LinearLayoutWidget()
@@ -276,34 +285,16 @@ def start_client():
 
 def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
     thread.start_new_thread(server_loop, (port, args, line_callback, quit_on_disconnect))
-    time.sleep(0.3)
+    time.sleep(0.4)
 
 def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
-    if osutil.is_android:
-        serverpath = os.path.join(os.path.dirname(client.freeciv.freecivclient.__file__), 'freecivserver')
-    else:
-        serverpath = 'server/freeciv-server'
+    assert quit_on_disconnect
     args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
-    print 'starting server - executable at', serverpath
-    stat = os.stat(serverpath)
-    try:
-        os.chmod(serverpath, 0o744) # octal!!!!
-    except OSError as err:
-        print 'chmodding server failed', err
-    piddir = get_save_dir()
-    cmd = (serverpath, ) + args
-    if osutil.is_desktop:
-        os.environ['LD_PRELOAD'] = ''
-    if quit_on_disconnect:
-        os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
-    else:
-        del os.environ['FREECIV_QUIT_ON_DISCONNECT']
-    print cmd
-    serv_in, stream = os.popen4(cmd, bufsize=1) # line buffering
 
-    p = subprocess.Popen(cmd, bufsize=1,
-          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
-    stream = p.stdout
+    piddir = get_save_dir()
+    print 'server args', args
+
+    stream = zygote_start_server(args)
 
     while True:
         line = stream.readline()
@@ -311,4 +302,36 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
             break
         if line_callback:
             line_callback(line)
-        monitor.log('server', line.rstrip())
+        print 'server:', line.rstrip()
+
+def start_zygote():
+    global zygote_cmd_pipe, zygote_console_pipe
+    cmd_pipe_fd, zygote_cmd_pipe_fd = os.pipe()
+    zygote_console_pipe_fd, console_pipe_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        zygote_main(os.fdopen(cmd_pipe_fd, 'r', 0),
+                    os.fdopen(console_pipe_fd, 'w', 0))
+    else:
+        print 'zygote spawned as', pid
+        atexit.register(os.kill, pid, 9) # no mercy!
+        zygote_cmd_pipe = os.fdopen(zygote_cmd_pipe_fd, 'w', 0)
+        zygote_console_pipe = os.fdopen(zygote_console_pipe_fd, 'r', 0)
+
+def zygote_start_server(cmd):
+    zygote_cmd_pipe.write('\0'.join(cmd) + '\n')
+    return zygote_console_pipe
+
+def zygote_main(cmd_pipe, console_pipe):
+    os.environ['FREECIV_QUIT_ON_DISCONNECT'] = 'true'
+    os.dup2(console_pipe.fileno(), 0)
+    os.dup2(console_pipe.fileno(), 1)
+    while True:
+        cmd = cmd_pipe.readline()
+        if not cmd:
+            print >>sys.stderr, 'zygote: exiting'
+            return
+        cmd = cmd.rstrip('\n')
+        print >>sys.stderr, 'zygote: starting server', ' '.join(cmd.split('\0'))
+        freeciv.func.py_server_main(cmd.split('\0'))
+        print >>sys.stderr, 'zygote: server forked'

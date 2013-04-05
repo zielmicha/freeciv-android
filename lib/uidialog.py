@@ -12,33 +12,53 @@
 
 import osutil
 import time
+import ui
+import graphics
 
 if osutil.is_desktop:
-    import easygui
     import webbrowser
-    
-    def inputbox(text, default=''):
-        return easygui.enterbox(text, default=default)
-        
+
     def open_url(url):
         webbrowser.open_new_tab(url)
-    
 elif osutil.is_android:
-    import pyjni
-    
-    def inputbox(text, default='', title=''):
-        pyjni.make_input_dialog(title, text, default)
-        
-        while True:
-            data = pyjni.get_dialog_retval()
-            if data:
-                n, rest = data.split(':', 1)
-                print 'inputbox got:', rest
-                if n == 'ok':
-                    return rest
-                else:
-                    return None
-            time.sleep(0.1)
-    
     def open_url(url):
-        pyjni.open_intent("android.intent.action.VIEW", url)
+        raise NotImplementedError
+        #pyjni.open_intent("android.intent.action.VIEW", url)
+
+def inputbox(text, default='', finish=None, cancel=None):
+    def _finish():
+        if text.label:
+            graphics.stop_text_input()
+            finish(text.label)
+            ui.back(allow_override=False)
+        else:
+            _cancel()
+
+    def reset():
+        text.set_text('')
+
+    def _cancel():
+        graphics.stop_text_input()
+        if cancel: cancel()
+        ui.back(allow_override=False)
+
+    graphics.start_text_input()
+    container = ui.LinearLayoutWidget()
+    container.back = _cancel
+    container.add(ui.Label('%s' % text))
+    text = InputBox(default)
+    container.add(text)
+    container.focus = text
+    panel = ui.HorizontalLayoutWidget(spacing=10)
+    panel.add(ui.Button('OK', _finish))
+    panel.add(ui.Button('Reset', reset))
+    container.add(panel)
+    ui.set(container)
+
+class InputBox(ui.Label):
+    def event(self, ev):
+        if ev.type == graphics.const.TEXTINPUT:
+            self.set_text(self.label + ev.text)
+        elif ev.type == graphics.const.KEYDOWN:
+            if ev.key == graphics.const.K_BACKSPACE:
+                self.set_text(self.label[:-1])

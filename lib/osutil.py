@@ -12,57 +12,44 @@
 
 import os
 import sys
-import pygame
+import graphics
 import time
 import features
+from graphics import sdl_open as open_res
 
 features.add_feature("app.disable_android_pause", type=bool, default=False)
 
 try:
     import android
-    import pyjni
 except ImportError:
     android = None
+else:
+    from android import get_internal_storage
 
 is_android = bool(android)
 is_desktop = not is_android
 
 def init():
     if android:
-        android.init()
-        android.map_key(android.KEYCODE_BACK, pygame.K_ESCAPE)
-        android.map_key(android.KEYCODE_MENU, pygame.K_F1)
+        android.map_key(android.KEYCODE_BACK, graphics.const.K_ESCAPE)
+        android.map_key(android.KEYCODE_MENU, graphics.const.K_F1)
 
 def get_android_data(append=''):
-    chdir = os.getcwd()
-    if chdir.startswith('/sdcard/'):
-        chdir = chdir[len('/sdcard/'):]
-    if chdir.startswith('/mnt/sdcard/'):
-        chdir = chdir[len('/mnt/sdcard/'):]
-    if chdir.endswith('/'):
-        chdir = chdir[:-1]
-    id = chdir
-    return '/data/data/%s/%s' % (id, append)
+    return get_internal_storage() + '/' + append
+
+def get_external_storage():
+    ident = get_internal_storage().strip('/').split('/')[-2]
+    return '/mnt/sdcard/' + ident
 
 def is_paused():
-    if is_android:
-        if features.get("app.disable_android_pause"):
-            return False
-        else:
-            return android.check_pause()
-    else:
-        return sig_state == PAUSED
+    return False
 
 def wait_for_resume():
-    if is_android:
-        android.wait_for_resume()
-    else:
-        while sig_state == PAUSED:
-            time.sleep(0.3)
+    pass
 
 def get_android_version():
     if is_android:
-        return pyjni.get_android_version()
+        return 999 # TODO
     else:
         return None
 
@@ -88,24 +75,3 @@ version_map = {
 
 def get_android_version_info():
     return version_map.get(get_android_version(), ('unknown', ''))
-
-if is_desktop:
-    import signal
-    
-    print 'PID for pausing is', os.getpid()
-    
-    PAUSED = 1
-    NOT_PAUSED = 0
-    
-    sig_state = NOT_PAUSED
-    
-    def _sig_pause(a, b):
-        global sig_state
-        sig_state = PAUSED
-    
-    def _sig_unpause(a, b):
-        global sig_state
-        sig_state = NOT_PAUSED
-    
-    signal.signal(signal.SIGUSR1, _sig_pause)
-    signal.signal(signal.SIGUSR2, _sig_unpause)

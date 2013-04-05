@@ -52,3 +52,4 @@ PyObject* py_mapper_message(struct message* s);
 void* py_alloc_struct(PyObject* stru);
 void py_setup_callglue();
 
+PyObject* py_get_pyobject(void* stru);

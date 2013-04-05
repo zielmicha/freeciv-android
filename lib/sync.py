@@ -17,23 +17,11 @@ import traceback
 import functools
 import features
 
+import osutil
 import civsync
 import ui
 import uidialog
 import save
-
-try:
-    import lzma
-except:
-    import pyjni
-
-    class lzma:
-        def decompress(self, data):
-            return pyjni.encode_or_decode_xz(1, data)
-
-        def compress(self, data):
-            return pyjni.encode_or_decode_xz(0, data)
-    lzma = lzma()
 
 def apply_host_change(host):
     print 'using civsync host', host
@@ -45,7 +33,7 @@ def apply_user_agent_change(ua):
     civsync.USER_AGENT = ua
 
 features.set_applier('civsync.ua', apply_user_agent_change)
-features.set('civsync.ua', 'CivSyncAndroid/1019')
+features.set('civsync.ua', 'CivSyncAndroid/1100')
 features.add_feature('civsync.enable', False, type=bool)
 
 session = None

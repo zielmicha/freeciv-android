@@ -54,18 +54,9 @@ def meswin_dialog_is_open():
 
 @freeciv.register
 def popup_newcity_dialog(unit, default_name):
-    text = uidialog.inputbox('What should we call our new city?', default_name)
-    while text:
-        try:
-            text.encode('ascii')
-        except UnicodeError:
-            text = uidialog.inputbox('Please use only latin characters!', default_name)
-        else:
-            break
-    if text:
-        freeciv.func.finish_city_at_unit(unit, text)
-    else:
-        freeciv.func.cancel_city_at_unit(unit)
+    uidialog.inputbox('What should we call our new city?', default_name,
+                      finish=lambda text: freeciv.func.finish_city_at_unit(unit, text),
+                      cancel=lambda: freeciv.func.cancel_city_at_unit(unit))
 
 @freeciv.register
 def popup_unit_select_dialog(tile):

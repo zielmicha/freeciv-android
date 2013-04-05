@@ -2,22 +2,12 @@ It includes Freeciv 2.3.1
 
 If you don't need to change source code and don't need latest version simply download APK from http://civ.zielm.com
 
-== DEPENDENCIES ==
-Building Freeciv for Android is currently only possible on Linux. On Ubuntu/Debian you need:
-   sudo apt-get install python-lzma python-tk python-pygame zlib1g-dev python2.7-dev
+== INSTALLATION ==
 
-Then configure:
-   bash ./build.sh
+Running Freeciv on desktop requires SDL2 with modified alpha blending from http://github.com/zielmicha/SDL2. You also need SDL2_image and SDL2_ttf (from http://hg.libsdl.org/SDL_image/ and http://hg.libsdl.org/SDL_ttf/).
 
-Build Freeciv for Android to run on desktop (for debugging):
-   make -Csrc
-   make -Cserver
+Build and run on desktop (for debugging):
+   make run
 
-And run:
-   python main.py
-
-Build Freeciv for Android for Android:
-   android/debug.sh
-
-APK which you can install on your device will be android/build/apk/FreecivDebug-0.9.0-debug.apk
-
+Build for Android:
+   make -C android debug

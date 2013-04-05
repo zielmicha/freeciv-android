@@ -1,0 +1,8 @@
+/local.properties
+/bin
+/gen
+/obj
+/jni/python
+/jni/SDL_image
+/jni/SDL_ttf
+/jni/freeciv

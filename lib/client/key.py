@@ -11,36 +11,36 @@
 # GNU General Public License for more details.
 
 import freeciv
-import pygame
+import graphics
 
 import actions
 
 dirkeymap = {
-    pygame.K_UP: freeciv.const.DIR8_NORTH,
-    pygame.K_RIGHT: freeciv.const.DIR8_EAST,
-    pygame.K_LEFT: freeciv.const.DIR8_WEST,
-    pygame.K_DOWN: freeciv.const.DIR8_SOUTH,
+    graphics.const.K_UP: freeciv.const.DIR8_NORTH,
+    graphics.const.K_RIGHT: freeciv.const.DIR8_EAST,
+    graphics.const.K_LEFT: freeciv.const.DIR8_WEST,
+    graphics.const.K_DOWN: freeciv.const.DIR8_SOUTH,
 }
 
 keymap = {
-    pygame.K_g: [actions.ACTIVITY_GOTO],
-    pygame.K_b: [actions.ACTIVITY_BUILD_CITY, actions.ACTIVITY_ADD_TO_CITY],
-    pygame.K_r: [actions.ACTIVITY_ROAD, actions.ACTIVITY_RAILROAD],
-    pygame.K_m: [actions.ACTIVITY_MINE],
-    pygame.K_i: [actions.ACTIVITY_IRRIGATE, ], # FARMLAND?
-    pygame.K_o: [actions.ACTIVITY_TRANSFORM],
-    pygame.K_f: [actions.ACTIVITY_FORTIFYING, actions.ACTIVITY_FORTRESS, actions.ACTIVITY_FORTIFYING],
-    pygame.K_SPACE: [actions.ACTIVITY_DONE],
+    graphics.const.K_g: [actions.ACTIVITY_GOTO],
+    graphics.const.K_b: [actions.ACTIVITY_BUILD_CITY, actions.ACTIVITY_ADD_TO_CITY],
+    graphics.const.K_r: [actions.ACTIVITY_ROAD, actions.ACTIVITY_RAILROAD],
+    graphics.const.K_m: [actions.ACTIVITY_MINE],
+    graphics.const.K_i: [actions.ACTIVITY_IRRIGATE, ], # FARMLAND?
+    graphics.const.K_o: [actions.ACTIVITY_TRANSFORM],
+    graphics.const.K_f: [actions.ACTIVITY_FORTIFYING, actions.ACTIVITY_FORTRESS, actions.ACTIVITY_FORTIFYING],
+    graphics.const.K_SPACE: [actions.ACTIVITY_DONE],
 }
 
 def key(type, key):
     unit = actions.get_unit_in_focus()
-    
-    if type == pygame.KEYDOWN:
+
+    if type == graphics.const.KEYDOWN:
         if key in dirkeymap:
             direction = dirkeymap[key]
             freeciv.func.key_unit_move_direction(direction)
-        if key == pygame.K_ESCAPE:
+        if key == graphics.const.K_ESCAPE:
             freeciv.func.key_cancel_action()
         if unit:
             available = set(unit.iter_actions())
@@ -49,4 +49,3 @@ def key(type, key):
                 for activity in activities:
                     if activity in available:
                         unit.perform_activity(activity)
-

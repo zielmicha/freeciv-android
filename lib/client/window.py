@@ -10,11 +10,9 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import pygame
+import graphics
 import freeciv
 import features
-
-features.add_feature('ui.fake_max_size')
 
 import osutil
 import common
@@ -40,7 +38,7 @@ def get_overview_area_dimensions():
 def overview_size_changed():
     global overview_surface
     w, h = freeciv.get_overview_size()
-    overview_surface = pygame.Surface((w, h))
+    overview_surface = graphics.create_surface(w, h)
     client.client.overview_size_changed(w, h)
 
 @freeciv.register
@@ -69,11 +67,7 @@ def update_overview_scroll_window_pos(x, y):
 
 @freeciv.register
 def update_mouse_cursor(cursor):
-    #pygame.mouse.set_cursor((8,8),(0,0),(0,0,0,0,0,0,0,0),(0,0,0,0,0,0,0,0))
-    #pygame.mouse.set_visible(False)
-    global current_cursor
-    i = cursor_names.get(cursor, 'CURSOR_DEFAULT')
-    current_cursor = cursors[cursor_mapping.get(i, 0)]
+    pass
 
 mouse_pos = (0, 0)
 
@@ -82,63 +76,17 @@ def create_line_at_mouse_pos():
     client.client.draw_patrol_lines = True
     freeciv.func.update_line(*mouse_pos)
 
-def load_cursors():
-    gfx = common.load_gfxfile('data/misc/cursors.png')
-    cursor = []
-    for i in xrange(10):
-        x = i * 33 + 1
-        w = 32
-        y = 1
-        h = 32
-        cursor.append(common.crop_sprite(gfx, x, y, w, h, None, 0, 0))
-    return cursor
+def init_screen():
+    global screen, surface, overview_surface
 
-def draw_cursor(pos):
-    if not current_cursor:
-        return
-    #x, y = pos
-    #w, h = current_cursor.get_size()
-    #screen.blit(current_cursor, (x - w/2, y - h/2))
+    if osutil.is_desktop:
+        # on Android android.pyx takes care of init
+        graphics.init()
+        graphics.create_window((1280, 800))
 
-current_cursor = None
-cursor_mapping = {}
-
-def init_screen(size=None):
-    def _get_max_size():
-        fake = features.get('ui.fake_max_size')
-        if fake:
-            return map(int, fake.split(','))
-        else:
-            return pygame.display.Info().current_w, pygame.display.Info().current_h
-
-    def _get_request_size(max_size):
-        if osutil.is_desktop and not features.get('ui.fake_max_size'):
-            return (1280, 800)
-        else:
-            w, h = max_size
-            MAX_W = 1000
-            if w > MAX_W:
-                scale = h / float(w)
-                size = (MAX_W, int(MAX_W * scale))
-            else:
-                size = (w, h)
-            return size
-
-    global screen, surface, overview_surface, cursors, cursor_names
-    pygame.display.init()
-    if not size:
-        max_size = _get_max_size()
-        ask_for_size = _get_request_size(max_size)
-        print 'screen size: max =', max_size, 'ask =', ask_for_size
-    else:
-        ask_for_size = size
-        print 'explicit size:', ask_for_size
-    screen = pygame.display.set_mode(ask_for_size, 0, 32) #((800, 480), 0, 32)
-    pygame.display.set_caption("touchciv")
+    screen = graphics.get_window()
     surface = screen
 
 def init():
-    global screen, surface, overview_surface, cursors, cursor_names
-    overview_surface = pygame.Surface((200, 200))
-    cursors = load_cursors()
-    cursor_names = dict([ (getattr(freeciv.const, name), name) for name in dir(freeciv.const) if name.startswith('CURSOR_') ])
+    global screen, surface, overview_surface
+    overview_surface = graphics.create_surface(200, 200)

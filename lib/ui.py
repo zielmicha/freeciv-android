@@ -10,16 +10,16 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import pygame
-import pygame.gfxdraw
 import time
 import traceback
+import graphics
 
-import uidialog
+import graphics
 import functools
 import features
 import osutil
 import os
+import sys
 
 history = []
 screen = None
@@ -118,17 +118,14 @@ class Dialog(object):
 
     def draw(self, surf, pos):
         self.screen.draw(surf, pos)
-        #pygame.gfxdraw.box(surf, (0, 0) + screen_size, (255, 255, 255, 100))
 
         x, y = self.get_pos()
         size = self.item.size
         spacing = 5
         rect = (x + pos[0] - spacing, y + pos[1] - spacing, size[0] + spacing*2, size[1] + spacing*2)
 
-        #pygame.draw.rect(surf, (255, 255, 255), rect)
         round_rect(surf, (255, 255, 255), (0, 0, 0), rect, 10)
         self.item.draw(surf, (x + pos[0], y + pos[1]))
-        #pygame.draw.rect(surf, (0, 0, 0), rect, 1)
 
     def get_pos(self):
         size = self.item.size
@@ -223,16 +220,13 @@ def set_fill_image(image):
     global _fill_image, _fill_image_not_resized
 
     _fill_image_not_resized = image
-    if image:
-        _fill_image = pygame.transform.smoothscale(image, pygame.display.get_surface().get_size())
-    else:
-        _fill_image = None
+    _fill_image = image
 
 def fill(surf, rect, screen=None):
-    if not _fill_image:
-        surf.fill((255, 255, 255), rect + (screen_size if (screen_size and screen_size[0]) else pygame.display.get_surface().get_size()))
-    else:
-        surf.blit(_fill_image, rect)
+    surf.fill((200, 200, 200, 255))
+    if _fill_image:
+        size = graphics.get_window().get_size()
+        surf.blit(_fill_image, dest=(rect[0], rect[1], size[0], size[1]))
 
 LOCK_MOUSE_EVENT = object() # constant
 
@@ -277,7 +271,7 @@ class LayoutWidget(object):
                         self._call_unhover(self.last_hovered)
                         self.last_hovered = None
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.type == graphics.const.MOUSEBUTTONDOWN:
                         if result == LOCK_MOUSE_EVENT:
                             self.holds_mouse = item
                             self.holds_mouse_pos = itempos
@@ -286,7 +280,7 @@ class LayoutWidget(object):
                     handled = True
                     break
 
-            if event.type == pygame.MOUSEBUTTONUP:
+            if event.type == graphics.const.MOUSEBUTTONUP:
                 self.holds_mouse = None
 
             if not handled:
@@ -337,16 +331,16 @@ class LayoutWidget(object):
             item.draw(surf, _addpoints(pos, itempos))
 
     def draw_clipped(self, surf, pos, rect):
-        last_clip = surf.get_clip()
-        rect = pygame.Rect(rect)
-        surf.set_clip(rect)
+        rect = graphics.Rect(rect)
+        cliptex = graphics.create_surface(rect[2], rect[3])
+        relpos = _subpoints(pos, (rect[0], rect[1]))
         self.positions = list(self.get_positions())
 
         for itempos, item in zip(self.positions, self.items):
             bpos = itempos[0] + pos[0], itempos[1] + pos[1]
-            if rect.colliderect((bpos, item.size)):
-                item.draw(surf, _addpoints(pos, itempos))
-        surf.set_clip(last_clip)
+            item.draw(cliptex, _addpoints(relpos, itempos))
+
+        surf.blit(cliptex, (rect[0], rect[1]))
 
 def _addpoints(a, b):
     return a[0] + b[0], a[1] + b[1]
@@ -360,7 +354,7 @@ def render_text(font, text, color=(0, 0, 0)):
         renders = [ font.render(line, True, color) for line in lines ]
         w = max( render.get_width() for render in renders )
         h = sum( render.get_height() for render in renders )
-        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        surf = graphics.create_surface(w, h)
         y = 0
         for render in renders:
             surf.blit(render, (0, y))
@@ -474,13 +468,15 @@ class Bordered(LinearLayoutWidget):
             return self._size
 
     def draw(self, surf, pos):
-        pygame.draw.rect(surf, (0, 0, 0), pos + self.size, 1)
+        surf.draw_rect((0, 0, 0), pos + self.size, 1)
         LinearLayoutWidget.draw(self, surf, pos)
 
 def back(allow_override=True, anim=True):
     if allow_override and hasattr(screen, 'back'):
         screen.back()
     elif not history:
+        if hasattr(sys, 'exitfunc'):
+            sys.exitfunc()
         os._exit(0)
     else:
         new_screen = history.pop()
@@ -491,46 +487,9 @@ def back(allow_override=True, anim=True):
 
 FPS = 15
 
-autoscale_enabled = False
-autoscale_scale = 1
-
 def add_overlay(overlay, pos):
     overlay.pos = pos
     overlays.append(overlay)
-
-def set_autoscale(surf):
-    global autoscale_enabled, _fill_image, autoscale_scale
-    autoscale_enabled = True
-
-    h = surf.get_height() * 800 / surf.get_width()
-    autoscale_scale = 800.0 / surf.get_width()
-
-    if _fill_image:
-        _fill_image = pygame.transform.smoothscale(_fill_image_not_resized, (800, h))
-
-    dest = pygame.Surface((800, h))
-
-    return dest
-
-def autoscale_flip(surf):
-    display = pygame.display.get_surface()
-    pygame.transform.smoothscale(surf, display.get_size(), display)
-    pygame.display.flip()
-
-def flip(surf):
-    if autoscale_enabled:
-        autoscale_flip(surf)
-    else:
-        pygame.display.flip()
-
-def maybe_set_autoscale(surf):
-    if surf.get_width() < 600:
-        return set_autoscale(surf)
-    else:
-        global autoscale_scale, autoscale_enabled
-        autoscale_enabled = False
-        autoscale_scale = 1
-        return surf
 
 import threading
 
@@ -540,7 +499,7 @@ execute_later_lock = threading.Lock()
 def main():
 
     def main_tick():
-        events = merge_mouse_events(pygame.event.get())
+        events = merge_mouse_events(graphics.get_events())
         if not screen:
             return
 
@@ -549,16 +508,15 @@ def main():
             if 'pos' in ev_dict:
                 ev_dict = dict(ev_dict)
                 x, y = ev_dict['pos']
-                ev_dict['pos'] =int(x*autoscale_scale), int(y*autoscale_scale)
+                ev_dict['pos'] = x, y
                 ev_dict['abs_pos'] = ev_dict['pos']
-            if event.type == pygame.QUIT:
+            if event.type == graphics.const.QUIT:
                 back()
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
                 back()
-            elif event.type == pygame.MOUSEMOTION:
-                screen.event(Event(event.type, ev_dict))
             else:
                 screen.event(Event(event.type, ev_dict))
+
         screen.tick()
 
         for overlay in overlays:
@@ -580,7 +538,7 @@ def main():
         if show_fps and fps_label:
             surf.blit(fps_label, (surf.get_width() - fps_label.get_width(), 0))
 
-        flip(surf)
+        graphics.flip()
 
         check_pause()
 
@@ -590,8 +548,7 @@ def main():
     lost_time = 0.0
     per_frame = 1./FPS
     frame_last = 0
-    surf = pygame.display.get_surface()
-    surf = maybe_set_autoscale(surf)
+    surf = graphics.get_window()
     screen_width, screen_height = screen_size = surf.get_size()
     while True:
         try:
@@ -629,7 +586,7 @@ def merge_mouse_events(events):
     mouse = None
     res = []
     for ev in events:
-        if ev.type == pygame.MOUSEMOTION:
+        if ev.type == graphics.const.MOUSEMOTION:
             mouse = ev
         else:
             res.append(ev)
@@ -684,7 +641,7 @@ class WithText(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -696,63 +653,19 @@ class WithText(object):
                 scale_h = float(self.size[1]) / self.image.get_height()
                 scale = min(scale_w, scale_h)
                 w, h = self.image.get_size()
-                self._scaled_image = pygame.transform.smoothscale(self.image, (int(w*scale), int(h*scale)))
+                self._scaled_image = self.image.scale((int(w*scale), int(h*scale)))
                 self._scaled_size = self.size
 
             iw, ih = self._scaled_image.get_size()
             w, h = self.size
             surf.blit(self._scaled_image, (pos[0] + (w - iw)/2, pos[1] + (h - ih)/2))
 
-def gfx_ellipse(surf, color, rect, width):
-    if width == 0:
-        f = pygame.gfxdraw.filled_ellipse
-    else:
-        f = pygame.gfxdraw.aaellipse
-    f(surf, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
-
-def gfx_rect(surf, color, rect, width):
-    if width == 0:
-        pygame.gfxdraw.box(surf, rect, color)
-    else:
-        pygame.gfxdraw.rectangle(surf, rect, color)
-
 def _round_rect(surface, color, rect, width, xr, yr):
-    clip = surface.get_clip()
-    rect = pygame.Rect(rect)
-
-    # left and right
-    surface.set_clip(clip.clip(rect.inflate(0, 5-yr*2)))
-    gfx_rect(surface, color, rect.inflate(1-width,0), width)
-
-    # top and bottom, without center
-    surface.set_clip(clip.clip(rect.inflate(5-xr*2, 0)))
-    if width != 0:
-        gfx_rect(surface, color, rect.inflate(0, 1-width), width)
-    else: # fill
-        x, y, w, h = rect
-        gfx_rect(surface, color, (x, y, w, yr - 3), width)
-        gfx_rect(surface, color, (x, y + h - yr + 2, w, yr - 1), width)
-
-    # top left corner
-    surface.set_clip(clip.clip(rect.left, rect.top, xr-3, yr-3))
-    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.top, 2*xr, 2*yr), width)
-
-    # top right corner
-    surface.set_clip(clip.clip(rect.right-xr+2, rect.top, xr, yr-3))
-    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr, rect.top, 2*xr, 2*yr), width)
-
-    # bottom left
-    surface.set_clip(clip.clip(rect.left, rect.bottom-yr+2, xr-3, yr))
-    gfx_ellipse(surface, color, pygame.Rect(rect.left, rect.bottom-2*yr, 2*xr, 2*yr), width)
-
-    # bottom right
-    surface.set_clip(clip.clip(rect.right-xr+2, rect.bottom-yr+2, xr, yr))
-    gfx_ellipse(surface, color, pygame.Rect(rect.right-2*xr-1, rect.bottom-2*yr-1, 2*xr, 2*yr), width)
-
-    surface.set_clip(clip)
+    # draw normal rect
+    surface.draw_rect(color, rect, width)
 
 def round_rect(surf, bg, fg, rect, round=10):
-    rect = pygame.Rect(rect)
+    rect = graphics.Rect(rect)
     _round_rect(surf, bg, rect, 0, round, round)
     _round_rect(surf, fg, rect, 1, round, round)
 
@@ -770,16 +683,17 @@ class Button(WithText):
             color = self.active_bg
         else:
             color = self.bg
-        round_rect(surf, color, self.fg, pos + self.size)
+        surf.draw_rect(color, pos + self.size, width=0)
+        surf.draw_rect(self.fg, pos + self.size, width=1)
         WithText.draw(self, surf, pos)
 
     def unhover(self):
         self.active = False
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.active = True
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             self.active = False
             if self.callback:
                 self.callback()
@@ -791,6 +705,7 @@ class EditField(Button):
         self.set_value(label)
 
     def callback(self):
+        import uidialog
         data = uidialog.inputbox('')
         if data != None:
             self.set_value(data)
@@ -818,7 +733,7 @@ class Image(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -843,7 +758,7 @@ class Image(object):
         pass
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONUP:
+        if event.type == graphics.const.MOUSEBUTTONUP:
             if self.callback:
                 self.callback()
 
@@ -856,7 +771,7 @@ class Menu(LinearLayoutWidget):
         self.font = font or bigfont
 
     def add(self, label, callback, color=(0, 0, 0)):
-        screen_width = pygame.display.get_surface().get_width()
+        screen_width = graphics.get_window().get_width()
         self.items.append(Button(label, callback, self.font, color=color, force_width=0.5*screen_width))
 
     @staticmethod
@@ -872,14 +787,14 @@ class Menu(LinearLayoutWidget):
         set(menu)
 
 def load_font(name, size):
-    return pygame.font.Font('fonts/ProcionoTT.ttf', size)
+    return graphics.load_font('fonts/ProcionoTT.ttf', size)
 
 def load_image(name):
-    return pygame.image.load(name).convert_alpha()
+    return graphics.load_image(name)
 
 def init():
     global font, smallfont, bigfont, mediumfont, consolefont
-    pygame.init()
+    graphics.init()
 
     consolefont = load_font(None, 20)
     smallfont = font = load_font(None, 25)
@@ -909,23 +824,18 @@ class ScrollWrapper(object):
         return (self.width, self.height)
 
     def draw(self, surf, pos):
-        x, y = pos
-        fx, fy = pos
+        fx, fy = 0, 0
         if self.use_x:
             fx -= self.x
         if self.use_y:
             fy -= self.y
 
-        last = surf.get_clip()
-        if hasattr(self.item, 'draw_clipped'):
-            self.item.draw_clipped(surf, (fx, fy), self.get_clip(pos))
-        else:
-            surf.set_clip(self.get_clip(pos))
-            self.item.draw(surf, (fx, fy))
-            surf.set_clip(last)
+        cliptex = graphics.create_surface(*self.get_clip())
+        self.item.draw(cliptex, (fx, fy))
+        surf.blit(cliptex, pos)
 
-    def get_clip(self, pos):
-        return pos + self.size
+    def get_clip(self):
+        return self.size
 
     def tick(self):
         self.x += self.vx
@@ -951,7 +861,7 @@ class ScrollWrapper(object):
         self.item.tick()
 
     def event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.vx = 0
             self.vy = 0
             self.start_dragging = event.pos
@@ -959,7 +869,7 @@ class ScrollWrapper(object):
             self.was_dragged = False
             self.canceled_event(event)
             return LOCK_MOUSE_EVENT
-        elif event.type == pygame.MOUSEMOTION:
+        elif event.type == graphics.const.MOUSEMOTION:
             if self.start_dragging:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
                 if (dx*dx+dy*dy) > 4:
@@ -967,7 +877,7 @@ class ScrollWrapper(object):
                     self.was_dragged = True
                     self.y += dy
                     self.x += dx
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             if self.was_dragged:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
                 self.vx = _scroll_speed_func(self.vx, dx)
@@ -976,7 +886,7 @@ class ScrollWrapper(object):
                 self.x += dx
             else:
                 if self.start_dragging:
-                    self.post_mouse_event(Event(pygame.MOUSEBUTTONDOWN, {'pos': self.start_dragging, 'abs_pos': self.start_dragging_abs}))
+                    self.post_mouse_event(Event(graphics.const.MOUSEBUTTONDOWN, {'pos': self.start_dragging, 'abs_pos': self.start_dragging_abs}))
                 self.post_mouse_event(event)
             self.start_dragging = None
             self.was_dragged = False

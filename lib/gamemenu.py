@@ -11,12 +11,13 @@
 # GNU General Public License for more details.
 
 import ui
-import pygame
+import graphics
 import client
 import math
 import time
 import features
 import functools
+import graphics
 
 from client import freeciv
 
@@ -140,14 +141,14 @@ class Button(object):
             surf.blit(self.image, pos)
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             self.click_at = time.time()
             x, y = ev.abs_pos
             y -= self.image.get_height()
             x -= self.image.get_width() / 2
             self.tooltip = ui.Tooltip(self.action_name, (x, y-40), color=(0, 255, 255))
             return ui.LOCK_MOUSE_EVENT
-        if ev.type == pygame.MOUSEBUTTONUP:
+        if ev.type == graphics.const.MOUSEBUTTONUP:
             if self.tooltip:
                 self.tooltip.remove()
             if time.time() - 0.5 > self.click_at:
@@ -202,20 +203,21 @@ class NewJoystick(object):
             size = self.size[0]/2
             angle = math.radians(self.current)
             x, y = size*math.cos(angle), size*math.sin(angle)
-            pygame.draw.line(surf, (255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
+            surf.draw_line((255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
 
     def _ellipse(self, surf, color, rect):
-        pygame.gfxdraw.filled_ellipse(surf, rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2, color)
+        # [rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2]
+        surf.gfx_ellipse(color, rect, width=0)
 
     def event(self, ev):
         if hasattr(ev, 'pos'):
             relpos = (ev.pos[0] - self.size[0]/2, ev.pos[1] - self.size[1]/2)
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             if abs(relpos[0]) <= self.small_radius and abs(relpos[1]) <= self.small_radius:
                 self.clicked = True
             else:
                 return False
-        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+        if ev.type in (graphics.const.MOUSEBUTTONDOWN, graphics.const.MOUSEMOTION):
             if self.clicked:
                 if abs(relpos[0]) > self.small_radius or abs(relpos[1]) > self.small_radius:
                     dir = self.get_direction(relpos)
@@ -225,7 +227,7 @@ class NewJoystick(object):
                 return ui.LOCK_MOUSE_EVENT
             else:
                 return False
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             if self.current is not None:
                 self.do_action(self.current)
             self.clicked = False
@@ -270,10 +272,10 @@ class Joystick(object):
 
     @staticmethod
     def init():
-        Joystick.gfx = client.common.load_gfxfile('data/user/joystick.png').convert_alpha()
-        Joystick.map = client.common.load_gfxfile('data/user/joystick-map.png').convert()
+        Joystick.gfx = graphics.load_image('data/user/joystick.png')
+        Joystick.map = graphics.load_image('data/user/joystick-map.png')
         Joystick.masks = dict(
-            (name, client.common.load_gfxfile('data/user/joystick-mask-%s.png' % name).convert_alpha())
+            (name, graphics.load_image('data/user/joystick-mask-%s.png' % name))
             for name in Joystick.colors.values() if name )
 
 
@@ -288,12 +290,12 @@ class Joystick(object):
             surf.blit(Joystick.masks[self.current], pos)
 
     def event(self, ev):
-        if ev.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+        if ev.type in (graphics.const.MOUSEBUTTONDOWN, graphics.const.MOUSEMOTION):
             dir = self.get_direction(ev.pos)
             self.current = dir
             if not dir:
                 return False
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             dir = self.get_direction(ev.pos)
             self.current = None
             if dir:
@@ -381,9 +383,9 @@ class TileButton(object):
     def event(self, event):
         if self.dir != None and self.joystick.hidden:
             return False
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == graphics.const.MOUSEBUTTONDOWN:
             self.active = True
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == graphics.const.MOUSEBUTTONUP:
             self.active = False
             self.click()
 
@@ -401,8 +403,8 @@ def init():
 
 def init_orders():
     global order_sprites
-    img_orders = client.common.load_gfxfile('data/user/theme_orders_buttons.png').convert_alpha()
+    img_orders = graphics.load_image('data/user/theme_orders_buttons.png')
     order_sprites = client.common.split_sprites(img_orders, start=(0, 1), each=(29, 31), size=(31, 29), num=(1, 38))
 
     for line in order_sprites:
-        line[0] = pygame.transform.smoothscale(line[0], (56, 56))
+        line[0] = line[0].scale((56, 56))

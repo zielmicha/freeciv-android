@@ -6,6 +6,7 @@ structs = [ 'struct ' + s for s in structs ] + ['PyObject']
 
 types = {
     'int': 'i',
+    'long': 'l',
     'char*': 's',
     'double': 'd',
 }
@@ -33,7 +34,7 @@ def proc(type, name):
         if type.endswith('*') and type[:-1] in mappers:
             return 'O', 'py_mapper_%s(%s)' % (type[:-1], name)
         elif type.endswith('*') and type[:-1] in mappers:
-            return 'i', '(int)%s' % name
+            return 'l', '(long)%s' % name
         elif type in mappers:
             return 'O', 'py_mapper_%s(&%s)' % (type, name)
         else:
@@ -51,7 +52,7 @@ def _proc_ret(type, name):
     if type.startswith('const '):
         type = type[len('const '):]
     if type.endswith('*') and type[:-1] in int_mappers:
-        return 'int', 'i', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
+        return 'long', 'l', '', 'arg_%s' % name, '(%s)arg_%s' % (type, name), name
     if type.endswith('*') and type[:-1] in structs:
         return 'PyObject*', 'O', '''
 \t%s argp_%s = py_alloc_struct(arg_%s);
@@ -98,34 +99,34 @@ for line in open('callglue').readlines():
     line = line.strip()
     print '// %s' % line.strip()
     android = False
-    
+
     if line.startswith('__android '):
         android = True
         line = line[len('__android '):].strip()
-    
+
     start, rest = line.split('(', 1)
     rettype, fname = start.rsplit(None, 1)
-    
+
     while fname.startswith('*'):
         rettype += '*'
         fname = fname[1:]
-    
+
     was_printed.add(fname)
-    
+
     nproc += 1
-    
+
     if android:
         print '#ifdef ANDROID'
-    
+
     try:
         rest, _ = rest.split(')', 1)
         if rest.strip() in ('void', ''):
             args = []
         else:
             args = [ p2(a.rsplit(None, 1)) for a in rest.split(',') ]
-        
+
         format = [ proc_ret(type, name) for type, name in args ]
-        
+
         print line.strip() + ';'
         print
         tmplcode = ''
@@ -140,13 +141,13 @@ for line in open('callglue').readlines():
         if joined:
             joined = ', ' + joined
         print '\tif(PyArg_ParseTuple(args, "%s"%s) == 0) return NULL;' % (tmplcode, joined)
-        
+
         call_args = []
         for (type, cformat, mod, val, retval, name) in format:
             print mod
             call_args.append(retval)
-        
-        
+
+
         if rettype != 'void':
             print '\t%s retval = %s(%s);' % (rettype, fname, ', '.join(call_args))
             tmpl, conv = proc(rettype, 'retval')
@@ -155,14 +156,14 @@ for line in open('callglue').readlines():
             print '\t%s(%s);' % (fname, ', '.join(call_args))
             print '\treturn Py_BuildValue("i", 0);'
         print '}'
-        
+
         if rettype != 'void':
             pass
     except:
         traceback.print_exc()
         f = ''
         fails.append((f, line.strip()))
-    
+
     if android:
         print '#endif'
 
@@ -172,7 +173,7 @@ for name, android in names:
     if android:
         print '#ifdef ANDROID'
     print '\tptr = python_%s;' % name
-    print '\tPY_CALL("ssi", "add_function", "%s", (int)ptr);' % name
+    print '\tPY_CALL("ssl", "add_function", "%s", (long)ptr);' % name
     if android:
         print '#endif'
 print '}'

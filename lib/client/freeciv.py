@@ -27,7 +27,7 @@ import time
 def set_debug(flag):
     global debug
     debug = flag
-    
+
 debug = False
 
 def make_init_profiling_tuple():
@@ -104,7 +104,7 @@ def _show_unused():
     print '\t' + '\n\t'.join(sorted(unused))
 
 def register(name_or_func):
-    if isinstance(name_or_func, str):    
+    if isinstance(name_or_func, str):
         def decorator(method):
             setattr(callback, name_or_func, method)
             return method
@@ -127,12 +127,15 @@ def _add_function(name, id):
 @register('set_const')
 def _set_const(name, val):
     setattr(const, name, val)
-    
+
 def _call(name, id, *args):
     if debug:
         start_time  = time.time()
     try:
         return freecivclient.call_f(id, args)
+    except OverflowError:
+        print name, id, args
+        raise
     finally:
         if debug:
             tpl = _profiling_calls[name]
@@ -148,4 +151,3 @@ freecivclient.set_callback(_callback)
 
 def run(args=[]):
     freecivclient.run_main(["freeciv-python-client"] + args)
-    

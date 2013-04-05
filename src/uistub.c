@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ const bool gui_use_transliteration = FALSE;
 /**************************************************************************
   Entry point for whole freeciv client program.
 **************************************************************************/
-int main(int argc, char **argv)
+int uistub_main(int argc, char **argv)
 {
   return client_main(argc, argv);
 }
@@ -117,4 +117,3 @@ void gui_ggz_embed_ensure_server(void)
 void free_intro_radar_sprites(void)
 {
 }
-

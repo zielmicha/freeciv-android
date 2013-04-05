@@ -14,12 +14,12 @@ from __future__ import division
 import ui
 import uidialog
 import client
-import pygame
-import pygame.gfxdraw
+import graphics
 import functools
 
 from client import freeciv
 
+import graphics
 import citydlg
 import gamemenu
 import icons
@@ -293,7 +293,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         super(ScreenWidget, self).tick()
 
     def event(self, ev):
-        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F1:
+        if ev.type == graphics.const.KEYDOWN and ev.key == graphics.const.K_F1:
             self.client.quit()
         else:
             return super(ScreenWidget, self).event(ev)
@@ -347,7 +347,7 @@ class TaxesPanel(ui.LinearLayoutWidget):
         self.add(ui.Label('Year: ' + year, font=ui.consolefont))
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             self.callback()
 
     def callback(self):
@@ -385,7 +385,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = pygame.transform.smoothscale(img, (30, 45))
+            img = img.scale((30, 45))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
@@ -436,14 +436,14 @@ class OverviewWidget(object):
         pass
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             w, h = self.client.get_overview_size()
             scale = float(w) / self.scale_width
             self.client.overview_click(int(ev.pos[0] * scale), int(ev.pos[1] * scale))
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        pygame.draw.rect(surf, (255,255,255), pos + self.size, 1)
+        surf.draw_rect((255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
@@ -465,30 +465,31 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def draw(self, surf, pos):
         if self.shown:
-            pygame.gfxdraw.box(surf, pos + self._size, (255, 255, 255, 170))
+            surf.draw_rect((255, 255, 255, 170), pos + self._size, 0, blend=graphics.MODE_NONE)
         super(ConsoleWidget, self).draw(surf, pos)
 
     def draw_clipped(self, surf, pos, clip):
-        old_clip = surf.get_clip()
-        surf.set_clip(clip)
+        rect = graphics.Rect(clip)
+        cliptex = graphics.create_surface(rect[2], rect[3])
+        relpos = ui._subpoints(pos, (rect[0], rect[1]))
 
-        self.draw(surf, pos)
+        self.draw(cliptex, relpos)
 
-        surf.set_clip(old_clip)
+        surf.blit(cliptex, (rect[0], rect[1]))
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEBUTTONDOWN:
+        if ev.type == graphics.const.MOUSEBUTTONDOWN:
             myabspos = ui._subpoints(ev.abs_pos, ev.pos)
             self.shown = True
             ui.add_overlay(self.scroll, myabspos)
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             self.shown = False
             if self.scroll in ui.overlays:
                 ui.overlays.remove(self.scroll)
 
 class ConsoleScrollWrapper(ui.ScrollWrapper):
-    def get_clip(self, pos):
-        return pos + (self.item._size[0], self.size[1])
+    def get_clip(self):
+        return (self.item._size[0], self.size[1])
 
     def canceled_event(self, event):
         self.item.event(event)
@@ -512,7 +513,7 @@ class MapWidget(object):
         self.client.escape()
 
     def event(self, ev):
-        if ev.type == pygame.MOUSEMOTION:
+        if ev.type == graphics.const.MOUSEMOTION:
             if self.start_drag:
                 if not self.was_dragged:
                     x, y = ev.pos
@@ -528,13 +529,13 @@ class MapWidget(object):
             self.client.mouse_motion(self.drawer.coord_ui_to_map(ev.pos))
             return ui.LOCK_MOUSE_EVENT
 
-        elif ev.type == pygame.MOUSEBUTTONDOWN:
+        elif ev.type == graphics.const.MOUSEBUTTONDOWN:
             x, y = ev.pos
             self.start_drag = ev.pos
             self.drawer.start_scrolling()
             return ui.LOCK_MOUSE_EVENT
 
-        elif ev.type == pygame.MOUSEBUTTONUP:
+        elif ev.type == graphics.const.MOUSEBUTTONUP:
             if self.was_dragged:
                 self.drag(ev.pos)
                 self.was_dragged = False
@@ -546,7 +547,7 @@ class MapWidget(object):
             self.start_drag = None
             self.last_drag_pos = None
 
-        elif ev.type in (pygame.KEYDOWN, pygame.KEYUP):
+        elif ev.type in (graphics.const.KEYDOWN, graphics.const.KEYUP):
             self.client.key_event(ev.type, ev.key)
 
     def draw(self, surf, pos):
@@ -573,7 +574,7 @@ class MapDrawer(object):
         self.valid_for_origin = None # if get_map_view_origin() returns something else, redraw map
         self.user_corner = (0.0, 0.0) # this point should be painted in top-left corner
 
-        self.map_cache = pygame.Surface((1, 1), pygame.SRCALPHA)
+        self.map_cache = graphics.create_surface(1, 1)
         self.last_map_size = None
         self.widget_size = (0, 0)
         self.scrolling = False
@@ -598,18 +599,20 @@ class MapDrawer(object):
         self.zoom = zoom
         self.reload()
 
-    def draw(self, surf, pos):
-        clip = surf.get_clip()
-        surf.set_clip(pos + self.widget_size)
+    def draw(self, surf, clip_pos):
+        pos = (0, 0)
+        cliptex = graphics.create_surface(*self.widget_size)
         if not self.scrolling:
             target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
             if self.zoom == 1:
-                self.client.draw_map(surf, target)
+                self.client.draw_map(cliptex, target)
             else:
                 self.client.draw_map(self.map_cache, (0, 0))
                 rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
                                            self.map_cache.get_height() - self.user_corner[1])
-                surf.blit(scale_by(self.map_cache.subsurface(rect), self.zoom), (pos[0], pos[1]))
+                #cliptex.blit(scale_by(self.map_cache.suburface(rect), self.zoom), (pos[0], pos[1]))
+                cliptex.blit(self.map_cache, src=rect,
+                             dest=(pos[0], pos[1], rect[2] * self.zoom, rect[3] * self.zoom))
         else:
             if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
@@ -618,18 +621,20 @@ class MapDrawer(object):
                     self.update_origin()
                     self.reload()
             if self.zoom == 1:
-                surf.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+                cliptex.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
             else:
-                surf.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
+                cliptex.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
                                                   int(pos[1] - self.user_corner[1] * self.zoom)))
-        surf.set_clip(clip)
+        surf.blit(cliptex, clip_pos)
 
     def reload(self):
         self.prepare_map_cache()
         #self.map_cache._pg.fill((100, 0, 100))
         self.client.draw_map(self.map_cache, (0, 0))
         if self.zoom != 1:
-            self.scaled_map_cache.blit(scale_by(self.map_cache, self.zoom), (0, 0))
+            self.scaled_map_cache.blit(self.map_cache, dest=(0, 0,
+                                                             self.map_cache.get_width() * self.zoom,
+                                                             self.map_cache.get_height() * self.zoom))
 
     def does_exceed(self):
         corner = (self.user_corner[0] * self.zoom, self.user_corner[1] * self.zoom)
@@ -650,12 +655,15 @@ class MapDrawer(object):
     def prepare_map_cache(self):
         w, h = self.widget_size
         size_mul = self.MAP_CACHE_SIZE * 2 + 1
-        size = (int(size_mul * w / self.zoom), int(size_mul * h / self.zoom))
+        size = (size_mul * w / self.zoom, size_mul * h / self.zoom)
+        if size[0] > 2048: size = (2048, size[1] * 2048 / size[0])
+        if size[1] > 2048: size = (size[0] * 2048 / size[1], 2048)
+        size = (int(size[0]), int(size[1]))
         if size != self.map_cache.get_size():
             self.client.set_map_size(size)
-            self.map_cache = pygame.Surface((size[0], size[1]))
+            self.map_cache = graphics.create_surface(size[0], size[1], alpha=False)
             if self.zoom != 1:
-                self.scaled_map_cache = pygame.Surface((int(size_mul * w), int(size_mul * h)))
+                self.scaled_map_cache = graphics.create_surface(int(size_mul * w), int(size_mul * h))
         self.user_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         self.valid_for_origin = freeciv.func.get_map_view_origin()
 
@@ -669,7 +677,7 @@ class MapDrawer(object):
 
 def scale_by(img, zoom):
     w, h = img.get_size()
-    return pygame.transform.smoothscale(img, (int(w * zoom), int(h * zoom)))
+    return img.scale((int(w * zoom), int(h * zoom)))
 
 def init():
     gamemenu.init()
