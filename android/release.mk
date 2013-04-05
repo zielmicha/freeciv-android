@@ -1,3 +1,6 @@
+VERSION=1100
+VERSION_NAME=1.1.0
+
 release: build/build.xml debug ndk
 	cd build; ant release
 
@@ -11,6 +14,8 @@ build/AndroidManifest.xml: build project/AndroidManifest.xml
 	cat project/AndroidManifest.xml \
 		| sed 's/pl.org.zielinscy.freeciv.debug/pl.org.zielinscy.freeciv/g' \
 		| sed 's/Freeciv Debug/Freeciv/g' \
+		| sed 's/versionCode="1"/versionCode="'$(VERSION)'"/g' \
+		| sed 's/versionName="1.0"/versionName="'$(VERSION_NAME)'"/g' \
 		| cat  >  build/AndroidManifest.xml
 
 build/build.xml: build/AndroidManifest.xml _links
