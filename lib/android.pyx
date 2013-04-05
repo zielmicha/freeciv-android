@@ -57,6 +57,12 @@ def init_screen():
     wnd = graphics.create_window(graphics.get_screen_size())
     wnd.fill((0, 128, 0))
     graphics.flip()
+    splash = graphics.load_image('data/user/presplash.png')
+    splash_size = (splash.get_width() * wnd.get_height() / splash.get_height(), wnd.get_height())
+    wnd.fill((255, 255, 255))
+    wnd.blit(splash,
+             dest=((wnd.get_width() - splash_size[0]) / 2, 0) + splash_size)
+    graphics.flip()
 
 _keep_from_gc = []
 

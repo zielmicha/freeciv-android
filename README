@@ -9,5 +9,5 @@ Running Freeciv on desktop requires SDL2 with modified alpha blending from http:
 Build and run on desktop (for debugging):
    make run
 
-Build for Android:
+Build for Android (put android, adb and ndk-build in your PATH):
    make -C android debug
