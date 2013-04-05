@@ -1,5 +1,9 @@
-all: build
-debugapk: build assets
+all: build assets
+
+release:
+	$(MAKE) -f release.mk
+
+debugapk: all
 	cd project; ant debug
 debuginstall: debugapk
 	cd project; ant installd
@@ -21,13 +25,16 @@ copyassets:
 
 # BUILD
 
-build: builddep cython project/jni/freeciv
+build: builddep cython project/jni/freeciv project/build.xml
 	ndk-build -C project -j4
+
+project/build.xml:
+	android update project --path project --name "FreecivDebug" --target android-17
 
 cython: project/jni/src/graphics.c project/jni/src/android.c
 
 project/jni/freeciv:
-	ln -s $(PWD)/../src project/jni/freeciv
+	ln -sf $(PWD)/../src project/jni/freeciv
 
 project/jni/src/graphics.c: ../lib/graphics.pyx
 	make -C ../lib graphics.c
