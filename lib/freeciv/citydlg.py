@@ -216,7 +216,7 @@ class Dialog(ui.HorizontalLayoutWidget):
 
         return panel
 
-class CityCanvas(object):
+class CityCanvas(ui.Widget):
     def __init__(self, dialog, city, scale_to=400):
         self.scale_to = scale_to
         self.city = city
@@ -236,9 +236,6 @@ class CityCanvas(object):
 
     def _dev_to_map(self, pos):
         return pos * self.orig_size[0] / self.scale_to
-
-    def tick(self):
-        pass
 
 def init():
     icons.init()

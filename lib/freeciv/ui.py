@@ -39,6 +39,7 @@ features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)
 
 def replace(new_screen):
+    assert isinstance(new_screen, Widget)
     global screen
     screen = new_screen
 
@@ -57,6 +58,20 @@ def set(new_screen, anim=True):
             replace(new_screen)
     else:
         replace(new_screen)
+
+def back(allow_override=True, anim=True):
+    if allow_override and screen.back() is not True:
+        return
+    elif not history:
+        if hasattr(sys, 'exitfunc'):
+            sys.exitfunc()
+        os._exit(0)
+    else:
+        new_screen = history.pop()
+        if anim:
+            replace_anim(new_screen, -1)
+        else:
+            replace(new_screen)
 
 def set_dialog(new_screen, scroll=False):
     if scroll:
@@ -111,7 +126,17 @@ def show_list_dialog(items, callback=None, get_text_func=None, title=None, title
         ui.add(Button(label, functools.partial(clicked, item) ))
     set_dialog(ui)
 
-class Dialog(object):
+class Widget(object):
+    def back(self):
+        return True
+
+    def event(self, ev):
+        pass
+
+    def tick(self):
+        pass
+
+class Dialog(Widget):
     def __init__(self, screen, item):
         self.item = item
         self.screen = screen
@@ -162,7 +187,7 @@ class Dialog(object):
         if self.is_opened():
             ui.back()
 
-class Animation(object):
+class Animation(Widget):
     spacing = 0.2
 
     def __init__(self, src, dest, dir):
@@ -208,10 +233,7 @@ class Animation(object):
         pass
 
     def back(self):
-        if hasattr(self.dest, 'back'):
-            self.dest.back()
-        else:
-            back(allow_override=False)
+        return self.dest.back()
 
 _fill_image = None
 _fill_image_not_resized = None
@@ -230,7 +252,7 @@ def fill(surf, rect, screen=None):
 
 LOCK_MOUSE_EVENT = object() # constant
 
-class LayoutWidget(object):
+class LayoutWidget(Widget):
     def __init__(self):
         self.items = []
         self.positions = []
@@ -240,7 +262,7 @@ class LayoutWidget(object):
         self.focus = None
 
     def add(self, item):
-        assert item != None
+        assert isinstance(item, Widget)
         self.items.append(item)
 
     def unhover(self):
@@ -363,15 +385,9 @@ def render_text(font, text, color=(0, 0, 0)):
     else:
         return font.render(text, True, color)
 
-class Spacing(object):
+class Spacing(Widget):
     def __init__(self, x, y):
         self.size = (x, y)
-
-    def tick(self):
-        pass
-
-    def event(self, ev):
-        pass
 
     def draw(self, surf, pos):
         pass
@@ -470,20 +486,6 @@ class Bordered(LinearLayoutWidget):
     def draw(self, surf, pos):
         surf.draw_rect((0, 0, 0), pos + self.size, 1)
         LinearLayoutWidget.draw(self, surf, pos)
-
-def back(allow_override=True, anim=True):
-    if allow_override and hasattr(screen, 'back'):
-        screen.back()
-    elif not history:
-        if hasattr(sys, 'exitfunc'):
-            sys.exitfunc()
-        os._exit(0)
-    else:
-        new_screen = history.pop()
-        if anim:
-            replace_anim(new_screen, -1)
-        else:
-            replace(new_screen)
 
 FPS = 15
 
@@ -610,7 +612,7 @@ class Event(object):
         for k, v in dict.items():
             setattr(self, k, v)
 
-class WithText(object):
+class WithText(Widget):
     def __init__(self, label, callback, font=None, color=None, padding=0, force_width=None, image=None):
         self.callback = callback
         self.font = font or mediumfont
@@ -748,14 +750,11 @@ class Tooltip(Label):
     def remove(self):
         overlays.remove(self)
 
-class Image(object):
+class Image(Widget):
     def __init__(self, img, callback=None):
         self.image = img
         self.size = self.image.get_size()
         self.callback = callback
-
-    def tick(self):
-        pass
 
     def event(self, event):
         if event.type == graphics.const.MOUSEBUTTONUP:
@@ -804,7 +803,7 @@ def init():
 SCROLL_HEIGHT = 1
 SCROLL_WIDTH = 2
 
-class ScrollWrapper(object):
+class ScrollWrapper(Widget):
     def __init__(self, item, height=None, width=None, ways=SCROLL_HEIGHT):
         self.item = item
         self.y = 0
@@ -902,6 +901,9 @@ class ScrollWrapper(object):
         ev.pos = (pos[0] + self.x, pos[1] + self.y)
         self.item.event(ev)
         ev.pos = pos
+
+    def back(self):
+        return self.item.back()
 
 def _scroll_speed_func(v, k):
     if abs(k) < 3:

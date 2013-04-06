@@ -421,7 +421,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
             panel.add(ui.Label(gov.name, functools.partial(commit_government_change, gov)))
         ui.set_dialog(panel, scroll=True)
 
-class OverviewWidget(object):
+class OverviewWidget(ui.Widget):
     def __init__(self, client):
         self.client = client
         self.scale_width = 150
@@ -494,7 +494,7 @@ class ConsoleScrollWrapper(ui.ScrollWrapper):
     def canceled_event(self, event):
         self.item.event(event)
 
-class MapWidget(object):
+class MapWidget(ui.Widget):
     def __init__(self, client):
         self.client = client
 

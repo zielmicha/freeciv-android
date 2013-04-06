@@ -125,7 +125,7 @@ class Menu(ui.LinearLayoutWidget):
         ui.set_dialog(panel, scroll=True)
 
 
-class Button(object):
+class Button(ui.Widget):
     def __init__(self, client, action_ident, action_name):
         self.client = client
         self.action_ident = action_ident
@@ -170,7 +170,7 @@ class Button(object):
         else:
             do()
 
-class NewJoystick(object):
+class NewJoystick(ui.Widget):
     small_radius = 35
 
     consts = {
@@ -246,80 +246,6 @@ class NewJoystick(object):
     def tick(self):
         pass
 
-class Joystick(object):
-    colors = {
-        (0xff, 0xff, 0): 'n',
-        (0, 0, 0x80): 'ne',
-        (0, 0xff, 0xff): 'e',
-        (0, 0xff, 0): 'se',
-        (0xff, 0, 0): 's',
-        (0, 0, 0): 'sw',
-        (0xff, 0, 0xff): 'w',
-        (0, 0, 0xff): 'nw',
-        (255, 255, 255): '',
-    }
-
-    consts = {
-        'n': freeciv.const.DIR8_NORTH,
-        'ne': freeciv.const.DIR8_NORTHEAST,
-        'nw': freeciv.const.DIR8_NORTHWEST,
-        's': freeciv.const.DIR8_SOUTH,
-        'se': freeciv.const.DIR8_SOUTHEAST,
-        'sw': freeciv.const.DIR8_SOUTHWEST,
-        'w': freeciv.const.DIR8_WEST,
-        'e': freeciv.const.DIR8_EAST,
-    }
-
-    @staticmethod
-    def init():
-        Joystick.gfx = graphics.load_image('data/user/joystick.png')
-        Joystick.map = graphics.load_image('data/user/joystick-map.png')
-        Joystick.masks = dict(
-            (name, graphics.load_image('data/user/joystick-mask-%s.png' % name))
-            for name in Joystick.colors.values() if name )
-
-
-    def __init__(self, client):
-        self.size = Joystick.gfx.get_size()
-        self.client = client
-        self.current = None
-
-    def draw(self, surf, pos):
-        surf.blit(Joystick.gfx, pos)
-        if self.current:
-            surf.blit(Joystick.masks[self.current], pos)
-
-    def event(self, ev):
-        if ev.type in (graphics.const.MOUSEBUTTONDOWN, graphics.const.MOUSEMOTION):
-            dir = self.get_direction(ev.pos)
-            self.current = dir
-            if not dir:
-                return False
-        elif ev.type == graphics.const.MOUSEBUTTONUP:
-            dir = self.get_direction(ev.pos)
-            self.current = None
-            if dir:
-                self.do_action(dir)
-            else:
-                return False
-
-    def unfocus(self):
-        self.current = None
-
-    def do_action(self, dir):
-        freeciv.func.key_unit_move_direction(self.consts[dir])
-
-    def get_direction(self, pos):
-        try:
-            color = Joystick.map.get_at(pos)[:3]
-            return Joystick.colors.get(color, '')
-        except IndexError:
-            return ''
-
-    def tick(self):
-        pass
-
-
 class TileJoystick(ui.LinearLayoutWidget):
     @staticmethod
     def init():
@@ -354,7 +280,7 @@ class TileJoystick(ui.LinearLayoutWidget):
 
         self.update_layout()
 
-class TileButton(object):
+class TileButton(ui.Widget):
     active_bg = (255, 255, 200, 150)
     bg = (130, 100, 0, 90)
     fg = (150, 150, 50)
@@ -397,7 +323,6 @@ class TileButton(object):
 
 def init():
     NewJoystick.init()
-    Joystick.init()
     TileJoystick.init()
     init_orders()
 
