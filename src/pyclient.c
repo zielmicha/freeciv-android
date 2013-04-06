@@ -272,6 +272,10 @@ void key_unit_move_direction(int gui_dir) {
     key_unit_move(gui_dir);
 }
 
+bool can_unit_upgrade(struct unit* punit) {
+    return can_upgrade_unittype(client_player(), unit_type(punit));
+}
+
 void ui_main(int argc, char *argv[]) {
     PY_CALL("s", "ui_main");
 }

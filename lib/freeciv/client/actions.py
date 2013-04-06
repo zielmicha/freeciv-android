@@ -47,6 +47,7 @@ ACTIVITY_UNLOAD = 1010
 ACTIVITY_ESTABLISH_TRADE_ROUTE = 2001
 ACTIVITY_HELP_BUILD_WONDER = 2002
 ACTIVITY_CENTER_ON_UNIT = 2003
+ACTIVITY_UPGRADE = 2004
 
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
@@ -91,41 +92,8 @@ class Unit(object):
         if freeciv.func.can_unit_change_homecity(id):
             yield ACTIVITY_CHANGE_HOMECITY
 
-        # TODO: unload transporter
-
-        #if freeciv.func.units_can_load(id):
-        #    yield ACTIVITY_LOAD
-        #
-        #if freeciv.func.units_can_unload(id):
-        #    yield ACTIVITY_UNLOAD
-
-        # TODO: wakup others
-        # TODO: autosettlers
-        # TODO: nuke
-        # TODO: airlift
-
-#        /common/unit.h:21:#include "base.h"
-#./common/unit.h:122:  Base_type_id base;            /* Only valid for activity ACTIVITY_BASE */
-#./common/unit.h:150:  Base_type_id           activity_base;
-#./common/unit.h:157:  Base_type_id           changed_from_base;
-#./common/unit.h:269:                                   Base_type_id base);
-#./common/unit.h:274:                                      Base_type_id base);
-#./common/unit.h:275:bool can_unit_do_activity_base(const struct unit *punit,
-#./common/unit.h:276:                               Base_type_id base);
-#./common/unit.h:281:                                Base_type_id base);
-#./common/unit.h:282:void set_unit_activity_base(struct unit *punit,
-#./common/unit.h:283:                            Base_type_id base);
-#./common/unit.h:294:bv_bases get_unit_tile_pillage_base_set(const struct tile *ptile);
-#./common/unittype.h:87:  int hp_loss_pct;         /* Percentage of hitpoints lost each turn not in city or airbase */
-#./common/tile.h:118:bool tile_has_base_flag_for_unit(const struct tile *ptile,
-#./common/unitlist.h:65:bool can_units_do_base(const struct unit_list *punits,
-#./common/unitlist.h:66:                       Base_type_id base);
-#./common/unitlist.h:67:bool can_units_do_base_gui(const struct unit_list *punits,
-#./common/unitlist.h:68:                           enum base_gui_type base_gui);
-#./common/combat.h:53:int base_get_attack_power(const struct unit_type *punittype,
-#./common/combat.h:55:int base_get_defense_power(const struct unit *punit);
-#./common/base.h:100:bool can_build_base(const struct unit *punit, const struct base_type *pbase,
-#./common/packets_gen.h:1791:int dsend_packet_unit_change_activity(struct connection *pc, int handle, enum unit_activity activity, enum tile_special_type activity_target, Base_type_id activity_base);
+        if freeciv.func.can_unit_upgrade(self.handle):
+            yield ACTIVITY_UPGRADE
 
         if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
             yield ACTIVITY_AIRBASE
@@ -239,6 +207,8 @@ class Unit(object):
             freeciv.func.py_caravan_establish_trade(self.handle)
         elif ident == ACTIVITY_CENTER_ON_UNIT:
             freeciv.func.request_center_focus_unit()
+        elif ident == ACTIVITY_UPGRADE:
+            freeciv.func.request_unit_upgrade(self.handle)
         else:
             print 'Unsupported action ', ident
 
