@@ -125,7 +125,6 @@ def main_menu():
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))
 
-    menu.right.add(MenuButton('Feed\nback', feedback))
     menu.right.add(MenuButton('', options.show_options, image=ui.load_image('data/user/options.png')))
     menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))

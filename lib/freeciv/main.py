@@ -10,7 +10,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import time
 import shutil
 import sys
 import osutil
@@ -42,6 +41,7 @@ features.add_feature('app.resume', default=False, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
+features.add_feature('app.marketnotice', default=True, type=bool)
 features.add_feature('app.version')
 
 features.add_feature('debug.remote', default=False, type=bool)
@@ -226,6 +226,39 @@ def except_hook():
     panel.add(ui.Label(''.join(tb_str), font=ui.consolefont))
     ui.screen = ui.ScrollWrapper(panel)
 
+def start_marketnotice():
+    if features.get('app.marketnotice'):
+        thread.start_new_thread(run_marketnotice, ())
+
+def run_marketnotice():
+    time.sleep(20 * 60)
+    with ui.execute_later_lock:
+        ui.execute_later.append(show_marketnotice)
+
+def show_marketnotice():
+    def never():
+        features.set_perm('app.marketnotice', False)
+        ui.back()
+
+    def okay():
+        osutil.open_market()
+        never()
+
+    msg = '''
+If you enjoy playing Freeciv,
+please take a moment to rate
+the app. Thank you for your
+support!'''.strip()
+
+    dialog = ui.LinearLayoutWidget()
+    panel = ui.HorizontalLayoutWidget(spacing=10)
+    panel.add(ui.Button('Okay', okay))
+    panel.add(ui.Button('Not now', ui.back))
+    panel.add(ui.Button('Never', never))
+    dialog.add(ui.Label(msg))
+    dialog.add(panel)
+    ui.set_dialog(dialog)
+
 def main():
     features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
@@ -249,6 +282,7 @@ def main():
     gamescreen.init()
 
     start_autoupdate()
+    start_marketnotice()
 
     client.freeciv.run()
 

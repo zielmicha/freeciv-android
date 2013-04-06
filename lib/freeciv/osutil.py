@@ -38,8 +38,10 @@ def get_android_data(append=''):
     return get_internal_storage() + '/' + append
 
 def get_external_storage():
-    ident = get_internal_storage().strip('/').split('/')[-2]
-    return '/mnt/sdcard/' + ident
+    return '/mnt/sdcard/' + get_ident()
+
+def get_ident():
+    return get_internal_storage().strip('/').split('/')[-2]
 
 def is_paused():
     return False
@@ -75,3 +77,8 @@ version_map = {
 
 def get_android_version_info():
     return version_map.get(get_android_version(), ('unknown', ''))
+
+def open_market():
+    print 'opening market'
+    # if is_android:
+    #    android.open_url('market://details?id=' + get_ident())

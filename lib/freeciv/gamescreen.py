@@ -519,7 +519,7 @@ class MapWidget(ui.Widget):
                     x, y = ev.pos
                     ox, oy = self.start_drag
                     dist = ((x - ox)**2 + (y - oy)**2) ** 0.5
-                    if dist > 15:
+                    if dist > 30:
                         self.was_dragged = True
                         #print 'was_dragged', dist
                 if self.was_dragged:

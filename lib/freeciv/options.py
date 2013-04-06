@@ -150,7 +150,7 @@ def debug_menu():
     menu.add('Pernament feature', pernament_feature)
     menu.add('Show features', show_features)
     menu.add('Cause exception', lambda: 1/0)
-    menu.add('Test Market URL', lambda: uidialog.open_url('market://details?id=pl.org.zielinscy.freeciv'))
+    menu.add('Test Market URL', osutil.open_market)
     menu.add('Test inputbox', test_inputbox)
 
     ui.set(ui.ScrollWrapper(menu))
