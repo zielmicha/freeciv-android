@@ -1,16 +1,17 @@
 #include "unarchive.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 // WARNING: this library assumes that archive is trusted
 // FIXME: don't assume little endian
 
 static char* read_str(SDL_RWops* archive, int* msize);
 static int64_t get_or_set_serial(const char* base, int64_t expected);
+static void rmtree(const char* filename);
 
 void unarchive(SDL_RWops* archive, const char* base) {
   uint64_t serial;
   SDL_RWread(archive, &serial, 8, 1);
-  mkdir(base, 0700);
   if(get_or_set_serial(base, serial)) {
     fprintf(stderr, "not extracting serial == %lld\n", serial);
     return;
@@ -46,6 +47,17 @@ void unarchive(SDL_RWops* archive, const char* base) {
   }
 }
 
+static void rmtree(const char* filename) {
+  // filename shouldn't contain ', but check won't hurt
+  const char* it;
+  for(it=filename; *it != 0; it++)
+    if(*it == '\'') abort();
+  char* cmd = malloc(strlen(filename) + 100);
+  sprintf(cmd, "rm -r '%s'", filename);
+  system(cmd);
+  free(cmd);
+}
+
 static int64_t get_or_set_serial(const char* base, int64_t expected) {
   const char* fn = "/_serial";
   char* path = malloc(strlen(base) + strlen(fn) + 2);
@@ -61,6 +73,8 @@ static int64_t get_or_set_serial(const char* base, int64_t expected) {
     free(path);
     return 1;
   }
+  rmtree(base);
+  mkdir(base, 0700);
   f = fopen(path, "w");
   if(f == NULL) {
     perror("writing serial failed");
