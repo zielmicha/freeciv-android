@@ -40,25 +40,24 @@ localhost = '127.0.0.1'
 def new_game():
     port = random.randint(2000, 15000)
     args = ('-r', './data/%s.serv' % features.get('app.ruleset'))
-    start_server(port, args=args)
-    ui.set(ServerGUI(port))
-
-def connect_dialog():
-    host = uidialog.inputbox('Server host')
-    port = int(uidialog.inputbox('Server port'))
-    username = uidialog.inputbox('User name')
-    connect(host, port, username)
-
-def connect(host, port, login='player'):
-    ui.set(ServerGUI(host=host, port=port, login=login, no_quit=True))
+    gui = ServerGUI()
+    start_server(port, args=args, line_callback=gui.server_line_callback)
+    gui.connect(port)
+    ui.set(gui.ui)
 
 class ServerGUI(ui.LinearLayoutWidget):
-    def __init__(self, port, host=localhost, login='player', no_quit=False):
+    def __init__(self, no_quit=False):
         super(ServerGUI, self).__init__()
-        sc_client = gamescreen.ScreenClient(no_quit=no_quit)
-        sc_client.connect_to_server(login, host, port)
+        gamescreen.ScreenClient(no_quit=no_quit)
+        self.ui = ui.ScrollWrapper(self)
         self.has_ui = False
         self.setup_loading_ui()
+
+        self.server_lines = []
+        self.server_console = None
+
+    def connect(self, port, host=localhost, login='player'):
+        client.client.connect_to_server(login, host, port)
 
     def setup_loading_ui(self):
         self.add(ui.Label('Loading...'))
@@ -110,6 +109,21 @@ class ServerGUI(ui.LinearLayoutWidget):
 
         self.set_nation_settings()
         self.set_difficulty_settings()
+
+        self.server_console = ui.Label('loading...', font=ui.consolefont)
+        self.add(self.server_console)
+        self.update_server_console()
+
+    def server_line_callback(self, line):
+        self.server_lines.append(line.rstrip())
+        self.server_lines = [ line for line in self.server_lines if line != '>' ]
+        self.server_lines = self.server_lines[-10:]
+        ui.execute_later.append(self.update_server_console)
+
+    def update_server_console(self):
+        if self.server_console:
+            caption = 'Server console:\n'
+            self.server_console.set_text(caption + '\n'.join(self.server_lines))
 
     def back(self):
         client.client.disconnect()
