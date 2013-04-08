@@ -46,6 +46,7 @@ def main():
     sys.argv = ['android']
     sys.stderr = LineStream(err)
     sys.stdout = LineStream(info)
+    init_encoding()
     init_screen()
     unpack_res()
     os.chdir(get_internal_storage())
@@ -63,6 +64,10 @@ def init_screen():
     wnd.blit(splash,
              dest=((wnd.get_width() - splash_size[0]) / 2, 0) + splash_size)
     graphics.flip()
+
+def init_encoding():
+    import encodings.ascii
+    import encodings.utf_8
 
 _keep_from_gc = []
 
