@@ -9,6 +9,7 @@
 void initgraphics();
 void initandroid();
 void initfreecivclient();
+void initjnius();
 
 static char* storage;
 
@@ -31,6 +32,7 @@ int SDL_main(int argc, char** argv) {
   Py_Initialize();
   PyRun_SimpleString("print 'Python running'");
   initgraphics();
+  initjnius();
   initandroid();
   initfreecivclient();
   PyRun_SimpleString("import android; android.main()");
@@ -39,6 +41,11 @@ int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "closing app");
 
   exit(0);
+}
+
+void* SDL_ANDROID_GetJNIEnv() {
+  /* make pyjnius happy */
+  return SDL_AndroidGetJNIEnv();
 }
 
 void unpack_res() {

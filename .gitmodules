@@ -10,3 +10,6 @@
 [submodule "android/project/jni/SDL"]
 	path = android/project/jni/SDL
 	url = https://github.com/zielmicha/SDL2.git
+[submodule "pyjnius"]
+	path = pyjnius
+	url = git://github.com/kivy/pyjnius.git

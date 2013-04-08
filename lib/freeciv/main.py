@@ -114,6 +114,8 @@ def run_autoupdate():
         notify_update(err.url)
     except Exception as err:
         print 'Failed to autoupdate:', err
+        import traceback
+        traceback.print_exc()
 
 def notify_update(url):
     print 'update found at', url

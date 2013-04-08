@@ -11,7 +11,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 	$(LOCAL_PATH)/../SDL_image $(LOCAL_PATH)/../SDL_ttf
 
 LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
-	entrypoint.c unarchive.c graphics.c android.c
+	entrypoint.c unarchive.c graphics.c android.c pyjnius.c
 
 LOCAL_SHARED_LIBRARIES := SDL2 SDL2_image SDL2_ttf python2.7 freeciv
 

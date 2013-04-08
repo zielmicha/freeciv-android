@@ -19,6 +19,7 @@ atexit"
 for mod in $STDMODULES; do
     cp ../python4android/Python-2.7/Lib/$mod.py $A/lib/python2.7 || exit 1
 done
+cp ../pyjnius/jnius/reflect.py $A/lib/python2.7/reflect.py
 rm -r project/assets/fonts
 mkdir project/assets/fonts
 cp ../fonts/*.ttf project/assets/fonts

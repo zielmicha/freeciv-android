@@ -37,7 +37,7 @@ public class SDLActivity extends Activity {
     public static boolean mIsPaused;
 
     // Main components
-    private static SDLActivity mSingleton;
+    public static SDLActivity mSingleton;
     private static SDLSurface mSurface;
     private static View mTextEdit;
     private static ViewGroup mLayout;

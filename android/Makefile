@@ -31,7 +31,10 @@ build: builddep cython project/jni/freeciv project/build.xml
 project/build.xml:
 	android update project --path project --name "FreecivDebug" --target android-17
 
-cython: project/jni/src/graphics.c project/jni/src/android.c
+cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyjnius.c
+
+project/jni/src/pyjnius.c:
+	./makejnius.sh
 
 project/jni/freeciv:
 	ln -sf $(PWD)/../src project/jni/freeciv

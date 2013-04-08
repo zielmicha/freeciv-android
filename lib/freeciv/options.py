@@ -12,6 +12,7 @@
 
 import ui
 import uidialog
+import osutil
 import features
 import functools
 import traceback
