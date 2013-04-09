@@ -1,4 +1,5 @@
 import ui
+import osutil
 import functools
 import graphics
 
@@ -45,7 +46,7 @@ def load_help():
 def _load_help():
     acum = []
     title = None
-    lines = open('data/android-help.txt').read().splitlines()
+    lines = osutil.open_res('data/android-help.txt').read().splitlines()
     for line in lines:
         if line.startswith('=== '):
             if acum: yield title, '\n'.join(acum)
@@ -90,7 +91,7 @@ class LongTextWidget(ui.LinearLayoutWidget):
 
         height = sum( max([ word.get_height() for word in line ] + [0]) for line in lines )
 
-        surf = graphics.const.Surface((width, height), graphics.const.SRCALPHA)
+        surf = graphics.create_surface(width, height)
 
         y = 0
         for line in lines:

@@ -40,7 +40,7 @@ done
 (cd ../data; find -type f) | while read line; do
     if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
         cp ../data/$line $B/$line || exit 1
-    elif [[ $line =~ \.(png|jpg|index)$ ]]; then
+    elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
         cp ../data/$line project/assets/data/$line || exit 1
     fi
 done
