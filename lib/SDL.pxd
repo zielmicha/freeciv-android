@@ -14,6 +14,7 @@ cdef extern from "SDL.h":
         SDL_PIXELFORMAT_ARGB8888
         SDL_PIXELFORMAT_ARGB4444
         SDL_PIXELFORMAT_RGB888
+        SDL_PIXELFORMAT_RGB332
         SDL_INIT_VIDEO
 
     ctypedef enum SDLMod:

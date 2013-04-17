@@ -688,7 +688,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
          * This should also take care of some kinds of manually toggled soft
          * keyboards (i.e. not via the SDL text input API).
          */
-        if ( (event.getDevice().getSources() & 0x00000010 /* API 12: InputDevice.SOURCE_CLASS_JOYSTICK*/) != 0) {
+        if ( event.getDevice() != null && (event.getDevice().getSources() & 0x00000010 /* API 12: InputDevice.SOURCE_CLASS_JOYSTICK*/) != 0) {
             int id = SDLActivity.getJoyId( event.getDeviceId() );
             // The joystick subsystem may be uninitialized, so ignore
             if (id < 0)

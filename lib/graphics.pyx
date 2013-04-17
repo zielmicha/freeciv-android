@@ -27,7 +27,7 @@ cdef class Font(object):
         if not self.font:
             raise TTFError()
 
-    def render(self, text, antialias, fg, bg=None):
+    def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
         if len(text) == 0:
             text = ' '
         # todo: antialias and bg
@@ -37,6 +37,7 @@ cdef class Font(object):
         surf = TTF_RenderUTF8_Blended(self.font, text, fgcolor)
         if not surf:
             raise TTFError()
+        _debug_createtexture(surf.w, surf.h)
         cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, surf)
         if not tex:
             raise SDLError()
@@ -53,6 +54,22 @@ cdef class Font(object):
 cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
     cdef SDL_Surface* surf
     return (<Surface> item)._tex
+
+_debug_texturecount = 0
+_debug_texturepixels = 0
+
+cdef _debug_createtexture(int w, int h):
+    global _debug_texturecount, _debug_texturepixels
+    _debug_texturecount += 1
+    _debug_texturepixels += w * h
+    if _debug_texturecount % 50 == 0:
+        print 'create (%d, %d) (no %d, pix %d kB)'\
+            % (w, h, _debug_texturecount, _debug_texturepixels / (1024 / 4))
+
+def _debug_destroytexture(size):
+    global _debug_texturecount, _debug_texturepixels
+    _debug_texturecount -= 1
+    _debug_texturepixels -= size[0] * size[1]
 
 MODE_BLEND = SDL_BLENDMODE_BLEND
 MODE_MOD = SDL_BLENDMODE_MOD
@@ -88,6 +105,9 @@ cdef class Surface(object):
         pass
 
     def blit(self, image, dest=(0, 0), src=None, blend=MODE_BLEND):
+        if isinstance(image, CroppedSurface):
+            (<CroppedSurface>image).blit_into(self, dest, src, blend)
+            return
         cdef SDL_Rect srect, drect
         cdef SDL_Texture* blit_src
         self._set_target()
@@ -135,11 +155,14 @@ cdef class Surface(object):
         SDL_RenderDrawLine(self._sdl, x1, y1, x2, y2)
         self._finish()
 
-    def scale(self, size):
-        cdef Surface dest = create_surface(size[0], size[1])
+    def scale(self, size, src=None):
+        cdef Surface dest = create_surface_small(size[0], size[1])
         dest._filename = 'scaled %s' % self._filename
-        dest.blit(self, dest=(0, 0, size[0], size[1]))
+        dest.blit(self, dest=(0, 0, size[0], size[1]), src=src)
         return dest
+
+    def cropped(self, rect):
+        return CroppedSurface(self, rect)
 
     def gfx_ellipse(self, color, rect, width):
         raise NotImplementedError
@@ -162,6 +185,100 @@ cdef class Surface(object):
         if self._tex != NULL:
             SDL_DestroyTexture(self._tex)
             self._tex = NULL
+            _debug_destroytexture(self.get_size())
+
+cdef class CroppedSurface(Surface):
+    cdef object orig
+    cdef object rect
+    cdef object allocator
+    cdef object alloc_free_data
+
+    def get_orig(self):
+        return self.orig
+
+    def get_crop(self):
+        return self.rect
+
+    def __init__(self, orig, rect):
+        assert rect
+        self.orig = orig
+        self.rect = Rect(rect)
+
+    def get_size(self):
+        return self.rect[2], self.rect[3]
+
+    cdef object blit_into(self, surf, dest, src, blend):
+        if not src:
+            src = self.rect
+        else:
+            src = (src[0] + self.rect[0], src[1] + self.rect[1], src[2], src[3])
+            src = self.rect.clip(src)
+        if len(dest) == 2:
+            dest = dest + (src[2], src[3])
+        surf.blit(self.orig, dest, src, blend)
+
+    def blit(self, surf, dest=(0, 0), src=None, *args, **kwargs):
+        if not src:
+            src = (0, 0) + surf.get_size()
+        if len(dest) == 2:
+            dest = dest + (src[2], src[3])
+        dest = (dest[0] + self.rect[0], dest[1] + self.rect[1], dest[2], dest[3])
+        dest = self.rect.clip(dest)
+        self.orig.blit(surf, dest, src, *args, **kwargs)
+
+    def scale(self, size):
+        return self.orig.scale(size, src=self.rect)
+
+    def set_alloc_data(self, allocator, alloc_free_data):
+        self.allocator = allocator
+        self.alloc_free_data = alloc_free_data
+
+    def __del__(self):
+        if self.allocator:
+            self.allocator.free.append(self.alloc_free_data)
+
+def create_surface_small(w, h):
+    _init_alloc()
+    for alloc in allocators:
+        if alloc.sw >= w and alloc.sh >= h:
+            return alloc.alloc(w, h)
+    return create_surface(w, h)
+
+S = 1024
+
+class Allocator:
+    def __init__(self, sw, sh=None):
+        sh = sh or sw
+        self.sw = sw
+        self.sh = sh
+        self.buffs = []
+        self.nw = S / self.sw
+        self.nh = S / self.sh
+        self.free = []
+        self._usage = []
+
+    def add_buff(self):
+        if self._usage:
+            print 'add_buff to %d,%d, eff %f' % (self.sw, self.sh, sum(self._usage) / len(self._usage))
+        i = len(self.buffs)
+        self.buffs.append(create_surface(S, S))
+        self.free += [ (i, x, y) for x in xrange(self.nw) for y in xrange(self.nh) ]
+
+    def alloc(self, w, h):
+        if not self.free:
+            self.add_buff()
+        i, x, y = self.free.pop()
+        self._usage.append(w * h / float(self.sw) / float(self.sh))
+        img = self.buffs[i].cropped((x * self.sw, y * self.sh, w, h))
+        img.set_alloc_data(self, (i, x, y))
+        return img
+
+def _init_alloc():
+    global allocators
+    if not allocators:
+        allocators = [Allocator(48), Allocator(96, 48), Allocator(128)]
+
+allocators = None
 
 cdef Surface _window
 cdef SDL_Window* _window_handle
@@ -179,8 +296,12 @@ class Rect(tuple):
     def clip(self, other):
         x, y, w, h = self
         x1, y1, w1, h1 = other
-        return max(x, x1), max(y, y1), min(x + w, x1 + w1) - max(x, x1), \
-            min(y + h, y1 + h1) - max(y, y1)
+        return Rect((max(x, x1), max(y, y1), min(x + w, x1 + w1) - max(x, x1), \
+            min(y + h, y1 + h1) - max(y, y1)))
+
+    def empty(self):
+        x, y, w, h = self
+        return w <= 0 or h <= 0
 
     @property
     def left(self):
@@ -217,6 +338,7 @@ def load_image(fn):
     cdef SDL_Surface* s = IMG_Load_RW(res, True)
     if not s:
         raise SDLError()
+    _debug_createtexture(s.w, s.h)
     cdef SDL_Texture* tex = SDL_CreateTextureFromSurface(_window._sdl, s)
     if not tex:
         raise SDLError()
@@ -230,6 +352,7 @@ def load_font(name, size):
 def create_surface(w, h, alpha=True):
     cdef SDL_Texture* tex
     MAX = 2048
+    _debug_createtexture(w, h)
     tex = SDL_CreateTexture(_window._sdl, 0,
                             SDL_TEXTUREACCESS_TARGET, min(max(1, w), MAX), min(max(1, h), MAX))
     if not tex:

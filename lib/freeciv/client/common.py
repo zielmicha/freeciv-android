@@ -39,7 +39,7 @@ def get_sprite_dimensions(image):
 
 @freeciv.register
 def crop_sprite(img, x, y, w, h, mask=None, mask_x=0, mask_y=0):
-    surf = graphics.create_surface(w, h)
+    surf = graphics.create_surface_small(w, h)
     surf.blit(img, (0, 0), (x, y, w, h))
     surf.filename = '%s%s[%d,%d,%d,%d]' % (img.filename,
                                            ',masked' if mask else '', x, y, w, h)
@@ -56,7 +56,7 @@ mask_stage = 0
 
 def mask_sprite(surf, mask, mx, my):
     mask = get_white_mask(mask)
-    newsurf = graphics.create_surface(*surf.get_size())
+    newsurf = graphics.create_surface_small(*surf.get_size())
     newsurf.blit(surf)
     newsurf.blit(mask, src=(mx, my) + surf.get_size(), blend=graphics.MODE_MOD)
     return newsurf
@@ -164,7 +164,7 @@ def load_flags_file(name):
     for line in osutil.open_res('data/flags/%s.index' % name):
         name, rect = line.split(' ', 1)
         rect = map(int, rect.split())
-        flag = graphics.create_surface(rect[2], rect[3])
+        flag = graphics.create_surface_small(rect[2], rect[3])
         flag.blit(img, (0, 0), rect)
         flag_index[name] = flag
 
