@@ -1,8 +1,10 @@
-all: src lib
+all: src lib data/techtree.index
 src/Makefile:
 	cd src; ./configure
 src/objectfiles:
 	mkdir src/objectfiles
+data/techtree.index:
+	cd data; python gentechtree.py | dot -Tplain > techtree.index
 src: src/Makefile src/objectfiles
 	$(MAKE) -C src
 lib:
