@@ -232,7 +232,7 @@ def start_marketnotice():
         thread.start_new_thread(run_marketnotice, ())
 
 def run_marketnotice():
-    time.sleep(20 * 60)
+    ui.user_time_sleep(20 * 60)
     ui.execute_later(show_marketnotice)
 
 def show_marketnotice():

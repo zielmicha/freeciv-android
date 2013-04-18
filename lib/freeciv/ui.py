@@ -502,7 +502,10 @@ def execute_later(func):
     with _execute_later_lock:
         _execute_later_list.append(func)
 
+any_mouse_events = 0
+
 def main_handle_events():
+    global any_mouse_events
     events = merge_mouse_events(graphics.get_events())
     if not screen:
         return
@@ -514,6 +517,7 @@ def main_handle_events():
             x, y = ev_dict['pos']
             ev_dict['pos'] = x, y
             ev_dict['abs_pos'] = ev_dict['pos']
+            any_mouse_events = time.time()
         if event.type == graphics.const.QUIT:
             back()
         elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
@@ -549,16 +553,25 @@ def main_tick():
     main_dispatch_ticks()
     main_draw()
 
+user_time_spent = 0
+
 def main_tick_wrapper():
+    global user_time_spent
     try:
         frame_start = time.time()
 
         main_tick()
 
-        frame_last = time.time() - frame_start
+        curr_time = time.time()
+        frame_last = curr_time - frame_start
         sleep = (1./FPS) - frame_last
         if sleep > 0:
             time.sleep(sleep)
+        USER_INACTIVITY_MAX = 10
+        if any_mouse_events + USER_INACTIVITY_MAX > curr_time:
+            # don't count time if user has locked screen or switched app
+            # or haven't touched screen for long
+            user_time_spent += min(frame_last, 1) + sleep
     except (KeyboardInterrupt, SystemExit):
         raise
     except:
@@ -573,8 +586,14 @@ def main():
     while True:
         main_tick_wrapper()
 
-except_callback = None
-pause_callback = None
+def user_time_sleep(c):
+    deadline = user_time_spent + c
+    while True:
+        to_sleep = deadline - user_time_spent
+        if to_sleep < 0:
+            break
+        print 'to_sleep', to_sleep
+        time.sleep(to_sleep)
 
 def merge_mouse_events(events):
     mouse = None
@@ -587,16 +606,6 @@ def merge_mouse_events(events):
     if mouse:
         res.append(mouse)
     return res
-
-def check_pause():
-    if osutil.is_paused():
-        print 'got pause signal'
-        if pause_callback:
-            pause_callback()
-        else:
-            print 'wait for resume'
-            osutil.wait_for_resume()
-            print 'resumed'
 
 class Event(object):
     def __init__(self, type, dict):
