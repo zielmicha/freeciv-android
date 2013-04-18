@@ -487,7 +487,7 @@ class Bordered(LinearLayoutWidget):
         surf.draw_rect((0, 0, 0), pos + self.size, 1)
         LinearLayoutWidget.draw(self, surf, pos)
 
-FPS = 15
+FPS = 30
 
 def add_overlay(overlay, pos):
     overlay.pos = pos

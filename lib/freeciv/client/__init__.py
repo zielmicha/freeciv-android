@@ -110,7 +110,7 @@ class Client(object):
 
         freeciv.func.call_idle_callbacks()
         if net_socket != -1:
-            r, w, x = select.select([net_socket], [], [], 0.03)
+            r, w, x = select.select([net_socket], [], [], 0.01)
             if r:
                 freeciv.func.input_from_server(net_socket)
         else:
