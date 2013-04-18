@@ -76,6 +76,8 @@ MODE_MOD = SDL_BLENDMODE_MOD
 MODE_NONE = SDL_BLENDMODE_NONE
 MODE_ADD = SDL_BLENDMODE_ADD
 
+same_blit_buffer = None
+
 cdef class Surface(object):
     cdef SDL_Renderer* _sdl
     cdef SDL_Texture* _tex
@@ -105,14 +107,28 @@ cdef class Surface(object):
         pass
 
     def blit(self, image, dest=(0, 0), src=None, blend=MODE_BLEND):
+        global same_blit_buffer
         if isinstance(image, CroppedSurface):
             (<CroppedSurface>image).blit_into(self, dest, src, blend)
             return
         cdef SDL_Rect srect, drect
         cdef SDL_Texture* blit_src
-        self._set_target()
         if not src:
             src = (0, 0, image.get_width(), image.get_height())
+
+        if self == image:
+            if not same_blit_buffer:
+                same_blit_buffer = create_surface(512, 512)
+            if src[2] > same_blit_buffer.get_width() or src[3] > same_blit_buffer.get_height():
+                raise RuntimeError('src==dest blit too big to fit into same_blit_buffer')
+            newsrc = (0, 0, src[2], src[3])
+            same_blit_buffer.draw_rect((0, 0, 0, 0), newsrc, blend=MODE_NONE)
+            same_blit_buffer.blit(image, src=src)
+            src = newsrc
+            image = same_blit_buffer
+
+        self._set_target()
+
         if len(dest) == 2:
             dest = (dest[0], dest[1], src[2], src[3])
         blit_src = _sdl_get_texture(self._sdl, image)
@@ -163,6 +179,11 @@ cdef class Surface(object):
 
     def cropped(self, rect):
         return CroppedSurface(self, rect)
+
+    def checked_cropped(self, rect):
+        if Rect((0, 0,) + self.get_size()).clip(rect) != rect:
+            raise ValueError('cropping %s of %s image' % (rect, self.get_size()))
+        return self.cropped(rect)
 
     def gfx_ellipse(self, color, rect, width):
         raise NotImplementedError
@@ -223,7 +244,8 @@ cdef class CroppedSurface(Surface):
         if len(dest) == 2:
             dest = dest + (src[2], src[3])
         dest = (dest[0] + self.rect[0], dest[1] + self.rect[1], dest[2], dest[3])
-        dest = self.rect.clip(dest)
+        if self.rect.clip(dest) != dest: print 'risky blit'
+
         self.orig.blit(surf, dest, src, *args, **kwargs)
 
     def scale(self, size):
@@ -235,7 +257,7 @@ cdef class CroppedSurface(Surface):
 
     def __del__(self):
         if self.allocator:
-            self.allocator.free.append(self.alloc_free_data)
+            self.allocator.free_area(*self.alloc_free_data)
 
 def create_surface_small(w, h):
     _init_alloc()
@@ -269,16 +291,20 @@ class Allocator:
             self.add_buff()
         i, x, y = self.free.pop()
         self._usage.append(w * h / float(self.sw) / float(self.sh))
-        img = self.buffs[i].cropped((x * self.sw, y * self.sh, w, h))
+        img = self.buffs[i].checked_cropped((x * self.sw, y * self.sh, w, h))
         img.set_alloc_data(self, (i, x, y))
         return img
+
+    def free_area(self, i, x, y):
+        self.buffs[i].draw_rect((0, 0, 0, 0), (x, y, self.sw, self.sh), mode=MODE_NONE)
+        self.free.append((i, x, y))
 
 def _init_alloc():
     global allocators
     if not allocators:
         allocators = [Allocator(48), Allocator(96, 48), Allocator(128)]
 
-allocators = None
+allocators = []
 
 cdef Surface _window
 cdef SDL_Window* _window_handle
