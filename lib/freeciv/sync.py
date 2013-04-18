@@ -85,7 +85,7 @@ def save_and_sync_next_step(old_set):
             break
     print 'found save', name
     time.sleep(0.5)
-    ui.execute_later.append(lambda: upload_save(save.get_save_dir() + '/' + name, name))
+    ui.execute_later(lambda: upload_save(save.get_save_dir() + '/' + name, name))
 
 def upload_save(path, name):
     data = save.open_save(path).read()
@@ -201,13 +201,11 @@ def show_login_form(callback, msg=None):
         ui.message(msg)
 
 def comment_upload(install_time):
-    with ui.execute_later_lock:
-        ui.execute_later.append(lambda: ui.message('Compressing log...'))
+    ui.execute_later(lambda: ui.message('Compressing log...'))
 
     content = lzma.compress(open(save.get_save_dir() + '/more.log').read())
 
-    with ui.execute_later_lock:
-        ui.execute_later.append(lambda: ui.back())
+    ui.execute_later(lambda: ui.back())
 
     request(lambda result: comment_next(install_time), 'upload_log', content, install_time,
             banner="Uploading log (%dkB)" % (len(content)/1024))
@@ -254,16 +252,15 @@ def sync_request(callback, name, args, kwargs):
             print 'Login failed:', err
             ui.back(anim=False)
             self = lambda: request(callback, name, *args, **kwargs)
-            ui.execute_later.append(lambda: show_login_form(self, str(err)))
+            ui.execute_later(lambda: show_login_form(self, str(err)))
             return
     except Exception as err:
         traceback.print_exc()
         ui.back(anim=False)
-        ui.execute_later.append(lambda: ui.message('Failed to connect to the internet'))
+        ui.execute_later(lambda: ui.message('Failed to connect to the internet'))
         return
     ui.back(anim=False)
-    with ui.execute_later_lock:
-        ui.execute_later.append(lambda: callback(result))
+    ui.execute_later(lambda: callback(result))
 
 
 def get_install_time():

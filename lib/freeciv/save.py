@@ -118,7 +118,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.server_lines.append(line.rstrip())
         self.server_lines = [ line for line in self.server_lines if line != '>' ]
         self.server_lines = self.server_lines[-10:]
-        ui.execute_later.append(self.update_server_console)
+        ui.execute_later(self.update_server_console)
 
     def update_server_console(self):
         if self.server_console:

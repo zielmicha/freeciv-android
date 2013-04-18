@@ -149,8 +149,7 @@ def notify_update(url):
     def callback():
         button.set_text('Loading...')
         button.callback = None
-        with ui.execute_later_lock:
-            ui.execute_later.append(lambda: uidialog.open_url(url))
+        ui.execute_later(lambda: uidialog.open_url(url))
 
     global main_menu_update_shown
     if main_menu_update_shown:

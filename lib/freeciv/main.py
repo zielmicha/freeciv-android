@@ -64,7 +64,7 @@ def client_main():
         return
 
     ui.set(ui.Label('loading...'))
-    ui.execute_later.append(app_main)
+    ui.execute_later(app_main)
 
     if features.get('app.profile'):
         profile_main()
@@ -122,8 +122,7 @@ def notify_update(url):
 
     time.sleep(1)
 
-    with ui.execute_later_lock:
-        ui.execute_later.append(lambda: menus.notify_update(url))
+    ui.execute_later(lambda: menus.notify_update(url))
 
 client.main = client_main
 
@@ -234,8 +233,7 @@ def start_marketnotice():
 
 def run_marketnotice():
     time.sleep(20 * 60)
-    with ui.execute_later_lock:
-        ui.execute_later.append(show_marketnotice)
+    ui.execute_later(show_marketnotice)
 
 def show_marketnotice():
     def never():

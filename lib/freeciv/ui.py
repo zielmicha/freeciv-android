@@ -495,91 +495,83 @@ def add_overlay(overlay, pos):
 
 import threading
 
-execute_later = []
-execute_later_lock = threading.Lock()
+_execute_later_list = []
+_execute_later_lock = threading.Lock()
+
+def execute_later(func):
+    with _execute_later_lock:
+        _execute_later_list.append(func)
+
+def main_handle_events():
+    events = merge_mouse_events(graphics.get_events())
+    if not screen:
+        return
+
+    for event in events:
+        ev_dict = event.dict
+        if 'pos' in ev_dict:
+            ev_dict = dict(ev_dict)
+            x, y = ev_dict['pos']
+            ev_dict['pos'] = x, y
+            ev_dict['abs_pos'] = ev_dict['pos']
+        if event.type == graphics.const.QUIT:
+            back()
+        elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
+            back()
+        else:
+            screen.event(Event(event.type, ev_dict))
+
+def main_draw():
+    surf = graphics.get_window()
+    fill(surf, (0,0))
+    screen.draw(surf, (0, 0))
+
+    for overlay in overlays:
+        overlay.draw(surf, overlay.pos)
+
+    graphics.flip()
+
+def main_dispatch_ticks():
+    with _execute_later_lock:
+        execute_later_list = list(_execute_later_list)
+        _execute_later_list[:] = []
+
+    screen.tick()
+
+    for overlay in overlays:
+        overlay.tick()
+
+    for func in execute_later_list:
+        func()
+
+def main_tick():
+    main_handle_events()
+    main_dispatch_ticks()
+    main_draw()
+
+def main_tick_wrapper():
+    try:
+        frame_start = time.time()
+
+        main_tick()
+
+        frame_last = time.time() - frame_start
+        sleep = (1./FPS) - frame_last
+        if sleep > 0:
+            time.sleep(sleep)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except:
+        traceback.print_exc()
+        if except_callback:
+            except_callback()
+        time.sleep(0.5)
 
 def main():
-
-    def main_tick():
-        events = merge_mouse_events(graphics.get_events())
-        if not screen:
-            return
-
-        for event in events:
-            ev_dict = event.dict
-            if 'pos' in ev_dict:
-                ev_dict = dict(ev_dict)
-                x, y = ev_dict['pos']
-                ev_dict['pos'] = x, y
-                ev_dict['abs_pos'] = ev_dict['pos']
-            if event.type == graphics.const.QUIT:
-                back()
-            elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
-                back()
-            else:
-                screen.event(Event(event.type, ev_dict))
-
-        screen.tick()
-
-        for overlay in overlays:
-            overlay.tick()
-
-        fill(surf, (0,0))
-        screen.draw(surf, (0, 0))
-
-        for overlay in overlays:
-            overlay.draw(surf, overlay.pos)
-
-        with execute_later_lock:
-            execute_later_list = list(execute_later)
-            execute_later[:] = []
-
-        for func in execute_later_list:
-            func()
-
-        if show_fps and fps_label:
-            surf.blit(fps_label, (surf.get_width() - fps_label.get_width(), 0))
-
-        graphics.flip()
-
-        check_pause()
-
-    global screen_width, screen_height, screen_size, execute_later
-    fps_label = None
-    fps_timeout = 0
-    lost_time = 0.0
-    per_frame = 1./FPS
-    frame_last = 0
-    surf = graphics.get_window()
-    screen_width, screen_height = screen_size = surf.get_size()
+    global screen_width, screen_height
+    screen_width, screen_height = screen_size = graphics.get_window().get_size()
     while True:
-        try:
-            frame_start = time.time()
-
-            main_tick()
-
-            frame_last = time.time() - frame_start
-            sleep = per_frame - frame_last
-            if sleep > 0:
-                time.sleep(sleep)
-            else:
-                lost_time += -sleep
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except:
-            traceback.print_exc()
-            if except_callback:
-                except_callback()
-            time.sleep(0.5)
-            continue
-
-
-        if show_fps:
-            if fps_timeout == 0:
-                fps_timeout = 10
-                fps_label = mediumfont.render(str(int(1/frame_last)), 1, (200, 150, 150))
-            else:
-                fps_timeout -= 1
+        main_tick_wrapper()
 
 except_callback = None
 pause_callback = None
