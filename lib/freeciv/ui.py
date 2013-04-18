@@ -592,7 +592,6 @@ def user_time_sleep(c):
         to_sleep = deadline - user_time_spent
         if to_sleep < 0:
             break
-        print 'to_sleep', to_sleep
         time.sleep(to_sleep)
 
 def merge_mouse_events(events):

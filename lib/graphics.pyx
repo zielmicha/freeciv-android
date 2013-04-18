@@ -62,9 +62,6 @@ cdef _debug_createtexture(int w, int h):
     global _debug_texturecount, _debug_texturepixels
     _debug_texturecount += 1
     _debug_texturepixels += w * h
-    if _debug_texturecount % 50 == 0:
-        print 'create (%d, %d) (no %d, pix %d kB)'\
-            % (w, h, _debug_texturecount, _debug_texturepixels / (1024 / 4))
 
 def _debug_destroytexture(size):
     global _debug_texturecount, _debug_texturepixels

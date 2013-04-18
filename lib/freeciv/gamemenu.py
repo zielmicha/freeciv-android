@@ -92,12 +92,9 @@ class Menu(ui.LinearLayoutWidget):
         if j_type == 'new':
             joystick = NewJoystick(client)
             joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
-        elif j_type == 'tile':
+        else:
             joystick = TileJoystick(client)
             joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 20
-        else:
-            joystick = Joystick(client)
-            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 10
         joystick_layout.add(joystick)
         self.items.insert(0, joystick_layout)
 
@@ -206,8 +203,9 @@ class NewJoystick(ui.Widget):
             surf.draw_line((255, 0, 0), (px+size, py+size), (px+size+x, py+size+y))
 
     def _ellipse(self, surf, color, rect):
+        # TODO
         # [rect[0]+rect[3]/2, rect[1]+rect[3]/2, rect[2]/2, rect[3]/2]
-        surf.gfx_ellipse(color, rect, width=0)
+        surf.gfx_rect(color, rect, width=0)
 
     def event(self, ev):
         if hasattr(ev, 'pos'):

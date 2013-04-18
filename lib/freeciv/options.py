@@ -174,7 +174,7 @@ def change_joystick():
         features.set_perm('app.joystick', name)
         ui.back()
 
-    types = ['new', 'tile', 'old']
+    types = ['new', 'tile']
     panel = ui.LinearLayoutWidget()
 
     for type in types:
