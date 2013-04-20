@@ -276,6 +276,10 @@ bool can_unit_upgrade(struct unit* punit) {
     return can_upgrade_unittype(client_player(), unit_type(punit));
 }
 
+void update_map_canvas_whole() {
+  update_map_canvas(0, 0, mapview.store_width, mapview.store_height);
+}
+
 void ui_main(int argc, char *argv[]) {
     PY_CALL("s", "ui_main");
 }

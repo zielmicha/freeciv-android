@@ -184,3 +184,5 @@ void py_server_main(PyObject* cmd)
 
 void request_unit_upgrade(struct unit *punit);
 bool can_unit_upgrade(struct unit *punit);
+
+void update_map_canvas_whole()

@@ -580,7 +580,7 @@ class MapDrawer(object):
         self.scrolling = False
         self.zoom = 1
 
-        self.MAP_CACHE_SIZE = 0.4
+        self.MAP_CACHE_SIZE = 0.
 
     def start_scrolling(self):
         self.scrolling = True
@@ -588,6 +588,7 @@ class MapDrawer(object):
 
     def end_scrolling(self):
         self.scrolling = False
+        freeciv.func.update_map_canvas_whole()
         self.update_origin()
         self.reload()
 
