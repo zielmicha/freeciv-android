@@ -277,7 +277,10 @@ bool can_unit_upgrade(struct unit* punit) {
 }
 
 void update_map_canvas_whole() {
-  update_map_canvas(0, 0, mapview.store_width, mapview.store_height);
+  bool old_cachable = mapview.can_do_cached_drawing;
+  mapview.can_do_cached_drawing = false;
+  base_set_mapview_origin(mapview.gui_x0, mapview.gui_y0);
+  mapview.can_do_cached_drawing = old_cachable;
 }
 
 void ui_main(int argc, char *argv[]) {

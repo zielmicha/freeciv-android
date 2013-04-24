@@ -16,6 +16,7 @@ import uidialog
 import client
 import graphics
 import functools
+import time
 
 from client import freeciv
 
@@ -579,6 +580,7 @@ class MapDrawer(object):
         self.widget_size = (0, 0)
         self.scrolling = False
         self.zoom = 1
+        self.canvas_last_updated = 0
 
         self.MAP_CACHE_SIZE = 0.
 
@@ -588,7 +590,6 @@ class MapDrawer(object):
 
     def end_scrolling(self):
         self.scrolling = False
-        freeciv.func.update_map_canvas_whole()
         self.update_origin()
         self.reload()
 
@@ -605,6 +606,7 @@ class MapDrawer(object):
         cliptex = graphics.create_surface(*self.widget_size)
         if not self.scrolling:
             target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
+            self.maybe_update_whole_canvas()
             if self.zoom == 1:
                 self.client.draw_map(cliptex, target)
             else:
@@ -627,6 +629,14 @@ class MapDrawer(object):
                 cliptex.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
                                                   int(pos[1] - self.user_corner[1] * self.zoom)))
         surf.blit(cliptex, clip_pos)
+
+    def maybe_update_whole_canvas(self):
+        # need to throttle update, to make animations smooth
+        current_time = time.time()
+        TIMEOUT = 1
+        if current_time > self.canvas_last_updated + TIMEOUT:
+            self.canvas_last_updated = current_time
+            freeciv.func.update_map_canvas_whole()
 
     def reload(self):
         self.prepare_map_cache()
