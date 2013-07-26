@@ -12,7 +12,7 @@
                   android:label="Freeciv Debug"
                   android:icon="@drawable/icon"
                   android:screenOrientation="landscape"
-                  android:configChanges="orientation|keyboardHidden"
+                  android:configChanges="orientation|keyboardHidden|screenSize"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
