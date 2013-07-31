@@ -3,22 +3,6 @@ import graphics
 import sys
 import os
 
-cdef extern from "SDL.h":
-    cdef char* SDL_AndroidGetExternalStoragePath()
-    cdef char* SDL_AndroidGetInternalStoragePath()
-
-def get_external_storage():
-    cdef char* path = SDL_AndroidGetExternalStoragePath()
-    if path == NULL:
-        raise SDLError()
-    return path
-
-def get_internal_storage():
-    cdef char* path = SDL_AndroidGetInternalStoragePath()
-    if path == NULL:
-        raise SDLError()
-    return path
-
 cdef extern from "android/log.h":
     cdef int __android_log_write(int prio, char *tag, char *text)
     ctypedef enum:
@@ -31,9 +15,6 @@ cdef extern from "android/log.h":
         ANDROID_LOG_ERROR
         ANDROID_LOG_FATAL
         ANDROID_LOG_SILENT
-
-cdef extern:
-    cdef void unpack_res()
 
 def err(line):
     __android_log_write(ANDROID_LOG_ERROR, "freeciv", line)
@@ -48,8 +29,7 @@ def main():
     sys.stdout = LineStream(info)
     init_encoding()
     init_screen()
-    unpack_res()
-    os.chdir(get_internal_storage())
+    #os.chdir(get_internal_storage())
     from freeciv import main
     main.main()
 

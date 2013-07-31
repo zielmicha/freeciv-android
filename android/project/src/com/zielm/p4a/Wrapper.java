@@ -1,4 +1,4 @@
-package org.libsdl.app;
+package com.zielm.p4a;
 
 import android.app.*;
 import android.content.*;
@@ -16,17 +16,13 @@ import android.content.*;
 
 import java.lang.*;
 import java.util.*;
-import com.zielm.p4a.*;
 
-/**
-    Not really SDL Activity - keeping activity name
-    for backwards compatibility.
-*/
-public class SDLActivity extends Activity {
-    @Override
-    protected void onCreate(Bundle src) {
-        super.onCreate(src);
-        Log.i("com.zielm.p4a", "BEGIN");
-        Wrapper.onCreate();
+public class Wrapper {
+    {
+        System.loadLibrary("main");
+    }
+
+    public static void onCreate() {
+
     }
 }

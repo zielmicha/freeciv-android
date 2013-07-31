@@ -1,12 +1,6 @@
 [submodule "python4android"]
 	path = python4android
 	url = https://github.com/zielmicha/python4android.git
-[submodule "android/project/jni/jpeg"]
-	path = android/project/jni/jpeg
-	url = https://github.com/zielmicha/jpeg8d.git
-[submodule "android/project/jni/png"]
-	path = android/project/jni/png
-	url = https://github.com/zielmicha/libpng-android.git
 [submodule "pyjnius"]
 	path = pyjnius
 	url = git://github.com/kivy/pyjnius.git
