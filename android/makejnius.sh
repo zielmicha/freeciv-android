@@ -1,4 +1,5 @@
 rm -r project/obj/jnius
+mkdir -p project/obj/
 cp -r ../pyjnius/jnius/ project/obj/jnius
 echo 'DEF JNIUS_PLATFORM = "android"' > project/obj/jnius/config.pxi
 find project/obj/jnius -name '*.pxi' | while read name; do

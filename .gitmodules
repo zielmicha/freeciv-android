@@ -7,9 +7,6 @@
 [submodule "android/project/jni/png"]
 	path = android/project/jni/png
 	url = https://github.com/zielmicha/libpng-android.git
-[submodule "android/project/jni/SDL"]
-	path = android/project/jni/SDL
-	url = https://github.com/zielmicha/SDL2.git
 [submodule "pyjnius"]
 	path = pyjnius
 	url = git://github.com/kivy/pyjnius.git
