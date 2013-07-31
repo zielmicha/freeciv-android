@@ -18,8 +18,8 @@ runlog: run
 
 # ASSETS
 assets: copyassets
-	python archive.py project/obj/code > project/assets/code.archive
-	python archive.py project/obj/res > project/assets/res.archive
+	cd project/obj/code; ziptar cf --zip ../../assets/code.archive .
+#	cd project/obj/res; ziptar cf --zip project/assets/res.archive
 copyassets:
 	./copyassets.sh
 

@@ -27,6 +27,6 @@ public class SDLActivity extends Activity {
     protected void onCreate(Bundle src) {
         super.onCreate(src);
         Log.i("com.zielm.p4a", "BEGIN");
-        Wrapper.onCreate();
+        Wrapper.onCreate(this);
     }
 }
