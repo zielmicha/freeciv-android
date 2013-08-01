@@ -37,10 +37,10 @@ def main():
 
 def init_screen():
     graphics.init()
-    wnd = graphics.get_window()
+    wnd = graphics.lock_window()
     wnd.fill((0, 128, 0))
     graphics.flip()
-    wnd = graphics.get_window()
+    wnd = graphics.lock_window()
     splash = graphics.load_image('data/user/presplash.png')
     splash_size = (splash.get_width() * wnd.get_height() / splash.get_height(), wnd.get_height())
     wnd.fill((255, 255, 255))

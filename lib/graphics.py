@@ -41,6 +41,10 @@ def get_screen_size():
 
 def get_window():
     global _window
+    return _window
+
+def lock_window():
+    global _window
     canvas = Wrapper.surfaceHolder.lockCanvas()
     _window = Surface(canvas)
     return _window
@@ -50,9 +54,11 @@ def flip():
     _window.usable = False
 
 MODE_BLEND = PorterDuffMode.SRC_OVER
-MODE_MOD, MODE_NONE, MODE_ADD = range(3)
+MODE_MOD = PorterDuffMode.MULTIPLY
+MODE_NONE = PorterDuffMode.DST
+MODE_ADD = PorterDuffMode.ADD
 
-_xfermode = { mode:PorterDuffXfermode(mode) for mode in [MODE_BLEND] }
+_xfermode = { mode:PorterDuffXfermode(mode) for mode in [MODE_BLEND, MODE_MOD, MODE_NONE, MODE_ADD] }
 
 class Surface(object):
     def __init__(self, canvas=None, bitmap=None):
@@ -60,10 +66,11 @@ class Surface(object):
         self.bitmap = bitmap
         self.usable = True
         self._paint = None
+        self.filename = None
 
     def _init_draw(self):
         if not self.usable:
-            raise RuntimeError('Surface set to unusable (using surface from get_window after flip?)')
+            raise RuntimeError('Surface set to unusable (using surface from lock_window after flip?)')
         if not self.canvas:
             self.canvas = Canvas(self.bitmap)
         if not self._paint:
@@ -186,7 +193,7 @@ def stop_text_input():
     pass
 
 def get_events():
-    pass
+    return []
 
 key_map = {}
 

@@ -526,14 +526,15 @@ def main_handle_events():
             screen.event(Event(event.type, ev_dict))
 
 def main_draw():
-    surf = graphics.get_window()
-    fill(surf, (0,0))
-    screen.draw(surf, (0, 0))
+    surf = graphics.lock_window()
+    try:
+        fill(surf, (0,0))
+        screen.draw(surf, (0, 0))
 
-    for overlay in overlays:
-        overlay.draw(surf, overlay.pos)
-
-    graphics.flip()
+        for overlay in overlays:
+            overlay.draw(surf, overlay.pos)
+    finally:
+        graphics.flip()
 
 def main_dispatch_ticks():
     with _execute_later_lock:

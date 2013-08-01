@@ -31,6 +31,9 @@ public class Wrapper {
         Wrapper.context = activity;
         activity.setContentView(view = new WrapperView(activity));
 
+        ActivityManager mgm = (ActivityManager) context.getSystemService(Activity.ACTIVITY_SERVICE);
+        Log.i("Wrapper", "memory: " + mgm.getLargeMemoryClass());
+
         (new Thread() {
                 public void run() {
                     init();
