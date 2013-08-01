@@ -41,7 +41,7 @@ public class Wrapper {
     public static void init() {
         extractApp();
         uiReadyEvent.waitFor();
-        String pythonPath = context.getFilesDir() + "/code";
+        String pythonPath = context.getFilesDir().getAbsolutePath();
         init0(pythonPath);
     }
 
@@ -53,8 +53,10 @@ public class Wrapper {
     static void extractDir(String name, String target) {
         Log.i(TAG, "extracting " + name);
         try {
+            File targetFile = new File(context.getFilesDir() + "/" + target);
+            targetFile.mkdirs();
             InputStream in = context.getAssets().open(name + ".archive");
-            ZipUtils.extract(in, new File(context.getFilesDir() + "/" + target));
+            ZipUtils.extract(in, targetFile);
         } catch(IOException err) {
             throw new RuntimeException(err);
         }

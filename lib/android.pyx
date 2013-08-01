@@ -22,7 +22,7 @@ def info(line):
     __android_log_write(ANDROID_LOG_INFO, "freeciv", line)
 
 def get_internal_storage():
-    return os.path.abspath(os.environ['PYTHONHOME'] + '/..')
+    return os.path.abspath(os.environ['PYTHONHOME'])
 
 def main():
     _keep_from_gc.extend([sys.stdout, sys.stderr])

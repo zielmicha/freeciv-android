@@ -16,6 +16,12 @@ debugrunlog: debuginstall
 runlog: run
 	./adb.py
 
+setupemulator:
+	adb shell stop
+	adb shell setprop dalvik.vm.checkjni false
+	adb shell setprop log.redirect-stdio true
+	adb shell start
+
 # ASSETS
 assets: copyassets
 	cd project/obj/code; ziptar cf --zip ../../assets/code.archive .
