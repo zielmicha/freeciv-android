@@ -46,14 +46,15 @@ public class Wrapper {
     }
 
     static void extractApp() {
-        extractDir("code");
+        extractDir("code", "");
+        extractDir("res", "data");
     }
 
-    static void extractDir(String name) {
+    static void extractDir(String name, String target) {
         Log.i(TAG, "extracting " + name);
         try {
             InputStream in = context.getAssets().open(name + ".archive");
-            ZipUtils.extract(in, new File(context.getFilesDir() + "/" + name));
+            ZipUtils.extract(in, new File(context.getFilesDir() + "/" + target));
         } catch(IOException err) {
             throw new RuntimeException(err);
         }
