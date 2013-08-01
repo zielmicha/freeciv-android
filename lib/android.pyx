@@ -21,6 +21,9 @@ def err(line):
 def info(line):
     __android_log_write(ANDROID_LOG_INFO, "freeciv", line)
 
+def get_internal_storage():
+    return os.path.abspath(os.environ['PYTHONHOME'] + '/..')
+
 def main():
     _keep_from_gc.extend([sys.stdout, sys.stderr])
     sys.argv = ['android']
@@ -28,15 +31,16 @@ def main():
     sys.stdout = LineStream(info)
     init_encoding()
     init_screen()
-    #os.chdir(get_internal_storage())
+    os.chdir(get_internal_storage())
     from freeciv import main
     main.main()
 
 def init_screen():
     graphics.init()
-    wnd = graphics.create_window(graphics.get_screen_size())
+    wnd = graphics.get_window()
     wnd.fill((0, 128, 0))
     graphics.flip()
+    wnd = graphics.get_window()
     splash = graphics.load_image('data/user/presplash.png')
     splash_size = (splash.get_width() * wnd.get_height() / splash.get_height(), wnd.get_height())
     wnd.fill((255, 255, 255))
@@ -47,6 +51,9 @@ def init_screen():
 def init_encoding():
     import encodings.ascii
     import encodings.utf_8
+
+def map_key(src, dst):
+    pass
 
 _keep_from_gc = []
 

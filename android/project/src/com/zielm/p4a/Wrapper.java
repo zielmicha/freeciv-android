@@ -40,6 +40,7 @@ public class Wrapper {
 
     public static void init() {
         extractApp();
+        uiReadyEvent.waitFor();
         String pythonPath = context.getFilesDir() + "/code";
         init0(pythonPath);
     }
@@ -62,5 +63,6 @@ public class Wrapper {
     public static Context context;
     public static SurfaceHolder surfaceHolder;
     public static WrapperView view;
+    public static Event uiReadyEvent = new Event();
     public static native void init0(String pythonPath);
 }

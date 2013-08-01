@@ -37,6 +37,7 @@ public class WrapperView extends SurfaceView implements SurfaceHolder.Callback {
 
     public void surfaceCreated(SurfaceHolder holder) {
         Wrapper.surfaceHolder = holder;
+        Wrapper.uiReadyEvent.set();
     }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
@@ -45,7 +46,6 @@ public class WrapperView extends SurfaceView implements SurfaceHolder.Callback {
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-
     }
 
     @Override

@@ -10,24 +10,49 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import io
-import os
+#import jnius
+import reflect as jnius_reflect
 
-class Font(object):
-    def __init__(self, name, size):
-        pass
+Wrapper = jnius_reflect.autoclass("com.zielm.p4a.Wrapper")
+PorterDuffMode = jnius_reflect.autoclass("android.graphics.PorterDuff$Mode")
+Canvas = jnius_reflect.autoclass("android.graphics.Canvas")
+Bitmap = jnius_reflect.autoclass("android.graphics.Bitmap")
+BitmapConfig = jnius_reflect.autoclass("android.graphics.Bitmap$Config")
 
-    def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
-        return create_surface(10, 10)
+_window = None
 
-    def size(self, text):
-        return (10, 10)
+def init():
+    pass
 
-MODE_BLEND, MODE_MOD, MODE_NONE, MODE_ADD = range(4)
+def create_surface(w, h, alpha=True):
+    b = Bitmap.createBitmap(w, h, BitmapConfig.ARGB_8888);
+    return Surface(bitmap=b)
+
+def get_screen_size():
+    return (1000, 1000)
+
+def get_window():
+    global _window
+    canvas = Wrapper.surfaceHolder.lockCanvas()
+    _window = Surface(canvas)
+    return _window
+
+def flip():
+    Wrapper.surfaceHolder.unlockCanvasAndPost(_window.canvas)
+    _window.canvas = None
+
+MODE_BLEND = PorterDuffMode.SRC_OVER
+MODE_MOD, MODE_NONE, MODE_ADD = range(3)
 
 class Surface(object):
+    def __init__(self, canvas=None, bitmap=None):
+        if not canvas:
+            canvas = Canvas(bitmap)
+        self.canvas = canvas
+        self.bitmap = bitmap
+
     def get_size(self):
-        return self._size
+        return self.canvas.getWidth(), self.canvas.getHeight()
 
     def get_width(self):
         return self.get_size()[0]
@@ -45,7 +70,8 @@ class Surface(object):
         pass
 
     def fill(self, color=(128, 0, 128), blend=MODE_BLEND):
-        pass
+        args = _rgba(color), blend
+        self.canvas.drawColor(_rgba(color), blend)
 
     def draw_line(self, color, start, end, blend=MODE_BLEND):
         pass
@@ -64,6 +90,17 @@ class Surface(object):
 
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
+
+def _rgba(tpl):
+    alpha = tpl[3] if len(tpl) == 4 else 0xFF
+    return _unsigned(alpha << 24 | tpl[0] << 16 | tpl[1] << 8 | tpl[2])
+
+MAXINT = 2**31
+import struct
+
+def _unsigned(val):
+    # converts signed int to unsigned (C ABI)
+    return struct.unpack('i', struct.pack('I', val))[0]
 
 class Rect(tuple):
     def colliderect(self, point):
@@ -107,29 +144,15 @@ def load_image(fn):
 def load_font(name, size):
     return Font(name, size)
 
-def create_surface(w, h, alpha=True):
-    return Surface()
-
-def get_screen_size():
-    return (1000, 1000)
-
-def init():
-    pass
-
 def start_text_input():
     pass
 
 def stop_text_input():
     pass
 
-def create_window(size):
-    pass
-
-def get_window():
-    pass
-
 def get_events():
     pass
+
 key_map = {}
 
 def map_key(src, dst):
@@ -151,8 +174,15 @@ class Event:
 def sdl_open(path):
     pass
 
-def flip():
-    pass
+class Font(object):
+    def __init__(self, name, size):
+        pass
+
+    def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
+        return create_surface(10, 10)
+
+    def size(self, text):
+        return (10, 10)
 
 class const: pass
 
