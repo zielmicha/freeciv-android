@@ -49,8 +49,36 @@ public class Wrapper {
     }
 
     static void extractApp() {
-        extractDir("code", "");
-        extractDir("res", "data");
+        if(!checkSerial()) {
+            extractDir("code", "");
+            extractDir("res", "data");
+            writeSerial();
+        }
+    }
+
+    static boolean checkSerial() {
+        try {
+            String pkgSerial =
+                new BufferedReader(new InputStreamReader(context.getAssets().open("serial"))).readLine();
+            String oldSerial =
+                new BufferedReader(new FileReader(context.getFilesDir() + "/serial")).readLine();
+            return pkgSerial.equals(oldSerial);
+        } catch(IOException err) {
+            err.printStackTrace();
+            return false;
+        }
+    }
+
+    static void writeSerial() {
+        try {
+            String pkgSerial =
+                new BufferedReader(new InputStreamReader(context.getAssets().open("serial"))).readLine();
+            FileWriter writer = new FileWriter(context.getFilesDir() + "/serial");
+            writer.write(pkgSerial + "\n");
+            writer.close();
+        } catch(IOException err) {
+            throw new RuntimeException(err);
+        }
     }
 
     static void extractDir(String name, String target) {

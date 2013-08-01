@@ -26,6 +26,7 @@ setupemulator:
 assets: copyassets
 	cd project/obj/code; ziptar cf --zip ../../assets/code.archive .
 	cd project/obj/res; ziptar cf --zip ../../assets/res.archive .
+	date > project/assets/serial
 copyassets:
 	./copyassets.sh
 
