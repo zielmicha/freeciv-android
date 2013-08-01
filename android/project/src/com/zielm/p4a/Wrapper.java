@@ -27,8 +27,10 @@ public class Wrapper {
 
     private static final String TAG = "PythonWrapper";
 
-    public static void onCreate(Context context) {
-        Wrapper.context = context;
+    public static void onCreate(Activity activity) {
+        Wrapper.context = activity;
+        activity.setContentView(view = new WrapperView(activity));
+
         (new Thread() {
                 public void run() {
                     init();
@@ -58,5 +60,7 @@ public class Wrapper {
     }
 
     public static Context context;
+    public static SurfaceHolder surfaceHolder;
+    public static WrapperView view;
     public static native void init0(String pythonPath);
 }

@@ -1,4 +1,3 @@
-from graphics import SDLError, map_key, const
 import graphics
 import sys
 import os
@@ -51,7 +50,7 @@ def init_encoding():
 
 _keep_from_gc = []
 
-KEYCODE_BACK = const.K_AC_BACK
+KEYCODE_BACK = None #const.K_AC_BACK
 KEYCODE_MENU = None
 
 class LineStream:

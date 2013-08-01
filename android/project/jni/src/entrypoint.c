@@ -10,21 +10,22 @@ void initandroid();
 void initfreecivclient();
 void initjnius();
 
+static JNIEnv* python_thread_jnienv;
+
 void* SDL_ANDROID_GetJNIEnv() {
   /* make pyjnius happy */
-  return NULL;
+  return python_thread_jnienv;
 }
 
 JNIEXPORT void JNICALL Java_com_zielm_p4a_Wrapper_init0
 (JNIEnv* env, jclass class, jstring jPythonPath) {
-  const char* pythonHome = (*env)->GetStringUTFChars(env, jPythonPath, 0);
+  python_thread_jnienv = env;
+  const char* python_home = (*env)->GetStringUTFChars(env, jPythonPath, 0);
   __android_log_write(ANDROID_LOG_INFO, "entrypoint.c", "starting Python");
-  //freopen("/sdcard/entrypoint.c.log", "a", stdout);
-  //freopen("/sdcard/entrypoint.c.log", "a", stderr);
 
-  setenv("PYTHONHOME", pythonHome, 1);
-  char* pythonpath = malloc(strlen(pythonHome) + 100);
-  strcpy(pythonpath, pythonHome);
+  setenv("PYTHONHOME", python_home, 1);
+  char* pythonpath = malloc(strlen(python_home) + 100);
+  strcpy(pythonpath, python_home);
   strcat(pythonpath, "/lib/python2.7");
   setenv("PYTHONPATH", pythonpath, 1);
   __android_log_print(ANDROID_LOG_INFO, "entrypoint.c", "PYTHONPATH: %s", pythonpath);

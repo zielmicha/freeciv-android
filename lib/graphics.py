@@ -10,8 +10,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-from libc.stdlib cimport malloc, free
-from SDL cimport *
 import io
 import os
 
@@ -25,12 +23,7 @@ class Font(object):
     def size(self, text):
         return (10, 10)
 
-MODE_BLEND = SDL_BLENDMODE_BLEND
-MODE_MOD = SDL_BLENDMODE_MOD
-MODE_NONE = SDL_BLENDMODE_NONE
-MODE_ADD = SDL_BLENDMODE_ADD
-
-same_blit_buffer = None
+MODE_BLEND, MODE_MOD, MODE_NONE, MODE_ADD = range(4)
 
 class Surface(object):
     def get_size(self):
@@ -62,10 +55,6 @@ class Surface(object):
 
     def checked_cropped(self, rect):
         pass
-
-    def gfx_ellipse(self, color, rect, width):
-        raise NotImplementedError
-        #f(self._pg, rect[0] + rect[2]/2, rect[1] + rect[2]/2, rect[2]/2, rect[3]/2, color)
 
     def gfx_rect(self, color, rect, width, **kwargs):
         self.draw_rect(color, rect, width, **kwargs)
@@ -122,10 +111,7 @@ def create_surface(w, h, alpha=True):
     return Surface()
 
 def get_screen_size():
-    cdef SDL_DisplayMode mode
-    if SDL_GetDesktopDisplayMode(0, &mode) < 0:
-        raise SDLError()
-    return (mode.w, mode.h)
+    return (1000, 1000)
 
 def init():
     pass
