@@ -53,10 +53,10 @@ builddep: project/jni/SDL/Android.mk project/jni/python/Android.mk \
 	project/jni/SDL_ttf/freetype
 
 project/jni/SDL_image/Android.mk:
-	cd project/jni; hg clone http://hg.libsdl.org/SDL_image/
+	cd project/jni; hg clone -r 363 http://hg.libsdl.org/SDL_image/
 
 project/jni/SDL_ttf/Android.mk:
-	cd project/jni; hg clone http://hg.libsdl.org/SDL_ttf/
+	cd project/jni; hg clone -r 228 http://hg.libsdl.org/SDL_ttf/
 
 project/jni/SDL_ttf/freetype: project/jni/SDL_ttf/Android.mk
 	git clone git://github.com/LuaDist/freetype.git project/jni/SDL_ttf/freetype

@@ -6,8 +6,15 @@ If you don't need to change source code and don't need latest version simply dow
 
 Running Freeciv on desktop requires SDL2 with modified alpha blending from http://github.com/zielmicha/SDL2. You also need SDL2_image and SDL2_ttf (from http://hg.libsdl.org/SDL_image/ and http://hg.libsdl.org/SDL_ttf/).
 
+Known working version:
+
+   hg clone -r 363 http://hg.libsdl.org/SDL_image
+   hg clone -r 228 http://hg.libsdl.org/SDL_ttf
+
 Build and run on desktop (for debugging):
    make run
+
+(Warning: if you break build process you may need to start again with clean repo)
 
 Build for Android (put android, adb and ndk-build in your PATH):
    make -C android debug
