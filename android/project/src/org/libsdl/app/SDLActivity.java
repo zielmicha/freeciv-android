@@ -125,6 +125,18 @@ public class SDLActivity extends Activity {
         }
     }
 
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        // stomp any attempts by the OS to resize my view.
+        // see http://stackoverflow.com/questions/7185644/android-opengl-crazy-aspect-ratio-after-sleep
+        mLayout.getLayoutParams().width = (int)mSurface.mWidth;
+        mLayout.getLayoutParams().height = (int)mSurface.mHeight;
+    }
+
+
     // Messages from the SDLMain thread
     static final int COMMAND_CHANGE_TITLE = 1;
     static final int COMMAND_UNUSED = 2;
@@ -546,7 +558,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     private static SensorManager mSensorManager;
 
     // Keep track of the surface size to normalize touch events
-    private static float mWidth, mHeight;
+    public static float mWidth, mHeight;
 
     // Startup
     public SDLSurface(Context context) {
@@ -648,9 +660,6 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     // unused
     public void onDraw(Canvas canvas) {}
-
-
-
 
     // Listen to joystick motion events if supported (API >= 12)
     private static class SDLOnGenericMotionListener implements View.OnGenericMotionListener {
