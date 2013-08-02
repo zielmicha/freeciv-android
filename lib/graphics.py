@@ -196,16 +196,22 @@ def stop_text_input():
     pass
 
 def get_events():
+    global event_counter
     events = []
     while True:
         ev = Wrapper.getEvent()
         if not ev: break
+        event_counter += 1
+        print 'event', event_counter, ev
         events.append(ev)
     return map(map_event, events)
+
+event_counter = 0
 
 def map_event(ev):
     name = ev.name
     val = ev.value
+
     if name == 'touch':
         if val.getAction() in (MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL):
             type = const.MOUSEBUTTONUP
@@ -243,11 +249,12 @@ class Font(object):
     def __init__(self, name, size):
         self._bounds = jRect()
         self._paint = Paint()
-        self._paint.setAnitAlias(True)
+        self._paint.setAntiAlias(True)
         self._size = size
         self._paint.setTextSize(self._size)
 
     def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
+        text = _decode_text(text)
         self._paint.setColor(_rgba(fg))
         surf = create_surface(*self.size(text))
         surf._init_draw()
@@ -255,7 +262,14 @@ class Font(object):
         return surf
 
     def size(self, text):
+        text = _decode_text(text)
         return int(self._paint.measureText(text)), int(self._size * (text.count('\n') + 1))
+
+def _decode_text(t):
+    if isinstance(t, str):
+        return t.decode('utf8')
+    else:
+        return t
 
 class const: pass
 
