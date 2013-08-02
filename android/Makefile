@@ -14,7 +14,7 @@ run:
 debugrunlog: debuginstall
 	$(MAKE) runlog
 runlog: run
-	adb logcat
+	./adb.py
 
 # ASSETS
 assets: copyassets
