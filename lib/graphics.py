@@ -129,8 +129,21 @@ class Surface(object):
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
 
+
+_rects_list = [ jRect() for i in xrange(4) ]
+_rects_current = 0
+
 def _make_rect(tpl):
-    return jRect(tpl[0], tpl[1], tpl[0] + tpl[2], tpl[1] + tpl[3])
+    '''
+    To avoid Java GC this method uses 'custom allocator' for rects - that means
+    that only 4 rects can exists simultaneously.
+    '''
+    global _rects_current
+    rect = _rects_list[_rects_current]
+    _rects_current += 1
+    _rects_current %= len(_rects_list)
+    rect.set(tpl[0], tpl[1], tpl[0] + tpl[2], tpl[1] + tpl[3])
+    return rect
 
 def _rgba(tpl):
     alpha = tpl[3] if len(tpl) == 4 else 0xFF
