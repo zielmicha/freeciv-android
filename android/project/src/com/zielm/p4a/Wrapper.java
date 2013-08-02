@@ -94,6 +94,31 @@ public class Wrapper {
         Log.i(TAG, "done extracting " + name);
     }
 
+
+    private static LinkedList<UIEvent> events = new LinkedList<UIEvent>();
+
+    public static void addEvent(String name, Object value) {
+        synchronized(events) {
+            UIEvent ev = new UIEvent();
+            ev.name = name;
+            ev.value = value;
+            events.addFirst(ev);
+        }
+    }
+
+    public static UIEvent getEvent() {
+        synchronized(events) {
+            if(events.size() == 0)
+                return null;
+            return events.removeLast();
+        }
+    }
+
+    public static class UIEvent {
+        public String name;
+        public Object value;
+    }
+
     public static Context context;
     public static SurfaceHolder surfaceHolder;
     public static WrapperView view;

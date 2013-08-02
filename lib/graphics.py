@@ -25,12 +25,15 @@ jRect = jnius_reflect.autoclass("android.graphics.Rect")
 Paint = jnius_reflect.autoclass("android.graphics.Paint")
 PorterDuffXfermode = jnius_reflect.autoclass("android.graphics.PorterDuffXfermode")
 
+MotionEvent = jnius_reflect.autoclass("android.view.MotionEvent")
+
 _window = None
 
 def init():
     pass
 
 def create_surface(w, h, alpha=True):
+    w = max(1, w); h = max(1, h)
     b = Bitmap.createBitmap(w, h, BitmapConfig.ARGB_8888);
     return Surface(bitmap=b)
 
@@ -193,7 +196,24 @@ def stop_text_input():
     pass
 
 def get_events():
-    return []
+    events = []
+    while True:
+        ev = Wrapper.getEvent()
+        if not ev: break
+        events.append(ev)
+    return map(map_event, events)
+
+def map_event(ev):
+    name = ev.name
+    val = ev.value
+    if name == 'touch':
+        if val.getAction() in (MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL):
+            type = const.MOUSEBUTTONUP
+        else:
+            type = const.MOUSEBUTTONDOWN
+        return Event(type, pos=(val.getX(), val.getY()), button=0)
+    else:
+        return Event(name)
 
 key_map = {}
 
@@ -221,13 +241,21 @@ def sdl_open(path):
 
 class Font(object):
     def __init__(self, name, size):
-        pass
+        self._bounds = jRect()
+        self._paint = Paint()
+        self._paint.setAnitAlias(True)
+        self._size = size
+        self._paint.setTextSize(self._size)
 
     def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
-        return create_surface(10, 10)
+        self._paint.setColor(_rgba(fg))
+        surf = create_surface(*self.size(text))
+        surf._init_draw()
+        surf.canvas.drawText(text, 0, surf.get_height(), self._paint)
+        return surf
 
     def size(self, text):
-        return (10, 10)
+        return int(self._paint.measureText(text)), int(self._size * (text.count('\n') + 1))
 
 class const: pass
 

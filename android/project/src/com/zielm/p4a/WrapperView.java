@@ -60,6 +60,7 @@ public class WrapperView extends SurfaceView implements SurfaceHolder.Callback {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        Wrapper.addEvent("touch", event);
         return true;
     }
 }

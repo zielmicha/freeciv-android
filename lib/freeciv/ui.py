@@ -576,16 +576,23 @@ def main_tick_wrapper():
     except (KeyboardInterrupt, SystemExit):
         raise
     except:
-        traceback.print_exc()
-        if except_callback:
-            except_callback()
-        time.sleep(0.5)
+        #if except_callback:
+        #traceback.print_exc()
+        #    except_callback()
+        raise
 
 def main():
-    global screen_width, screen_height
-    screen_width, screen_height = screen_size = graphics.get_window().get_size()
+    init_size()
     while True:
         main_tick_wrapper()
+
+def init_size():
+    wnd = graphics.lock_window()
+    try:
+        global screen_width, screen_height, screen_size
+        screen_width, screen_height = screen_size = wnd.get_size()
+    finally:
+        graphics.flip()
 
 def user_time_sleep(c):
     deadline = user_time_spent + c
