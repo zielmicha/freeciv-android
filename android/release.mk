@@ -1,5 +1,5 @@
-VERSION=1103
-VERSION_NAME=1.1.3
+VERSION=1104
+VERSION_NAME=1.1.4
 
 release: build/build.xml debug ndk
 	cd build; ant release
