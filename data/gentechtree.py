@@ -15,6 +15,7 @@ for section in config.sections():
     techs[name] = req
 
 print 'digraph technologies {'
+print 'rankdir=LR;'
 for name, reqs in techs.items():
     for req in reqs:
         print '"%s" -> "%s";' % (req, name)

@@ -186,3 +186,6 @@ void request_unit_upgrade(struct unit *punit);
 bool can_unit_upgrade(struct unit *punit);
 
 void update_map_canvas_whole()
+
+PyObject* get_advances()
+int get_invention_state(int i)

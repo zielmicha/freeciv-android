@@ -222,6 +222,9 @@ class Client(object):
     def get_techs(self, level=11):
         return map(Tech, freeciv.func.get_techs(level))
 
+    def get_all_techs(self):
+        return map(Tech, freeciv.func.get_advances())
+
     def get_current_year_name(self):
         return freeciv.func.get_current_year_name()
 
@@ -281,6 +284,9 @@ class Tech(object):
 
     def set_as_goal(self):
         freeciv.func.set_tech_goal(self.index)
+
+    def get_research_state(self):
+        return freeciv.func.get_invention_state(self.index)
 
     def set_as_current(self):
         freeciv.func.set_tech_research(self.index)

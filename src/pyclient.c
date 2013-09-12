@@ -7,6 +7,7 @@
 #include "repodlgs_common.h"
 #include "fc_types.h"
 #include "government.h"
+#include "name_translation.h"
 #include <sys/prctl.h>
 
 enum city_get_mode {
@@ -614,6 +615,23 @@ PyObject* get_governments() {
     } governments_iterate_end;
 
     return list;
+}
+
+PyObject* get_advances() {
+    PyObject* list = PyList_New(0);
+
+    advance_iterate(A_NONE, pAdv) {
+
+        PyList_Append(list, Py_BuildValue(
+                          "isi", pAdv->item_number, name_translation(&pAdv->name), -1));
+
+    } advance_iterate_end;
+
+    return list;
+}
+
+int get_invention_state(int i) {
+    return player_invention_state(client.conn.playing, i);
 }
 
 void py_accept_treaty(int counterpart) {

@@ -3,7 +3,7 @@ src/Makefile:
 	cd src; ./configure
 src/objectfiles:
 	mkdir src/objectfiles
-data/techtree.index:
+data/techtree.index: data/gentechtree.py
 	cd data; python gentechtree.py | dot -Tplain > techtree.index
 src: src/Makefile src/objectfiles
 	$(MAKE) -C src
