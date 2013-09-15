@@ -19,6 +19,10 @@ import save
 import features
 import options
 import tutorial
+import osutil
+
+if osutil.is_android:
+    import dropbox
 
 class SpacingLayoutWidget(ui.LayoutWidget):
     def __init__(self, item1, item2, size):
@@ -117,11 +121,19 @@ def main_menu():
     global main_menu_item
     main_menu_item = menu = PrettyMenu()
 
-    menu.add(ui.Label('version %s' % features.get('app.version'), color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
+    menu.add(ui.Label('version %s' % features.get('app.version'),
+                      color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
+
     new_game_button = MenuButton('New\ngame', new_game_menu)
     menu.left.add(new_game_button)
+
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
     menu.left.add(load_game_button)
+
+    if osutil.is_android:
+        dropbox_button = MenuButton('Dropbox\n', dropbox.login)
+        menu.left.add(dropbox_button)
+
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))
 

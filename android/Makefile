@@ -1,4 +1,4 @@
-all: build assets
+all: build javadep assets
 
 release:
 	$(MAKE) -f release.mk
@@ -15,6 +15,15 @@ debugrunlog: debuginstall
 	$(MAKE) runlog
 runlog: run
 	./adb.py
+
+# JAVA
+
+javadep: dropboxdep
+
+dropboxdep: project/libs/commons-logging-1.1.1.jar project/libs/dropbox-android-sdk-1.5.4.jar project/libs/httpclient-4.0.3.jar project/libs/httpcore-4.0.1.jar project/libs/httpmime-4.0.3.jar project/libs/json_simple-1.1.jar
+
+project/libs/%.jar: project/dropbox-sdk/lib/%.jar
+	cp $^ $@
 
 # ASSETS
 assets: copyassets

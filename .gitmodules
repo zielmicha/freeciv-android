@@ -13,3 +13,6 @@
 [submodule "pyjnius"]
 	path = pyjnius
 	url = git://github.com/kivy/pyjnius.git
+[submodule "android/project/dropbox-sdk"]
+	path = android/project/dropbox-sdk
+	url = https://github.com/zielmicha/dropbox-android-core-sdk-mirror
