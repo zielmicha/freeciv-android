@@ -131,7 +131,7 @@ def main_menu():
     menu.left.add(load_game_button)
 
     if osutil.is_android:
-        dropbox_button = MenuButton('Dropbox\n', dropbox.login)
+        dropbox_button = MenuButton('Drop\nbox', dropbox.login)
         menu.left.add(dropbox_button)
 
     if features.get('app.multiplayer'):

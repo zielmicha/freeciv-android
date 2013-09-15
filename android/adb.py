@@ -12,7 +12,7 @@ for line in iter(inf.stdout.readline, b''):
         pid = int(pid)
     except ValueError:
         continue
-    if line.startswith('I/com.zielm.p4a('):
+    if line.startswith('I/freeciv ('):
         watch_for = pid
     elif pid == watch_for:
         print line

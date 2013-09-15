@@ -104,7 +104,12 @@ public class SDLActivity extends Activity {
         Log.v("SDL", "onResume()");
         super.onResume();
         // Don't call SDLActivity.nativeResume(); here, it will be called via SDLSurface::surfaceChanged->SDLActivity::startApp
-    }*/
+        }*/
+
+    protected void onResume() {
+        super.onResume();
+        com.zielm.freeciv.DropboxHelper.onResume();
+    }
 
     protected void onDestroy() {
         super.onDestroy();
@@ -363,7 +368,7 @@ public class SDLActivity extends Activity {
                 EGLConfig config = null;
                 int bestdiff = -1, bitdiff;
                 int[] value = new int[1];
-                
+
                 // eglChooseConfig returns a number of configurations that match or exceed the requested attribs.
                 // From those, we select the one that matches our requirements more closely
                 Log.v("SDL", "Got " + num_config[0] + " valid modes from egl");
@@ -384,17 +389,17 @@ public class SDLActivity extends Activity {
                             bitdiff += value[0] - attribs[j + 1]; // value is always >= attrib
                         }
                     }
-                    
+
                     if (bitdiff < bestdiff || bestdiff == -1) {
                         config = configs[i];
                         bestdiff = bitdiff;
                     }
-                    
+
                     if (bitdiff == 0) break; // we found an exact match!
                 }
-                
+
                 Log.d("SDL", "Selected mode with a total bit difference of " + bestdiff);
-               
+
 
                 SDLActivity.mEGLDisplay = dpy;
                 SDLActivity.mEGLConfig = config;
