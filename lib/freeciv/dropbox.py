@@ -7,17 +7,35 @@ import time
 if osutil.is_android:
     import jnius
     import reflect as jnius_reflect
-
-    DropboxHelper = jnius_reflect.autoclass('com.zielm.freeciv.DropboxHelper')
+    DropboxHelper = None
 
 features.add_feature('civsync.key', None)
 features.add_feature('civsync.secret', None)
 
 # Important: all calls to Java need to be done in UI thread
 
+def init():
+    global DropboxHelper
+    if not DropboxHelper:
+        DropboxHelper = jnius_reflect.autoclass('com.zielm.freeciv.DropboxHelper')
+        DropboxHelper.init()
+        ui.execute_later(_message_checker)
+
+def _message_checker():
+    if DropboxHelper.needAuth:
+        DropboxHelper.needAuth = False
+        features.set_perm('civsync.key', None)
+        features.set_perm('civsync.secret', None)
+        login()
+
+    msg = DropboxHelper.getMessage()
+    if msg:
+        ui.message(msg)
+    ui.execute_later(_message_checker)
+
 @ui.execute_later_decorator
 def login():
-    DropboxHelper.init()
+    init()
     DropboxHelper.doAuth()
     _check_finish()
 
@@ -45,7 +63,7 @@ def check_auth():
         login()
         return False
     else:
-        DropboxHelper.init()
+        init()
         DropboxHelper.tokenKey = features.get('civsync.key')
         DropboxHelper.tokenSecret = features.get('civsync.secret')
         DropboxHelper.useTokens()
@@ -71,3 +89,4 @@ def save(path):
     name = make_name(path)
     print 'uploading', path, 'as', name
     DropboxHelper.uploadFile(path, name)
+    sync.request_with_sid('/sync/uploading', name=name)

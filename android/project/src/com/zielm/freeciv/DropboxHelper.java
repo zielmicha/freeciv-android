@@ -6,6 +6,7 @@ import com.dropbox.client2.android.*;
 import com.dropbox.client2.exception.*;
 import org.libsdl.app.*;
 import java.io.*;
+import java.util.*;
 import android.util.Log;
 
 public class DropboxHelper {
@@ -19,8 +20,18 @@ public class DropboxHelper {
     public static String tokenKey = null;
     public static String tokenSecret = null;
     public static boolean authFinished;
+    public static boolean needAuth = false;
+    static Queue<String> messages = new LinkedList<String>();
 
-    public static void init() {
+    public synchronized static String getMessage() {
+        return messages.peek();
+    }
+
+    synchronized static void addMessage(String s) {
+        messages.offer(s);
+    }
+
+    public synchronized static void init() {
         SDLActivity.mSingleton.runOnUiThread(new Runnable() {
                 public void run(){
                     if(mDBApi == null) {
@@ -28,12 +39,22 @@ public class DropboxHelper {
                         AndroidAuthSession session = new AndroidAuthSession(appKeys, ACCESS_TYPE);
                         mDBApi = new DropboxAPI<AndroidAuthSession>(session);
                     }
+                    synchronized(DropboxHelper.class) {
+                            DropboxHelper.class.notify();
+                    }
                 }
             });
+        try {
+            DropboxHelper.class.wait();
+        } catch(InterruptedException ex) {}
     }
 
     public static void useTokens() {
-        mDBApi.getSession().setAccessTokenPair(new AccessTokenPair(tokenKey, tokenSecret));
+        SDLActivity.mSingleton.runOnUiThread(new Runnable() {
+                public void run() {
+                    mDBApi.getSession().setAccessTokenPair(new AccessTokenPair(tokenKey, tokenSecret));
+                }
+            });
     }
 
     public static void doAuth() {
@@ -69,18 +90,20 @@ public class DropboxHelper {
             DropboxAPI.Entry response = mDBApi.putFile("/" + name, inputStream,
                                                        file.length(), null, null);
             Log.i(TAG, "uploaded file as " + response.rev);
+            addMessage("save uploaded to Dropbox/Applications/Freeciv");
         } catch(IOException ex) {
             ex.printStackTrace();
             // do something
         } catch(DropboxUnlinkedException ex) {
             ex.printStackTrace();
-            needAuth();
+            tellNeedAuth();
         } catch(DropboxException ex) {
             ex.printStackTrace();
         }
     }
 
-    static void needAuth() {
-        // do something
+    static void tellNeedAuth() {
+        needAuth = true;
+        //addMessage("You need to login.");
     }
 }

@@ -190,6 +190,7 @@ class ScreenClient(client.Client):
             ui.back()
 
         def save_db():
+            ui.back()
             self.save_and_get_name(lambda path: dropbox.save(path))
 
         def show_help():

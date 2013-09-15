@@ -19,6 +19,7 @@ feature_types = {}
 pernaments = {}
 
 FEATURE_FILE_PATH = osutil.get_internal_storage() + '/features'
+print 'features', FEATURE_FILE_PATH
 
 monitor = None
 
