@@ -24,7 +24,7 @@ public class DropboxHelper {
     static Queue<String> messages = new LinkedList<String>();
 
     public synchronized static String getMessage() {
-        return messages.peek();
+        return messages.poll();
     }
 
     synchronized static void addMessage(String s) {
@@ -36,7 +36,15 @@ public class DropboxHelper {
                 public void run(){
                     if(mDBApi == null) {
                         AppKeyPair appKeys = new AppKeyPair(APP_KEY, APP_SECRET);
-                        AndroidAuthSession session = new AndroidAuthSession(appKeys, ACCESS_TYPE);
+                        AndroidAuthSession session;
+                        if(tokenKey != null) {
+                            AccessTokenPair tokens = new AccessTokenPair(tokenKey, tokenSecret);
+                            Log.v(TAG, "using old tokens " + tokens);
+                            session = new AndroidAuthSession(appKeys, ACCESS_TYPE, tokens);
+                        } else {
+                            Log.v(TAG, "need new tokens");
+                            session = new AndroidAuthSession(appKeys, ACCESS_TYPE);
+                        }
                         mDBApi = new DropboxAPI<AndroidAuthSession>(session);
                     }
                     synchronized(DropboxHelper.class) {
@@ -49,12 +57,9 @@ public class DropboxHelper {
         } catch(InterruptedException ex) {}
     }
 
-    public static void useTokens() {
-        SDLActivity.mSingleton.runOnUiThread(new Runnable() {
-                public void run() {
-                    mDBApi.getSession().setAccessTokenPair(new AccessTokenPair(tokenKey, tokenSecret));
-                }
-            });
+    public static void setTokens(String key, String secret) {
+        tokenKey = key;
+        tokenSecret = secret;
     }
 
     public static void doAuth() {
@@ -76,6 +81,7 @@ public class DropboxHelper {
                 Log.v(TAG, "tokens " + tokens);
                 tokenKey = tokens.key;
                 tokenSecret = tokens.secret;
+                Log.v(TAG, "tokens set to " + tokenKey + " " + tokenSecret);
             } catch (IllegalStateException e) {
                 Log.i("DbAuthLog", "Error authenticating", e);
             }

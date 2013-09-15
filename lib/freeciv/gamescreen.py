@@ -196,7 +196,7 @@ class ScreenClient(client.Client):
         def show_help():
             help.show()
 
-        menu = ui.Menu(center=0.7)
+        menu = ui.Menu(force_full=False) # center=0.7,
         menu.add('Quit', quit)
         menu.add('Save', save)
         menu.add('Save to Dropbox', save_db)

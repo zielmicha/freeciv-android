@@ -15,14 +15,20 @@ features.add_feature('civsync.secret', None)
 # Important: all calls to Java need to be done in UI thread
 
 def init():
+    print 'DropboxHelper init'
     global DropboxHelper
     if not DropboxHelper:
         DropboxHelper = jnius_reflect.autoclass('com.zielm.freeciv.DropboxHelper')
+        print 'initializing DropboxHelper tokens'
+        tokenKey = features.get('civsync.key')
+        tokenSecret = features.get('civsync.secret')
+        DropboxHelper.setTokens(tokenKey, tokenSecret)
         DropboxHelper.init()
         ui.execute_later(_message_checker)
 
 def _message_checker():
     if DropboxHelper.needAuth:
+        print 'Authentication requested by DropboxHelper'
         DropboxHelper.needAuth = False
         features.set_perm('civsync.key', None)
         features.set_perm('civsync.secret', None)
@@ -46,6 +52,7 @@ def _check_finish():
         ui.execute_later(_check_finish)
 
 def _auth_finished():
+    print '_auth_finished'
     key = DropboxHelper.tokenKey
     secret = DropboxHelper.tokenSecret
     features.set_perm('civsync.key', key)
@@ -64,9 +71,6 @@ def check_auth():
         return False
     else:
         init()
-        DropboxHelper.tokenKey = features.get('civsync.key')
-        DropboxHelper.tokenSecret = features.get('civsync.secret')
-        DropboxHelper.useTokens()
         return True
 
 def make_name(path):

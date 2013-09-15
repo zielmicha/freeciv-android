@@ -83,7 +83,7 @@ def set_dialog(new_screen, scroll=False):
     return dialog
 
 def message(msg, type=None):
-    set_dialog(Label(msg))
+    set_dialog(Label(msg, callback=back))
 
 def ask(msg, callback):
     def call_callback():
