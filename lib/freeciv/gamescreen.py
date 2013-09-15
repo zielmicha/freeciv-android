@@ -29,6 +29,7 @@ import features
 import diplodialog
 import empiredlg
 import help
+import dropbox
 
 SELECT_POPUP = 0
 
@@ -188,8 +189,8 @@ class ScreenClient(client.Client):
             self.chat('/save')
             ui.back()
 
-        def save_and_sync():
-            sync.save_and_sync(self)
+        def save_db():
+            self.save_and_get_name(lambda path: dropbox.save(path))
 
         def show_help():
             help.show()
@@ -197,8 +198,7 @@ class ScreenClient(client.Client):
         menu = ui.Menu(center=0.7)
         menu.add('Quit', quit)
         menu.add('Save', save)
-        if features.get('civsync.enable'):
-            menu.add('Save & sync', save_and_sync)
+        menu.add('Save to Dropbox', save_db)
         menu.add('Help', show_help)
         ui.set_dialog(menu, scroll=True)
 

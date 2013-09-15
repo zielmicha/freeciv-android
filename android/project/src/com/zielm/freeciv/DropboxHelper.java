@@ -5,6 +5,7 @@ import com.dropbox.client2.session.*;
 import com.dropbox.client2.android.*;
 import com.dropbox.client2.exception.*;
 import org.libsdl.app.*;
+import java.io.*;
 import android.util.Log;
 
 public class DropboxHelper {
@@ -22,11 +23,17 @@ public class DropboxHelper {
     public static void init() {
         SDLActivity.mSingleton.runOnUiThread(new Runnable() {
                 public void run(){
-                    AppKeyPair appKeys = new AppKeyPair(APP_KEY, APP_SECRET);
-                    AndroidAuthSession session = new AndroidAuthSession(appKeys, ACCESS_TYPE);
-                    mDBApi = new DropboxAPI<AndroidAuthSession>(session);
+                    if(mDBApi == null) {
+                        AppKeyPair appKeys = new AppKeyPair(APP_KEY, APP_SECRET);
+                        AndroidAuthSession session = new AndroidAuthSession(appKeys, ACCESS_TYPE);
+                        mDBApi = new DropboxAPI<AndroidAuthSession>(session);
+                    }
                 }
             });
+    }
+
+    public static void useTokens() {
+        mDBApi.getSession().setAccessTokenPair(new AccessTokenPair(tokenKey, tokenSecret));
     }
 
     public static void doAuth() {
@@ -53,5 +60,27 @@ public class DropboxHelper {
             }
             authFinished = true;
         }
+    }
+
+    public static void uploadFile(String path, String name) {
+        try {
+            File file = new File(path);
+            FileInputStream inputStream = new FileInputStream(file);
+            DropboxAPI.Entry response = mDBApi.putFile("/" + name, inputStream,
+                                                       file.length(), null, null);
+            Log.i(TAG, "uploaded file as " + response.rev);
+        } catch(IOException ex) {
+            ex.printStackTrace();
+            // do something
+        } catch(DropboxUnlinkedException ex) {
+            ex.printStackTrace();
+            needAuth();
+        } catch(DropboxException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    static void needAuth() {
+        // do something
     }
 }

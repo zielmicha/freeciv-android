@@ -11,9 +11,8 @@
 # GNU General Public License for more details.
 
 import os
-import traceback
-import functools
 import urllib
+import time
 
 import features
 import save
@@ -43,7 +42,7 @@ features.add_feature('civsync.sid', None)
 def get_sid():
     sid = features.get('civsync.sid')
     if not sid:
-        sid = os.urandom(8).encode('hex')
+        sid = ''.join( hex(ord(ch))[2:] for ch in os.urandom(8) )
         features.set_perm('civsync.sid', sid)
     return sid
 
@@ -61,8 +60,14 @@ def get_install_time():
     return install_time
 
 def request(path, **get):
-    resp = urllib.urlopen('http://' + HOST + path + '?' + urllib.urlencode(get))
+    url = 'http://' + HOST + path + '?' + urllib.urlencode(get)
+    print 'request', url
+    resp = urllib.urlopen(url)
     return resp.read()
+
+def request_with_sid(path, **get):
+    get['sid'] = get_sid()
+    return request(path, **get)
 
 class UpdateRequiredError(Exception):
     pass

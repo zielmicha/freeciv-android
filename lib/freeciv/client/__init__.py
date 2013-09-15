@@ -102,6 +102,11 @@ class Client(object):
         self.out_window_callback = None
         self.turn_button_flip = False
         self.meetings = {}
+        self.additional_server_line_callback = None
+
+    def server_line_callback(self, line):
+        if self.additional_server_line_callback:
+            self.additional_server_line_callback(line)
 
     def tick(self):
         if self.next_time >= time.time():
@@ -265,6 +270,16 @@ class Client(object):
         can_establish, can_trade, can_wonder = \
             freeciv.func.py_get_caravan_options(unit.handle, homecity.handle, destcity.handle)
         return can_establish, can_trade, can_wonder
+
+    def save_and_get_name(self, callback):
+        def line_callback(line):
+            prefix = 'Game saved as '
+            if line.startswith(prefix):
+                self.additional_server_line_callback = None
+                callback(line[len(prefix):].strip())
+
+        self.additional_server_line_callback = line_callback
+        self.chat('/save')
 
 
 class Gov(object):

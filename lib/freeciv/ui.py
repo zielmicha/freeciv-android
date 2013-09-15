@@ -502,6 +502,9 @@ def execute_later(func):
     with _execute_later_lock:
         _execute_later_list.append(func)
 
+def execute_later_decorator(func):
+    return lambda *args, **kwargs: execute_later(lambda: func(*args, **kwargs))
+
 any_mouse_events = 0
 
 def main_handle_events():

@@ -119,6 +119,8 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.server_lines = [ line for line in self.server_lines if line != '>' ]
         self.server_lines = self.server_lines[-10:]
         ui.execute_later(self.update_server_console)
+        if client.client:
+            client.client.server_line_callback(line)
 
     def update_server_console(self):
         if self.server_console:
@@ -264,12 +266,12 @@ def load_game(path, user_callback=None, before_callback=None):
             start_button = ui.Dialog(ui.screen, ui.Button('Touch to start game', callback))
             start_button.back = callback
             ui.set(start_button, anim=False)
-            sc_client.out_window_callback = None
-
-    port = random.randint(1500, 12000)
-    start_server(port, ('-f', path))
 
     sc_client = gamescreen.ScreenClient()
+
+    port = random.randint(1500, 12000)
+    start_server(port, ('-f', path), line_callback=sc_client.server_line_callback)
+
     sc_client.out_window_callback = out_callback
     try:
         sc_client.connect_to_server('player', localhost, port)
