@@ -14,5 +14,5 @@ for line in iter(inf.stdout.readline, b''):
         continue
     if line.startswith('I/freeciv ('):
         watch_for = pid
-    elif pid == watch_for:
+    if pid == watch_for:
         print line
