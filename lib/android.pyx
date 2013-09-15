@@ -2,6 +2,7 @@ from graphics import SDLError, map_key, const
 import graphics
 import sys
 import os
+import time
 
 cdef extern from "SDL.h":
     cdef char* SDL_AndroidGetExternalStoragePath()
@@ -48,7 +49,10 @@ def main():
     sys.stdout = LineStream(info)
     init_encoding()
     init_screen()
+    started = time.time()
     unpack_res()
+    print 'unpack_res took', time.time() - started
+    display_splash('data/user/presplash.png', (255, 255, 255))
     os.chdir(get_internal_storage())
     from freeciv import main
     main.main()
@@ -58,9 +62,13 @@ def init_screen():
     wnd = graphics.create_window(graphics.get_screen_size())
     wnd.fill((0, 128, 0))
     graphics.flip()
-    splash = graphics.load_image('data/user/presplash.png')
+    display_splash('data/user/portedby.png', (0, 0, 0))
+
+def display_splash(name, background):
+    wnd = graphics.get_window()
+    splash = graphics.load_image(name)
     splash_size = (splash.get_width() * wnd.get_height() / splash.get_height(), wnd.get_height())
-    wnd.fill((255, 255, 255))
+    wnd.fill(background)
     wnd.blit(splash,
              dest=((wnd.get_width() - splash_size[0]) / 2, 0) + splash_size)
     graphics.flip()
