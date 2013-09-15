@@ -10,5 +10,5 @@ def start():
             print 'change nation to', name, style, id
             client.freeciv.func.set_nation_settings(id, 'Player', style, 2)
         return True
-    
+
     save.load_game('data/tutorial.sav', before_callback=callback)

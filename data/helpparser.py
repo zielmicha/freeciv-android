@@ -33,7 +33,7 @@ def strip(s):
 
 for d in l:
 	if 'name' not in d: continue
-	print '=== %s' % strip(d['name']) 
+	print '=== %s' % strip(d['name'])
 	#print repr(d['text'])
 	for para in d['text'].split('),'):
 		u = strip(para)

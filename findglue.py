@@ -27,7 +27,7 @@ def tokenize_lines(fn):
                     break
                 content.append(line)
                 i -= 1
-            if i == -1:    
+            if i == -1:
                 print >>sys.stderr, '%s:%d: Bad func call' % (fn, i_start)
             i = i_start + 1
         i += 1

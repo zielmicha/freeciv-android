@@ -3,7 +3,7 @@ structs = [ 'struct ' + s for s in structs ]
 
 types = {
     'int': 'i',
-    'char*': 's', 
+    'char*': 's',
 }
 
 ignore = 'get_overview_area_dimensions gfx_fileextensions get_sprite_dimensions ' \
@@ -81,35 +81,35 @@ for line in open('gui-stub').readlines() + open('gui-manual').readlines():
     print '// %s' % line.strip()
     start, rest = line.strip().split('(', 1)
     rettype, fname = start.rsplit(None, 1)
-    
+
     while fname.startswith('*'):
         rettype += '*'
         fname = fname[1:]
-    
+
     if fname in was_printed:
         print '// continue %s - was processed' % fname
         continue
     was_printed.add(fname)
-    
+
     if fname in ignore:
         nign += 1
         ignored.append(line)
         print '// ignored'
-        print 
+        print
         continue
-    
+
     nproc += 1
-    
+
     try:
         rest, _ = rest.split(')', 1)
         if rest.strip() in ('void', ''):
             args = []
         else:
             args = [ p2(a.rsplit(None, 1)) for a in rest.split(',') ]
-        
+
         format = [ proc(type, name)[0] for type, name in args ]
         args = [ proc(type, name)[1] for type, name in args ]
-        
+
         print line.strip() + '{'
         joinedargs = ', '.join(args)
         if joinedargs:
@@ -127,7 +127,7 @@ for line in open('gui-stub').readlines() + open('gui-manual').readlines():
         else:
             print '\tPy_DECREF(ret);'
         print '}'
-        
+
         if rettype != 'void':
             pass
     except:

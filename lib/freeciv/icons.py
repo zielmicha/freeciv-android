@@ -68,7 +68,7 @@ small_image_names = [
 
 def load_small_images():
     global small_images
-    
+
     img = client.common.load_gfxfile('data/misc/small.png')
     small_images = client.common.split_sprites(img, (0, 0), (15, 20), (15, 20), (40, 1))[0]
 

@@ -40,60 +40,60 @@ class Session(object):
         self._sessid = sessid
         self._proxy_re = None
         self._proxy_host = None
-    
+
     @property
     def sessid(self):
         if self._sessid == None:
             raise LoginError('Not logged')
         return self._sessid
-    
+
     def is_logged(self):
         return bool(self._sessid)
-    
+
     def login(self, login, password):
         self._login_or_register('/login.cgi', make_payload(login=login, password=password))
-    
+
     def register(self, login, password, mail):
         self._login_or_register('/register.cgi', make_payload(login=login, password=password, mail=mail))
-    
+
     def logout(self, all=False):
         url = '/logout.cgi'
         if all:
             url += '?all=true'
         self._request(url)
         self._sessid = None
-    
+
     def upload(self, source, name, content):
         url = '/sync/upload?source=%s&name=%s' % (source, name)
         upload =  _Upload(url, content, 'fcsession=%s' % self.sessid, host=self.get_host(url))
         upload.header()
         return upload
-    
+
     def upload_content(self, source, name, content):
         self.upload(source, name, content).send_all_console()
-    
+
     def upload_log(self, content, install_time):
         url = '/sync/log_upload?time=%s' % install_time
         upload =  _Upload(url, content, 'fcsession=%s' % self._sessid)
         upload.header()
         upload.send_all_console()
-    
+
     def download(self, sha1):
         return self._request('/sync/download?sha1=%s' % sha1)
-    
+
     def download_content(self, sha1):
         return self.download(sha1).read()
-    
+
     def list(self):
         l = []
         for line in self._request('/sync/list').read().splitlines():
             sha1, source, date, size, name = line.split(None, 4)
             l.append(ListEntry(sha1, source, int(date), int(size), name))
         return l
-    
+
     def updates(self, install_time):
         return request('/sync/updates?install_time=%d' % install_time, strict_update=True)
-    
+
     def _login_or_register(self, url, payload):
         set_cookie = request(url, payload, return_cookie=True, host=self.get_host(url))
         if not set_cookie.startswith('fcsession='):
@@ -103,10 +103,10 @@ class Session(object):
             set_cookie, _ = set_cookie.split(';', 1)
         set_cookie = set_cookie.strip()
         self._sessid = set_cookie
-    
+
     def _request(self, url, payload=None):
         return request(url, payload, self.sessid, host=self.get_host(url))
-    
+
     def get_host(self, url):
         if url.startswith('/sync/updates'):
             return HOST
@@ -181,7 +181,7 @@ class _Upload(object):
         self.cookie = cookie
         self.host = host
         self.i = 0
-    
+
     def header(self):
         self.h = httplib.HTTPConnection(self.host)
         self.h.putrequest('POST', self.url)
@@ -191,24 +191,24 @@ class _Upload(object):
         self.h.putheader('x-api-version', API_VERSION)
         self.h.putheader('cookie', self.cookie)
         self.h.endheaders()
-    
+
     def send_part(self):
         bs = 1024 * 10
         data = self.data[self.i: self.i + bs]
         self.i += bs
-        
+
         self.h.send(data)
-        
+
         if self.i >= len(self.data):
             return 1
         else:
             return float(self.i) / len(self.data)
-    
+
     def finish(self):
         response = self.h.getresponse()
         headers = dict(response.getheaders())
         check_response(response, headers)
-    
+
     def send_all(self, callback):
         while True:
             status = self.send_part()
@@ -216,15 +216,14 @@ class _Upload(object):
             if status == 1:
                 self.finish()
                 break
-            
-    
+
+
     def send_all_console(self):
         def wr(perc):
             print '%.2f %%' % (perc*100)
         self.send_all(wr)
-    
-    
+
+
 def make_payload(**args):
     return urllib.urlencode(dict(**args))
 
-    

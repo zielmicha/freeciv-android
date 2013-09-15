@@ -9,7 +9,7 @@ import threading
 
 class ThreadingServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
-    
+
 class Handler(SocketServer.StreamRequestHandler):
     def handle(self):
         print 'incoming remote connection from', self.client_address
@@ -17,7 +17,7 @@ class Handler(SocketServer.StreamRequestHandler):
         self.check_password(f)
         self.run_shell(f)
         self.request.close()
-    
+
     def check_password(self, f):
         passphase = features.get('debug.remote.passphase')
         if not passphase:
@@ -33,7 +33,7 @@ class Handler(SocketServer.StreamRequestHandler):
                 time.sleep(1)
             else:
                 return True
-    
+
     def run_shell(self, f):
         f.write('There is no pty - remember to use -i option when running some programs.\n')
         f.flush()
@@ -61,7 +61,7 @@ def run():
 def patch_pickle():
     # patch pickle module so it works on Android
     import pickle
-    
+
     def string_unescape(rep):
         i = 0
         c = []
@@ -88,7 +88,7 @@ def patch_pickle():
                 c.append(ch)
                 i += 1
         return ''.join(c)
-    
+
     def load_string(self):
         rep = self.readline()[:-1]
         for q in "\"'": # double or single quote
