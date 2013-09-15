@@ -15,7 +15,9 @@ static char* storage;
 
 int SDL_main(int argc, char** argv) {
   __android_log_write(ANDROID_LOG_INFO, "freeciv", "starting SDL_main");
-  storage = SDL_AndroidGetInternalStoragePath();
+  char* ipath = storage = SDL_AndroidGetInternalStoragePath();
+  storage = malloc(strlen(ipath) + 100);
+  sprintf(storage, "%s/package", ipath);
   setenv("PYTHONHOME", storage, 1);
   char* pythonpath = malloc(strlen(storage) + 100);
   strcpy(pythonpath, storage);

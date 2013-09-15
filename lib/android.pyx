@@ -53,7 +53,7 @@ def main():
     unpack_res()
     print 'unpack_res took', time.time() - started
     display_splash('data/user/presplash.png', (255, 255, 255))
-    os.chdir(get_internal_storage())
+    os.chdir(get_internal_storage() + '/package')
     from freeciv import main
     main.main()
 
