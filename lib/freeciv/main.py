@@ -109,8 +109,8 @@ def start_autoupdate():
 def run_autoupdate():
     install_time = sync.get_install_time()
     try:
-        sync.client().updates(install_time)
-    except sync.civsync.UpdateRequiredError as err:
+        sync.updates(install_time)
+    except sync.UpdateRequiredError as err:
         notify_update(err.url)
     except Exception as err:
         print 'Failed to autoupdate:', err
@@ -260,7 +260,6 @@ support!'''.strip()
     ui.set_dialog(dialog)
 
 def main():
-    features.FEATURE_FILE_PATH = os.path.join(save.get_save_dir(), 'features')
     features.parse_options()
     setup_game_version()
     setup_android_version()

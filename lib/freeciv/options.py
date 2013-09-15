@@ -119,7 +119,7 @@ def debug_menu():
         uidialog.inputbox('name=key', finish=finish)
 
     def pernament_feature():
-        def finish():
+        def finish(arg):
             try:
                 k, v = arg.split('=', 1)
                 features.set_perm(k, v)

@@ -1,8 +1,12 @@
 import jnius
 import reflect as jnius_reflect
 import ui
+import features
 
 DropboxHelper = jnius_reflect.autoclass('com.zielm.freeciv.DropboxHelper')
+
+features.add_feature('civsync.key', None)
+features.add_feature('civsync.secret', None)
 
 def login():
     DropboxHelper.init()
@@ -18,6 +22,6 @@ def check_finish():
 def auth_finished():
     key = DropboxHelper.tokenKey
     secret = DropboxHelper.tokenSecret
-    msg = 'auth finished (%s, %s)' % (key, secret)
-    print msg
+    features.set_perm('civsync.key', key)
+    features.set_perm('civsync.secret', secret)
     ui.message(msg)

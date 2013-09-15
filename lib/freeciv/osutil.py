@@ -13,21 +13,24 @@
 freeciv.osutil handles system-specific activity - mainly Android interaction.
 '''
 
+try:
+    import android
+except ImportError:
+    android = None
+
+    def get_internal_storage():
+        return os.path.expanduser('~/.freeciv/android-internal')
+
+else:
+    from android import get_internal_storage
+
+
 import os
 import sys
 import graphics
 import time
 import features
 from graphics import sdl_open as open_res
-
-features.add_feature("app.disable_android_pause", type=bool, default=False)
-
-try:
-    import android
-except ImportError:
-    android = None
-else:
-    from android import get_internal_storage
 
 if android:
     import jnius
