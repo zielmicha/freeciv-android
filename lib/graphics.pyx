@@ -277,8 +277,6 @@ class Allocator:
         self._usage = []
 
     def add_buff(self):
-        if self._usage:
-            print 'add_buff to %d,%d, eff %f' % (self.sw, self.sh, sum(self._usage) / len(self._usage))
         i = len(self.buffs)
         self.buffs.append(create_surface(S, S))
         self.free += [ (i, x, y) for x in xrange(self.nw) for y in xrange(self.nh) ]

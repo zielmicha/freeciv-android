@@ -18,7 +18,7 @@ import collections
 
 ListEntry = collections.namedtuple('ListEntry', 'sha1 source date size name')
 
-HOST = 'freeciv.zielinscy.org.pl'
+HOST = 'api.civ.zielm.com'
 API_VERSION = '1'
 USER_AGENT = 'CivSyncGeneric/1'
 
@@ -227,3 +227,4 @@ class _Upload(object):
 def make_payload(**args):
     return urllib.urlencode(dict(**args))
 
+    
