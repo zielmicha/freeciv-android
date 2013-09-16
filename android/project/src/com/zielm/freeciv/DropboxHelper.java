@@ -89,7 +89,15 @@ public class DropboxHelper {
         }
     }
 
-    public static void uploadFile(String path, String name) {
+    public static void uploadFile(final String path, final String name) {
+        (new Thread() {
+                public void run() {
+                    uploadFileBlocking(path, name);
+                }
+            }).start();
+    }
+
+    static void uploadFileBlocking(String path, String name) {
         try {
             File file = new File(path);
             FileInputStream inputStream = new FileInputStream(file);
@@ -99,12 +107,40 @@ public class DropboxHelper {
             addMessage("save uploaded to Dropbox/Applications/Freeciv");
         } catch(IOException ex) {
             ex.printStackTrace();
-            // do something
+            addMessage("Upload failed. Try again. (" + ex + ")");
         } catch(DropboxUnlinkedException ex) {
             ex.printStackTrace();
             tellNeedAuth();
         } catch(DropboxException ex) {
+            addMessage("Upload failed. Try again. (" + ex + ")");
             ex.printStackTrace();
+        }
+    }
+
+    public static void listDirectory() {
+        (new Thread() {
+                public void run() {
+                    listDirectoryBlocking();
+                }
+            }).start();
+    }
+
+    public static List<DropboxAPI.Entry> result;
+
+    static void listDirectoryBlocking() {
+        result = null;
+        try {
+            DropboxAPI.Entry ls = mDBApi.metadata("/", 1000, null, true, null);
+            System.out.println("Files in the root path: " + ls.contents);
+            result = ls.contents;
+        } catch(DropboxUnlinkedException ex) {
+            ex.printStackTrace();
+            tellNeedAuth();
+            result = new ArrayList<DropboxAPI.Entry>();
+        } catch(DropboxException ex) {
+            addMessage("Listing failed. Try again. (" + ex + ")");
+            ex.printStackTrace();
+            result = new ArrayList<DropboxAPI.Entry>();
         }
     }
 

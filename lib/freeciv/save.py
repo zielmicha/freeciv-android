@@ -29,6 +29,8 @@ import subprocess
 import atexit
 import sys
 
+import dropbox
+
 from freeciv.client import _freeciv as freeciv
 
 from monitor import get_save_dir
@@ -220,8 +222,7 @@ def get_scenarios():
 def load_dialog():
     menu = ui.LinearLayoutWidget()
     was_any = False
-    if features.get('civsync.enable'):
-        menu.add(ui.Button('Show CivSync saves', sync.show_load))
+    menu.add(ui.Button('Show saves in Dropbox', dropbox.load_from_dropbox))
     for name, path in get_saves():
         callback = functools.partial(load_game, path)
         menu.add(ui.Button(name, callback))

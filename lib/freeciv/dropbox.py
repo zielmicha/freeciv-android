@@ -3,6 +3,7 @@ import features
 import sync
 import osutil
 import time
+import functools
 
 if osutil.is_android:
     import jnius
@@ -13,6 +14,7 @@ features.add_feature('civsync.key', None)
 features.add_feature('civsync.secret', None)
 
 # Important: all calls to Java need to be done in UI thread
+# (execute_later_decorator is for that)
 
 def init():
     print 'DropboxHelper init'
@@ -36,6 +38,7 @@ def _message_checker():
 
     msg = DropboxHelper.getMessage()
     if msg:
+        print 'showing message from DropboxHelper', msg
         ui.message(msg)
     ui.execute_later(_message_checker)
 
@@ -88,9 +91,44 @@ def make_name(path):
 
 @ui.execute_later_decorator
 def save(path):
-    if not check_auth():
-        return
+    if not check_auth(): return
     name = make_name(path)
     print 'uploading', path, 'as', name
     DropboxHelper.uploadFile(path, name)
     sync.request_with_sid('/sync/uploading', name=name)
+
+@ui.execute_later_decorator
+def load_from_dropbox():
+    if not check_auth(): return
+
+    ui.message("Listing saves from Dropbox...")
+
+    DropboxHelper.listDirectory()
+
+    def wait():
+        if DropboxHelper.result:
+            jlist = DropboxHelper.result
+            print jlist
+            saves = jlist_to_list(jlist)
+            load_dialog(saves)
+        else:
+            ui.execute_later(wait)
+
+    wait()
+
+def jlist_to_list(l):
+    arr = []
+    for i in xrange(l.size()):
+        arr.append(l.get(i))
+    return arr
+
+def load_dialog(entries):
+    print entries
+
+    def callback(entry):
+        print 'need to load', name
+
+    menu = ui.LinearLayoutWidget()
+    for entry in entries:
+        menu.add(ui.Button(entry.path, functools.partial(callback, entry)))
+    ui.set(ui.ScrollWrapper(menu))
