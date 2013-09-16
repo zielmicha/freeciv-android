@@ -109,6 +109,7 @@ def load_from_dropbox():
         if DropboxHelper.result:
             jlist = DropboxHelper.result
             print jlist
+            DropboxHelper.printList(jlist)
             saves = jlist_to_list(jlist)
             load_dialog(saves)
         else:
@@ -130,5 +131,6 @@ def load_dialog(entries):
 
     menu = ui.LinearLayoutWidget()
     for entry in entries:
-        menu.add(ui.Button(entry.path, functools.partial(callback, entry)))
+        menu.add(ui.Button(DropboxHelper.getPath(entry),
+                           functools.partial(callback, entry)))
     ui.set(ui.ScrollWrapper(menu))

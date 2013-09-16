@@ -127,6 +127,17 @@ public class DropboxHelper {
 
     public static List<DropboxAPI.Entry> result;
 
+    public static void printList(List<DropboxAPI.Entry> l) {
+        System.err.println("printing list " + l.getClass());
+        for(int i=0; i<l.size(); i++)
+            System.err.println("list item " + i + "=" + l.get(i) + " " + l.get(i).path);
+    }
+
+    public static String getPath(DropboxAPI.Entry e) {
+        System.err.println("getPath " + e + " " + e.path);
+        return e.path;
+    }
+
     static void listDirectoryBlocking() {
         result = null;
         try {
