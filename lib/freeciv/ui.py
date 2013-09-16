@@ -877,7 +877,7 @@ class ScrollWrapper(Widget):
         elif event.type == graphics.const.MOUSEMOTION:
             if self.start_dragging:
                 dx, dy = _subpoints(self.start_dragging, event.pos)
-                if (dx*dx+dy*dy) > 4:
+                if (dx*dx+dy*dy) > 16:
                     self.start_dragging = event.pos
                     self.was_dragged = True
                     self.y += dy
