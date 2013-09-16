@@ -49,7 +49,8 @@ def replace_anim(new_screen, direction=1):
     else:
         replace(new_screen)
 
-def set(new_screen, anim=True):
+def set(new_screen, anim=True, no_stack=False):
+    new_screen._no_stack = no_stack
     if screen:
         history.append(screen)
         if anim:
@@ -60,6 +61,8 @@ def set(new_screen, anim=True):
         replace(new_screen)
 
 def back(allow_override=True, anim=True):
+    while history and getattr(history[-1], '_no_stack', False):
+        history.pop()
     if allow_override and screen.back() is not True:
         return
     elif not history:
@@ -73,17 +76,17 @@ def back(allow_override=True, anim=True):
         else:
             replace(new_screen)
 
-def set_dialog(new_screen, scroll=False):
+def set_dialog(new_screen, scroll=False, no_stack=False):
     if scroll:
         item = ScrollWrapper(new_screen, height=screen_height*0.7, width=screen_width*0.7, ways=SCROLL_HEIGHT|SCROLL_WIDTH)
     else:
         item = new_screen
     dialog = Dialog(screen, item)
-    set(dialog, anim=False)
+    set(dialog, anim=False, no_stack=no_stack)
     return dialog
 
 def message(msg, type=None):
-    set_dialog(Label(msg, callback=back))
+    set_dialog(Label(msg, callback=back), no_stack=True)
 
 def ask(msg, callback):
     def call_callback():

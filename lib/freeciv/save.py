@@ -263,7 +263,6 @@ def get_save_username(path):
 def load_game(path, user_callback=None, before_callback=None):
     def out_callback(line):
         if 'Established control over the server. You have command access level' in line:
-            ui.back(anim=False)
             start_button = ui.Dialog(ui.screen, ui.Button('Touch to start game', callback))
             start_button.back = callback
             ui.set(start_button, anim=False)
