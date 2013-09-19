@@ -21,6 +21,8 @@ public class DropboxHelper {
     public static String tokenSecret = null;
     public static boolean authFinished;
     public static boolean needAuth = false;
+    public static boolean downloaded = false;
+    public static boolean downloadedSuccess = false;
     static Queue<String> messages = new LinkedList<String>();
 
     public synchronized static String getMessage() {
@@ -127,15 +129,15 @@ public class DropboxHelper {
 
     public static List<DropboxAPI.Entry> result;
 
+    public static String getPath(DropboxAPI.Entry e) {
+        return e.path;
+    }
+
+
     public static void printList(List<DropboxAPI.Entry> l) {
         System.err.println("printing list " + l.getClass());
         for(int i=0; i<l.size(); i++)
             System.err.println("list item " + i + "=" + l.get(i) + " " + l.get(i).path);
-    }
-
-    public static String getPath(DropboxAPI.Entry e) {
-        System.err.println("getPath " + e + " " + e.path);
-        return e.path;
     }
 
     static void listDirectoryBlocking() {
@@ -158,5 +160,34 @@ public class DropboxHelper {
     static void tellNeedAuth() {
         needAuth = true;
         //addMessage("You need to login.");
+    }
+
+    public static void downloadFile(final String path, final String outputPath) {
+        downloaded = false;
+        (new Thread() {
+                public void run() {
+                    downloadFileBlocking(path, outputPath);
+                }
+            }).start();
+    }
+
+    public static void downloadFileBlocking(String path, String outputPath) {
+        downloadedSuccess = false;
+        try{
+            OutputStream output = new FileOutputStream(new File(outputPath));
+            mDBApi.getFile(path, null, output, null);
+            Log.i(TAG, "downloaded file  " + path + " as " + outputPath);
+            downloadedSuccess = true;
+        } catch(IOException ex) {
+            ex.printStackTrace();
+            addMessage("Download failed. Try again. (" + ex + ")");
+        } catch(DropboxUnlinkedException ex) {
+            ex.printStackTrace();
+            tellNeedAuth();
+        } catch(DropboxException ex) {
+            addMessage("Download failed. Try again. (" + ex + ")");
+            ex.printStackTrace();
+        }
+        downloaded = true;
     }
 }

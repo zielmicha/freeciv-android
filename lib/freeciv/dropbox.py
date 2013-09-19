@@ -1,7 +1,10 @@
-import ui
-import features
-import sync
-import osutil
+from freeciv import ui
+from freeciv import features
+from freeciv import sync
+from freeciv import osutil
+
+import save as _save
+
 import time
 import functools
 
@@ -123,14 +126,31 @@ def jlist_to_list(l):
         arr.append(l.get(i))
     return arr
 
+@ui.execute_later_decorator
 def load_dialog(entries):
     print entries
 
     def callback(entry):
-        print 'need to load', name
+        print 'fetching from Dropbox', entry.path
+        ui.message('downloading save from Dropbox...')
+        DropboxHelper.downloadFile(entry.path, get_download_path())
+        check_downloaded()
 
     menu = ui.LinearLayoutWidget()
     for entry in entries:
-        menu.add(ui.Button(DropboxHelper.getPath(entry),
+        menu.add(ui.Button(DropboxHelper.getPath(entry).strip('/'),
                            functools.partial(callback, entry)))
     ui.set(ui.ScrollWrapper(menu))
+
+def get_download_path():
+    return _save.get_save_dir() + '/from-dropbox.sav'
+
+def check_downloaded():
+    if DropboxHelper.downloaded:
+        if DropboxHelper.downloadedSuccess:
+            download_success()
+    else:
+        ui.execute_later(check_downloaded)
+
+def download_success():
+    _save.load_game(get_download_path())
