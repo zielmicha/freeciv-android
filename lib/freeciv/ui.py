@@ -778,9 +778,10 @@ class Menu(LinearLayoutWidget):
                                     marginleft=0.1 * screen_width if for_dialog else 0)
         self.font = font or bigfont
 
-    def add(self, label, callback, color=(0, 0, 0)):
+    def add(self, label, callback, color=(0, 0, 0), button_class=Button):
         screen_width = graphics.get_window().get_width()
-        self.items.append(Button(label, callback, self.font, color=color, force_width=0.5*screen_width))
+        self.items.append(button_class(label, callback,
+                                       self.font, color=color, force_width=0.5*screen_width))
 
     @staticmethod
     def yndialog(text, callback):

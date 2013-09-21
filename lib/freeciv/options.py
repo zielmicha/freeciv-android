@@ -73,7 +73,7 @@ class OptionsPanel(ui.LinearLayoutWidget):
         self.add(BoolOptionsButton(label_t, label_f, key))
 
 def show_options():
-    options = OptionsPanel()
+    options = OptionsPanel(marginleft=10)
     options.add(ui.Label('Touch an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
     #options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
@@ -82,7 +82,7 @@ def show_options():
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
 
-    options.add(ui.Button('Login to Dropbox', lambda: dropbox.login()))
+    options.add(dropbox.DBButton('Login to Dropbox', lambda: dropbox.login()))
 
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))

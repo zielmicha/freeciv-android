@@ -155,3 +155,21 @@ def check_downloaded():
 
 def download_success():
     _save.load_game(get_download_path())
+
+class DBButton(ui.Button):
+    fg = (0, 0x7E, 0xE5)
+    bg = (255, 255, 255, 180)
+    color = fg
+    active_bg = bg
+
+    def __init__(self, *args, **kwargs):
+        ui.Button.__init__(self, *args, **kwargs)
+        self._image = ui.load_image('data/dropbox_logo.png')
+
+    def set_text(self, label):
+        ui.Button.set_text(self, '     ' + label)
+
+    def draw(self, surf, pos):
+        ui.Button.draw(self, surf, pos)
+        h = self.size[1]
+        surf.blit(self._image, dest=pos + (h, h))

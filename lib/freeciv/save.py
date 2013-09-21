@@ -220,9 +220,9 @@ def get_scenarios():
         if '.sav' in name ]
 
 def load_dialog():
-    menu = ui.LinearLayoutWidget()
+    menu = ui.LinearLayoutWidget(marginleft=10)
     was_any = False
-    menu.add(ui.Button('Show saves in Dropbox', dropbox.load_from_dropbox))
+    menu.add(dropbox.DBButton('Show saves in Dropbox', dropbox.load_from_dropbox))
     for name, path in get_saves():
         callback = functools.partial(load_game, path)
         menu.add(ui.Button(name, callback))

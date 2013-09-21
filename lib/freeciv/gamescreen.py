@@ -199,7 +199,7 @@ class ScreenClient(client.Client):
         menu = ui.Menu(for_dialog=True)
         menu.add('Quit', quit)
         menu.add('Save', save)
-        menu.add('Save to Dropbox', save_db)
+        menu.add('Save to Dropbox', save_db, button_class=dropbox.DBButton)
         menu.add('Help', show_help)
         ui.set_dialog(menu, scroll=True)
 
