@@ -604,7 +604,7 @@ def merge_mouse_events(events):
     mouse = None
     res = []
     for ev in events:
-        if ev.type == graphics.const.MOUSEMOTION:
+        if ev.type == graphics.const.MOUSEMOTION and not mouse:
             mouse = ev
         else:
             res.append(ev)
