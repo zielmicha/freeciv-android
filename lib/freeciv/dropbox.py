@@ -137,6 +137,7 @@ def load_dialog(entries):
         check_downloaded()
 
     menu = ui.LinearLayoutWidget()
+    menu.add(ui.Label('Save your games to folder /Applications/Freeciv in your Dropbox.'))
     for entry in entries:
         menu.add(ui.Button(DropboxHelper.getPath(entry).strip('/'),
                            functools.partial(callback, entry)))

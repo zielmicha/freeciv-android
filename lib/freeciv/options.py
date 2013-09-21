@@ -10,12 +10,15 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import ui
-import uidialog
-import osutil
-import features
-import functools
 import traceback
+import functools
+
+from freeciv import ui
+from freeciv import uidialog
+from freeciv import osutil
+from freeciv import features
+
+from freeciv import dropbox
 
 class OptionsButton(ui.Button):
     def __init__(self, label, key):
@@ -78,17 +81,12 @@ def show_options():
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
-    options.add(ui.Button('Change zoom (experimental)', change_zoom))
+
+    options.add(ui.Button('Login to Dropbox', lambda: dropbox.login()))
 
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
     ui.set(options)
-
-def change_zoom():
-    menu = ui.LinearLayoutWidget()
-    for size in [None, (320, 240), (480, 320), (640, 480), (1024, 800)]:
-        menu.add(ui.Button(str(size or 'Disabled'), functools.partial(change_screen_size, size)))
-    ui.set_dialog(menu, scroll=True)
 
 def change_screen_size(size):
     features.set_perm('app.forcesize', ('%d,%d' % size) if size else '')
