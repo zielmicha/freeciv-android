@@ -771,8 +771,11 @@ class Image(Widget):
         surf.blit(self.image, pos)
 
 class Menu(LinearLayoutWidget):
-    def __init__(self, font=None, force_full=True, center=True):
-        LinearLayoutWidget.__init__(self, center=center, force_full=force_full)
+    def __init__(self, font=None, force_full=True, center=True, for_dialog=False):
+        LinearLayoutWidget.__init__(self,
+                                    center=False if for_dialog else center,
+                                    force_full=False if for_dialog else force_full,
+                                    marginleft=0.1 * screen_width if for_dialog else 0)
         self.font = font or bigfont
 
     def add(self, label, callback, color=(0, 0, 0)):
