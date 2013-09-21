@@ -1,7 +1,7 @@
-VERSION=1105
-VERSION_NAME=1.1.5
+VERSION=1106
+VERSION_NAME=1.1.6
 
-release: build/build.xml debug ndk
+release: build/build.xml debug ndk dropboxdep
 	cd build; ant release
 
 debug:
@@ -20,6 +20,12 @@ build/AndroidManifest.xml: build project/AndroidManifest.xml
 
 build/build.xml: build/AndroidManifest.xml _links
 	android update project --path build --name "Freeciv" --target android-17
+
+dropboxdep: build/libs/commons-logging-1.1.1.jar build/libs/dropbox-android-sdk-1.5.4.jar build/libs/httpclient-4.0.3.jar build/libs/httpcore-4.0.1.jar build/libs/httpmime-4.0.3.jar build/libs/json_simple-1.1.jar
+
+build/libs/%.jar: project/dropbox-sdk/lib/%.jar
+	mkdir -p build/libs
+	cp $^ $@
 
 ndk:
 	ndk-build -C build
