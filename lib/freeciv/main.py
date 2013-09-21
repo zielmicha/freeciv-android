@@ -259,6 +259,16 @@ support!'''.strip()
     dialog.add(panel)
     ui.set_dialog(dialog)
 
+def set_logical_size():
+    good_dpi = 250
+    dev_dpi = osutil.get_dpi()
+    print 'device dpi', dev_dpi
+    if dev_dpi > 0 and dev_dpi > good_dpi:
+        w, h = graphics.get_window().get_size()
+        SCALE = float(good_dpi) / dev_dpi
+        print 'scale factor', SCALE
+        graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
+
 def main():
     features.parse_options()
     setup_game_version()
@@ -272,6 +282,7 @@ def main():
 
     client.window.init_screen()
     osutil.init()
+    set_logical_size()
 
     ui.init()
     ui.set_fill_image(graphics.load_image('data/user/background.jpg'))

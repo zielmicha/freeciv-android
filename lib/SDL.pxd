@@ -409,6 +409,7 @@ cdef extern from "SDL.h":
     cdef int SDL_GetDesktopDisplayMode(int displayIndex, SDL_DisplayMode * mode)
     cdef int SDL_SetTextureColorMod(SDL_Texture * texture, Uint8 r, Uint8 g, Uint8 b)
     cdef int SDL_SetTextureAlphaMod(SDL_Texture * texture, Uint8 alpha)
+    cdef int SDL_RenderSetLogicalSize(SDL_Renderer * renderer, int w, int h)
     cdef char * SDL_GetError()
 
 cdef extern from "SDL_image.h":

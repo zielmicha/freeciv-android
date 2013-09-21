@@ -416,6 +416,11 @@ def create_window(size):
     _window._size = size
     return get_window()
 
+def set_logical_size(w, h):
+    assert _window
+    SDL_RenderSetLogicalSize(_window._sdl, w, h)
+    _window._size = (w, h)
+
 def get_window():
     return _window
 

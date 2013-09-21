@@ -32,6 +32,8 @@ import time
 import features
 from graphics import sdl_open as open_res
 
+features.add_feature('app.emulatedpi', 60, type=int)
+
 if android:
     import jnius
     import reflect as jnius_reflect
@@ -91,6 +93,13 @@ def open_url(url, action='android.intent.action.VIEW'):
         init_jni()
         intent = Intent(action, Uri.parse(url))
         _get_activity().startActivity(intent)
+
+def get_dpi():
+    if is_android:
+        init_jni()
+        return _get_activity().getResources().getDisplayMetrics().density * 160
+    else:
+        return features.get('app.emulatedpi')
 
 def _get_activity():
     return SDLActivity.mSingleton
