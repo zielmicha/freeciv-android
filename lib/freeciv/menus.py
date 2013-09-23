@@ -14,12 +14,13 @@ import ui
 import uidialog
 import graphics
 
-import sync
-import save
-import features
-import options
-import tutorial
-import osutil
+from freeciv import sync
+from freeciv import save
+from freeciv import features
+from freeciv import options
+from freeciv import tutorial
+from freeciv import osutil
+from freeciv import gold
 
 class SpacingLayoutWidget(ui.LayoutWidget):
     def __init__(self, item1, item2, size):
@@ -126,6 +127,11 @@ def main_menu():
 
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
     menu.left.add(load_game_button)
+
+    gold_button = MenuButton(u'civsync\n  Gold', gold.menu)
+    gold_button.fg = (255, 215, 0)
+    gold_button.bg = (255, 215, 0, 100)
+    menu.left.add(gold_button)
 
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))

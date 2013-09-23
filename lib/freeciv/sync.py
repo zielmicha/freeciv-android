@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Michal Zielinski (michal@zielinscy.org.pl)
+# Copyright (C) 2013 Michal Zielinski (michal@zielinscy.org.pl)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,14 +18,19 @@ import features
 import save
 
 HOST = 'api.civ.zielm.com'
+PROTO = 'http'
 USER_AGENT = 'CivGeneric/1'
 
 def apply_host_change(host):
-    print 'using civsync host', host
     global HOST
     HOST = host
 
+def apply_proto_change(proto):
+    global PROTO
+    PROTO = proto
+
 features.set_applier('civsync.host', apply_host_change, default=HOST)
+features.set_applier('civsync.proto', apply_proto_change, default=PROTO)
 
 def apply_user_agent_change(ua):
     global USER_AGENT
@@ -60,7 +65,7 @@ def get_install_time():
     return install_time
 
 def request(path, **get):
-    url = 'http://' + HOST + path + '?' + urllib.urlencode(get)
+    url = PROTO + '://' + HOST + path + '?' + urllib.urlencode(get)
     print 'request', url
     resp = urllib.urlopen(url)
     return resp.read()
