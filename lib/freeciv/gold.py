@@ -7,7 +7,7 @@ from freeciv import osutil
 def menu():
     layout = ui.LinearLayoutWidget()
     button = ui.Button('Get Gold', open_gold_link)
-    text_label = help.LongTextWidget('Loading...', ui.screen_width, ui.consolefont)
+    text_label = help.LongTextWidget('Loading...', ui.screen_width, ui.smallfont)
 
     layout.add(button)
     layout.add(text_label)
