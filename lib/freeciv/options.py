@@ -86,6 +86,10 @@ def show_options():
 
     if features.get('app.debug'):
         options.add(ui.Button('Debug', debug_menu))
+
+
+    options.add(ui.Label('Freeciv for Android is licensed under GNU/GPL. \n' \
+                         'Dropbox and Dropbox logo are trademarks of Dropbox, Inc.\n', ))
     ui.set(options)
 
 def change_screen_size(size):
