@@ -11,14 +11,19 @@
 # GNU General Public License for more details.
 
 import os
-import urllib
+import osutil
+
+if osutil.is_desktop:
+    import urllib
+else:
+    import java_https as urllib
 import time
 
 import features
 import save
 
-HOST = 'api.civ.zielm.com'
-PROTO = 'http'
+HOST = 'www.civsync.com'
+PROTO = 'https'
 USER_AGENT = 'CivGeneric/1'
 
 def apply_host_change(host):
@@ -65,7 +70,9 @@ def get_install_time():
     return install_time
 
 def request(path, **get):
-    url = PROTO + '://' + HOST + path + '?' + urllib.urlencode(get)
+    # don't need HTTPS when not transmitting sid
+    proto = PROTO if 'sid' in get else 'http'
+    url = proto + '://' + HOST + path + '?' + urllib.urlencode(get)
     print 'request', url
     resp = urllib.urlopen(url)
     return resp.read()
