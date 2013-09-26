@@ -12,12 +12,17 @@ class URLopener:
 
 URLHelper = None
 
+_local = threading.local()
+
 def _init():
+    _local.main = True
     global URLHelper
     if not URLHelper:
         URLHelper = jnius_reflect.autoclass('com.zielm.freeciv.URLHelper')
 
 def urlopen(url):
+    if getattr(_local, 'main', False):
+        raise RuntimeError('HTTP request on main thread')
     return Request(url).execute()
 
 class Request:

@@ -17,7 +17,7 @@ abc copy_reg sre_compile sre_constants sre_parse keyword
 heapq bisect random __future__ glob socket StringIO urlparse
 mimetools tempfile rfc822 gzip struct io subprocess pickle
 atexit encodings/__init__ encodings/ascii encodings/utf_8
-encodings/aliases codecs"
+encodings/aliases codecs SocketServer"
 mkdir $A/lib/python2.7/encodings
 for mod in $STDMODULES; do
     cp ../python4android/Python-2.7/Lib/$mod.py $A/lib/python2.7/$mod.py || exit 1

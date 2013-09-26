@@ -68,10 +68,10 @@ def _auth_finished():
     tell_civsync()
 
 def tell_civsync():
-    sync.request_with_sid('/sync/register',
-                          key=features.get('civsync.key'),
-                          secret=features.get('civsync.secret'),
-                          install_time=sync.get_install_time())
+    ui.async(lambda: sync.request_with_sid('/sync/register',
+                                           key=features.get('civsync.key'),
+                                           secret=features.get('civsync.secret'),
+                                           install_time=sync.get_install_time()))
 
 def check_auth():
     if not features.get('civsync.key'):
@@ -102,8 +102,8 @@ def save(path):
     name = make_name(path)
     print 'uploading', path, 'as', name
     DropboxHelper.uploadFile(path, name)
-    sync.request_with_sid('/sync/uploading', name=name,
-                          sharing=features.get('civsync.allow_sharing'))
+    ui.async(lambda: sync.request_with_sid('/sync/uploading', name=name,
+                                           sharing=features.get('civsync.allow_sharing')))
 
 def ask_if_sharing_allowed(then):
     def notokay():
