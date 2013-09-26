@@ -46,7 +46,7 @@ def apply_user_agent_change(ua):
     urllib.URLopener.version = ua
 
 features.set_applier('civsync.ua', apply_user_agent_change)
-features.set('civsync.ua', 'CivSyncAndroid/1106')
+features.set('civsync.ua', 'CivSyncAndroid/1107')
 features.add_feature('civsync.enable', False, type=bool)
 features.add_feature('civsync.sid', None)
 
