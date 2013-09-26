@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 
 import os
-import json
+import microjson as json
 import osutil
 
 if osutil.is_desktop:

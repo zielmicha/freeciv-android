@@ -6,6 +6,7 @@ from freeciv import osutil
 from freeciv import features
 from freeciv import sync
 
+features.add_feature('gold.enable', type=bool, default=False)
 features.add_feature('gold.initiated', type=bool, default=False)
 
 def set_gold_status(status):

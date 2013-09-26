@@ -133,10 +133,11 @@ def main_menu():
     load_game_button = MenuButton('Load\ngame', save.load_dialog)
     menu.left.add(load_game_button)
 
-    gold_button = MenuButton(u'civsync\n  Gold', gold.menu)
-    gold_button.fg = (255, 215, 0)
-    gold_button.bg = (255, 215, 0, 100)
-    menu.left.add(gold_button)
+    if features.get('gold.enable'):
+        gold_button = MenuButton(u'civsync\n  Gold', gold.menu)
+        gold_button.fg = (255, 215, 0)
+        gold_button.bg = (255, 215, 0, 100)
+        menu.left.add(gold_button)
 
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))
