@@ -2,6 +2,7 @@ from freeciv import ui
 from freeciv import features
 from freeciv import sync
 from freeciv import osutil
+from freeciv import help
 
 import save as _save
 
@@ -15,6 +16,7 @@ if osutil.is_android:
 
 features.add_feature('civsync.key', None)
 features.add_feature('civsync.secret', None)
+features.add_feature('civsync.allow_sharing', 'none')
 
 # Important: all calls to Java need to be done in UI thread
 # (execute_later_decorator is for that)
@@ -94,11 +96,39 @@ def make_name(path):
 
 @ui.execute_later_decorator
 def save(path):
+    if features.get('civsync.allow_sharing') == 'none':
+        return ask_if_sharing_allowed(lambda: save(path))
     if not check_auth(): return
     name = make_name(path)
     print 'uploading', path, 'as', name
     DropboxHelper.uploadFile(path, name)
-    sync.request_with_sid('/sync/uploading', name=name)
+    sync.request_with_sid('/sync/uploading', name=name,
+                          sharing=features.get('civsync.allow_sharing'))
+
+def ask_if_sharing_allowed(then):
+    def notokay():
+        features.set_perm('civsync.allow_sharing', 'false')
+        ui.back()
+        then()
+
+    def okay():
+        features.set_perm('civsync.allow_sharing', 'true')
+        ui.back()
+        then()
+
+    msg = \
+          'civsync.com may put saves you upload to Dropbox on a public list, for others to play.' \
+          '\n\n' \
+          'By clicking "I agree" you share your saves on CC0 license (public domain) ' \
+          'and allow Freeciv to upload them to civsync.com.'.strip()
+
+    dialog = ui.LinearLayoutWidget()
+    panel = ui.HorizontalLayoutWidget(spacing=10)
+    panel.add(ui.Button('I agress', okay))
+    panel.add(ui.Button('I don\'t agree', notokay))
+    dialog.add(help.LongTextWidget(msg, ui.screen_width / 3, ui.smallfont))
+    dialog.add(panel)
+    ui.set_dialog(dialog)
 
 @ui.execute_later_decorator
 def load_from_dropbox():
