@@ -5,4 +5,4 @@ else
 	name="$1"
 	shift
 fi
-PYTHONPATH=lib:src python -m "$name" "$*"
+PYTHONPATH=lib:src python -m "$name" "$@"

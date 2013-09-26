@@ -112,10 +112,11 @@ def set_perm(name, value):
     assert '=' not in name and '\n' not in name and '\r' not in name
 
     set(name, value)
-    pernaments[name] = value
-    _store_pernaments()
+    if pernaments.get(name, Ellipsis) != value:
+        pernaments[name] = value
+        _store_pernaments()
 
-    print 'changed pernament feature %s to %r' % (name, value)
+        print 'changed pernament feature %s to %r' % (name, value)
 
 def _store_pernaments():
     with open(FEATURE_FILE_PATH, 'w') as features_conf:

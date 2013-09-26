@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import os
+import json
 import osutil
 
 if osutil.is_desktop:
@@ -80,6 +81,10 @@ def request(path, **get):
 def request_with_sid(path, **get):
     get['sid'] = get_sid()
     return request(path, **get)
+
+def json_request_with_sid(path, **get):
+    get['sid'] = get_sid()
+    return json.loads(request(path, **get))
 
 class UpdateRequiredError(Exception):
     pass

@@ -27,12 +27,14 @@ import uidialog
 import gamescreen
 import ui
 import client
-import sync
 import features
 import monitor
 import options
 import menus
 import graphics
+
+import sync
+import gold
 
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
@@ -116,6 +118,8 @@ def run_autoupdate():
         print 'Failed to autoupdate:', err
         import traceback
         traceback.print_exc()
+
+    gold.maybe_check_products()
 
 def notify_update(url):
     print 'update found at', url

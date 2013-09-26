@@ -119,7 +119,12 @@ def main_menu():
     global main_menu_item
     main_menu_item = menu = PrettyMenu()
 
-    menu.add(ui.Label('version %s' % features.get('app.version'),
+    version = 'version %s' % features.get('app.version')
+    if features.get('gold.status') != 'none':
+        version += '+' + features.get('gold.status')
+    if features.get('gold.session_warning'):
+        version += ' WARNING! Login with Dropbox in options menu to save your purchases.'
+    menu.add(ui.Label(version,
                       color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
 
     new_game_button = MenuButton('New\ngame', new_game_menu)
