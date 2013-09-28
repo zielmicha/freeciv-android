@@ -124,7 +124,7 @@ def ask_if_sharing_allowed(then):
 
     dialog = ui.LinearLayoutWidget()
     panel = ui.HorizontalLayoutWidget(spacing=10)
-    panel.add(ui.Button('I agress', okay))
+    panel.add(ui.Button('I agree', okay))
     panel.add(ui.Button('I don\'t agree', notokay))
     dialog.add(help.LongTextWidget(msg, ui.screen_width / 3, ui.smallfont))
     dialog.add(panel)

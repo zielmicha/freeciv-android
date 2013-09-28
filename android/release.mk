@@ -10,7 +10,7 @@ debug:
 build:
 	mkdir build
 
-build/AndroidManifest.xml: build project/AndroidManifest.xml
+build/AndroidManifest.xml: build project/AndroidManifest.xml release.mk
 	cat project/AndroidManifest.xml \
 		| sed 's/pl.org.zielinscy.freeciv.debug/pl.org.zielinscy.freeciv/g' \
 		| sed 's/Freeciv Debug/Freeciv/g' \
