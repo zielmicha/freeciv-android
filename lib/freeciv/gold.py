@@ -27,6 +27,7 @@ def menu():
     layout.add(text_label)
     layout.add(buttons)
 
+    ui.async(check_products)
 
     def text_fetched(text):
         data = json.loads(text)
