@@ -34,6 +34,12 @@ def open_gold_link():
     features.set_perm('gold.initiated', True)
     osutil.open_url(sync.PROTO + '://' + sync.HOST + '/sync/login?then=sale/gold&sid=' + sync.get_sid())
 
+    def callback():
+        ui.history = []
+        redisplay_menu()
+
+    ui.set_dialog(ui.Button('Touch after finishing transaction', callback))
+
 def maybe_check_products():
     if features.get('gold.initiated'):
         # if user ever wanted to get gold, check if he did it
