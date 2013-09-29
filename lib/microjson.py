@@ -367,5 +367,5 @@ def to_json(obj):
     return stm.getvalue()
 
 
-dumps = decode = from_json
-loads = encode = to_json
+loads = decode = from_json
+dumps = encode = to_json
