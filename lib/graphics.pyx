@@ -30,6 +30,8 @@ cdef class Font(object):
     def render(self, text, antialias=1, fg=(0, 0, 0), bg=None):
         if len(text) == 0:
             text = ' '
+        if isinstance(text, unicode):
+            text = text.encode('utf8')
         # todo: antialias and bg
         cdef SDL_Surface* s
         cdef SDL_Color fgcolor
