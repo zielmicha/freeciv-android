@@ -115,7 +115,7 @@ class Client(object):
 
         freeciv.func.call_idle_callbacks()
         if net_socket != -1:
-            r, w, x = select.select([net_socket], [], [], 0.01)
+            r, w, x = server_select([net_socket], [], [], 0.01)
             if r:
                 freeciv.func.input_from_server(net_socket)
         else:
@@ -281,6 +281,9 @@ class Client(object):
         self.additional_server_line_callback = line_callback
         self.chat('/save')
 
+@freeciv.server_side
+def server_select(r, w, x, timeout):
+    return select.select(r, w, x, timeout)
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

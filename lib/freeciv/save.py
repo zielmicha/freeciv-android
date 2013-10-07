@@ -349,5 +349,6 @@ def zygote_main(cmd_pipe, console_pipe):
             return
         cmd = cmd.rstrip('\n')
         print >>sys.stderr, 'zygote: starting server', ' '.join(cmd.split('\0'))
-        freeciv.func.py_server_main(cmd.split('\0'))
+        from freeciv.client import clientnative
+        clientnative.func.py_server_main(cmd.split('\0'))
         print >>sys.stderr, 'zygote: server forked'

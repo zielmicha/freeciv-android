@@ -11,12 +11,12 @@
 # GNU General Public License for more details.
 
 import sys
-import osutil
-
 features = {}
 appliers = {}
 feature_types = {}
 pernaments = {}
+
+import osutil
 
 FEATURE_FILE_PATH = osutil.get_internal_storage() + '/features'
 print 'features', FEATURE_FILE_PATH
