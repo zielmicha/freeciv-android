@@ -4,6 +4,7 @@ class Socket:
     def __init__(self, f, handler):
         self.f = f
         self.handler = handler
+        self.disabled = False
 
     def load(self):
         return json.JSONDecoder(object_hook=from_json).decode(self.f.readline())
@@ -62,8 +63,17 @@ def from_json(obj):
         return obj
 
 def call(sock, name, *args, **kwargs):
-    sock.dump({'call': name, 'args': args, 'kwargs': kwargs})
-    return loop(sock)
+    if sock.disabled:
+        raise RuntimeError('attempted to call back in no-ack mode  (info: %s)' % sock.disabled)
+    ack = True
+    if '_noack' in kwargs:
+        ack = not kwargs['_noack']
+        del kwargs['_noack']
+    sock.dump({'call': name, 'args': args, 'kwargs': kwargs, 'ack': ack})
+    if ack:
+        print 'wait for', name
+        res = loop(sock)
+        return res
 
 def loop(sock):
     while True:
@@ -71,5 +81,10 @@ def loop(sock):
         if 'return' in func:
             return func['return']
         else:
+            if not func['ack']:
+                sock.disabled = repr(func)
             result = sock.handler(func['call'], *func['args'], **func['kwargs'])
-            sock.dump({'return': result})
+            if func['ack']:
+                sock.dump({'return': result})
+            else:
+                sock.disabled = False

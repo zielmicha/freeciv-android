@@ -113,15 +113,7 @@ class Client(object):
             sleep_time = freeciv.func.real_timer_callback()
             self.next_time = time.time() + sleep_time
 
-        freeciv.func.call_idle_callbacks()
-        if net_socket != -1:
-            r, w, x = server_select([net_socket], [], [], 0.01)
-            if r:
-                freeciv.func.input_from_server(net_socket)
-        else:
-            time.sleep(0.03)
-
-        #window.draw_cursor(cursor_pos)
+        server_input_process(net_socket)
 
     def console_line(self, text):
         if self.out_window_callback:
@@ -282,8 +274,12 @@ class Client(object):
         self.chat('/save')
 
 @freeciv.server_side
-def server_select(r, w, x, timeout):
-    return select.select(r, w, x, timeout)
+def server_input_process(net_socket):
+    freeciv.func.call_idle_callbacks()
+    if net_socket != -1:
+        r, w, x = select.select([net_socket], [], [], 0.005)
+        if r:
+            freeciv.func.input_from_server(net_socket)
 
 class Gov(object):
     def __init__(self, (index, name, changable)):

@@ -60,6 +60,8 @@ def server_side(func):
     server_side_funcs[func.__module__ + '.' + func.__name__] = func
     return func
 
+server_side_async = server_side
+
 def run(args=[]):
     freecivclient.run_main(["freeciv-python-client"] + args)
 

@@ -2,13 +2,13 @@ import simplerpc
 import socket
 
 def handler(name, args, kwargs):
-    print 'call', name, args, kwargs
     try:
         func = getattr(callback, name)
     except AttributeError:
         print 'Missing callback', name
     else:
-        return func(*args, **kwargs)
+        result = func(*args, **kwargs)
+        return result
 
 conn = socket.socket()
 conn.connect(('localhost', 9999))
@@ -19,7 +19,6 @@ class _callback: pass
 callback = _callback()
 
 def _call(name, *args, **kwargs):
-    print 'call', name, args, kwargs
     return sock.call(name, *args, **kwargs)
 
 class _func:
@@ -53,6 +52,10 @@ def register(name_or_func):
     else:
         raise TypeError('%r should be str or callable' % name_or_func)
 
-def server_side(func):
+def server_side(func, async=False):
     ident = func.__module__ + '.' + func.__name__
-    return lambda *args, **kwargs: _call('server_side', ident, *args, **kwargs)
+    return lambda *args, **kwargs: _call('server_side', ident, *args,
+                                         **dict(kwargs, _noack=async))
+
+def server_side_async(func):
+    return server_side(func, async=True)

@@ -18,5 +18,5 @@ else:
 
 for name in ['get_overview_size', 'register',
              'const', 'callback', 'func', 'run',
-             'server_side']:
+             'server_side', 'server_side_async']:
     globals()[name] = getattr(client, name)
