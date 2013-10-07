@@ -11,8 +11,11 @@ cdef extern from "SDL.h":
     ctypedef enum:
         SDL_PIXELFORMAT_BGRX8888
         SDL_PIXELFORMAT_BGRX4444
+        SDL_PIXELFORMAT_BGRA8888
+        SDL_PIXELFORMAT_ABGR8888
         SDL_PIXELFORMAT_ARGB8888
         SDL_PIXELFORMAT_ARGB4444
+        SDL_PIXELFORMAT_RGBA8888
         SDL_PIXELFORMAT_RGB888
         SDL_PIXELFORMAT_RGB332
         SDL_INIT_VIDEO
@@ -411,6 +414,7 @@ cdef extern from "SDL.h":
     cdef int SDL_SetTextureAlphaMod(SDL_Texture * texture, Uint8 alpha)
     cdef int SDL_RenderSetLogicalSize(SDL_Renderer * renderer, int w, int h)
     cdef char * SDL_GetError()
+    cdef int SDL_RenderReadPixels(SDL_Renderer* renderer, SDL_Rect* rect, Uint32 format, void* pixels, int pitch)
 
 cdef extern from "SDL_image.h":
     cdef SDL_Surface *IMG_Load(char *file)

@@ -32,6 +32,7 @@ import monitor
 import options
 import menus
 import graphics
+import stream
 
 import sync
 import gold
@@ -297,6 +298,8 @@ def main():
 
     start_autoupdate()
     start_marketnotice()
+
+    stream.maybe_init()
 
     client.freeciv.run()
 

@@ -92,8 +92,9 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
         self.background_size = surf_size[0], int(new_height)
 
     def draw(self, surf, (x, y)):
-        surf.blit(self.background,
-                  (x, y + self.background_margin_top) + self.background_size)
+        if not features.get('stream.enable'):
+            surf.blit(self.background,
+                      (x, y + self.background_margin_top) + self.background_size)
         super(PrettyMenu, self).draw(surf, (x, y))
 
 class MenuButton(ui.Button):

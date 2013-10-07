@@ -265,6 +265,21 @@ def create_surface_small(w, h):
             return alloc.alloc(w, h)
     return create_surface(w, h)
 
+def read_window_data():
+    size = _window.get_size()
+    cdef SDL_Rect rect = _make_rect((0, 0, size[0], size[1]))
+    cdef int pixelsize = 4
+    cdef int bufsize = pixelsize * size[0] * size[1]
+    cdef char* pixels = <char*>malloc(bufsize)
+    if SDL_RenderReadPixels(_window._sdl, &rect,
+                            SDL_PIXELFORMAT_ABGR8888,
+                            pixels, size[0] * pixelsize) != 0:
+        free(pixels)
+        raise SDLError()
+    cdef bytes py_data = pixels[:bufsize]
+    free(pixels)
+    return py_data
+
 S = 1024
 
 class Allocator:
