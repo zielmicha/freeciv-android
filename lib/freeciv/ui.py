@@ -556,18 +556,18 @@ def main_dispatch_ticks():
         execute_later_list = list(_execute_later_list)
         _execute_later_list[:] = []
 
+    for func in execute_later_list:
+        func()
+
     screen.tick()
 
     for overlay in overlays:
         overlay.tick()
 
-    for func in execute_later_list:
-        func()
-
 def main_tick():
     main_handle_events()
-    main_dispatch_ticks()
     main_draw()
+    main_dispatch_ticks()
 
 user_time_spent = 0
 
