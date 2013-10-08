@@ -517,10 +517,12 @@ def async(thing, then=None):
     threading.Thread(target=wrapper).start()
 
 any_mouse_events = 0
+syntetic_events = []
 
 def main_handle_events():
     global any_mouse_events
-    events = merge_mouse_events(graphics.get_events())
+    events = merge_mouse_events(graphics.get_events() + syntetic_events)
+    syntetic_events[:] = []
     if not screen:
         return
 

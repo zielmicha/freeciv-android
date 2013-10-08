@@ -12,7 +12,7 @@ class WSHandler(websocket.WebSocketHandler):
         self.handlers.append(self)
 
     def on_message(self, message):
-        pass
+        self.ctrl_file.write(message + '\n')
 
     def on_close(self):
         pass
@@ -34,12 +34,17 @@ def stream_data(fdin):
     print 'stream finished'
 
 if __name__ == u"__main__":
-    fdin, fdout = os.pipe()
+    streamin, streamout = os.pipe()
+    ctrlin, ctrlout = os.pipe()
     inferior = subprocess.Popen(['bash', './main.sh',
                                  'freeciv.main',
-                                 '-f:stream.enable', '-f:stream.fd=%d' % fdout])
-    os.close(fdout)
-    threading.Thread(target=stream_data, args=[fdin]).start()
+                                 '-f:stream.enable', '-f:stream.fd=%d' % streamout,
+                                 '-f:ctrl.enable', '-f:ctrl.fd=%d' % ctrlin,
+                                 '-f:ui.enable_anim=false', '-f:app.debug=false'])
+    os.close(streamout)
+    os.close(ctrlin)
+    WSHandler.ctrl_file = os.fdopen(ctrlout, 'w', 0)
+    threading.Thread(target=stream_data, args=[streamin]).start()
 
     application = web.Application([
         (r'/ws', WSHandler),
