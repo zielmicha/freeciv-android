@@ -231,7 +231,7 @@ def except_hook():
     panel.add(ui.Label('error!', font=ui.consolefont))
     panel.add(ui.Label(str(type) + ':\n' + str(value), font=ui.consolefont))
     panel.add(ui.Label(''.join(tb_str), font=ui.consolefont))
-    ui.screen = ui.ScrollWrapper(panel)
+    ui.set_screen(ui.ScrollWrapper(panel))
 
 def start_marketnotice():
     if features.get('app.marketnotice'):

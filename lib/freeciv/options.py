@@ -13,9 +13,9 @@
 import traceback
 import functools
 
-from freeciv import ui
+import ui
 from freeciv import uidialog
-from freeciv import osutil
+import osutil
 from freeciv import features
 
 from freeciv import dropbox
@@ -95,7 +95,7 @@ def show_options():
 def change_screen_size(size):
     features.set_perm('app.forcesize', ('%d,%d' % size) if size else '')
     ui.history = []
-    ui.screen = None
+    ui.set_screen(None)
     import main
     main.main(init=False)
 

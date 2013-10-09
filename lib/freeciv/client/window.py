@@ -13,7 +13,7 @@
 import graphics
 from freeciv.client import _freeciv as freeciv
 from freeciv import features
-from freeciv import osutil
+import osutil
 from freeciv import client
 
 import common

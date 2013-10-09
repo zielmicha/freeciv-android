@@ -1,8 +1,7 @@
-from freeciv import ui
+import ui
 from freeciv import sync
-from freeciv import ui
 from freeciv import help
-from freeciv import osutil
+import osutil
 from freeciv import features
 from freeciv import sync
 

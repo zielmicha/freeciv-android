@@ -19,7 +19,7 @@ from freeciv import save
 from freeciv import features
 from freeciv import options
 from freeciv import tutorial
-from freeciv import osutil
+import osutil
 from freeciv import gold
 
 class SpacingLayoutWidget(ui.LayoutWidget):

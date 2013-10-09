@@ -16,7 +16,7 @@ import window
 import sys
 import time
 from freeciv import features
-from freeciv import osutil
+import osutil
 
 DO_MASK = False
 

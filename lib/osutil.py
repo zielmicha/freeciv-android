@@ -29,7 +29,7 @@ import os
 import sys
 import graphics
 import time
-import features
+from freeciv import features
 from graphics import sdl_open as open_res
 
 features.add_feature('app.emulatedpi', 60, type=int)

@@ -1,0 +1,265 @@
+# Copyright (C) 2011 Michal Zielinski (michal@zielinscy.org.pl)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+import time
+import traceback
+import graphics
+
+import graphics
+import functools
+from freeciv import features
+import osutil
+import os
+import sys
+
+import ui
+
+history = []
+overlays = []
+_screen = None
+
+show_fps = False
+
+def set_show_fps(val):
+    global show_fps
+    show_fps = val
+
+features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
+features.add_feature('ui.enable_anim', type=bool, default=True)
+
+def replace(new_screen):
+    assert isinstance(new_screen, ui.Widget)
+    global _screen
+    _screen = new_screen
+
+def replace_anim(new_screen, direction=1):
+    if features.get('ui.enable_anim'):
+        replace(ui.Animation(get_screen(), new_screen, direction))
+    else:
+        replace(new_screen)
+
+def set(new_screen, anim=True, no_stack=False):
+    new_screen._no_stack = no_stack
+    if _screen:
+        history.append(_screen)
+        if anim:
+            replace_anim(new_screen)
+        else:
+            replace(new_screen)
+    else:
+        replace(new_screen)
+
+def get_screen():
+    return _screen
+
+def set_screen(new):
+    global _screen
+    _screen = new
+
+def back(allow_override=True, anim=True):
+    while history and getattr(history[-1], '_no_stack', False):
+        history.pop()
+    if allow_override and _screen.back() is not True:
+        return
+    elif not history:
+        if hasattr(sys, 'exitfunc'):
+            sys.exitfunc()
+        os._exit(0)
+    else:
+        new_screen = history.pop()
+        if anim:
+            replace_anim(new_screen, -1)
+        else:
+            replace(new_screen)
+
+_fill_image = None
+_fill_image_not_resized = None
+
+def set_fill_image(image):
+    global _fill_image, _fill_image_not_resized
+
+    _fill_image_not_resized = image
+    _fill_image = image
+
+def fill(surf, rect, screen=None):
+    surf.fill((200, 200, 200, 255))
+    if _fill_image:
+        size = graphics.get_window().get_size()
+        surf.blit(_fill_image, dest=(rect[0], rect[1], size[0], size[1]))
+
+LOCK_MOUSE_EVENT = object() # constant
+
+def render_text(font, text, color=(0, 0, 0)):
+    if '\n' in text:
+        lines = text.splitlines()
+        renders = [ font.render(line, True, color) for line in lines ]
+        w = max( render.get_width() for render in renders )
+        h = sum( render.get_height() for render in renders )
+        surf = graphics.create_surface(w, h)
+        y = 0
+        for render in renders:
+            surf.blit(render, (0, y))
+            y += render.get_height()
+        return surf
+    else:
+        return font.render(text, True, color)
+
+FPS = 30
+
+def add_overlay(overlay, pos):
+    overlay.pos = pos
+    overlays.append(overlay)
+
+import threading
+
+_execute_later_list = []
+_execute_later_lock = threading.Lock()
+
+def execute_later(func):
+    with _execute_later_lock:
+        _execute_later_list.append(func)
+
+def execute_later_decorator(func):
+    return lambda *args, **kwargs: execute_later(lambda: func(*args, **kwargs))
+
+def async(thing, then=None):
+    def wrapper():
+        result = thing()
+        if then:
+            execute_later(lambda: then(result))
+
+    threading.Thread(target=wrapper).start()
+
+any_mouse_events = 0
+syntetic_events = []
+
+def main_handle_events():
+    global any_mouse_events
+    events = merge_mouse_events(graphics.get_events() + syntetic_events)
+    syntetic_events[:] = []
+    if not _screen:
+        return
+
+    for event in events:
+        ev_dict = event.dict
+        if 'pos' in ev_dict:
+            ev_dict = dict(ev_dict)
+            x, y = ev_dict['pos']
+            ev_dict['pos'] = x, y
+            ev_dict['abs_pos'] = ev_dict['pos']
+            any_mouse_events = time.time()
+        if event.type == graphics.const.QUIT:
+            back()
+        elif event.type == graphics.const.KEYDOWN and event.key == graphics.const.K_ESCAPE:
+            back()
+        else:
+            _screen.event(Event(event.type, ev_dict))
+
+def main_draw():
+    surf = graphics.get_window()
+    fill(surf, (0,0))
+    _screen.draw(surf, (0, 0))
+
+    for overlay in overlays:
+        overlay.draw(surf, overlay.pos)
+
+    graphics.flip()
+
+def main_dispatch_ticks():
+    with _execute_later_lock:
+        execute_later_list = list(_execute_later_list)
+        _execute_later_list[:] = []
+
+    for func in execute_later_list:
+        func()
+
+    _screen.tick()
+
+    for overlay in overlays:
+        overlay.tick()
+
+def main_tick():
+    main_handle_events()
+    main_draw()
+    main_dispatch_ticks()
+
+user_time_spent = 0
+
+def main_tick_wrapper():
+    global user_time_spent
+    try:
+        frame_start = time.time()
+
+        main_tick()
+
+        curr_time = time.time()
+        frame_last = curr_time - frame_start
+        sleep = (1./FPS) - frame_last
+        if sleep > 0:
+            time.sleep(sleep)
+        USER_INACTIVITY_MAX = 10
+        if any_mouse_events + USER_INACTIVITY_MAX > curr_time:
+            # don't count time if user has locked screen or switched app
+            # or haven't touched screen for long
+            user_time_spent += min(frame_last, 1) + sleep
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except:
+        traceback.print_exc()
+        if ui.except_callback:
+            ui.except_callback()
+        time.sleep(0.5)
+
+def main():
+    ui.screen_width, ui.screen_height = ui.screen_size = graphics.get_window().get_size()
+    while True:
+        main_tick_wrapper()
+
+def user_time_sleep(c):
+    deadline = user_time_spent + c
+    while True:
+        to_sleep = deadline - user_time_spent
+        if to_sleep < 0:
+            break
+        time.sleep(to_sleep)
+
+def merge_mouse_events(events):
+    mouse = None
+    res = []
+    for ev in events:
+        if ev.type == graphics.const.MOUSEMOTION:
+            mouse = ev
+        else:
+            res.append(ev)
+    if mouse:
+        res.append(mouse)
+    return res
+
+def load_font(name, size):
+    return graphics.load_font('fonts/ProcionoTT.ttf', size)
+
+def load_image(name):
+    return graphics.load_image(name)
+
+def init():
+    graphics.init()
+
+    ui.consolefont = load_font(None, 20)
+    ui.smallfont = font = load_font(None, 25)
+    ui.mediumfont = load_font(None, 32)
+    ui.font = ui.bigfont = load_font(None, 50)
+
+class Event(object):
+    def __init__(self, type, dict):
+        self.type = type
+        for k, v in dict.items():
+            setattr(self, k, v)

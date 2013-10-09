@@ -211,10 +211,10 @@ class ScreenClient(client.Client):
             self.get_city_dialog(city).refresh()
 
     def get_city_dialog(self, city):
-        if isinstance(ui.screen, ui.ScrollWrapper):
-            item = ui.screen.item
+        if isinstance(ui.get_screen(), ui.ScrollWrapper):
+            item = ui.get_screen().item
         else:
-            item = ui.screen
+            item = ui.get_screen()
         if isinstance(item, citydlg.Dialog) and item.city == city:
             return item
         else:
@@ -473,7 +473,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
     def draw_clipped(self, surf, pos, clip):
         rect = graphics.Rect(clip)
         cliptex = graphics.create_surface(rect[2], rect[3])
-        relpos = ui._subpoints(pos, (rect[0], rect[1]))
+        relpos = ui.layout._subpoints(pos, (rect[0], rect[1]))
 
         self.draw(cliptex, relpos)
 
@@ -481,7 +481,7 @@ class ConsoleWidget(ui.LinearLayoutWidget):
 
     def event(self, ev):
         if ev.type == graphics.const.MOUSEBUTTONDOWN:
-            myabspos = ui._subpoints(ev.abs_pos, ev.pos)
+            myabspos = ui.layout._subpoints(ev.abs_pos, ev.pos)
             self.shown = True
             ui.add_overlay(self.scroll, myabspos)
         elif ev.type == graphics.const.MOUSEBUTTONUP:
@@ -561,7 +561,7 @@ class MapWidget(ui.Widget):
     def drag(self, pos):
         if not self.last_drag_pos:
             self.last_drag_pos = self.start_drag
-        delta = ui._subpoints(self.last_drag_pos, pos)
+        delta = ui.layout._subpoints(self.last_drag_pos, pos)
         self.last_drag_pos = pos
 
         self.drawer.move_map(delta)

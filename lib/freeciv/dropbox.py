@@ -1,7 +1,7 @@
-from freeciv import ui
+import ui
 from freeciv import features
 from freeciv import sync
-from freeciv import osutil
+import osutil
 from freeciv import help
 
 import save as _save
