@@ -55,7 +55,8 @@ if __name__ == u"__main__":
                                  '-f:stream.enable', '-f:stream.fd=%d' % streamout,
                                  '-f:ctrl.enable', '-f:ctrl.fd=%d' % ctrlin,
                                  '-f:ui.enable_anim=false', '-f:app.debug=false',
-                                 '-f:ui.fps_limit=3'])
+                                 '-f:ui.redraw_fps_limit=3',
+                                 '-f:ui.fps_limit=15'])
     os.close(streamout)
     os.close(ctrlin)
     WSHandler.ctrl_file = os.fdopen(ctrlout, 'w', 0)

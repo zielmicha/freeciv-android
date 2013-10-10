@@ -2,8 +2,15 @@ import ui
 import graphics
 
 class Widget(object):
-    def back(self):
+    def back(self, _is_not_overriden=None):
         return True
+
+    def is_back_overriden(self):
+        # hack
+        try:
+            return not self.back(_is_not_overriden=None)
+        except TypeError:
+            return True
 
     def event(self, ev):
         pass

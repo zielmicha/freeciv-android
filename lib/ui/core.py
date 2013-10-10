@@ -23,7 +23,6 @@ import sys
 
 import ui
 
-
 from . import stream
 
 history = []
@@ -39,7 +38,8 @@ def set_show_fps(val):
 
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)
-features.add_feature('ui.fps_limit', type=int, default=True)
+features.add_feature('ui.fps_limit', type=int, default=30)
+features.add_feature('ui.redraw_fps_limit', type=int, default=None)
 
 features.add_feature('stream.enable', type=bool, default=False)
 
@@ -134,17 +134,47 @@ def add_overlay(overlay, pos):
     overlay.pos = pos
     overlays.append(overlay)
 
+class Timer(object):
+    def __init__(self):
+        self.last = 0
+
+    def capture(self):
+        self.last = time.time()
+
+    def get_time_delta(self):
+        return time.time() - self.last
+
 import threading
 
-_execute_later_list = []
-_execute_later_lock = threading.Lock()
+class HookList:
+    def __init__(self):
+        self.list = []
+        self.lock = threading.Lock()
 
-def execute_later(func):
-    with _execute_later_lock:
-        _execute_later_list.append(func)
+    def execute_and_clear(self, *args, **kwargs):
+        values = self.clear()
+        for callback in values:
+            callback(*args, **kwargs)
 
-def execute_later_decorator(func):
-    return lambda *args, **kwargs: execute_later(lambda: func(*args, **kwargs))
+    def clear(self):
+        with self.lock:
+            l = list(self.list)
+            self.list[:] = []
+            return l
+
+    def add(self, func):
+        with self.lock:
+            self.list.append(func)
+
+    def decorator(self, func):
+        return lambda *args, **kwargs: self.add(lambda: func(*args, **kwargs))
+
+tick_hooks = HookList()
+draw_hooks = HookList()
+
+# `backward` compatibility
+execute_later = tick_hooks.add
+execute_later_decorator = tick_hooks.decorator
 
 def async(thing, then=None):
     def wrapper():
@@ -153,6 +183,14 @@ def async(thing, then=None):
             execute_later(lambda: then(result))
 
     threading.Thread(target=wrapper).start()
+
+def main_tick():
+    any_events = main_handle_events()
+    if any_events:
+        main_draw()
+    else:
+        main_maybe_draw()
+    main_dispatch_ticks()
 
 any_mouse_events = 0
 syntetic_events = []
@@ -179,7 +217,17 @@ def main_handle_events():
         else:
             _screen.event(Event(event.type, ev_dict))
 
+    return bool(events)
+
+last_draw = Timer()
+
+def main_maybe_draw():
+    if last_draw.get_time_delta() > 1. / features.get('ui.redraw_fps_limit'):
+        main_draw()
+
 def main_draw():
+    last_draw.capture()
+
     surf = graphics.get_window()
     fill(surf, (0,0))
 
@@ -189,26 +237,18 @@ def main_draw():
     for overlay in overlays:
         overlay.draw(surf, overlay.pos)
 
+    draw_hooks.execute_and_clear()
+
     graphics.flip()
 
 def main_dispatch_ticks():
-    with _execute_later_lock:
-        execute_later_list = list(_execute_later_list)
-        _execute_later_list[:] = []
-
-    for func in execute_later_list:
-        func()
+    tick_hooks.execute_and_clear()
 
     _screen.update_layout()
     _screen.tick()
 
     for overlay in overlays:
         overlay.tick()
-
-def main_tick():
-    main_handle_events()
-    main_draw()
-    main_dispatch_ticks()
 
 user_time_spent = 0
 

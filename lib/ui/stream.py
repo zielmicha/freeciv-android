@@ -12,7 +12,7 @@ features.add_feature('stream.fd', type=int, default=2)
 
 def init():
     print 'stream enabled (FD=%d)' % features.get('stream.fd')
-    ui.execute_later(run)
+    ui.draw_hooks.add(run)
 
 def write_image(data):
     import Image
@@ -43,4 +43,4 @@ def run():
 
     for frame in data:
         os.write(features.get('stream.fd'), json.dumps(frame) + '\n')
-    ui.execute_later(run)
+    ui.draw_hooks.add(run)
