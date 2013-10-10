@@ -29,6 +29,7 @@ from . import stream
 history = []
 overlays = []
 _screen = None
+_allow_animation = 0
 
 show_fps = False
 
@@ -46,12 +47,14 @@ def replace(new_screen):
     assert isinstance(new_screen, ui.Widget)
     global _screen
     _screen = new_screen
+    _set_allow_animation(0)
 
 def replace_anim(new_screen, direction=1):
     if features.get('ui.enable_anim'):
         replace(ui.Animation(get_screen(), new_screen, direction))
     else:
         replace(new_screen)
+    _set_allow_animation(direction)
 
 def set(new_screen, anim=True, no_stack=False):
     new_screen._no_stack = no_stack
@@ -63,6 +66,13 @@ def set(new_screen, anim=True, no_stack=False):
             replace(new_screen)
     else:
         replace(new_screen)
+
+def get_allow_animation():
+    return _allow_animation
+
+def _set_allow_animation(val):
+    global _allow_animation
+    _allow_animation = val
 
 def get_screen():
     return _screen

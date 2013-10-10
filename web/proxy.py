@@ -27,6 +27,16 @@ class MainHandler(web.RequestHandler):
     def get(self):
         self.redirect('ws.html')
 
+class MyStaticFileHandler(web.RequestHandler):
+    def initialize(self, path):
+        self._path = path
+
+    def get(self, name):
+        if name in os.listdir(self._path):
+            self.write(open(self._path + '/' + name).read())
+        else:
+            raise Exception('not found')
+
 def stream_data(fdin):
     f = os.fdopen(fdin, 'r', 1)
 
@@ -54,7 +64,7 @@ if __name__ == u"__main__":
     application = web.Application([
         (r'/', MainHandler),
         (r'/ws', WSHandler),
-        (r'/(.*)', web.StaticFileHandler, {'path': os.path.dirname(__file__)}),
+        (r'/(.*)', MyStaticFileHandler, {'path': os.path.dirname(__file__)}),
     ])
 
     http_server = httpserver.HTTPServer(application)

@@ -38,7 +38,8 @@ def run():
         'type': 'frame',
         'data': compressed.encode('base64'),
         'id': id(ui.get_screen()),
-        'back': id(ui.history[0]) if ui.history else None})
+        'back': id(ui.history[0]) if ui.history else None,
+        'allow_animation': ui.get_allow_animation()})
 
     for frame in data:
         os.write(features.get('stream.fd'), json.dumps(frame) + '\n')
