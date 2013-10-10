@@ -15,7 +15,7 @@ from freeciv.client import _freeciv as freeciv
 import window
 import sys
 import time
-from freeciv import features
+import features
 import osutil
 
 DO_MASK = False

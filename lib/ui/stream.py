@@ -8,16 +8,14 @@ import json
 import time
 import StringIO
 
-features.add_feature('stream.enable', type=bool, default=False)
 features.add_feature('stream.fd', type=int, default=2)
 
 last_send = 0
 min_send_pause = 0.4
 
-def maybe_init():
-    if features.get('stream.enable'):
-        print 'stream enabled (FD=%d)' % features.get('stream.fd')
-        run()
+def init():
+    print 'stream enabled (FD=%d)' % features.get('stream.fd')
+    run()
 
 def write_image(data):
     import Image
@@ -40,7 +38,7 @@ def run():
 
     last_send = time.time()
 
-    ui._fill_image = None
+    ui.set_fill_image(None)
     start = time.time()
     data = graphics.read_window_data()
     compressed = write_image(data)

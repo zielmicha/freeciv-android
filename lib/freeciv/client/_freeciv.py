@@ -20,7 +20,7 @@ import traceback
 import glob
 import os
 from freecivclient import mask_sprite, get_overview_size
-from freeciv import features
+import features
 import collections
 import time
 

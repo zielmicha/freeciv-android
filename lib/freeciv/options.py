@@ -16,7 +16,7 @@ import functools
 import ui
 from freeciv import uidialog
 import osutil
-from freeciv import features
+import features
 
 from freeciv import dropbox
 

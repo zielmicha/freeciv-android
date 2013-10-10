@@ -16,7 +16,7 @@ import graphics
 
 from freeciv import sync
 from freeciv import save
-from freeciv import features
+import features
 from freeciv import options
 from freeciv import tutorial
 import osutil

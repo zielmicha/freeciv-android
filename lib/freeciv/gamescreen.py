@@ -541,7 +541,7 @@ class MapWidget(ui.Widget):
             if self.was_dragged:
                 self.drag(ev.pos)
                 self.was_dragged = False
-            elif ev.button == 1:
+            else:
                 x, y = self.drawer.coord_ui_to_map(ev.pos)
                 print ev.pos, x, y
                 freeciv.func.action_button_pressed(x, y, SELECT_POPUP)

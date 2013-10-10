@@ -18,7 +18,7 @@ import freeciv.client
 
 from freeciv import progress
 from freeciv import monitor
-from freeciv import features
+import features
 
 from freeciv.client import _freeciv as freeciv
 

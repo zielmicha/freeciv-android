@@ -1,5 +1,5 @@
 import ui
-from freeciv import features
+import features
 from freeciv import sync
 import osutil
 from freeciv import help

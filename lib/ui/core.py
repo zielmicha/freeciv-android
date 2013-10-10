@@ -16,7 +16,7 @@ import graphics
 
 import graphics
 import functools
-from freeciv import features
+import features
 import osutil
 import os
 import sys
@@ -35,6 +35,8 @@ def set_show_fps(val):
 
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)
+
+features.add_feature('stream.enable', type=bool, default=False)
 
 def replace(new_screen):
     assert isinstance(new_screen, ui.Widget)
@@ -91,10 +93,11 @@ def set_fill_image(image):
     _fill_image = image
 
 def fill(surf, rect, screen=None):
-    surf.fill((200, 200, 200, 255))
     if _fill_image:
         size = graphics.get_window().get_size()
         surf.blit(_fill_image, dest=(rect[0], rect[1], size[0], size[1]))
+    else:
+        surf.fill((255, 255, 255, 0), blend=graphics.MODE_NONE)
 
 LOCK_MOUSE_EVENT = object() # constant
 
@@ -257,6 +260,10 @@ def init():
     ui.smallfont = font = load_font(None, 25)
     ui.mediumfont = load_font(None, 32)
     ui.font = ui.bigfont = load_font(None, 50)
+
+    if features.get('stream.enable'):
+        import stream
+        stream.init()
 
 class Event(object):
     def __init__(self, type, dict):

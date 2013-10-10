@@ -11,15 +11,11 @@
 # GNU General Public License for more details.
 
 import sys
-import osutil
 
 features = {}
 appliers = {}
 feature_types = {}
 pernaments = {}
-
-FEATURE_FILE_PATH = osutil.get_internal_storage() + '/features'
-print 'features', FEATURE_FILE_PATH
 
 monitor = None
 
@@ -27,7 +23,7 @@ def log(str):
     global monitor
     if not monitor:
         try:
-            import monitor
+            from freeciv import monitor
         except ImportError:
             print str
             return
@@ -47,6 +43,10 @@ def add_feature(name, default=None, type=str):
     feature_types[name] = type
 
 def load_config():
+    import osutil
+    FEATURE_FILE_PATH = osutil.get_internal_storage() + '/features'
+    print 'features', FEATURE_FILE_PATH
+
     try:
         for line in open(FEATURE_FILE_PATH):
             try:

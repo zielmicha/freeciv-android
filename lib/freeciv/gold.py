@@ -2,7 +2,7 @@ import ui
 from freeciv import sync
 from freeciv import help
 import osutil
-from freeciv import features
+import features
 from freeciv import sync
 
 import functools
