@@ -182,6 +182,8 @@ def main_handle_events():
 def main_draw():
     surf = graphics.get_window()
     fill(surf, (0,0))
+
+    _screen.update_layout()
     _screen.draw(surf, (0, 0))
 
     for overlay in overlays:
@@ -197,6 +199,7 @@ def main_dispatch_ticks():
     for func in execute_later_list:
         func()
 
+    _screen.update_layout()
     _screen.tick()
 
     for overlay in overlays:

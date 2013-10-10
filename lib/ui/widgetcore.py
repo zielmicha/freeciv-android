@@ -11,6 +11,9 @@ class Widget(object):
     def tick(self):
         pass
 
+    def update_layout(self):
+        pass
+
 class Animation(Widget):
     spacing = 0.2
 

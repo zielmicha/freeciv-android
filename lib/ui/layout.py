@@ -86,8 +86,7 @@ class LayoutWidget(ui.Widget):
 
     def update_layout(self):
         for item in self.items:
-            if hasattr(item, 'update_layout'):
-                item.update_layout()
+            item.update_layout()
 
         self.positions = list(self.get_positions())
 

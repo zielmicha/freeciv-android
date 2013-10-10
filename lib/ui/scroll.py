@@ -35,6 +35,9 @@ class ScrollWrapper(ui.Widget):
     def size(self):
         return (self.width, self.height)
 
+    def update_layout(self):
+        self.item.update_layout()
+
     def draw(self, surf, pos):
         fx, fy = 0, 0
         if self.use_x:

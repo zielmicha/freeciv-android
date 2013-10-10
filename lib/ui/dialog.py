@@ -111,3 +111,7 @@ class Dialog(ui.Widget):
     def close(self):
         if self.is_opened():
             ui.back()
+
+    def update_layout(self):
+        self.item.update_layout()
+        self.screen.update_layout()
