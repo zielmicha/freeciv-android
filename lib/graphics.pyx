@@ -83,8 +83,17 @@ cdef class Surface(object):
     cdef object _size
     cdef object _filename
     cdef int _alpha
+    # version number - changes after each draw
+    cdef int _version
+
+    def __cinit__(self):
+        self._version = 0
 
     def _set_target(self):
+        # increment version number when texture is set as target
+        self._version += 1
+
+        # set as target
         res = SDL_SetRenderTarget(self._sdl, self._tex)
         if res < 0:
             raise SDLError()
@@ -198,6 +207,9 @@ cdef class Surface(object):
         def __set__(self, val): self._filename = val
         def __get__(self): return self._filename
 
+    property version:
+        def __get__(self): return self._version
+
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
 
@@ -267,11 +279,14 @@ def create_surface_small(w, h):
 
 def read_window_data():
     size = _window.get_size()
+    return read_renderer_data(size, _window._sdl)
+
+cdef object read_renderer_data(object size, SDL_Renderer* renderer):
     cdef SDL_Rect rect = _make_rect((0, 0, size[0], size[1]))
     cdef int pixelsize = 4
     cdef int bufsize = pixelsize * size[0] * size[1]
     cdef char* pixels = <char*>malloc(bufsize)
-    if SDL_RenderReadPixels(_window._sdl, &rect,
+    if SDL_RenderReadPixels(renderer, &rect,
                             SDL_PIXELFORMAT_ABGR8888,
                             pixels, size[0] * pixelsize) != 0:
         free(pixels)
