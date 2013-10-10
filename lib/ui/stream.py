@@ -10,12 +10,9 @@ import StringIO
 
 features.add_feature('stream.fd', type=int, default=2)
 
-last_send = 0
-min_send_pause = 0.4
-
 def init():
     print 'stream enabled (FD=%d)' % features.get('stream.fd')
-    run()
+    ui.execute_later(run)
 
 def write_image(data):
     import Image
@@ -28,16 +25,7 @@ def write_image(data):
     output.close()
     return content
 
-@ui.execute_later_decorator
 def run():
-    global last_send
-
-    if time.time() - last_send < min_send_pause:
-        run()
-        return
-
-    last_send = time.time()
-
     ui.set_fill_image(None)
     start = time.time()
     data = graphics.read_window_data()
@@ -45,9 +33,13 @@ def run():
     stats = {'size': len(compressed),
              'time': int((time.time() - start) * 1000)}
 
-    frame = {
+    data = []
+    data.append({
         'type': 'frame',
         'data': compressed.encode('base64'),
-        'stats': stats}
-    os.write(features.get('stream.fd'), json.dumps(frame) + '\n')
-    run()
+        'id': id(ui.get_screen()),
+        'back': id(ui.history[0]) if ui.history else None})
+
+    for frame in data:
+        os.write(features.get('stream.fd'), json.dumps(frame) + '\n')
+    ui.execute_later(run)

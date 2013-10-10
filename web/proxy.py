@@ -23,6 +23,10 @@ class WSHandler(websocket.WebSocketHandler):
             if handler.ws_connection:
                 handler.write_message(data)
 
+class MainHandler(web.RequestHandler):
+    def get(self):
+        self.redirect('ws.html')
+
 def stream_data(fdin):
     f = os.fdopen(fdin, 'r', 1)
 
@@ -40,14 +44,17 @@ if __name__ == u"__main__":
                                  'freeciv.main',
                                  '-f:stream.enable', '-f:stream.fd=%d' % streamout,
                                  '-f:ctrl.enable', '-f:ctrl.fd=%d' % ctrlin,
-                                 '-f:ui.enable_anim=false', '-f:app.debug=false'])
+                                 '-f:ui.enable_anim=false', '-f:app.debug=false',
+                                 '-f:ui.fps_limit=3'])
     os.close(streamout)
     os.close(ctrlin)
     WSHandler.ctrl_file = os.fdopen(ctrlout, 'w', 0)
     threading.Thread(target=stream_data, args=[streamin]).start()
 
     application = web.Application([
+        (r'/', MainHandler),
         (r'/ws', WSHandler),
+        (r'/(.*)', web.StaticFileHandler, {'path': os.path.dirname(__file__)}),
     ])
 
     http_server = httpserver.HTTPServer(application)

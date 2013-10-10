@@ -23,6 +23,9 @@ import sys
 
 import ui
 
+
+from . import stream
+
 history = []
 overlays = []
 _screen = None
@@ -35,6 +38,7 @@ def set_show_fps(val):
 
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)
+features.add_feature('ui.fps_limit', type=int, default=True)
 
 features.add_feature('stream.enable', type=bool, default=False)
 
@@ -115,8 +119,6 @@ def render_text(font, text, color=(0, 0, 0)):
         return surf
     else:
         return font.render(text, True, color)
-
-FPS = 30
 
 def add_overlay(overlay, pos):
     overlay.pos = pos
@@ -206,7 +208,7 @@ def main_tick_wrapper():
 
         curr_time = time.time()
         frame_last = curr_time - frame_start
-        sleep = (1./FPS) - frame_last
+        sleep = (1./features.get('ui.fps_limit')) - frame_last
         if sleep > 0:
             time.sleep(sleep)
         USER_INACTIVITY_MAX = 10
@@ -262,7 +264,6 @@ def init():
     ui.font = ui.bigfont = load_font(None, 50)
 
     if features.get('stream.enable'):
-        import stream
         stream.init()
 
 class Event(object):
