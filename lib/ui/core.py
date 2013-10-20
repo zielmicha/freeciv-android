@@ -36,10 +36,15 @@ def set_show_fps(val):
     global show_fps
     show_fps = val
 
+def create_window(size):
+    graphics.init()
+    graphics.create_window(size, hidden=features.get('ui.offscreen'))
+
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)
 features.add_feature('ui.fps_limit', type=int, default=30)
-features.add_feature('ui.redraw_fps_limit', type=int, default=None)
+features.add_feature('ui.redraw_fps_limit', type=int, default=60)
+features.add_feature('ui.offscreen', type=bool, default=False)
 
 features.add_feature('stream.enable', type=bool, default=False)
 
@@ -156,6 +161,10 @@ class HookList:
         for callback in values:
             callback(*args, **kwargs)
 
+    def execute(self, *args, **kwargs):
+        for callback in self.list:
+            callback(*args, **kwargs)
+
     def clear(self):
         with self.lock:
             l = list(self.list)
@@ -166,11 +175,15 @@ class HookList:
         with self.lock:
             self.list.append(func)
 
+    def is_bound(self):
+        return len(self.list) != 0
+
     def decorator(self, func):
         return lambda *args, **kwargs: self.add(lambda: func(*args, **kwargs))
 
 tick_hooks = HookList()
 draw_hooks = HookList()
+layer_hooks = HookList()
 
 # `backward` compatibility
 execute_later = tick_hooks.add

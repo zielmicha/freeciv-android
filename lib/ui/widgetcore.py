@@ -21,6 +21,27 @@ class Widget(object):
     def update_layout(self):
         pass
 
+class Layer(Widget):
+    def draw(self, surf, pos):
+        if surf == graphics.get_window() and ui.layer_hooks.is_bound():
+            tex = graphics.create_surface(*self.get_content_size())
+            self.draw_content(tex, (0, 0))
+            ui.layer_hooks.execute(id=id(self),
+                                   surf=tex,
+                                   pos=pos,
+                                   offset=self.get_offset(),
+                                   size=self.get_clip())
+            # not only for decorative purposes - also somehow causes SDL to return right renderer data
+            surf.draw_rect((255, 255, 255, 0), pos + self.get_clip(), blend=graphics.MODE_NONE)
+        else:
+            cliptex = graphics.create_surface(*self.get_clip())
+            x, y = self.get_offset()
+            self.draw_content(cliptex, (-x, -y))
+            surf.blit(cliptex, pos)
+
+class LayerAware(object):
+    pass
+
 class Animation(Widget):
     spacing = 0.2
 

@@ -264,6 +264,12 @@ support!'''.strip()
     dialog.add(panel)
     ui.set_dialog(dialog)
 
+
+def init_window():
+    if osutil.is_desktop:
+        # on Android android.pyx takes care of init
+        ui.create_window((1280, 800))
+
 def set_logical_size():
     good_dpi = 250
     dev_dpi = osutil.get_dpi()
@@ -285,6 +291,7 @@ def main():
     monitor.start()
     save.start_zygote()
 
+    init_window()
     client.window.init_screen()
     osutil.init()
     set_logical_size()

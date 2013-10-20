@@ -79,11 +79,6 @@ def create_line_at_mouse_pos():
 def init_screen():
     global screen, surface, overview_surface
 
-    if osutil.is_desktop:
-        # on Android android.pyx takes care of init
-        graphics.init()
-        graphics.create_window((1280, 800))
-
     screen = graphics.get_window()
     surface = screen
 

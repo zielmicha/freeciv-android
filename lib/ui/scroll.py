@@ -16,7 +16,7 @@ def _scroll_speed_func(v, k):
 def _sgn(f):
     return 1 if f>0 else (0 if f==0 else -1)
 
-class ScrollWrapper(ui.Widget):
+class ScrollWrapper(ui.Layer):
     def __init__(self, item, height=None, width=None, ways=SCROLL_HEIGHT):
         self.item = item
         self.y = 0
@@ -38,16 +38,14 @@ class ScrollWrapper(ui.Widget):
     def update_layout(self):
         self.item.update_layout()
 
-    def draw(self, surf, pos):
-        fx, fy = 0, 0
-        if self.use_x:
-            fx -= self.x
-        if self.use_y:
-            fy -= self.y
+    def draw_content(self, surf, pos):
+        self.item.draw(surf, pos)
 
-        cliptex = graphics.create_surface(*self.get_clip())
-        self.item.draw(cliptex, (fx, fy))
-        surf.blit(cliptex, pos)
+    def get_content_size(self):
+        return self.item.size
+
+    def get_offset(self):
+        return self.x, self.y
 
     def get_clip(self):
         return self.size

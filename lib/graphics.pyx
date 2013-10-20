@@ -203,6 +203,18 @@ cdef class Surface(object):
     def get_clip(self):
         return Rect((0, 0, 8000, 8000))
 
+    def read_data(self):
+        yfix = self.get_size()[1] - _window.get_size()[1]
+        self._set_target()
+        #tex = create_surface(*self.get_size())
+        #tex.blit(self)
+        #tex._set_target()
+        size = self.get_size()
+        if size[0] != 0 and size[1] != 0:
+            return read_renderer_data((0, -yfix) + size, self._sdl)
+        else:
+            return ''
+
     property filename:
         def __set__(self, val): self._filename = val
         def __get__(self): return self._filename
@@ -278,11 +290,11 @@ def create_surface_small(w, h):
     return create_surface(w, h)
 
 def read_window_data():
-    size = _window.get_size()
-    return read_renderer_data(size, _window._sdl)
+    return read_renderer_data((0, 0) + _window.get_size(), _window._sdl)
 
-cdef object read_renderer_data(object size, SDL_Renderer* renderer):
-    cdef SDL_Rect rect = _make_rect((0, 0, size[0], size[1]))
+cdef object read_renderer_data(object _rect, SDL_Renderer* renderer):
+    cdef object size = (_rect[2], _rect[3])
+    cdef SDL_Rect rect = _make_rect(_rect)
     cdef int pixelsize = 4
     cdef int bufsize = pixelsize * size[0] * size[1]
     cdef char* pixels = <char*>malloc(bufsize)
@@ -436,10 +448,13 @@ def start_text_input():
 def stop_text_input():
     SDL_StopTextInput()
 
-def create_window(size):
+def create_window(size, hidden=False):
     global _window, _window_handle
     w, h = size
-    wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, 0)
+    flags = 0
+    if hidden:
+        flags |= SDL_WINDOW_HIDDEN
+    wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, flags)
     _window_handle = wnd
     renderer = SDL_CreateRenderer(wnd, -1, 0)
     if not renderer:

@@ -20,6 +20,9 @@ cdef extern from "SDL.h":
         SDL_PIXELFORMAT_RGB332
         SDL_INIT_VIDEO
 
+    ctypedef enum:
+        SDL_WINDOW_HIDDEN
+
     ctypedef enum SDLMod:
         pass
 

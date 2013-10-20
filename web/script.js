@@ -30,7 +30,6 @@ function draw_screen() {
         canvas_ctx.drawImage(last_screen_content, 0, 0)
     } else {
         var w = $('canvas')[0].width
-        console.log("anim", typeof animation_source, typeof animation_target)
         canvas_ctx.drawImage(animation_source, -animation_progress * w, 0)
         canvas_ctx.drawImage(animation_target, (1-animation_progress) * w, 0)
     }
@@ -63,18 +62,92 @@ function animation_timer() {
     }
 }
 
+function draw_layer(image, frame) {
+    if(dragging_layer == frame.layerid) {
+        frame.offset[0] = drag_start_pos[0] - drag_delta[0]
+        frame.offset[1] = drag_start_pos[1] - drag_delta[1]
+    }
+    if(animation_progress == null) {
+        // drawImage is like - if anything is out of range, draw nothing
+        var offx = Math.max(0, frame.offset[0])
+        var offy = Math.max(0, frame.offset[1])
+        var negoffx = Math.min(0, frame.offset[0])
+        var negoffy = Math.min(0, frame.offset[1])
+        var w = frame.size[0]
+        var h = frame.size[1]
+        w += negoffx
+        h += negoffy
+        w = Math.min(w, image.width - offx)
+        h = Math.min(h, image.height - offy)
+        canvas_ctx.drawImage(image,
+                             offx, offy,
+                             w, h,
+                             frame.pos[0] - negoffx, frame.pos[1] - negoffy,
+                             w, h)
+    }
+}
+
+function draw_layers() {
+    for(var key in layerlist) {
+        draw_layer(layerlist[key].img, layerlist[key])
+    }
+}
+
+var dragging_layer
+var drag_start
+var drag_delta
+var drag_start_pos
+
+function layers_mouse_event(name, pos) {
+    if(name == 'MOUSEBUTTONDOWN') {
+        for(var key in layerlist) {
+            var l = layerlist[key]
+            if(pos[0] > l.pos[0] && pos[1] > l.pos[1] &&
+              pos[0] < l.pos[0] + l.size[0] && pos[1] < l.pos[1] + l.size[1] ) {
+                dragging_layer = l.layerid
+                drag_start = pos
+                drag_start_pos = [l.offset[0], l.offset[1]]
+            }
+        }
+    } else if(name == 'MOUSEMOTION') {
+        drag_delta = [pos[0] - drag_start[0],
+                      pos[1] - drag_start[1]]
+        draw_screen()
+        draw_layers()
+    } else if(name == 'MOUSEBUTTONUP') {
+        dragging_layer = null
+    }
+}
+
+var layerlist = {}
+
 ws.onmessage = function (evt) {
     var received_msg = evt.data
-    data = JSON.parse(received_msg)
-    var b64 = data.data
+    msg = JSON.parse(received_msg)
+    load_image_from_b64(msg[0].data, function(img) {
+        handle_screen(img, msg[0])
+    })
+    layerlist = {}
+    for(var i=1; i<msg.length; i++) {
+        layerlist[msg[i].layerid] = msg[i];
+        (function(j) {
+            load_image_from_b64(msg[i].data, function(img) {
+                msg[j].img = img
+                draw_layer(img, msg[j])
+            })
+        })(i)
+    }
+};
+
+function load_image_from_b64(b64, func) {
     var url = 'data:image/png;base64,' + b64
     var img = new Image()
     img.src = url
     canvas_ctx = $('#screen')[0].getContext('2d')
     img.onload = function() {
-        handle_screen(img, data)
+        func(img)
     }
-};
+}
 
 // events
 
@@ -104,16 +177,27 @@ $(function() {
 
 function mouse_event(name, e) {
     var pos = [e.offsetX, e.offsetY]
+    layers_mouse_event(name, pos)
     var button = e.button
     if(button == 2) button = 1
-    send_message({'type': name,
-                  'pos': pos,
-                  'button': button})
+    func = name == 'MOUSEMOTION' ? send_throttled_message : send_message
+    func({'type': name,
+          'pos': pos,
+          'button': button})
 }
 
 function key_event(name, e) {
     send_message({'type': name,
                   'key': e.keyCode})
+}
+
+var last_message = new Date
+
+function send_throttled_message(msg) {
+    if(new Date - last_message > 100) {
+        send_message(msg)
+        last_message = new Date
+    }
 }
 
 function send_message(msg) {

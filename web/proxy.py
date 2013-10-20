@@ -3,7 +3,7 @@ import subprocess
 import threading
 import os
 
-PORT = 8002
+PORT = int(os.environ.get('FC_PORT', 8002))
 
 class WSHandler(websocket.WebSocketHandler):
     handlers = []
