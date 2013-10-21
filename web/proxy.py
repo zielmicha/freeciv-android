@@ -57,7 +57,8 @@ if __name__ == u"__main__":
                                  '-f:ui.enable_anim=false', '-f:app.debug=false',
                                  '-f:ui.redraw_fps_limit=3',
                                  '-f:ui.fps_limit=15',
-                                 '-f:ui.offscreen'])
+                                 '-f:ui.offscreen',
+                                 '-f:app.desktop_size=1280,800'])
     os.close(streamout)
     os.close(ctrlin)
     WSHandler.ctrl_file = os.fdopen(ctrlout, 'w', 0)

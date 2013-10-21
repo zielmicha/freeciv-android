@@ -80,6 +80,8 @@ function draw_layer(image, frame) {
         h += negoffy
         w = Math.min(w, image.width - offx)
         h = Math.min(h, image.height - offy)
+        canvas_ctx.clearRect(frame.pos[0], frame.pos[1],
+                            frame.size[0], frame.size[1])
         canvas_ctx.drawImage(image,
                              offx, offy,
                              w, h,
@@ -143,6 +145,15 @@ ws.onmessage = function (evt) {
     })
     var finished = 0
     layerlist = {}
+    var debugarea = $('.debugarea')
+    debugarea.html('')
+    for(var i=0; i<msg.length; i++) {
+        var c = $('<div>')
+        $('<img height=100>').attr(
+            'src', msg[i].data).appendTo(c)
+        $('<span>').text(parseInt(msg[i].data.length / 1024) + 'kB').appendTo(c)
+        c.appendTo(debugarea)
+    }
     for(var i=1; i<msg.length; i++) {
         layerlist[msg[i].layerid] = msg[i];
         (function(j) {
@@ -156,7 +167,7 @@ ws.onmessage = function (evt) {
 };
 
 function load_image_from_b64(b64, func) {
-    var url = 'data:image/png;base64,' + b64
+    var url = b64
     var img = new Image()
     img.src = url
     img.onload = function() {

@@ -16,16 +16,22 @@ def init():
     ui.layer_hooks.add(layer_hook)
 
 def write_image(data, size):
-    import Image
+    try:
+        import Image
+    except ImportError:
+        from Pillow import Image
     mode = 'RGBA'
     image = Image.frombuffer(mode, size, data, 'raw', mode, 0, 1)
     image.load()
 
-    output = StringIO.StringIO()
-    image.save(output, format='png')
-    content = output.getvalue()
+    for format in ['png', 'jpeg']:
+        output = StringIO.StringIO()
+        image.save(output, format=format)
+        content = output.getvalue()
+        if len(output.getvalue()) < 500000:
+            break
     output.close()
-    return content
+    return 'data:image/%s;base64,%s' % (format, content.encode('base64'))
 
 def get_texture_data(texture):
     data = texture.read_data()
@@ -42,7 +48,7 @@ def run():
     data = []
     data.append({
         'type': 'frame',
-        'data': compressed.encode('base64'),
+        'data': compressed,
         'id': id(ui.get_screen()),
         'back': id(ui.history[0]) if ui.history else None,
         'allow_animation': ui.get_allow_animation(),
@@ -55,7 +61,7 @@ def run():
         data.append({
             'type': 'layer',
             'layerid': id,
-            'data': image_data.encode('base64'),
+            'data': image_data,
             'pos': pos,
             'offset': offset,
             'size': size,

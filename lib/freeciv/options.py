@@ -92,13 +92,6 @@ def show_options():
                          'Dropbox and Dropbox logo are trademarks of Dropbox, Inc.\n', ))
     ui.set(options)
 
-def change_screen_size(size):
-    features.set_perm('app.forcesize', ('%d,%d' % size) if size else '')
-    ui.history = []
-    ui.set_screen(None)
-    import main
-    main.main(init=False)
-
 def debug_menu():
     def fake_screen_size(size):
         import main

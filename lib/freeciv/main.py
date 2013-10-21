@@ -39,7 +39,7 @@ import gold
 
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
-features.add_feature('app.forcesize')
+features.add_feature('app.desktop_size', default='1280,800')
 features.add_feature('app.resume', default=False, type=bool)
 features.add_feature('app.profile', default=False, type=bool)
 features.add_feature('app.shutdown', default=10, type=int)
@@ -130,10 +130,6 @@ def notify_update(url):
     ui.execute_later(lambda: menus.notify_update(url))
 
 client.main = client_main
-
-def check_force_size():
-    if features.get('app.forcesize'):
-        return map(int, features.get('app.forcesize').split(','))
 
 def pause():
     if client.client:
@@ -268,7 +264,8 @@ support!'''.strip()
 def init_window():
     if osutil.is_desktop:
         # on Android android.pyx takes care of init
-        ui.create_window((1280, 800))
+        size = features.get('app.desktop_size')
+        ui.create_window(map(int, size.split(',')))
 
 def set_logical_size():
     good_dpi = 250
