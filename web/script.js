@@ -10,6 +10,7 @@ var animation_target
 var animation_direction
 var animation_progress = null
 var canvas_ctx
+var canvas
 var animation_timer_id
 
 function handle_screen(image, frame) {
@@ -20,7 +21,7 @@ function handle_screen(image, frame) {
     }
     last_screen_id = frame.id
     last_screen_content = image
-    draw_screen()
+    draw_all()
 }
 
 function draw_screen() {
@@ -56,7 +57,7 @@ function animation_timer() {
         if(animation_progress > 1 || animation_progress < 0) {
             animation_progress = null
         }
-        draw_screen()
+        draw_all(true)
     } else {
         clearInterval(animation_timer_id)
     }
@@ -87,10 +88,24 @@ function draw_layer(image, frame) {
     }
 }
 
-function draw_layers() {
+function draw_all(force) {
+    var layers_ready = true
     for(var key in layerlist) {
-        draw_layer(layerlist[key].img, layerlist[key])
+        if(!layerlist[key].img)
+            layers_ready = false
     }
+    if(force || layers_ready) {
+        clear_canvas()
+        for(var key in layerlist) {
+            draw_layer(layerlist[key].img, layerlist[key])
+        }
+        draw_screen()
+    }
+}
+
+function clear_canvas() {
+    canvas_ctx.fillStyle = 'rgba(0, 0, 0, 1)'
+    canvas_ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
 
 var dragging_layer
@@ -112,8 +127,7 @@ function layers_mouse_event(name, pos) {
     } else if(name == 'MOUSEMOTION') {
         drag_delta = [pos[0] - drag_start[0],
                       pos[1] - drag_start[1]]
-        draw_screen()
-        draw_layers()
+        draw_all()
     } else if(name == 'MOUSEBUTTONUP') {
         dragging_layer = null
     }
@@ -127,13 +141,15 @@ ws.onmessage = function (evt) {
     load_image_from_b64(msg[0].data, function(img) {
         handle_screen(img, msg[0])
     })
+    var finished = 0
     layerlist = {}
     for(var i=1; i<msg.length; i++) {
         layerlist[msg[i].layerid] = msg[i];
         (function(j) {
             load_image_from_b64(msg[i].data, function(img) {
                 msg[j].img = img
-                draw_layer(img, msg[j])
+                finished ++
+                if(finished == msg.length - 1) draw_all()
             })
         })(i)
     }
@@ -143,7 +159,6 @@ function load_image_from_b64(b64, func) {
     var url = 'data:image/png;base64,' + b64
     var img = new Image()
     img.src = url
-    canvas_ctx = $('#screen')[0].getContext('2d')
     img.onload = function() {
         func(img)
     }
@@ -154,6 +169,9 @@ function load_image_from_b64(b64, func) {
 var is_down = false
 
 $(function() {
+    canvas = $('#screen')[0]
+    canvas_ctx = canvas.getContext('2d')
+
     $('#screen').mousedown(function(e) {
         is_down = true
         mouse_event('MOUSEBUTTONDOWN', e)

@@ -38,7 +38,9 @@ def set_show_fps(val):
 
 def create_window(size):
     graphics.init()
-    graphics.create_window(size, hidden=features.get('ui.offscreen'))
+    graphics.create_window(size)
+    if features.get('ui.offscreen'):
+        graphics.set_offscreen_window(size)
 
 features.set_applier('ui.showfps', set_show_fps, type=bool, default=False)
 features.add_feature('ui.enable_anim', type=bool, default=True)

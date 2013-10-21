@@ -35,7 +35,7 @@ class Layer(Widget):
                                    offset=offset,
                                    size=clip)
             # not only for decorative purposes - also somehow causes SDL to return right renderer data
-            surf.draw_rect((255, 255, 255, 255), pos + clip, blend=graphics.MODE_NONE)
+            surf.draw_rect((255, 255, 0, 0), pos + clip, blend=graphics.MODE_NONE)
         else:
             if full_texture:
                 surf.blit(full_texture, dest=pos, src=offset + clip)

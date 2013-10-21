@@ -290,7 +290,10 @@ def create_surface_small(w, h):
     return create_surface(w, h)
 
 def read_window_data():
-    return read_renderer_data((0, 0) + _window.get_size(), _window._sdl)
+    if _window._tex:
+        return _window.read_data()
+    else:
+        return read_renderer_data((0, 0) + _window.get_size(), _window._sdl)
 
 cdef object read_renderer_data(object _rect, SDL_Renderer* renderer):
     cdef object size = (_rect[2], _rect[3])
@@ -462,6 +465,10 @@ def create_window(size, hidden=False):
     _window = _make_surface(renderer, NULL, size, "window")
     _window._size = size
     return get_window()
+
+def set_offscreen_window(size):
+    global _window
+    _window = create_surface(*size)
 
 def set_logical_size(w, h):
     assert _window
