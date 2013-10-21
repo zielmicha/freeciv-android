@@ -496,7 +496,7 @@ class ConsoleScrollWrapper(ui.ScrollWrapper):
     def canceled_event(self, event):
         self.item.event(event)
 
-class MapWidget(ui.Layer):
+class MapWidget(ui.Widget):
     def __init__(self, client):
         self.client = client
 
@@ -556,12 +556,7 @@ class MapWidget(ui.Layer):
         if self.size != self.last_size:
             self.drawer.set_size(self.size)
             self.last_size = self.size
-        tex, offset = self.drawer.draw()
-
-        self.do_draw(surf, pos,
-                     offset=offset,
-                     clip=self.size,
-                     full_texture=tex)
+        self.drawer.draw(surf, pos)
 
     def drag(self, pos):
         if not self.last_drag_pos:
@@ -607,22 +602,34 @@ class MapDrawer(object):
         self.zoom = zoom
         self.reload()
 
-    def draw(self):
+    def draw(self, surf, clip_pos):
         pos = (0, 0)
+        cliptex = graphics.create_surface(*self.widget_size)
         if not self.scrolling:
+            target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
             self.maybe_update_whole_canvas()
-        if freeciv.func.get_map_view_origin() != self.valid_for_origin:
-            self.reload()
+            if self.zoom == 1:
+                self.client.draw_map(cliptex, target)
+            else:
+                self.client.draw_map(self.map_cache, (0, 0))
+                rect = self.user_corner + (self.map_cache.get_width() - self.user_corner[0],
+                                           self.map_cache.get_height() - self.user_corner[1])
+                #cliptex.blit(scale_by(self.map_cache.suburface(rect), self.zoom), (pos[0], pos[1]))
+                cliptex.blit(self.map_cache, src=rect,
+                             dest=(pos[0], pos[1], rect[2] * self.zoom, rect[3] * self.zoom))
         else:
-            if self.does_exceed():
-                self.update_origin()
+            if freeciv.func.get_map_view_origin() != self.valid_for_origin:
                 self.reload()
-
-        if self.zoom == 1:
-            return self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
-        else:
-            return self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
-                                           int(pos[1] - self.user_corner[1] * self.zoom))
+            else:
+                if self.does_exceed():
+                    self.update_origin()
+                    self.reload()
+            if self.zoom == 1:
+                cliptex.blit(self.map_cache, (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1]))
+            else:
+                cliptex.blit(self.scaled_map_cache, (int(pos[0] - self.user_corner[0] * self.zoom),
+                                                  int(pos[1] - self.user_corner[1] * self.zoom)))
+        surf.blit(cliptex, clip_pos)
 
     def maybe_update_whole_canvas(self):
         # need to throttle update, to make animations smooth
