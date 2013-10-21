@@ -542,7 +542,7 @@ cdef Surface _make_surface(SDL_Renderer* renderer, SDL_Texture* tex,
     cdef Surface s = Surface()
     s._sdl = renderer
     s._tex = tex
-    s._size = _size
+    s._size = (int(_size[0]), int(_size[1]))
     s._filename = _filename
     s._alpha = _alpha
     return s

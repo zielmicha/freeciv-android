@@ -22,22 +22,33 @@ class Widget(object):
         pass
 
 class Layer(Widget):
-    def draw(self, surf, pos):
+    def do_draw(self, surf, pos, offset, clip, full_texture=None):
         if surf == graphics.get_window() and ui.layer_hooks.is_bound():
-            tex = graphics.create_surface(*self.get_content_size())
-            self.draw_content(tex, (0, 0))
+            if full_texture:
+                tex = full_texture
+            else:
+                tex = graphics.create_surface(*self.get_content_size())
+                self.draw_content(tex, (0, 0))
             ui.layer_hooks.execute(id=id(self),
                                    surf=tex,
                                    pos=pos,
-                                   offset=self.get_offset(),
-                                   size=self.get_clip())
+                                   offset=offset,
+                                   size=clip)
             # not only for decorative purposes - also somehow causes SDL to return right renderer data
-            surf.draw_rect((255, 255, 255, 0), pos + self.get_clip(), blend=graphics.MODE_NONE)
+            surf.draw_rect((255, 255, 255, 255), pos + clip, blend=graphics.MODE_NONE)
         else:
-            cliptex = graphics.create_surface(*self.get_clip())
-            x, y = self.get_offset()
-            self.draw_content(cliptex, (-x, -y))
-            surf.blit(cliptex, pos)
+            if full_texture:
+                surf.blit(full_texture, dest=pos, src=offset + clip)
+            else:
+                cliptex = graphics.create_surface(*clip)
+                x, y = offset
+                self.draw_content(cliptex, (-x, -y))
+                surf.blit(cliptex, pos)
+
+    def draw(self, surf, pos):
+        self.do_draw(surf, pos,
+                     offset=self.get_offset(),
+                     clip=self.get_clip())
 
 class LayerAware(object):
     pass
