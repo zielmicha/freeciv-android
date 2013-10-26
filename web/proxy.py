@@ -35,7 +35,7 @@ class MyStaticFileHandler(web.RequestHandler):
         if name in os.listdir(self._path):
             self.write(open(self._path + '/' + name).read())
         else:
-            raise Exception('not found')
+            pass
 
 def stream_data(fdin):
     f = os.fdopen(fdin, 'r', 1)

@@ -63,9 +63,9 @@ def run():
     _messages[:] = []
 
     def proc_layer(id, surf, pos, offset, size):
-        if surf.get_width() == 0 or surf.get_height() == 0:
-            return
-        image_data = get_texture_data(surf)
+        if surf and (surf.get_width() == 0 or surf.get_height() == 0):
+            surf = None
+        image_data = get_texture_data(surf) if surf else None
         data.append({
             'type': 'layer',
             'layerid': id,

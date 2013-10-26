@@ -51,7 +51,7 @@ def process_event(message):
         else:
             raise Exception('message denied (key %r)' % k)
 
-    del message['type']
+    type = getattr(graphics.const, message['type'])
     ui.syntetic_events.append(graphics.Event(type, **dict))
 
 def bind_event(name, func):

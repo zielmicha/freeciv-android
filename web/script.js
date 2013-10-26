@@ -64,12 +64,11 @@ function animation_timer() {
 }
 
 function draw_layer(image, frame) {
-    if(dragging_layer == frame.layerid) {
-        frame.offset[0] = drag_start_pos[0] - drag_delta[0]
-        frame.offset[1] = drag_start_pos[1] - drag_delta[1]
-    }
     if(image == null)
         return;
+    if(drag_offsets[frame.id]) {
+        frame.offset = drag_offsets[frame.id]
+    }
     if(animation_progress == null) {
         // drawImage is like - if anything is out of range, draw nothing
         var offx = Math.max(0, frame.offset[0])
@@ -95,16 +94,19 @@ function draw_layer(image, frame) {
 function draw_all(force) {
     var layers_ready = true
     for(var key in layerlist) {
-        if(!layerlist[key].img)
+        if(layerlist[key].data && !layerlist[key].img)
             layers_ready = false
     }
     if(force || layers_ready) {
         clear_canvas()
+
+        if(layerlist.map)
+            tiles_draw()
+
         for(var key in layerlist) {
             draw_layer(layerlist[key].img, layerlist[key])
         }
         draw_screen()
-        tiles_draw()
     }
 }
 
@@ -113,28 +115,47 @@ function clear_canvas() {
     canvas_ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
 
-var dragging_layer
+var drag_id
 var drag_start
 var drag_delta
-var drag_start_pos
+var drag_delta_offset
 
-function layers_mouse_event(name, pos) {
+var drag_offsets = {}
+
+function layers_mouse_event(name, pos, e) {
     if(name == 'MOUSEBUTTONDOWN') {
         for(var key in layerlist) {
             var l = layerlist[key]
             if(pos[0] > l.pos[0] && pos[1] > l.pos[1] &&
               pos[0] < l.pos[0] + l.size[0] && pos[1] < l.pos[1] + l.size[1] ) {
-                dragging_layer = l.layerid
+                drag_id = l.layerid
                 drag_start = pos
-                drag_start_pos = [l.offset[0], l.offset[1]]
+                drag_delta = [0, 0]
+                if(!drag_offsets[drag_id])
+                    drag_offsets[drag_id] = [0, 0]
+                drag_delta_offset = drag_offsets[drag_id]
+                return false
             }
         }
     } else if(name == 'MOUSEMOTION' && drag_start) {
-        drag_delta = [pos[0] - drag_start[0],
-                      pos[1] - drag_start[1]]
+        drag_delta = [pos[0] - drag_start[0] + drag_delta_offset[0],
+                      pos[1] - drag_start[1] + drag_delta_offset[1]]
+        drag_offsets[drag_id] = [
+            drag_delta[0],
+            drag_delta[1]
+        ]
         draw_all()
+        return false
     } else if(name == 'MOUSEBUTTONUP') {
-        dragging_layer = null
+        var result = drag_id
+        drag_id = null
+        if(result) {
+            if(Math.abs(drag_delta[0]) + Math.abs(drag_delta[1]) < 6) {
+                pass_mouse_event('MOUSEBUTTONDOWN', e)
+                pass_mouse_event('MOUSEBUTTONUP', e)
+            }
+            return false
+        }
     }
 }
 
@@ -160,18 +181,15 @@ ws.onmessage = function (evt) {
     var debugarea = $('.debugarea')
     debugarea.html('')
     for(var i=0; i<msg.length; i++) {
-        var c = $('<div>')
-        $('<img height=100>').attr(
-            'src', msg[i].data).appendTo(c)
-        $('<span>').text(parseInt(msg[i].data.length / 1024) + 'kB').appendTo(c)
-        c.appendTo(debugarea)
+        if(!msg[i].data) continue;
+        image_show_debug(msg[i].data)
     }
     for(var i=1; i<msg.length; i++) {
         layerlist[msg[i].layerid] = msg[i];
         if(!msg[i].data) {
             // fully transparent layer
-            finished ++;
-            continue;
+            finished ++
+            continue
         }
         (function(j) {
             load_image_from_b64(msg[i].data, function(img) {
@@ -182,6 +200,15 @@ ws.onmessage = function (evt) {
         })(i)
     }
 };
+
+function image_show_debug(data) {
+    var debugarea = $('.debugarea')
+    var c = $('<div>')
+    $('<img height=100>').attr(
+        'src', data).appendTo(c)
+    $('<span>').text(parseInt(data.length / 1024) + 'kB').appendTo(c)
+    c.appendTo(debugarea)
+}
 
 function load_image_from_b64(b64, func) {
     var url = b64
@@ -223,7 +250,13 @@ $(function() {
 
 function mouse_event(name, e) {
     var pos = [e.offsetX, e.offsetY]
-    layers_mouse_event(name, pos)
+    if(layers_mouse_event(name, pos, e) === false)
+        return
+    pass_mouse_event(name, e)
+}
+
+function pass_mouse_event(name, e) {
+    var pos = [e.offsetX, e.offsetY]
     var button = e.button
     if(button == 2) button = 1
     func = name == 'MOUSEMOTION' ? send_throttled_message : send_message
@@ -237,12 +270,14 @@ function key_event(name, e) {
                   'key': e.keyCode})
 }
 
-var last_message = new Date
+var last_message = {}
 
 function send_throttled_message(msg) {
-    if(new Date - last_message > 100) {
+    var type = msg.type
+    if(typeof last_message[type] == 'undefined') last_message[type] = 0
+    if(new Date - last_message[type] > 100) {
         send_message(msg)
-        last_message = new Date
+        last_message[type] = new Date
     }
 }
 
