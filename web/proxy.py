@@ -58,7 +58,8 @@ if __name__ == u"__main__":
                                  '-f:ui.redraw_fps_limit=3',
                                  '-f:ui.fps_limit=15',
                                  '-f:ui.offscreen',
-                                 '-f:app.desktop_size=1280,800'])
+                                 '-f:app.desktop_size=1280,800',
+                                 '-f:app.map_tiles'])
     os.close(streamout)
     os.close(ctrlin)
     WSHandler.ctrl_file = os.fdopen(ctrlout, 'w', 0)

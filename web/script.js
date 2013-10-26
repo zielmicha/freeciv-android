@@ -68,6 +68,8 @@ function draw_layer(image, frame) {
         frame.offset[0] = drag_start_pos[0] - drag_delta[0]
         frame.offset[1] = drag_start_pos[1] - drag_delta[1]
     }
+    if(image == null)
+        return;
     if(animation_progress == null) {
         // drawImage is like - if anything is out of range, draw nothing
         var offx = Math.max(0, frame.offset[0])
@@ -102,6 +104,7 @@ function draw_all(force) {
             draw_layer(layerlist[key].img, layerlist[key])
         }
         draw_screen()
+        tiles_draw()
     }
 }
 
@@ -126,7 +129,7 @@ function layers_mouse_event(name, pos) {
                 drag_start_pos = [l.offset[0], l.offset[1]]
             }
         }
-    } else if(name == 'MOUSEMOTION') {
+    } else if(name == 'MOUSEMOTION' && drag_start) {
         drag_delta = [pos[0] - drag_start[0],
                       pos[1] - drag_start[1]]
         draw_all()
@@ -139,7 +142,16 @@ var layerlist = {}
 
 ws.onmessage = function (evt) {
     var received_msg = evt.data
-    msg = JSON.parse(received_msg)
+    var all_msg = JSON.parse(received_msg)
+    var msg = []
+    for(var i=0; i<all_msg.length; i++) {
+        var m = all_msg[i]
+        if(m.type == 'layer' || m.type == 'frame')
+            msg.push(m)
+        else if(m.type == 'tile') {
+            tiles_process_message(m)
+        }
+    }
     load_image_from_b64(msg[0].data, function(img) {
         handle_screen(img, msg[0])
     })
@@ -156,6 +168,11 @@ ws.onmessage = function (evt) {
     }
     for(var i=1; i<msg.length; i++) {
         layerlist[msg[i].layerid] = msg[i];
+        if(!msg[i].data) {
+            // fully transparent layer
+            finished ++;
+            continue;
+        }
         (function(j) {
             load_image_from_b64(msg[i].data, function(img) {
                 msg[j].img = img

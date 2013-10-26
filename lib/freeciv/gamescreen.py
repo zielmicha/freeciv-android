@@ -28,10 +28,12 @@ import empiredlg
 import help
 import dropbox
 import mapdrawer
+import maptiles
 
 SELECT_POPUP = 0
 
 features.add_feature('app.full_label_toggle_button', type=bool)
+features.add_feature('app.map_tiles', type=bool, default=False)
 
 class ScreenClient(client.Client):
     def __init__(self, **kwargs):
@@ -247,7 +249,10 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         super(ScreenWidget, self).__init__()
         self.client = client
 
-        self.map = mapdrawer.MapWidget(client)
+        if features.get('app.map_tiles'):
+            self.map = maptiles.MapWidget(client)
+        else:
+            self.map = mapdrawer.MapWidget(client)
         self.overview = OverviewWidget(client)
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client)

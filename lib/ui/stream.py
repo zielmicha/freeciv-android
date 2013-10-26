@@ -10,6 +10,11 @@ import StringIO
 
 features.add_feature('stream.fd', type=int, default=2)
 
+_messages = []
+
+def add_message(m):
+    _messages.append(m)
+
 def init():
     print 'stream enabled (FD=%d)' % features.get('stream.fd')
     ui.draw_hooks.add(run)
@@ -53,6 +58,9 @@ def run():
         'back': id(ui.history[0]) if ui.history else None,
         'allow_animation': ui.get_allow_animation(),
         'pos': [0, 0]})
+
+    data += _messages
+    _messages[:] = []
 
     def proc_layer(id, surf, pos, offset, size):
         if surf.get_width() == 0 or surf.get_height() == 0:

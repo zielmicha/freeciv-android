@@ -9,6 +9,8 @@ import graphics
 features.add_feature('ctrl.enable', type=bool, default=False)
 features.add_feature('ctrl.fd', type=int, default=0)
 
+_bound_events = {}
+
 def maybe_init():
     if features.get('ctrl.enable'):
         print 'ctrl enabled (FD=%d)' % features.get('ctrl.fd')
@@ -32,6 +34,8 @@ def process_message(message):
     type = message['type']
     if type in EVENT_NAMES:
         process_event(message)
+    elif type in _bound_events:
+        _bound_events[type](message)
     else:
         print 'unsupported ctrl message', type
 
@@ -47,6 +51,8 @@ def process_event(message):
         else:
             raise Exception('message denied (key %r)' % k)
 
-    type = getattr(graphics.const, message['type'])
     del message['type']
     ui.syntetic_events.append(graphics.Event(type, **dict))
+
+def bind_event(name, func):
+    _bound_events[name] = func
