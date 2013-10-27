@@ -36,10 +36,10 @@ struct canvas *get_overview_window(void){
 	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from get_overview_window (expected 'O')\n");
 	Py_INCREF(retval);
 	Py_DECREF(ret);
-	
+
 	struct canvas* retstru = py_alloc_struct(retval);
 	return retstru;
-        
+
 }
 // void flush_mapcanvas(int canvas_x, int canvas_y, int pixel_width, int pixel_height)
 void flush_mapcanvas(int canvas_x, int canvas_y, int pixel_width, int pixel_height){
@@ -109,10 +109,10 @@ struct sprite *load_gfxfile(const char *filename){
 	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from load_gfxfile (expected 'O')\n");
 	Py_INCREF(retval);
 	Py_DECREF(ret);
-	
+
 	struct sprite* retstru = py_alloc_struct(retval);
 	return retstru;
-        
+
 }
 // struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y)
 struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y){
@@ -121,10 +121,10 @@ struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int h
 	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from crop_sprite (expected 'O')\n");
 	Py_INCREF(retval);
 	Py_DECREF(ret);
-	
+
 	struct sprite* retstru = py_alloc_struct(retval);
 	return retstru;
-        
+
 }
 // void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
 // ignored
@@ -179,10 +179,10 @@ struct canvas *canvas_create(int width, int height){
 	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from canvas_create (expected 'O')\n");
 	Py_INCREF(retval);
 	Py_DECREF(ret);
-	
+
 	struct canvas* retstru = py_alloc_struct(retval);
 	return retstru;
-        
+
 }
 // void canvas_free(struct canvas *store)
 void canvas_free(struct canvas *store){
@@ -856,6 +856,11 @@ void real_economy_report_dialog_update(void){
 // void real_units_report_dialog_update(void)
 void real_units_report_dialog_update(void){
 	PyObject* ret = PY_CALL("s", "real_units_report_dialog_update");
+	Py_DECREF(ret);
+}
+// void global_update_tile(int x, int y)
+void global_update_tile(int x, int y){
+    PyObject* ret = PY_CALL("sii", "global_update_tile", x, y);
 	Py_DECREF(ret);
 }
 // IGNORED:

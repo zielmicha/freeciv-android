@@ -1,6 +1,6 @@
 var tiles_draw_at
 var map_pos = [0, 0]
-var tile_size = 256
+var tile_size = 128
 var tile_storage = {}
 var tiles_init_done = false
 var tiles_draw_frame = true
@@ -36,12 +36,13 @@ function tiles_draw() {
     }
     var w = pos[2]
     var h = pos[3]
-    tiles_notify_about_position(pos[0], pos[1])
+    // notify about center
+    tiles_notify_about_position(pos[0] - w / 2, pos[1] - h / 2)
     var x_start = nround(-pos[0], tile_size)
     var y_start = nround(-pos[1], tile_size)
 
-    for(var x=0; x < w + tile_size*2; x+=tile_size) {
-        for(var y=0; y < h + tile_size*2; y+=tile_size) {
+    for(var x=-tile_size; x < w + tile_size*2; x+=tile_size) {
+        for(var y=-tile_size; y < h + tile_size*2; y+=tile_size) {
             tile_draw(pos, x_start + x, y_start + y)
         }
     }

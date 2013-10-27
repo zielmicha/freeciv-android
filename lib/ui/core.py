@@ -186,6 +186,7 @@ class HookList:
 tick_hooks = HookList()
 draw_hooks = HookList()
 layer_hooks = HookList()
+idle_hooks = HookList()
 
 # `backward` compatibility
 execute_later = tick_hooks.add
@@ -278,7 +279,7 @@ def main_tick_wrapper():
         frame_last = curr_time - frame_start
         sleep = (1./features.get('ui.fps_limit')) - frame_last
         if sleep > 0:
-            time.sleep(sleep)
+            idle_sleep(sleep)
         USER_INACTIVITY_MAX = 10
         if any_mouse_events + USER_INACTIVITY_MAX > curr_time:
             # don't count time if user has locked screen or switched app
@@ -291,6 +292,15 @@ def main_tick_wrapper():
         if ui.except_callback:
             ui.except_callback()
         time.sleep(0.5)
+
+def idle_sleep(t):
+    if idle_hooks.is_bound():
+        deadline = time.time() + t
+        while time.time() < deadline:
+            idle_hooks.execute()
+        idle_hooks.clear()
+    else:
+        time.sleep(t)
 
 def main():
     ui.screen_width, ui.screen_height = ui.screen_size = graphics.get_window().get_size()

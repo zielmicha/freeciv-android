@@ -417,9 +417,13 @@ def load_image(fn):
 def load_font(name, size):
     return Font(name, size)
 
+max_texture_size = 2048
+
 def create_surface(w, h, alpha=True):
     cdef SDL_Texture* tex
-    MAX = 2048
+    MAX = max_texture_size
+    if w > MAX or h > MAX:
+        print 'WARNING! trimming texture to fit max size'
     _debug_createtexture(w, h)
     tex = SDL_CreateTexture(_window._sdl, 0,
                             SDL_TEXTUREACCESS_TARGET, min(max(1, w), MAX), min(max(1, h), MAX))

@@ -72,7 +72,7 @@ struct gotoline_hash *mapdeco_gotoline_table;
 struct view mapview;
 bool can_slide = TRUE;
 
-static void base_canvas_to_map_pos(int *map_x, int *map_y,
+void base_canvas_to_map_pos(int *map_x, int *map_y,
 				   int canvas_x, int canvas_y);
 
 enum update_type {
@@ -370,7 +370,7 @@ bool tile_to_canvas_pos(int *canvas_x, int *canvas_y, struct tile *ptile)
   Finds the map coordinates corresponding to pixel coordinates.  The
   resulting position is unwrapped and may be unreal.
 ****************************************************************************/
-static void base_canvas_to_map_pos(int *map_x, int *map_y,
+void base_canvas_to_map_pos(int *map_x, int *map_y,
 				   int canvas_x, int canvas_y)
 {
   gui_to_map_pos(tileset, map_x, map_y,
@@ -2462,6 +2462,7 @@ void unqueue_mapview_updates(bool write_to_screen)
 	     * Right now they account for as much as 90% of the runtime of
 	     * the unqueue. */
 	    overview_update_tile(ptile);
+        global_update_tile(ptile->x, ptile->y);
 	  } tile_list_iterate_end;
 	}
       }

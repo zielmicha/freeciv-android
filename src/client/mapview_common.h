@@ -81,7 +81,7 @@ extern bool can_slide;
  *
  * _x, _y: the canvas position of the current element, declared inside
  * the macro.  Each element is assumed to be tileset_tile_width(tileset) *
- * tileset_tile_height(tileset) in size.  If an element is larger, the 
+ * tileset_tile_height(tileset) in size.  If an element is larger, the
  * caller needs to use a larger rectangle of iteration.
  *
  * The grid of iteration is rather complicated.  For a picture of it see
@@ -293,7 +293,7 @@ bool show_unit_orders(struct unit *punit);
 void draw_segment(struct tile *ptile, enum direction8 dir);
 void undraw_segment(struct tile *ptile, enum direction8 dir);
 
-void decrease_unit_hp_smooth(struct unit *punit0, int hp0, 
+void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
 			     struct unit *punit1, int hp1);
 void move_unit_map_canvas(struct unit *punit,
 			  struct tile *ptile, int dx, int dy);

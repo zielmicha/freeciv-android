@@ -189,3 +189,5 @@ void update_map_canvas_whole()
 
 PyObject* get_advances()
 int get_invention_state(int i)
+
+PyObject* py_canvas_to_map(int x, int y)

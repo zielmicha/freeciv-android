@@ -16,6 +16,16 @@ enum city_get_mode {
     MODE_WASTE
 };
 
+PyObject* py_canvas_to_map(int x, int y) {
+    int map_x = 0, map_y = 0;
+    base_canvas_to_map_pos(&map_x, &map_y, x, y);
+    if (normalize_map_pos(&map_x, &map_y)) {
+        return Py_BuildValue("ii", map_x, map_y);
+    } else {
+        Py_RETURN_NONE;
+    }
+}
+
 PyObject* py_mapper_city(struct city* s) {
     return Py_BuildValue("l", (long)s);
 }

@@ -140,6 +140,9 @@ class Client(object):
         mapview = freeciv.func.get_mapview_store()
         surf.blit(mapview, pos)
 
+    def get_mapview_store(self):
+        return freeciv.func.get_mapview_store()
+
     def draw_overview(self, surf, pos, scale):
         dest_surf = window.overview_surface.scale(scale)
         surf.blit(dest_surf, pos)

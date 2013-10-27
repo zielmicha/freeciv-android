@@ -14,13 +14,15 @@ class MapWidget(ui.Widget):
         self.client = client
         self.size = (0, 0)
         self.drawer = TileDrawer(client)
-        self.tile_size = 256
+        self.tile_size = 128
         self.tile_storage = {}
         self.tile_client_cache = {} # corresponds to client's one
+        self.tile_map_pos = {}
         self.screen_pos = (0, 0)
         self.screen_tiles = 10
 
         ctrl.bind_event('tile', self.process_message)
+        freeciv.register(self.global_update_tile)
 
     def back(self):
         self.client.escape()
@@ -49,6 +51,17 @@ class MapWidget(ui.Widget):
                  for i in range_around(tile_pos[0], self.screen_tiles)
                  for j in range_around(tile_pos[1], self.screen_tiles) ]
 
+    def global_update_tile(self, x, y):
+        # find 4 nearest tiles
+        by_dist = sorted(self.tile_map_pos.items(),
+                         key=lambda (k, v): abs(v[0] - x) + abs(v[1] - y) if v else 100000)
+        by_dist = by_dist[:4]
+        print 'update', by_dist
+        # and queue update
+        for k, v in by_dist:
+            if k in self.tile_storage:
+                del self.tile_storage[k]
+
     def push_tile(self, x, y):
         self.init_tile(x, y)
         new_data = self.tile_storage[x, y]
@@ -61,12 +74,13 @@ class MapWidget(ui.Widget):
             self.update_tile(x, y)
 
     def update_tile(self, x, y):
-        img = self.drawer.draw_fragment((x, y,
-                                              self.tile_size,
-                                              self.tile_size))
+        img, tile_pos = self.drawer.draw_fragment((x, y,
+                                                   self.tile_size,
+                                                   self.tile_size))
 
         new_data = stream.get_texture_data(img)
         self.tile_storage[x, y] = new_data
+        self.tile_map_pos[x, y] = tile_pos
 
     def process_message(self, message):
         print 'tile message', message
@@ -95,7 +109,8 @@ class TileDrawer(object):
             surf = graphics.create_surface(rect[2], rect[3])
             surf.fill((255, 0, 255, 255), blend=graphics.MODE_NONE)
             self.client.draw_map(surf, (0, 0))
-            return surf
+            tile_pos = freeciv.func.py_canvas_to_map(rect[2] / 2, rect[3] / 2)
+            return surf, tile_pos
 
     def set_map_size(self, size):
         self.map_size = size
