@@ -21,11 +21,13 @@ class MapWidget(ui.Widget):
         self.tile_draw_time = {}
         self.screen_pos = (0, 0)
         self.screen_tiles = (20, 15)
+        self.redraw_queue = set()
 
         ctrl.bind_event('tile_posnotify', self.pos_notify)
         ctrl.bind_event('tile_init', self.client_init)
         freeciv.register(self.global_update_tile)
         freeciv.register(self.global_set_mapview_center)
+        freeciv.register(self.global_update_everything)
 
     def back(self):
         self.client.escape()
@@ -40,7 +42,6 @@ class MapWidget(ui.Widget):
 
         self.tick()
 
-        self.redraw_some_old()
         ui.layer_hooks.execute(id='map',
                                surf=None,
                                pos=pos,
@@ -49,13 +50,25 @@ class MapWidget(ui.Widget):
 
 
     def tick(self):
+        need_redraw = self.redraw_queue & set(self.get_screen_tiles())
+        can_redraw = 15
+
+        if self.redraw_queue:
+            print 'queue', len(self.redraw_queue), 'need', len(need_redraw)
+        for tile in list(need_redraw)[:can_redraw]:
+            self.update_tile(*tile)
+
+        can_redraw -= len(need_redraw)
+        for tile in list(self.redraw_queue)[:can_redraw]:
+            self.update_tile(*tile)
+
         for i, j in self.get_screen_tiles():
-            self.push_tile(i * self.tile_size, j * self.tile_size)
+            self.push_tile(i, j)
 
     def get_screen_tiles(self):
         tile_pos = self.screen_pos[0] // self.tile_size, \
                    self.screen_pos[1] // self.tile_size
-        return [ (i, j)
+        return [ (i  * self.tile_size, j * self.tile_size)
                  for i in range_around(tile_pos[0], self.screen_tiles[0])
                  for j in range_around(tile_pos[1], self.screen_tiles[1]) ]
 
@@ -67,21 +80,14 @@ class MapWidget(ui.Widget):
         print 'update', by_dist
         # and queue update
         for k, v in by_dist:
-            if k in self.tile_storage:
-                del self.tile_storage[k]
+            self.redraw_queue.add(k)
+
+    def global_update_everything(self):
+        print 'update everything'
+        self.redraw_queue |= set(self.tile_storage.keys())
 
     def global_set_mapview_center(self, x, y):
         stream.add_message({'type': 'tiles_center_at', 'pos': (x, y)})
-
-    def redraw_some_old(self):
-        timeout = 10
-        count = 4
-        for key, t in self.tile_draw_time.items():
-            if not count:
-                break
-            if time.time() > t + timeout:
-                count -= 1
-                self.update_tile(*key)
 
     def push_tile(self, x, y):
         self.init_tile(x, y)
@@ -95,14 +101,16 @@ class MapWidget(ui.Widget):
             self.update_tile(x, y)
 
     def update_tile(self, x, y):
+        start = time.time()
         img, tile_pos = self.drawer.draw_fragment((x, y,
                                                    self.tile_size,
                                                    self.tile_size))
-
+        print 'updated %s in %d ms' % ((x, y), (time.time() - start) * 1000)
         new_data = stream.get_texture_data(img)
         self.tile_storage[x, y] = new_data
         self.tile_map_pos[x, y] = tile_pos
         self.tile_draw_time[x, y] = time.time()
+        self.redraw_queue -= {(x, y)}
 
     def client_init(self, message):
         self.tile_client_cache = {}

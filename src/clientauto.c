@@ -863,8 +863,14 @@ void global_update_tile(int x, int y){
     PyObject* ret = PY_CALL("sii", "global_update_tile", x, y);
 	Py_DECREF(ret);
 }
+// void global_set_mapview_center(int gui_x, int gui_y)
 void global_set_mapview_center(int gui_x, int gui_y){
     PyObject* ret = PY_CALL("sii", "global_set_mapview_center", gui_x, gui_y);
+	Py_DECREF(ret);
+}
+// void global_update_everything()
+void global_update_everything(){
+    PyObject* ret = PY_CALL("s", "global_update_everything");
 	Py_DECREF(ret);
 }
 // IGNORED:
