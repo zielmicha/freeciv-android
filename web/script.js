@@ -1,7 +1,13 @@
 
 var ws = new WebSocket("ws://" + location.hostname + ":" + location.port + "/ws")
-ws.onopen = function() {}
+ws.onopen = function() {
+    send_message({'type': 'init',
+                  'search': location.search,
+                  'hash': location.hash})
+    send_message({'type': 'init_cache'})
+}
 
+var image_cache = {} // TODO: lru cache
 var current_screen = null
 var last_screen_id = 0
 var last_screen_content = null
@@ -174,7 +180,7 @@ ws.onmessage = function (evt) {
         } else if(m.type == 'tiles_center_at')
             tiles_center_at(m.pos)
     }
-    load_image_from_b64(msg[0].data, function(img) {
+    load_image_cached(msg[0].data, function(img) {
         handle_screen(img, msg[0])
     })
     var finished = 0
@@ -193,7 +199,7 @@ ws.onmessage = function (evt) {
             continue
         }
         (function(j) {
-            load_image_from_b64(msg[i].data, function(img) {
+            load_image_cached(msg[i].data, function(img) {
                 msg[j].img = img
                 finished ++
                 if(finished == msg.length - 1) draw_all()
@@ -206,9 +212,24 @@ function image_show_debug(data) {
     var debugarea = $('.debugarea')
     var c = $('<div>')
     $('<img height=100>').attr(
-        'src', data).appendTo(c)
+        'src', get_image_cached(data)).appendTo(c)
     $('<span>').text(parseInt(data.length / 1024) + 'kB').appendTo(c)
     c.appendTo(debugarea)
+}
+
+function load_image_cached(val, func) {
+    return load_image_from_b64(get_image_cached(val), func)
+}
+
+function get_image_cached(val) {
+    if(val[0] == 'get_from_cache') {
+        return image_cache[val[1]]
+    } else if(val[0] == 'store_to_cache') {
+        image_cache[val[1]] = val[2]
+        return val[2]
+    } else {
+        console.log('unknown cached image', val)
+    }
 }
 
 function load_image_from_b64(b64, func) {

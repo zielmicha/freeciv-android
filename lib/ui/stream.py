@@ -7,16 +7,20 @@ import os
 import json
 import time
 import StringIO
+import zlib
 
 features.add_feature('stream.fd', type=int, default=2)
 
 _messages = []
+_client_cache = {}
 
 def add_message(m):
     _messages.append(m)
 
 def init():
     print 'stream enabled (FD=%d)' % features.get('stream.fd')
+    import ctrl
+    ctrl.bind_event('init_cache', lambda msg: _client_cache.clear())
     ui.draw_hooks.add(run)
     ui.layer_hooks.add(layer_hook)
 
@@ -42,6 +46,16 @@ def get_texture_data(texture):
     data = texture.read_data()
     return write_image(data, texture.get_size())
 
+def _cached_image(id, data):
+    if data == None:
+        return None
+    crc = zlib.crc32(data)
+    if _client_cache.get(id) == crc:
+        return ['get_from_cache', id]
+    else:
+        _client_cache[id] = crc
+        return ['store_to_cache', id, data]
+
 def run():
     ui.set_fill_image(None)
     start = time.time()
@@ -51,10 +65,11 @@ def run():
              'time': int((time.time() - start) * 1000)}
 
     data = []
+    screen_id = id(ui.get_screen())
     data.append({
         'type': 'frame',
-        'data': compressed,
-        'id': id(ui.get_screen()),
+        'data': _cached_image(screen_id, compressed),
+        'id': screen_id,
         'back': id(ui.history[0]) if ui.history else None,
         'allow_animation': ui.get_allow_animation(),
         'pos': [0, 0]})
@@ -69,7 +84,7 @@ def run():
         data.append({
             'type': 'layer',
             'layerid': id,
-            'data': image_data,
+            'data': _cached_image(id, image_data),
             'pos': pos,
             'offset': offset,
             'size': size,

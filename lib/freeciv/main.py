@@ -32,7 +32,7 @@ import monitor
 import options
 import menus
 import graphics
-import ctrl
+from ui import ctrl
 
 import sync
 import gold

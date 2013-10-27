@@ -3,7 +3,7 @@ import graphics
 import time
 import contextlib
 from ui import stream
-from freeciv import ctrl
+from ui import ctrl
 
 from client import freeciv
 
