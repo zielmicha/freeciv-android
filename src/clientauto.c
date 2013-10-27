@@ -863,6 +863,10 @@ void global_update_tile(int x, int y){
     PyObject* ret = PY_CALL("sii", "global_update_tile", x, y);
 	Py_DECREF(ret);
 }
+void global_set_mapview_center(int gui_x, int gui_y){
+    PyObject* ret = PY_CALL("sii", "global_set_mapview_center", gui_x, gui_y);
+	Py_DECREF(ret);
+}
 // IGNORED:
 //  void get_overview_area_dimensions(int *width, int *height)
 //  const char **gfx_fileextensions(void)

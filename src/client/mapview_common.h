@@ -333,4 +333,7 @@ void link_marks_decrease_turn_counters(void);
 void link_mark_add_new(enum text_link_type type, int id);
 void link_mark_restore(enum text_link_type type, int id);
 
+void global_update_tile(int x, int y);
+void global_set_mapview_center(int gui_x, int gui_y);
+
 #endif /* FC__MAPVIEW_COMMON_H */

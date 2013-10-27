@@ -18,11 +18,14 @@ class MapWidget(ui.Widget):
         self.tile_storage = {}
         self.tile_client_cache = {} # corresponds to client's one
         self.tile_map_pos = {}
+        self.tile_draw_time = {}
         self.screen_pos = (0, 0)
-        self.screen_tiles = 10
+        self.screen_tiles = (20, 15)
 
-        ctrl.bind_event('tile', self.process_message)
+        ctrl.bind_event('tile_posnotify', self.pos_notify)
+        ctrl.bind_event('tile_init', self.client_init)
         freeciv.register(self.global_update_tile)
+        freeciv.register(self.global_set_mapview_center)
 
     def back(self):
         self.client.escape()
@@ -38,6 +41,8 @@ class MapWidget(ui.Widget):
         for i, j in self.get_screen_tiles():
             self.push_tile(i * self.tile_size, j * self.tile_size)
 
+        self.redraw_some_old()
+
         ui.layer_hooks.execute(id='map',
                                surf=None,
                                pos=pos,
@@ -48,8 +53,8 @@ class MapWidget(ui.Widget):
         tile_pos = self.screen_pos[0] // self.tile_size, \
                    self.screen_pos[1] // self.tile_size
         return [ (i, j)
-                 for i in range_around(tile_pos[0], self.screen_tiles)
-                 for j in range_around(tile_pos[1], self.screen_tiles) ]
+                 for i in range_around(tile_pos[0], self.screen_tiles[0])
+                 for j in range_around(tile_pos[1], self.screen_tiles[1]) ]
 
     def global_update_tile(self, x, y):
         # find 4 nearest tiles
@@ -61,6 +66,19 @@ class MapWidget(ui.Widget):
         for k, v in by_dist:
             if k in self.tile_storage:
                 del self.tile_storage[k]
+
+    def global_set_mapview_center(self, x, y):
+        stream.add_message({'type': 'tiles_center_at', 'pos': (x, y)})
+
+    def redraw_some_old(self):
+        timeout = 10
+        count = 4
+        for key, t in self.tile_draw_time.items():
+            if not count:
+                break
+            if time.time() > t + timeout:
+                count -= 1
+                self.update_tile(*key)
 
     def push_tile(self, x, y):
         self.init_tile(x, y)
@@ -81,15 +99,14 @@ class MapWidget(ui.Widget):
         new_data = stream.get_texture_data(img)
         self.tile_storage[x, y] = new_data
         self.tile_map_pos[x, y] = tile_pos
+        self.tile_draw_time[x, y] = time.time()
 
-    def process_message(self, message):
-        print 'tile message', message
-        subtype = message['subtype']
-        if subtype == 'init':
-            self.tile_client_cache = {}
-        elif subtype == 'posnotify':
-            x, y = message['pos']
-            self.screen_pos = -x, -y
+    def client_init(self, message):
+        self.tile_client_cache = {}
+
+    def pos_notify(self, message):
+        x, y = message['pos']
+        self.screen_pos = -x, -y
 
 def range_around(x, phi):
     return range(x - phi/2, x - phi/2 + phi)

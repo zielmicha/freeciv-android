@@ -3,7 +3,7 @@ var map_pos = [0, 0]
 var tile_size = 128
 var tile_storage = {}
 var tiles_init_done = false
-var tiles_draw_frame = true
+var tiles_draw_frame = false
 
 function tiles_process_message(m) {
     if(m.draw_at) {
@@ -18,7 +18,7 @@ function tiles_process_message(m) {
 }
 
 function tiles_init() {
-    send_message({'type': 'tile', 'subtype': 'init'})
+    send_message({'type': 'tile_init'})
 }
 
 function tiles_draw() {
@@ -29,7 +29,8 @@ function tiles_draw() {
     }
     var pos = [tiles_draw_at[0], tiles_draw_at[1],
                tiles_draw_at[2], tiles_draw_at[3]]
-    canvas_ctx.clearRect(pos[0], pos[1], pos[2], pos[3])
+    canvas_ctx.fillStyle = 'black'
+    canvas_ctx.fillRect(pos[0], pos[1], pos[2], pos[3])
     if(drag_offsets.map) {
         pos[0] += drag_offsets.map[0]
         pos[1] += drag_offsets.map[1]
@@ -58,7 +59,7 @@ function tiles_notify_about_position(x, y) {
     key = x + ',' + y
     if(key != tiles_notified_about) {
         tiles_notified_about = key
-        send_throttled_message({'type': 'tile', 'subtype': 'posnotify',
+        send_throttled_message({'type': 'tile_posnotify',
                                 'pos': [x, y]})
     }
 }
@@ -82,6 +83,12 @@ function tile_draw(pos, x, y) {
 
 function tile_round(v) {
     return parseInt(v / tile_size) * tile_size
+}
+
+function tiles_center_at(pos) {
+    console.log("center at" + pos)
+    drag_offsets.map = [-pos[0] + layerlist.map.size[0] / 2,
+                        -pos[1] + layerlist.map.size[1] / 2]
 }
 
 function draw_image_cropped(img, x, y, cx, cy, cw, ch) {

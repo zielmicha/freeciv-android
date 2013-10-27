@@ -171,7 +171,8 @@ ws.onmessage = function (evt) {
             msg.push(m)
         else if(m.type == 'tile') {
             tiles_process_message(m)
-        }
+        } else if(m.type == 'tiles_center_at')
+            tiles_center_at(m.pos)
     }
     load_image_from_b64(msg[0].data, function(img) {
         handle_screen(img, msg[0])

@@ -829,6 +829,9 @@ void center_tile_mapcanvas(struct tile *ptile)
 
   map_to_gui_pos(tileset, &gui_x, &gui_y, ptile->x, ptile->y);
 
+  /* For clients with local scroll. */
+  global_set_mapview_center(gui_x, gui_y);
+
   /* Put the center pixel of the tile at the exact center of the mapview. */
   gui_x -= (mapview.width - tileset_tile_width(tileset)) / 2;
   gui_y -= (mapview.height - tileset_tile_height(tileset)) / 2;
