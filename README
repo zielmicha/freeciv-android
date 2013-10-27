@@ -11,6 +11,19 @@ Known working version:
    hg clone -r 363 http://hg.libsdl.org/SDL_image
    hg clone -r 228 http://hg.libsdl.org/SDL_ttf
 
+Dependency installation:
+
+   apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0
+   apt-get install -y graphviz
+   pip install Cython==0.14
+   # if on fairly new system
+   ln -s /usr/bin/aclocal /usr/local/bin/aclocal-1.13
+   ln -s /usr/bin/automake /usr/local/bin/automake-1.13
+   # if software renderer needed
+   apt-get install libgl1-mesa-swx11
+
+Don't install SDL2 from your distribution repository! It is highly probable that it will be incompatible.
+
 Build and run on desktop (for debugging):
    make run
 
