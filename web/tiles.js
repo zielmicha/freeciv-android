@@ -86,7 +86,13 @@ function tile_round(v) {
 }
 
 function tiles_center_at(pos) {
-    console.log("center at" + pos)
+    console.log("center at " + pos)
+    var offset = drag_offsets.map
+    if(pos[0] > -offset[0] && pos[0] < -offset[0] + layerlist.map.size[0] &&
+       pos[1] > -offset[1] && pos[1] < -offset[1] + layerlist.map.size[1]) {
+        console.log("no need to center, offset is:", offset)
+        return // already on screen
+    }
     drag_offsets.map = [-pos[0] + layerlist.map.size[0] / 2,
                         -pos[1] + layerlist.map.size[1] / 2]
 }

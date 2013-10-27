@@ -1,4 +1,10 @@
 
+if(!console) {
+    console = {
+        log: function() {}
+    }
+}
+
 var ws = new WebSocket("ws://" + location.hostname + ":" + location.port + "/ws")
 ws.onopen = function() {
     send_message({'type': 'init',
