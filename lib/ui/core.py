@@ -278,8 +278,7 @@ def main_tick_wrapper():
         curr_time = time.time()
         frame_last = curr_time - frame_start
         sleep = (1./features.get('ui.fps_limit')) - frame_last
-        if sleep > 0:
-            idle_sleep(sleep)
+        idle_sleep(sleep)
         USER_INACTIVITY_MAX = 10
         if any_mouse_events + USER_INACTIVITY_MAX > curr_time:
             # don't count time if user has locked screen or switched app
@@ -295,11 +294,8 @@ def main_tick_wrapper():
 
 def idle_sleep(t):
     if idle_hooks.is_bound():
-        deadline = time.time() + t
-        while time.time() < deadline:
-            idle_hooks.execute()
-        idle_hooks.clear()
-    else:
+        idle_hooks.execute(t)
+    elif sleep > 0:
         time.sleep(t)
 
 def main():

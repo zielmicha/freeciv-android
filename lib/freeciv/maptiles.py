@@ -38,16 +38,19 @@ class MapWidget(ui.Widget):
         surf.draw_rect((255, 255, 255, 0), pos + self.size, blend=graphics.MODE_NONE)
         stream.add_message({'type': 'tile', 'draw_at': pos + self.size})
 
-        for i, j in self.get_screen_tiles():
-            self.push_tile(i * self.tile_size, j * self.tile_size)
+        self.tick()
 
         self.redraw_some_old()
-
         ui.layer_hooks.execute(id='map',
                                surf=None,
                                pos=pos,
                                offset=(0, 0),
                                size=self.size)
+
+
+    def tick(self):
+        for i, j in self.get_screen_tiles():
+            self.push_tile(i * self.tile_size, j * self.tile_size)
 
     def get_screen_tiles(self):
         tile_pos = self.screen_pos[0] // self.tile_size, \

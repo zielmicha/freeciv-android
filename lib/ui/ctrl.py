@@ -5,11 +5,14 @@ import os
 import json
 import functools
 import graphics
+import threading
 
 features.add_feature('ctrl.enable', type=bool, default=False)
 features.add_feature('ctrl.fd', type=int, default=0)
 
 _bound_events = {}
+_message_available = threading.Condition()
+_messages = []
 
 def maybe_init():
     if features.get('ctrl.enable'):
@@ -17,12 +20,23 @@ def maybe_init():
         t = threading.Thread(target=loop)
         t.daemon = True
         t.start()
+        ui.idle_hooks.add(idle_sleep)
+
+def idle_sleep(dt):
+    with _message_available:
+        if dt > 0:
+            _message_available.wait(dt)
+        for message in _messages:
+            process_message(message)
+        _messages[:] = []
 
 def loop():
     input = os.fdopen(features.get('ctrl.fd'), 'r', 1)
     for line in iter(input.readline, ''):
         message = json.loads(line)
-        ui.execute_later(functools.partial(process_message, message))
+        with _message_available:
+            _messages.append(message)
+            _message_available.notify()
 
 EVENT_NAMES = [
     'MOUSEBUTTONUP', 'MOUSEBUTTONDOWN',
