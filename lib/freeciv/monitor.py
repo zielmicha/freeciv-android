@@ -94,6 +94,8 @@ def change_stdout():
             self.log_buffer = ''
 
         def write(self, s):
+            if isinstance(s, unicode):
+                s = s.encode('utf8')
             logout.write(str(s))
             self.log_buffer += s
             while '\n' in self.log_buffer:
