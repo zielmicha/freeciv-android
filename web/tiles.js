@@ -1,6 +1,6 @@
 var tiles_draw_at
 var map_pos = [0, 0]
-var tile_size = 128
+var tile_size = 256
 var tile_storage = {}
 var tiles_init_done = false
 var tiles_draw_frame = false

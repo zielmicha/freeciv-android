@@ -14,13 +14,13 @@ class MapWidget(ui.Widget):
         self.client = client
         self.size = (0, 0)
         self.drawer = TileDrawer(client)
-        self.tile_size = 128
+        self.tile_size = 256
         self.tile_storage = {}
         self.tile_client_cache = {} # corresponds to client's one
         self.tile_map_pos = {}
         self.tile_draw_time = {}
         self.screen_pos = (0, 0)
-        self.screen_tiles = (20, 15)
+        self.screen_tiles = (10, 8)
         self.redraw_queue = set()
 
         ctrl.bind_event('tile_posnotify', self.pos_notify)
