@@ -295,7 +295,7 @@ def main_tick_wrapper():
 def idle_sleep(t):
     if idle_hooks.is_bound():
         idle_hooks.execute(t)
-    elif sleep > 0:
+    elif t > 0:
         time.sleep(t)
 
 def main():
