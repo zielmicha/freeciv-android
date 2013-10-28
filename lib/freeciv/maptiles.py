@@ -35,6 +35,17 @@ class MapWidget(ui.Widget):
     def event(self, ev):
         if ev.type in (graphics.const.KEYDOWN, graphics.const.KEYUP):
             self.client.key_event(ev.type, ev.key)
+        elif ev.type == graphics.const.MOUSEBUTTONDOWN:
+            try:
+                pos = ev.data['tile_pos']
+            except (AttributeError, KeyError):
+                pass
+            else:
+                self.click(pos)
+
+    def click(self, pos):
+        x, y = pos
+        self.drawer.click(x, y)
 
     def draw(self, surf, pos):
         surf.draw_rect((255, 255, 255, 0), pos + self.size, blend=graphics.MODE_NONE)
@@ -73,10 +84,10 @@ class MapWidget(ui.Widget):
                  for j in range_around(tile_pos[1], self.screen_tiles[1]) ]
 
     def global_update_tile(self, x, y):
-        # find 4 nearest tiles
+        # find 6 nearest tiles
         by_dist = sorted(self.tile_map_pos.items(),
                          key=lambda (k, v): abs(v[0] - x) + abs(v[1] - y) if v else 100000)
-        by_dist = by_dist[:4]
+        by_dist = by_dist[:6]
         print 'update', by_dist
         # and queue update
         for k, v in by_dist:
@@ -146,6 +157,11 @@ class TileDrawer(object):
 
     def set_map_origin(self, x, y):
         freeciv.func.base_set_mapview_origin(x, y)
+
+    def click(self, x, y):
+        with self.save_state():
+            self.set_map_origin(x, y)
+            freeciv.func.action_button_pressed(0, 0, SELECT_POPUP)
 
     @contextlib.contextmanager
     def save_state(self):

@@ -55,7 +55,7 @@ def process_message(message):
 
 def process_event(message):
     supported_keys = ['type', 'pos', 'key', 'unicode', 'text', 'start', 'length',
-                          'button']
+                          'button', 'data']
 
     dict = {}
     for k in message:

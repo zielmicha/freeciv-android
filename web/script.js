@@ -134,6 +134,8 @@ var drag_delta_offset
 
 var drag_offsets = {}
 
+var layer_click_handlers = {}
+
 function layers_mouse_event(name, pos, e) {
     if(name == 'MOUSEBUTTONDOWN') {
         for(var key in layerlist) {
@@ -163,8 +165,12 @@ function layers_mouse_event(name, pos, e) {
         drag_id = null
         if(result) {
             if(Math.abs(drag_delta[0]) + Math.abs(drag_delta[1]) < 6) {
-                pass_mouse_event('MOUSEBUTTONDOWN', e)
-                pass_mouse_event('MOUSEBUTTONUP', e)
+                if(layer_click_handlers[result]) {
+                    layer_click_handlers[result](e, pos)
+                } else {
+                    pass_mouse_event('MOUSEBUTTONDOWN', e)
+                    pass_mouse_event('MOUSEBUTTONUP', e)
+                }
             }
             return false
         }
@@ -290,7 +296,8 @@ function pass_mouse_event(name, e) {
     func = name == 'MOUSEMOTION' ? send_throttled_message : send_message
     func({'type': name,
           'pos': pos,
-          'button': button})
+          'button': button,
+          'data': e.data})
 }
 
 function key_event(name, e) {

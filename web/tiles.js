@@ -49,6 +49,16 @@ function tiles_draw() {
     }
 }
 
+layer_click_handlers.map = function(e, pos) {
+    pos[0] -= tiles_draw_at[0]
+    pos[1] -= tiles_draw_at[1]
+    pos[0] -= drag_offsets.map[0]
+    pos[1] -= drag_offsets.map[1]
+    e.data = {tile_pos: pos}
+    pass_mouse_event('MOUSEBUTTONDOWN', e)
+    pass_mouse_event('MOUSEBUTTONUP', e)
+}
+
 function nround(i, r) {
     return parseInt(i / r) * r
 }
@@ -88,6 +98,7 @@ function tile_round(v) {
 function tiles_center_at(pos) {
     console.log("center at " + pos)
     var offset = drag_offsets.map
+    if(!offset) offset = [0, 0]
     if(pos[0] > -offset[0] && pos[0] < -offset[0] + layerlist.map.size[0] &&
        pos[1] > -offset[1] && pos[1] < -offset[1] + layerlist.map.size[1]) {
         console.log("no need to center, offset is:", offset)
