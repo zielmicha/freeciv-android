@@ -5,7 +5,23 @@ if(!console) {
     }
 }
 
-var ws = new WebSocket("ws://" + location.hostname + ":" + location.port + "/ws")
+function get_url_params() {
+    var query = location.search.substr(1)
+    var data = query.split("&")
+    var result = {}
+    for(var i=0; i<data.length; i++) {
+        var item = data[i].split("=")
+        result[item[0]] = unescape(item[1])
+    }
+    return result
+}
+
+var url_params = get_url_params()
+var ws_url = "ws://" + location.hostname + ":" + location.port + "/ws"
+if(url_params.wsurl)
+    ws_url = url_params.wsurl
+var ws = new WebSocket(ws_url)
+
 ws.onopen = function() {
     send_message({'type': 'init',
                   'search': location.search,
