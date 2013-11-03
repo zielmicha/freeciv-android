@@ -46,6 +46,7 @@ def stream_data(fdin):
         if not line: break
         ioloop.IOLoop.instance().add_callback(WSHandler.broadcast, line)
     print 'stream finished'
+    os._exit(0)
 
 if __name__ == u"__main__":
     streamin, streamout = os.pipe()
