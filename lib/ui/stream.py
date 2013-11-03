@@ -21,6 +21,7 @@ def init():
     print 'stream enabled (FD=%d)' % features.get('stream.fd')
     import ctrl
     ctrl.bind_event('init_cache', lambda msg: _client_cache.clear())
+    ctrl.bind_event('ping', lambda msg: add_message({'type': 'pong'}))
     ui.draw_hooks.add(run)
     ui.layer_hooks.add(layer_hook)
 
