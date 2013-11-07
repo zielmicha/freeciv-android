@@ -6,7 +6,7 @@ If you don't need to change source code and don't need latest version simply dow
 
 Running Freeciv on desktop requires SDL2 with modified alpha blending from http://github.com/zielmicha/SDL2. You also need SDL2_image and SDL2_ttf (from http://hg.libsdl.org/SDL_image/ and http://hg.libsdl.org/SDL_ttf/).
 
-Known working version:
+Known working version (and remember to run ./augogen.sh first!):
 
    hg clone -r 363 http://hg.libsdl.org/SDL_image
    hg clone -r 228 http://hg.libsdl.org/SDL_ttf
@@ -14,13 +14,16 @@ Known working version:
 Dependency installation:
 
    apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0
-   apt-get install -y graphviz
+   apt-get install -y graphviz python-pip mercurial python2.7-dev git-core
    pip install Cython==0.14
+   # for running web/proxy.py
+   pip install tornado==3.1.1
+   apt-get install -y python-imaging
    # if on fairly new system
    ln -s /usr/bin/aclocal /usr/local/bin/aclocal-1.13
    ln -s /usr/bin/automake /usr/local/bin/automake-1.13
    # if software renderer needed
-   apt-get install libgl1-mesa-swx11
+   apt-get install libgl1-mesa-swx11-dev xvfb
 
 Don't install SDL2 from your distribution repository! It is highly probable that it will be incompatible.
 
