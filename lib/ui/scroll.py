@@ -54,6 +54,14 @@ class ScrollWrapper(ui.Layer):
         self.x += self.vx
         self.y += self.vy
 
+        self.normalize()
+
+        self.vx -= _sgn(self.vx)
+        self.vy -= _sgn(self.vy)
+
+        self.item.tick()
+
+    def normalize(self):
         if self.y > self.item.size[1] - self.height:
             self.y = self.item.size[1] - self.height
             self.vy = 0
@@ -67,11 +75,6 @@ class ScrollWrapper(ui.Layer):
         if self.x < 0:
             self.x = 0
             self.vx = 0
-
-        self.vx -= _sgn(self.vx)
-        self.vy -= _sgn(self.vy)
-
-        self.item.tick()
 
     def event(self, event):
         if event.type == graphics.const.MOUSEBUTTONDOWN:
@@ -108,6 +111,8 @@ class ScrollWrapper(ui.Layer):
             self.canceled_event(event)
         else:
             self.item.event(event)
+
+        self.normalize()
 
     def canceled_event(self, event):
         pass
