@@ -207,6 +207,8 @@ ws.onmessage = function (evt) {
             tiles_process_message(m)
         } else if(m.type == 'tiles_center_at')
             tiles_center_at(m.pos)
+        else if(m.type == 'tile_config')
+            tiles_got_config(m)
     }
     load_image_cached(msg[0].data, function(img) {
         handle_screen(img, msg[0])

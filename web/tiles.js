@@ -1,6 +1,6 @@
 var tiles_draw_at
 var map_pos = [0, 0]
-var tile_size = 256
+var tile_size = 512
 var tile_storage = {}
 var tiles_init_done = false
 var tiles_draw_frame = false
@@ -19,6 +19,11 @@ function tiles_process_message(m) {
 
 function tiles_init() {
     send_message({'type': 'tile_init'})
+    send_message({'type': 'tile_getconfig'})
+}
+
+function tiles_got_config(conf) {
+    tile_size = conf.tile_size
 }
 
 function tiles_draw() {

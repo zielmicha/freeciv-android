@@ -14,20 +14,25 @@ class MapWidget(ui.Widget):
         self.client = client
         self.size = (0, 0)
         self.drawer = TileDrawer(client)
-        self.tile_size = 256
+        self.tile_size = 512
         self.tile_storage = {}
         self.tile_client_cache = {} # corresponds to client's one
         self.tile_map_pos = {}
         self.tile_draw_time = {}
         self.screen_pos = (0, 0)
-        self.screen_tiles = (10, 8)
+        self.screen_tiles = (2500 // self.tile_size + 1, 1800 // self.tile_size + 1)
         self.redraw_queue = set()
 
         ctrl.bind_event('tile_posnotify', self.pos_notify)
         ctrl.bind_event('tile_init', self.client_init)
+        ctrl.bind_event('tile_getconfig', self.send_config)
         freeciv.register(self.global_update_tile)
         freeciv.register(self.global_set_mapview_center)
         freeciv.register(self.global_update_everything)
+
+    def send_config(self, m):
+        stream.add_message({'type': 'tile_config',
+                            'tile_size': self.tile_size})
 
     def back(self):
         self.client.escape()
@@ -62,7 +67,7 @@ class MapWidget(ui.Widget):
 
     def tick(self):
         need_redraw = self.redraw_queue & set(self.get_screen_tiles())
-        can_redraw = 15
+        can_redraw = 5
 
         if self.redraw_queue:
             print 'queue', len(self.redraw_queue), 'need', len(need_redraw)
@@ -84,10 +89,10 @@ class MapWidget(ui.Widget):
                  for j in range_around(tile_pos[1], self.screen_tiles[1]) ]
 
     def global_update_tile(self, x, y):
-        # find 6 nearest tiles
+        # find nearest tiles
         by_dist = sorted(self.tile_map_pos.items(),
                          key=lambda (k, v): abs(v[0] - x) + abs(v[1] - y) if v else 100000)
-        by_dist = by_dist[:6]
+        by_dist = by_dist[:5]
         print 'update', by_dist
         # and queue update
         for k, v in by_dist:
