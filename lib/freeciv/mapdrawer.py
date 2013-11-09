@@ -17,6 +17,13 @@ class MapWidget(ui.Widget):
         self.last_drag_pos = None
         self.was_dragged = False
 
+        def nothing(*args):
+            return
+
+        freeciv.register('global_update_tile')(nothing)
+        freeciv.register('global_set_mapview_center')(nothing)
+        freeciv.register('global_update_everything')(nothing)
+
     def tick(self):
         pass
 

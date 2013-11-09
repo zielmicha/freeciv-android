@@ -65,8 +65,8 @@ class Button(WithText):
     bg = (130, 100, 0, 90)
     fg = (150, 150, 50)
 
-    def __init__(self, label, callback, font=None, color=None, force_width=None, force_height=None, image=None):
-        WithText.__init__(self, label, callback, font, color, padding=4, force_width=force_width, image=image)
+    def __init__(self, label, callback, font=None, color=None, force_width=None, force_height=None, image=None, padding=4):
+        WithText.__init__(self, label, callback, font, color, padding=padding, force_width=force_width, image=image)
         self.active = False
 
     def draw(self, surf, pos):

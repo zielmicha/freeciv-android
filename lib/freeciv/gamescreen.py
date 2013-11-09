@@ -247,6 +247,13 @@ class ScreenClient(client.Client):
 class ScreenWidget(ui.HorizontalLayoutWidget):
     def __init__(self, client):
         super(ScreenWidget, self).__init__()
+        width = 150
+
+        def make_button(name, func):
+            return ui.Button(name, func,
+                             force_width=width - 15,
+                             padding=1)
+
         self.client = client
 
         if features.get('app.map_tiles'):
@@ -256,8 +263,8 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.overview = OverviewWidget(client)
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client)
-        self.end_turn_button = ui.Button('End turn', self.client.end_turn)
-        self.empire_button = ui.Button('Empire', self.empire_dialog)
+        self.end_turn_button = make_button('End turn', self.client.end_turn)
+        self.empire_button = make_button('Empire', self.empire_dialog)
         self.taxes_panel = TaxesPanel(client)
 
         self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True)
@@ -385,8 +392,9 @@ class TaxesDialog(ui.LinearLayoutWidget):
             tpl[0] -= val * 10
             a, b, c = map(lambda x: max(0, min(100, x)), tpl)
             self.client.set_tax_values(a, b, c)
-            ui.screen.tick()
+            ui.get_screen().tick()
             self.update()
+            ui.execute_later(self.update)
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
@@ -398,11 +406,14 @@ class TaxesDialog(ui.LinearLayoutWidget):
             line.add(img_l)
             if type != 0:
                 line.add(ui.Spacing(10, 0))
-                line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font))
+                w = 40
+                line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font,
+                                   force_width=w))
                 line.add(ui.Spacing(10, 0))
-                line.add(ui.Button(' + ', functools.partial(change, type, +1), font=font))
+                line.add(ui.Button(' + ', functools.partial(change, type, +1), font=font,
+                                   force_width=w))
             else:
-                line.add(ui.Spacing(123, 0))
+                line.add(ui.Spacing(116, 0))
             line.add(ui.Spacing(10, 0))
             line.add(ui.Label('%d%%' % tpl[type], font=font))
             panel.add(line)
