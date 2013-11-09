@@ -1,5 +1,6 @@
 import ui
 import graphics
+import time
 
 class Widget(object):
     def back(self, _is_not_overriden=None):
@@ -65,7 +66,8 @@ class Animation(Widget):
         self.screen_background = 0xFFFFFF
 
         self.frame = 0
-        self.duration = 3
+        self.duration = 0.3
+        self.start = None
 
     def draw(self, surf, pos):
         width = ui.screen_width * (self.spacing + 1)
@@ -92,8 +94,10 @@ class Animation(Widget):
         a.draw(surf, (a_x + x, y))
 
     def tick(self):
-        self.frame += 1
-        if self.frame == self.duration:
+        if not self.start:
+            self.start = time.time()
+        self.frame = time.time() - self.start
+        if self.frame >= self.duration:
             ui.replace(self.dest)
 
     def event(self, ev):
