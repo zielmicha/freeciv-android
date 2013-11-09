@@ -22,6 +22,7 @@ cdef extern from "SDL.h":
 
     ctypedef enum:
         SDL_WINDOW_HIDDEN
+        SDL_WINDOW_FULLSCREEN
 
     ctypedef enum SDLMod:
         pass

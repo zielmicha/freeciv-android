@@ -455,12 +455,14 @@ def start_text_input():
 def stop_text_input():
     SDL_StopTextInput()
 
-def create_window(size, hidden=False):
+def create_window(size, hidden=False, fullscreen=False):
     global _window, _window_handle
     w, h = size
     flags = 0
     if hidden:
         flags |= SDL_WINDOW_HIDDEN
+    if fullscreen:
+        flags |= SDL_WINDOW_FULLSCREEN
     wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, flags)
     _window_handle = wnd
     renderer = SDL_CreateRenderer(wnd, -1, 0)
