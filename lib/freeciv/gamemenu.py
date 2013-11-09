@@ -69,6 +69,11 @@ class Menu(ui.LinearLayoutWidget):
         self.add(self.panel)
         self.panel.add(ui.Label('loading...', color=(0, 255, 0)))
 
+        self.activity_label = ui.Label('', font=ui.consolefont)
+
+        self.left_widget = ui.LinearLayoutWidget()
+        self.left_widget.add(self.activity_label)
+
     def incr_zoom(self, i=1):
         self.zoom_level += i
         self.zoom_level = max(0, min(len(ZOOM_LEVELS) - 1, self.zoom_level))
@@ -85,6 +90,13 @@ class Menu(ui.LinearLayoutWidget):
             self.update_actions(unit)
 
         self.update_layout()
+        self.update_left_widget(unit)
+
+    def update_left_widget(self, unit):
+        if unit:
+            self.activity_label.set_text(unit.get_activity_string())
+        else:
+            self.activity_label.set_text('')
 
     def update_joystick(self):
         joystick_layout = ui.LinearLayoutWidget()

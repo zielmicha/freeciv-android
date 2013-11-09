@@ -212,6 +212,9 @@ class Unit(object):
         else:
             print 'Unsupported action ', ident
 
+    def get_activity_string(self):
+        return freeciv.func.get_activity_str(self.handle)
+
 def get_unit_in_focus():
     units = freeciv.func.get_units_in_focus()
     if units:

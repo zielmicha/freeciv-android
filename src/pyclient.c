@@ -8,6 +8,7 @@
 #include "fc_types.h"
 #include "government.h"
 #include "name_translation.h"
+#include "astring.h"
 #include <sys/prctl.h>
 
 enum city_get_mode {
@@ -100,13 +101,6 @@ void cancel_city_at_unit(long unit) {
 }
 
 void* py_alloc_struct(PyObject* stru) {
-    /*PyObject* attr = PyObject_GetAttrString(stru, "_civstruct");
-    if(!attr) errlog("No _civstruct member\n");
-    long val = PyInt_AsLong(attr);
-    if(val == -1 && PyErr_Occurred())
-        errlog("_civstruct was not integer\n");
-    return (void*)val;*/
-    //errlog("refcnt: %d\n", stru->ob_refcnt);
     if(stru == NULL)
         errlog("py_alloc_struct: stru == NULL");
     Py_INCREF(stru);
@@ -711,11 +705,19 @@ void py_overview_click(int x, int y) {
 }
 
 int py_get_city_id(struct city* city) {
-  return city->id;
+    return city->id;
 }
 
 int py_get_unit_id(struct unit* unit) {
-  return unit->id;
+    return unit->id;
+}
+
+PyObject* get_activity_str(struct unit* unit) {
+    struct astring astr = ASTRING_INIT;
+    unit_activity_astr(unit, &astr);
+    PyObject* ret = PyString_FromStringAndSize(astr_str(&astr), astr_len(&astr));
+    astr_free(&astr);
+    return ret;
 }
 
 void py_server_main(PyObject* cmd) {

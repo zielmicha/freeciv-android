@@ -282,6 +282,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.left_panel.add(self.taxes_panel)
         self.left_panel.add(ui.Spacing(0, 10))
         self.left_panel.add(self.empire_button)
+        self.left_panel.add(self.menu.left_widget)
 
         if features.get('app.full_label_toggle_button'):
             full_label_toggle_button = ui.Button('city labels', client.toggle_full_labels, font=ui.consolefont)
