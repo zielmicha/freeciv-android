@@ -29,9 +29,7 @@ done
 echo "all: freecivclient.so" > client.mk
 echo "objectfiles_gen: $ev
 " >> client.mk
-echo "_graphics.so: _graphicsmodule.h _graphicsmodule.c
-	gcc -I/usr/include/python2.7 -l$PYTHON _graphicsmodule.c -shared -o _graphics.so" >> client.mk
-echo "freecivclient.so: objectfiles_gen
+echo "freecivclient.so: $ev
 	gcc -fPIC -shared -o freecivclient.so objectfiles/*.o -lm -lz -l$PYTHON" >> client.mk
 echo "callauto.c: ../callglue
 	python ../gencallglue.py" >> client.mk
