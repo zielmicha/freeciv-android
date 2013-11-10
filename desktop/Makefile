@@ -25,6 +25,6 @@ freetype/autogen.sh: SDL_ttf/autogen.sh
 	git clone git://github.com/LuaDist/freetype.git
 
 Python:
-	wget http://www.python.org/ftp/python/2.7/Python-2.7.tar.bz2 -O Python-2.7.tar.bz2
+	wget http://www.python.org/ftp/python/2.7.5/Python-2.7.5.tar.bz2 -O Python-2.7.tar.bz2
 	tar xvf Python-2.7.tar.bz2
-	mv Python-2.7 Python
+	mv Python-2.7.5 Python
