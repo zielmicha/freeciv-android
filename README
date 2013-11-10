@@ -15,7 +15,7 @@ Dependency installation:
 
    apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0
    apt-get install -y graphviz python-pip mercurial python2.7-dev git-core
-   pip install Cython==0.14
+   pip install Cython==0.15
    # for running web/proxy.py
    pip install tornado==3.1.1
    apt-get install -y python-imaging
