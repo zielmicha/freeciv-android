@@ -1,5 +1,5 @@
 #!/bin/bash
-TARGETS="SDL2 SDL_image freetype SDL_ttf"
+TARGETS="SDL2 SDL_image freetype SDL_ttf Python"
 
 if [ -z "$1" ]; then
     echo "usage: buildarch.sh [arch]"
@@ -10,7 +10,7 @@ make getdep || exit 1
 
 builddir="$PWD/build/$1/"
 
-FLAGS_SDL2="--disable-input-tslib"
+FLAGS_SDL2="--disable-input-tslib --disable-dbus --enable-static"
 FLAGS_SDL_image="--with-sdl-prefix=$builddir"
 FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir"
 FLAGS_python='CFLAGS="-fPIC" LDFLAGS="-fPIC" '
@@ -20,6 +20,10 @@ mkdir -p "$builddir"
 
 MY_CFLAGS="$MY_CFLAGS=-fPIC"
 MY_LDFLAGS="$MY_LDFLAGS -L$builddir/lib -fPIC"
+
+cp Setup Python/Modules/Setup
+mkdir -p "$builddir/Python/Modules"
+cp Setup $builddir/Python/Modules/Setup
 
 for target in $TARGETS; do
     pushd $PWD
@@ -38,36 +42,49 @@ for target in $TARGETS; do
             --prefix=$builddir || exit 1
     fi
 
-
     make -j4 || exit 1
-    make install || exit 1
+    if [ "$SKIPINSTALL" = "" ]; then
+        make install || exit 1
+    fi
 
     popd
 done
 
+# Build _io module
+
+pushd "$builddir/Python"
+io_build_dir=$(dirname "$(find -name iobase.o)")
+ar rcs _io.a $io_build_dir/*.o || exit 1
+popd
+
 mkdir -p "$builddir/freeciv"
 pushd "$builddir/freeciv" || exit 1
-#PYTHON_INC=$builddir/include/python2.7
+export PYTHON_INC=$builddir/include/python2.7
 ../../../../src/configure || exit 1
 make -j4 || exit 1
+make freecivclient.a || exit 1
 
 cp ../../../../lib/Makefile lib.mk
 if [ ! -e graphics.c ]; then
     cp -a ../../../../lib/graphics.c .
 fi
 
-$MY_CC graphics.c -o graphics.so -shared -Wall -lpython2.7 \
-	-I/usr/include/python2.7 -I$builddir/include/SDL2 -L$builddir/lib \
-	-fPIC -lSDL2 -lSDL2_image -lSDL2_ttf -fPIC || exit 1
+cython --embed ../../../main.pyx -o main.c || exit
 
+STATIC=$builddir/lib/lib
+
+$MY_CC graphics.c main.c ../Python/_io.a -o graphics.bin \
+	-I$PYTHON_INC -I$builddir/include/SDL2 -L$builddir/lib \
+	${STATIC}SDL2.a ${STATIC}SDL2_image.a ${STATIC}SDL2_ttf.a ${STATIC}freetype.a \
+    ${STATIC}python2.7.a \
+    $builddir/freeciv/freecivclient.a \
+    -lbz2 -lX11 -lssl -lcrypto -lz -lm -lutil -ldl \
+    -pthread -lpthread \
+    || exit 1
+
+cp graphics.bin ../../../freeciv_$1
 popd
+
+
 pushd "$builddir"
-
-mkdir -p dist
-cp freeciv/*.so dist
-cp $(find lib/ -name '*.so.*' -type f) dist
-cd dist
-$MY_STRIP *.so*
-tar czvf ../../../dist_"$1".tgz *.so*
-
 popd

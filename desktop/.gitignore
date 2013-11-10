@@ -6,3 +6,6 @@
 /dist_*.tgz
 /Python
 /Python-2.7.tar.bz2
+/freeciv_amd64
+/freeciv_i386
+/freeciv_win

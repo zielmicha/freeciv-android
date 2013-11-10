@@ -2,12 +2,10 @@ import ui
 import features
 import graphics
 import time
-import zlib
 import os
 import json
 import time
 import StringIO
-import zlib
 
 features.add_feature('stream.fd', type=int, default=2)
 

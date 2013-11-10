@@ -42,6 +42,8 @@ echo "objectfiles_gen: $ev
 " >> client.mk
 echo "freecivclient.so: $ev
 	gcc -fPIC -shared -o freecivclient.so objectfiles/*.o -lm -lz -l$PYTHON $MY_LDFLAGS" >> client.mk
+echo "freecivclient.a: $ev
+	ar rcs freecivclient.a objectfiles/*.o" >> client.mk
 echo "callauto.c: $SRC/../callglue
 	python $SRC/../gencallglue.py" >> client.mk
 echo "clean:
