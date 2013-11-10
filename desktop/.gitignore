@@ -3,3 +3,6 @@
 /SDL_image
 /freetype
 /SDL_ttf
+/dist_*.tgz
+/Python
+/Python-2.7.tar.bz2

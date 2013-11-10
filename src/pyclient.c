@@ -10,6 +10,7 @@
 #include "name_translation.h"
 #include "astring.h"
 #include <sys/prctl.h>
+#include <signal.h>
 
 enum city_get_mode {
     MODE_PROD,
