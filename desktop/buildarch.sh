@@ -10,14 +10,15 @@ make getdep || exit 1
 
 builddir="$PWD/build/$1/"
 
-FLAGS_SDL2="--disable-input-tslib --disable-dbus --enable-static"
-FLAGS_SDL_image="--with-sdl-prefix=$builddir"
-FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir"
-FLAGS_python='CFLAGS="-fPIC" LDFLAGS="-fPIC" '
-
 mkdir -p dist
 
 source "$1.sh" || exit 1
+
+FLAGS_SDL2="--disable-input-tslib --disable-dbus --enable-static $FLAGS_SDL2"
+FLAGS_SDL_image="--with-sdl-prefix=$builddir --disable-jpg-shared --disable-png-shared $FLAGS_SDL_image"
+FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir $FLAGS_SDL_ttf"
+FLAGS_python='CFLAGS="-fPIC" LDFLAGS="-fPIC" '"$FLAGS_python"
+
 mkdir -p "$builddir"
 
 MY_CFLAGS="$MY_CFLAGS=-fPIC"
@@ -78,7 +79,7 @@ STATIC=$builddir/lib/lib
 $MY_CC graphics.c main.c ../Python/_io.a -o graphics.bin \
 	-I$PYTHON_INC -I$builddir/include/SDL2 -L$builddir/lib \
 	${STATIC}SDL2.a ${STATIC}SDL2_image.a ${STATIC}SDL2_ttf.a ${STATIC}freetype.a \
-    ${STATIC}python2.7.a \
+    ${STATIC}python2.7.a $MY_LIBLOC/libjpeg.a $MY_LIBLOC/libpng.a \
     $builddir/freeciv/freecivclient.a \
     -lbz2 -lX11 -lssl -lcrypto -lz -lm -lutil -ldl \
     -pthread -lpthread \
