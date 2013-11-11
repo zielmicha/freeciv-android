@@ -32,10 +32,14 @@ import monitor
 import options
 import menus
 import graphics
-from ui import ctrl
 
 import sync
 import gold
+
+try:
+    from ui import ctrl
+except ImportError:
+    ctrl = None
 
 features.add_feature('app.debug', default=True, type=bool)
 features.add_feature('app.autoupdate', default=True, type=bool)
@@ -304,7 +308,8 @@ def main():
     start_autoupdate()
     start_marketnotice()
 
-    ctrl.maybe_init()
+    if ctrl:
+        ctrl.maybe_init()
 
     client.freeciv.run()
 

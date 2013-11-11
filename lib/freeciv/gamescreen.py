@@ -28,7 +28,6 @@ import empiredlg
 import help
 import dropbox
 import mapdrawer
-import maptiles
 
 SELECT_POPUP = 0
 
@@ -257,6 +256,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.client = client
 
         if features.get('app.map_tiles'):
+            import maptiles
             self.map = maptiles.MapWidget(client)
         else:
             self.map = mapdrawer.MapWidget(client)

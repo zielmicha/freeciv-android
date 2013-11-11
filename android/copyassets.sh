@@ -6,8 +6,10 @@ mkdir $A/lib
 mkdir $A/lib/python2.7
 echo > $A/lib/python2.7/site.py
 mkdir -p $A/lib/python2.7/freeciv/client
+mkdir -p $A/lib/python2.7/ui
 cp ../lib/*.py $A/lib/python2.7
 cp ../lib/freeciv/*.py $A/lib/python2.7/freeciv
+cp ../lib/ui/*.py $A/lib/python2.7/ui
 cp ../lib/freeciv/client/*.py $A/lib/python2.7/freeciv/client
 echo 'array = str' > $A/lib/python2.7/array.py
 STDMODULES="shutil stat os posixpath traceback linecache
