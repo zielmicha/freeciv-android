@@ -16,7 +16,7 @@ source "$1.sh" || exit 1
 
 FLAGS_SDL2="--disable-input-tslib --disable-dbus --enable-static $FLAGS_SDL2"
 FLAGS_SDL_image="--with-sdl-prefix=$builddir --disable-jpg-shared --disable-png-shared $FLAGS_SDL_image"
-FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir $FLAGS_SDL_ttf"
+FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir --with-freetype-prefix=$builddir $FLAGS_SDL_ttf"
 FLAGS_python='CFLAGS="-fPIC" LDFLAGS="-fPIC" '"$FLAGS_python"
 
 mkdir -p "$builddir"
@@ -29,6 +29,10 @@ mkdir -p "$builddir/Python/Modules"
 cp Setup $builddir/Python/Modules/Setup
 
 for target in $TARGETS; do
+    if [ "$target" = Python -a $1 = win32 ]; then
+        # Python is stupid and doesn't support cross-compilation
+        continue
+    fi
     pushd $PWD
     pushd $target || exit 1
     dir="$PWD"
@@ -52,6 +56,11 @@ for target in $TARGETS; do
 
     popd
 done
+
+if [ $1 = win32 ]; then
+    win32_support
+    exit $?
+fi
 
 # Build _io module
 

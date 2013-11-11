@@ -9,7 +9,10 @@
 #include "government.h"
 #include "name_translation.h"
 #include "astring.h"
-#include <sys/prctl.h>
+
+#if !__MINGW32__
+    #include <sys/prctl.h>
+#endif
 #include <signal.h>
 
 enum city_get_mode {
@@ -722,6 +725,7 @@ PyObject* get_activity_str(struct unit* unit) {
 }
 
 void py_server_main(PyObject* cmd) {
+#if !__MINGW32__
   char* cmdlist[2048];
   int length = PyList_Size(cmd);
   int i;
@@ -746,6 +750,9 @@ void py_server_main(PyObject* cmd) {
   }
   for(i=0; i<length+1; i++)
     free(cmdlist[i]);
+#else
+  fprintf(stderr, "py_server_main - forget it on Windows\n");
+#endif
 }
 
 static void py_setup_const() {

@@ -11,6 +11,9 @@ i386: archdep
 amd64: archdep
 	./buildarch.sh amd64
 
+win32: archdep
+	./buildarch.sh win32
+
 archdep: getdep ../src/callauto.c ../lib/graphics.c
 
 ../src/callauto.c: ../src/Makefile

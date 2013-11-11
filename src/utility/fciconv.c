@@ -1,4 +1,4 @@
-/********************************************************************** 
+/**********************************************************************
  Freeciv - Copyright (C) 2003-2004 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -194,7 +194,7 @@ char *convert_string(const char *text,
   fc_assert_ret_val(NULL != text, NULL);
 
   if (cd == (iconv_t) (-1)) {
-    /* TRANS: "Could not convert text from <encoding a> to <encoding b>:" 
+    /* TRANS: "Could not convert text from <encoding a> to <encoding b>:"
      *        <externally translated error string>."*/
     log_error(_("Could not convert text from %s to %s: %s"),
               from, to, fc_strerror(fc_get_errno()));
@@ -273,7 +273,9 @@ char *convert_string(const char *text,
 #endif /* HAVE_ICONV */
 }
 
+#ifndef HAVE_ICONV
 char* transliteration_string = "";
+#endif
 
 #define CONV_FUNC_MALLOC(src, dst)                                          \
 char *src ## _to_ ## dst ## _string_malloc(const char *text)                \
