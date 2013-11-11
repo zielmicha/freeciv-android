@@ -23,8 +23,6 @@ import sys
 
 import ui
 
-from . import stream
-
 history = []
 overlays = []
 _screen = None
@@ -49,6 +47,7 @@ features.add_feature('ui.redraw_fps_limit', type=int, default=60)
 features.add_feature('ui.offscreen', type=bool, default=False)
 
 features.add_feature('stream.enable', type=bool, default=False)
+features.add_feature('stream.fd', type=int, default=2)
 
 def replace(new_screen):
     assert isinstance(new_screen, ui.Widget)
@@ -338,6 +337,7 @@ def init():
     ui.font = ui.bigfont = load_font(None, 50)
 
     if features.get('stream.enable'):
+        from . import stream
         stream.init()
 
 class Event(object):

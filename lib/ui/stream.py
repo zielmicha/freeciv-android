@@ -7,8 +7,6 @@ import json
 import time
 import StringIO
 
-features.add_feature('stream.fd', type=int, default=2)
-
 _messages = []
 _client_cache = {}
 
