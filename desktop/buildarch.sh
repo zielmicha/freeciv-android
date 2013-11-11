@@ -15,6 +15,8 @@ FLAGS_SDL_image="--with-sdl-prefix=$builddir"
 FLAGS_SDL_ttf="--with-sdl-prefix=$builddir --with-freetype=$builddir"
 FLAGS_python='CFLAGS="-fPIC" LDFLAGS="-fPIC" '
 
+mkdir -p dist
+
 source "$1.sh" || exit 1
 mkdir -p "$builddir"
 
@@ -82,7 +84,7 @@ $MY_CC graphics.c main.c ../Python/_io.a -o graphics.bin \
     -pthread -lpthread \
     || exit 1
 
-cp graphics.bin ../../../freeciv_$1
+cp graphics.bin ../../../dist/freeciv_$1
 popd
 
 

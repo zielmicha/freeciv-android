@@ -1,13 +1,13 @@
 TARGETS=SDL_image/ SDL_ttf/ SDL2/ freetype/
 
-all: getdep archs
+all: getdep archs dist/module.zip
 
-archs: i386
+archs: amd64
 
-i386:
+i386: getdep
 	./buildarch.sh i386
 
-amd64:
+amd64: getdep
 	./buildarch.sh amd64
 
 getdep: $(addsuffix autogen.sh, $(TARGETS)) Python
@@ -24,7 +24,11 @@ SDL2/autogen.sh:
 freetype/autogen.sh: SDL_ttf/autogen.sh
 	git clone git://github.com/LuaDist/freetype.git
 
+dist/module.zip: Python
+	./package_modules.sh
+
 Python:
 	wget http://www.python.org/ftp/python/2.7.5/Python-2.7.5.tar.bz2 -O Python-2.7.tar.bz2
 	tar xvf Python-2.7.tar.bz2
+	rm Python-2.7.tar.bz2
 	mv Python-2.7.5 Python
