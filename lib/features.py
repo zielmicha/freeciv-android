@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import sys
+import os
 
 features = {}
 appliers = {}
@@ -42,9 +43,12 @@ def add_feature(name, default=None, type=str):
     features[name] = default
     feature_types[name] = type
 
-def load_config():
+def get_feature_file_path():
     import osutil
-    FEATURE_FILE_PATH = osutil.get_internal_storage() + '/features'
+    return osutil.get_internal_storage() + '/features'
+
+def load_config():
+    FEATURE_FILE_PATH = get_feature_file_path()
     print 'features', FEATURE_FILE_PATH
 
     try:
@@ -119,7 +123,11 @@ def set_perm(name, value):
         print 'changed pernament feature %s to %r' % (name, value)
 
 def _store_pernaments():
-    with open(FEATURE_FILE_PATH, 'w') as features_conf:
+    path = get_feature_file_path()
+    dir = os.path.dirname(path)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    with open(path, 'w') as features_conf:
         features_conf.write('\n'.join([ '%s=%s' % (k, v) for k, v in pernaments.items() ]) + '\n')
 
 set_feature = set

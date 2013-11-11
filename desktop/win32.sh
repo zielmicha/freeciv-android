@@ -34,7 +34,7 @@ win32_support() {
         -L$PYLIB -lpython27 \
         -lz -lm -lwsock32 -lgdi32 -lwinmm -lole32 -limm32 -lversion -luuid -loleaut32 \
         || exit 1
-    #$MY_STRIP graphics.bin
+    $MY_STRIP graphics.bin
     target=../../../dist/freeciv_win32.exe
     rm $target
     cp graphics.bin $target

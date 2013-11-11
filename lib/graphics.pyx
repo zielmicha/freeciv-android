@@ -458,18 +458,19 @@ def stop_text_input():
 def create_window(size, hidden=False, fullscreen=False):
     global _window, _window_handle
     w, h = size
-    flags = 0
+    flags = SDL_WINDOW_OPENGL # we need OpenGL, software renderer is shit
     if hidden:
         flags |= SDL_WINDOW_HIDDEN
     if fullscreen:
         flags |= SDL_WINDOW_FULLSCREEN
     wnd = SDL_CreateWindow("touchciv", 0, 0, w, h, flags)
     _window_handle = wnd
-    renderer = SDL_CreateRenderer(wnd, -1, 0)
+    renderer = SDL_CreateRenderer(wnd, -1, SDL_RENDERER_ACCELERATED)
     if not renderer:
         raise SDLError()
     _window = _make_surface(renderer, NULL, size, "window")
     _window._size = size
+    print 'graphics: window created', size
     return get_window()
 
 def set_offscreen_window(size):

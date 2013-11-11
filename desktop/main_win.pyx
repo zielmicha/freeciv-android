@@ -21,8 +21,8 @@ def main():
 
     sys.path = [os.path.abspath('modules.zip'), 'z:\\dist']
 
-    import code
-    code.interact()
+    #import code
+    #code.interact()
 
     import freeciv.main
     freeciv.main.main()
