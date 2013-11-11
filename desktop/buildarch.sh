@@ -84,7 +84,11 @@ $MY_CC graphics.c main.c ../Python/_io.a -o graphics.bin \
     -pthread -lpthread \
     || exit 1
 
-cp graphics.bin ../../../dist/freeciv_$1
+$MY_STRIP graphics.bin
+
+target=../../../dist/freeciv_$1
+rm $target
+cp graphics.bin $target
 popd
 
 

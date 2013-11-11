@@ -8,7 +8,7 @@ mimetools tempfile rfc822 gzip struct io subprocess pickle
 atexit encodings/__init__ encodings/ascii encodings/utf_8
 encodings/aliases codecs SocketServer hashlib json/decoder
 json/encoder json/__init__ json/scanner json/tool webbrowser
-shlex base64 contextlib ssl textwrap"
+shlex base64 contextlib ssl textwrap tarfile weakref copy"
 
 modules=""
 for i in $STDMODULES; do
@@ -20,4 +20,8 @@ rm $path
 
 pushd Python/Lib
 zip $path $modules
+popd
+
+pushd ../lib
+zip $path $(find -name '*.py')
 popd

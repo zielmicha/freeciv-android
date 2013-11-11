@@ -1,14 +1,20 @@
 TARGETS=SDL_image/ SDL_ttf/ SDL2/ freetype/
+ARCH=$(shell ./getarch.sh)
 
-all: getdep archs dist/module.zip
+all: getdep archs dist/module.zip dist/data.tgz
 
-archs: amd64
+archs: $(ARCH)
 
-i386: getdep
+i386: archdep
 	./buildarch.sh i386
 
-amd64: getdep
+amd64: archdep
 	./buildarch.sh amd64
+
+archdep: getdep ../src/callauto.c
+
+../src/callauto.c:
+	make -C ../src callauto.c
 
 getdep: $(addsuffix autogen.sh, $(TARGETS)) Python
 
@@ -26,6 +32,9 @@ freetype/autogen.sh: SDL_ttf/autogen.sh
 
 dist/module.zip: Python
 	./package_modules.sh
+
+dist/data.tgz:
+	./package_data.sh
 
 Python:
 	wget http://www.python.org/ftp/python/2.7.5/Python-2.7.5.tar.bz2 -O Python-2.7.tar.bz2

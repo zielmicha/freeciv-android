@@ -3,6 +3,21 @@ cdef extern from *:
     void init_io()
     void initfreecivclient()
 
+def unpack_data():
+    curr_version = open('version').read()
+    try:
+        if open('version_ready').read() == curr_version:
+            return
+    except IOError:
+        pass
+
+    import tarfile
+    print 'extracting data...'
+    tarfile.open('data.tgz').extractall()
+
+    with open('version_ready', 'w') as f:
+        f.write(curr_version)
+
 def main():
     init_io()
     initgraphics()
@@ -11,16 +26,13 @@ def main():
     import sys
 
     sys.path = []
-    sys.path = ['dist/modules.zip']
+    sys.path = ['modules.zip']
 
     import os
 
-    print os, sys.path
+    unpack_data()
 
-    sys.path = [os.path.abspath('dist/modules.zip')]
-
-    os.chdir('..')
-    sys.path.append('lib')
+    sys.path = [os.path.abspath('modules.zip')]
 
     import freeciv.main
     freeciv.main.main()
