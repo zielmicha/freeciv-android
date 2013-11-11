@@ -11,13 +11,16 @@ i386: archdep
 amd64: archdep
 	./buildarch.sh amd64
 
-archdep: getdep ../src/callauto.c
+archdep: getdep ../src/callauto.c ../lib/graphics.c
 
 ../src/callauto.c: ../src/Makefile
 	make -C ../src callauto.c
 
 ../src/Makefile:
 	cd ../src && ./configure
+
+../lib/graphics.c:
+	make -C ../lib graphics.c
 
 getdep: $(addsuffix autogen.sh, $(TARGETS)) Python
 
