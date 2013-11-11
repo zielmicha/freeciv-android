@@ -21,16 +21,25 @@ win32_support() {
     $MY_RANLIB freecivclient.a
 
     cp -a ../../../../lib/graphics.c . || exit 1
-    cython --embed ../../../main.pyx -o main.c || exit 1
+    cython --embed ../../../main_win.pyx -o main.c || exit 1
 
     STATIC=$builddir/lib/lib
+    PYLIB=/opt/mxe/Python27/libs
 
     $MY_CC graphics.c main.c -o graphics.bin \
 	    -I$PYTHON_INC -I$builddir/include/SDL2 -L$builddir/lib \
 	    ${STATIC}SDL2.a ${STATIC}SDL2_image.a ${STATIC}SDL2_ttf.a ${STATIC}freetype.a \
         $MY_LIBLOC/libjpeg.a $MY_LIBLOC/libpng.a \
-        $builddir/freeciv/freecivclient.a \
-        -L/opt/mxe/Python27/libs -lpython27 \
-        -lbz2 -lz -lm -lwsock32 -lgdi32 -lwinmm -lole32 -limm32 -lversion -luuid -loleaut32 \
+        $builddir/freeciv/freecivclient.a $MY_LIBLOC/libbz2.a \
+        -L$PYLIB -lpython27 \
+        -lz -lm -lwsock32 -lgdi32 -lwinmm -lole32 -limm32 -lversion -luuid -loleaut32 \
         || exit 1
+    #$MY_STRIP graphics.bin
+    target=../../../dist/freeciv_win32.exe
+    rm $target
+    cp graphics.bin $target
+    popd
 }
+
+#$PYLIB/select.lib $PYLIB/_socket.lib $PYLIB/_ssl.lib \
+#$PYLIB/bz2.lib $PYLIB/_hashlib.lib \

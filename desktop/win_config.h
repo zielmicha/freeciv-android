@@ -541,3 +541,5 @@
 #define vfork fork
 
 #define BINDIR "/notexisting"
+
+#include "pyclient_always.h"

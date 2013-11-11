@@ -286,7 +286,8 @@ def main():
     maybe_start_remote_debug()
 
     monitor.start()
-    save.start_zygote()
+    if os.name != 'nt':
+        save.start_zygote()
 
     init_window()
     client.window.init_screen()

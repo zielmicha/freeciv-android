@@ -1,25 +1,28 @@
 cdef extern from *:
     void initgraphics()
-    void init_io()
     void initfreecivclient()
+    void initselect()
 
 include "main_common.pxi"
 
 def main():
-    init_io()
+    print 'main_win.pyx'
     initgraphics()
     initfreecivclient()
 
     import sys
 
     sys.path = []
-    sys.path = ['modules.zip']
+    sys.path = ['modules.zip', 'z:\\dist']
 
     import os
 
     unpack_data()
 
-    sys.path = [os.path.abspath('modules.zip')]
+    sys.path = [os.path.abspath('modules.zip'), 'z:\\dist']
+
+    import code
+    code.interact()
 
     import freeciv.main
     freeciv.main.main()
