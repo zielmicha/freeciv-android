@@ -13,8 +13,11 @@ amd64: archdep
 
 archdep: getdep ../src/callauto.c
 
-../src/callauto.c:
+../src/callauto.c: ../src/Makefile
 	make -C ../src callauto.c
+
+../src/Makefile:
+	cd ../src && ./configure
 
 getdep: $(addsuffix autogen.sh, $(TARGETS)) Python
 
