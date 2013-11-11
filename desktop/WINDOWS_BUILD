@@ -1,0 +1,14 @@
+Grab MXE cross compiler (mxe.cc):
+
+sudo git clone https://github.com/mxe/mxe.git /opt/mxe
+sudo make -C /opt/mxe gcc zlib jpeg png bison bz2 freetype
+
+Install Python 2.7.5 from python.org on nearby Windows (virtual) machine, copy C:\Python27 to /opt/mxe/Python27.
+
+Add MXE to path:
+
+export PATH="/opt/mxe/usr/bin/:$PATH"
+
+And start build process:
+
+make win32
