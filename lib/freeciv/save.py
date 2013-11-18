@@ -252,6 +252,11 @@ def open_save(path):
         return open(path)
 
 def get_save_username(path):
+    '''
+    Hack to take over right user.
+    As I couldn't find Freeciv API to do this I this function reads Freeciv save
+    and extracts first player name.
+    '''
     for name in open_save(path):
         if name.startswith('name='):
             name = name[len('name='):].strip().strip('"')
