@@ -243,7 +243,7 @@ class ScreenClient(client.Client):
         panel.add(ui.Button('Okay', ui.back))
         ui.set_dialog(panel)
 
-class ScreenWidget(ui.HorizontalLayoutWidget):
+class ScreenWidget(ui.AbsoluteLayoutWidget):
     def __init__(self, client):
         super(ScreenWidget, self).__init__()
         width = 150
@@ -267,14 +267,13 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         self.empire_button = make_button('Empire', self.empire_dialog)
         self.taxes_panel = TaxesPanel(client)
 
-        self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True)
-        self.map_wrapper = ui.AbsoluteLayoutWidget()
+        self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True, marginleft=0)
+        self.left_panel.background = (190, 160, 110, 170)
 
-        self.add(self.left_panel)
-        self.add(self.map_wrapper)
-
-        self.map_wrapper.add(self.map, (0, 0))
-        self.map_wrapper.add(self.menu, (0, 0), align=ui.BOTTOM)
+        self.add(self.map, (0, 0))
+        self.add(self.menu, (0, 0), align=ui.BOTTOM)
+        self.add(self.left_panel, (0, 0), align=ui.LEFT)
+        self.update_layout()
 
         self.left_panel.add(self.overview)
         self.left_panel.add(self.console.scroll)
@@ -301,7 +300,7 @@ class ScreenWidget(ui.HorizontalLayoutWidget):
         empiredlg.EmpireDialog(self.client).show()
 
     def tick(self):
-        self.map.size = ui.screen_width - self.overview.size[0], ui.screen_height
+        self.map.size = ui.screen_width, ui.screen_height
         self.client.tick()
         super(ScreenWidget, self).tick()
 

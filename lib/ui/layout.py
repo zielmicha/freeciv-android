@@ -1,7 +1,14 @@
 import ui
 import graphics
 
-class LayoutWidget(ui.Widget):
+class DecoratedWidget(ui.Widget):
+    background = None
+
+    def draw(self, surf, pos):
+        if self.background:
+            surf.draw_rect(self.background, pos + self.size)
+
+class LayoutWidget(DecoratedWidget):
     def __init__(self):
         self.items = []
         self.positions = []
@@ -95,6 +102,8 @@ class LayoutWidget(ui.Widget):
             item.tick()
 
     def draw(self, surf, pos):
+        DecoratedWidget.draw(self, surf, pos)
+
         self.positions = list(self.get_positions())
 
         for itempos, item in zip(self.positions, self.items):

@@ -74,6 +74,8 @@ class Menu(ui.LinearLayoutWidget):
         self.left_widget = ui.LinearLayoutWidget()
         self.left_widget.add(self.activity_label)
 
+        self.joystick_layout = ui.LinearLayoutWidget()
+
     def incr_zoom(self, i=1):
         self.zoom_level += i
         self.zoom_level = max(0, min(len(ZOOM_LEVELS) - 1, self.zoom_level))
@@ -99,16 +101,17 @@ class Menu(ui.LinearLayoutWidget):
             self.activity_label.set_text('')
 
     def update_joystick(self):
-        joystick_layout = ui.LinearLayoutWidget()
+        self.joystick_layout.items = []
         j_type = get_joystick_type()
+        width = ui.screen_width
         if j_type == 'new':
             joystick = NewJoystick(client)
-            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 50
+            self.joystick_layout.marginleft = width - 50 - joystick.size[0]
         else:
             joystick = TileJoystick(client)
-            joystick_layout.marginleft = self.client.ui.map.size[0] - joystick.size[0] - 20
-        joystick_layout.add(joystick)
-        self.items.insert(0, joystick_layout)
+            self.joystick_layout.marginleft = width -20 - joystick.size[0]
+        self.joystick_layout.add(joystick)
+        self.items.insert(0, self.joystick_layout)
 
     def update_actions(self, unit):
         image = unit.get_image()
