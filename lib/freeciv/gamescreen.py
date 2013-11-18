@@ -268,7 +268,7 @@ class ScreenWidget(ui.AbsoluteLayoutWidget):
         self.taxes_panel = TaxesPanel(client)
 
         self.left_panel = ui.LinearLayoutWidget(spacing=0, center=True, marginleft=0)
-        self.left_panel.background = (190, 160, 110, 170)
+        self.left_panel.widget_background = (190, 160, 110, 170)
 
         self.add(self.map, (0, 0))
         self.add(self.menu, (0, 0), align=ui.BOTTOM)

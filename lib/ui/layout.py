@@ -2,11 +2,11 @@ import ui
 import graphics
 
 class DecoratedWidget(ui.Widget):
-    background = None
+    widget_background = None
 
     def draw(self, surf, pos):
-        if self.background:
-            surf.draw_rect(self.background, pos + self.size)
+        if self.widget_background:
+            surf.draw_rect(self.widget_background, pos + self.size)
 
 class LayoutWidget(DecoratedWidget):
     def __init__(self):

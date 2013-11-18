@@ -74,7 +74,7 @@ class Dialog(ui.Widget):
         spacing = 5
         rect = (x + pos[0] - spacing, y + pos[1] - spacing, size[0] + spacing*2, size[1] + spacing*2)
 
-        ui.round_rect(surf, (255, 255, 255), (0, 0, 0), rect, 10)
+        ui.round_rect(surf, (255, 255, 255, 240), (0, 0, 0), rect, 10)
         self.item.draw(surf, (x + pos[0], y + pos[1]))
 
     def get_pos(self):
