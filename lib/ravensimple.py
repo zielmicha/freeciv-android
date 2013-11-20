@@ -28,9 +28,9 @@ def _report_raw(event, dsn=None):
     dsn = dsn or DEFAULT_DSN
     proto, host, path, login = _parse_dsn(dsn)
     key, secret = login.split(':', 1)
-    conntype = {'http': httplib.HTTPConnection,
-                'https': httplib.HTTPSConnection}[proto]
-    conn = conntype(host)
+    conntype = {'http': lambda: httplib.HTTPConnection,
+                'https': lambda: httplib.HTTPSConnection}[proto]
+    conn = conntype()(host)
     conn.request('POST', '/api/' + path + '/store/',
                  body=data, headers={
                      'X-Sentry-Auth': 'Sentry sentry_version=4,'

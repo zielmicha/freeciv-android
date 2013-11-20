@@ -230,8 +230,14 @@ def setup_errors():
 
 def except_hook():
     import ravensimple
-    if features.get('debug.dsn'):
-        ravensimple.report_exception(dsn=features.get('debug.dsn'))
+    dsn = features.get('debug.dsn')
+    if dsn:
+        print 'Raven: report exception to', dsn
+        exc_type, exc_val, tb = sys.exc_info()
+        ui.async(lambda:
+                 ravensimple.report_exception(
+                     exc_val, tb,
+                     dsn=dsn))
     except_dialog()
 
 def except_dialog():
