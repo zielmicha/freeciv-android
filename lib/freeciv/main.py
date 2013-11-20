@@ -55,6 +55,11 @@ features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
 features.add_feature('debug.remote.port', default=15589, type=int)
 
+features.add_feature('debug.dsn',
+                     default='http://247716acba64489e9165dd294491248b'
+                     ':38d1cedf2fda48dc80b825c568d17c3f@sentrypublic.civsync.com/4',
+                     type=bool)
+
 def apply_hardexit(t):
     client.freeciv.hard_exit = t
 
@@ -224,6 +229,12 @@ def setup_errors():
     ui.except_callback = except_hook
 
 def except_hook():
+    import ravensimple
+    if features.get('debug.dsn'):
+        ravensimple.report_exception(dsn=features.get('debug.dsn'))
+    except_dialog()
+
+def except_dialog():
     type, value, tb = sys.exc_info()
     tb_str = traceback.format_exception(type, value, tb, limit=20)
     panel = ui.LinearLayoutWidget()
