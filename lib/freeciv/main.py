@@ -229,16 +229,23 @@ def setup_errors():
     ui.except_callback = except_hook
 
 def except_hook():
-    import ravensimple
     dsn = features.get('debug.dsn')
     if dsn:
-        print 'Raven: report exception to', dsn
-        exc_type, exc_val, tb = sys.exc_info()
-        ui.async(lambda:
-                 ravensimple.report_exception(
-                     exc_val, tb,
-                     dsn=dsn))
+        raven_report(dsn)
     except_dialog()
+
+def raven_report(dsn):
+    import ravensimple
+    print 'Raven: report exception to', dsn
+    exc_type, exc_val, tb = sys.exc_info()
+    meta = {
+        'install_time': sync.get_install_time(),
+        'version': features.get('civsync.ua'),
+    }
+    ui.async(lambda:
+             ravensimple.report_exception(
+                 exc_val, tb,
+                 dsn=dsn, extra=meta))
 
 def except_dialog():
     type, value, tb = sys.exc_info()
