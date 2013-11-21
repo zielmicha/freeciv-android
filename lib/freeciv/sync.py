@@ -47,7 +47,7 @@ def apply_user_agent_change(ua):
 
 features.set_applier('civsync.ua', apply_user_agent_change)
 
-version = 1108
+version = 1109
 if osutil.is_desktop:
     features.set('civsync.ua', 'CivSyncDesktop/%d' % version)
 else:

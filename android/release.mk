@@ -1,5 +1,5 @@
-VERSION=1108
-VERSION_NAME=1.1.8
+VERSION=1109
+VERSION_NAME=1.1.9
 
 release: build/build.xml debug ndk dropboxdep
 	cd build; ant release
