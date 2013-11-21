@@ -262,7 +262,7 @@ class ScreenWidget(ui.AbsoluteLayoutWidget):
             self.map = mapdrawer.MapWidget(client)
         self.overview = OverviewWidget(client)
         self.console = ConsoleWidget(client)
-        self.menu = gamemenu.Menu(client)
+        self.menu = gamemenu.Menu(client, ui.screen_width - width)
         self.end_turn_button = make_button('End turn', self.client.end_turn)
         self.empire_button = make_button('Empire', self.empire_dialog)
         self.taxes_panel = TaxesPanel(client)
@@ -271,7 +271,7 @@ class ScreenWidget(ui.AbsoluteLayoutWidget):
         self.left_panel.widget_background = (190, 160, 110, 170)
 
         self.add(self.map, (0, 0))
-        self.add(self.menu, (0, 0), align=ui.BOTTOM)
+        self.add(self.menu, (width, 0), align=ui.BOTTOM)
         self.add(self.left_panel, (0, 0), align=ui.LEFT)
         self.update_layout()
 

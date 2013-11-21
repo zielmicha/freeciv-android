@@ -57,8 +57,9 @@ def get_order_sprite(name):
 ZOOM_LEVELS = [0.3, 0.5, 0.7, 1, 1.3, 1.6, 2, 2.5]
 
 class Menu(ui.LinearLayoutWidget):
-    def __init__(self, client):
+    def __init__(self, client, width=0):
         ui.LinearLayoutWidget.__init__(self)
+        self.width = width or ui.screen_width
         self.client = client
         self.zoom_panel = ui.HorizontalLayoutWidget(spacing=4)
         self.zoom_panel.add(ui.Button('+', self.incr_zoom, force_width=20))
@@ -103,7 +104,7 @@ class Menu(ui.LinearLayoutWidget):
     def update_joystick(self):
         self.joystick_layout.items = []
         j_type = get_joystick_type()
-        width = ui.screen_width
+        width = self.width
         if j_type == 'new':
             joystick = NewJoystick(client)
             self.joystick_layout.marginleft = width - 50 - joystick.size[0]
