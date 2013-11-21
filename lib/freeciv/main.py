@@ -229,15 +229,25 @@ def setup_errors():
     ui.except_callback = except_hook
 
 def except_hook():
-    dsn = features.get('debug.dsn')
-    if dsn:
-        raven_report(dsn)
+    except_hook_raven()
     except_dialog()
 
-def raven_report(dsn):
+def early_except_hook(e_type, e_val, e_tb):
+    try:
+        except_hook_raven(exc_info=(e_type, e_val, e_tb))
+    except Exception as err:
+        print 'Error while reporting error:', err
+    raise e_type, e_val, e_tb
+
+def except_hook_raven(exc_info=None):
+    dsn = features.get('debug.dsn')
+    if dsn:
+        raven_report(dsn, exc_info=exc_info)
+
+def raven_report(dsn, exc_info=None):
     import ravensimple
     print 'Raven: report exception to', dsn
-    exc_type, exc_val, tb = sys.exc_info()
+    exc_type, exc_val, tb = exc_info or sys.exc_info()
     meta = {
         'install_time': sync.get_install_time(),
         'version': features.get('civsync.ua'),
@@ -306,6 +316,7 @@ def set_logical_size():
         graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
 
 def main():
+    sys.excepthook = early_except_hook
     features.parse_options()
     setup_game_version()
     setup_android_version()
