@@ -27,7 +27,6 @@ import uidialog
 import gamescreen
 import ui
 import client
-import client.core
 import features
 import monitor
 import options
@@ -143,7 +142,7 @@ def notify_update(url):
 
     ui.execute_later(lambda: menus.notify_update(url))
 
-client.core.main = client_main
+client.main = client_main
 
 def pause():
     if client.client:
