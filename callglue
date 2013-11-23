@@ -180,7 +180,8 @@ int py_get_city_id(struct city* city)
 int py_get_unit_id(struct unit* unit)
 
 void request_diplomat_answer(enum diplomat_actions action, int dipl_id, int target_id, int value)
-void py_server_main(PyObject* cmd)
+void py_server_main_forking(PyObject* cmd)
+void py_server_main_run(PyObject* cmd)
 
 void request_unit_upgrade(struct unit *punit);
 bool can_unit_upgrade(struct unit *punit);

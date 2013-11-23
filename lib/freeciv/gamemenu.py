@@ -18,6 +18,7 @@ import time
 import features
 import functools
 import graphics
+import client.actions
 
 from freeciv.client import _freeciv as freeciv
 

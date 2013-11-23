@@ -28,15 +28,16 @@ import empiredlg
 import help
 import dropbox
 import mapdrawer
+import client.core
 
 SELECT_POPUP = 0
 
 features.add_feature('app.full_label_toggle_button', type=bool)
 features.add_feature('app.map_tiles', type=bool, default=False)
 
-class ScreenClient(client.Client):
+class ScreenClient(client.core.Client):
     def __init__(self, **kwargs):
-        client.Client.__init__(self, **kwargs)
+        client.core.Client.__init__(self, **kwargs)
         self.turn_loading_dialog = None
         self.init_ui()
 

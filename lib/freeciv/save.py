@@ -36,6 +36,7 @@ from freeciv.client import _freeciv as freeciv
 from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='default')
+features.add_feature('app.fork', type=bool, default=hasattr(os, 'fork'))
 
 localhost = '127.0.0.1'
 
@@ -315,7 +316,10 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     piddir = get_save_dir()
     print 'server args', args
 
-    stream = zygote_start_server(args)
+    if features.get('app.fork'):
+        stream = zygote_start_server(args)
+    else:
+        stream = subprocess_start_server(args)
 
     while True:
         line = stream.readline()
@@ -324,6 +328,16 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
         if line_callback:
             line_callback(line)
         print 'server:', line.rstrip()
+
+def subprocess_start_server(args):
+    if sys.argv[0].endswith('.py'): # if running as script, not cython --embed
+        cmd = [sys.executable, '-m', 'freeciv.main']
+    else:
+        cmd = [sys.argv[0]]
+    cmd.append('server')
+    cmd += args
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return proc.stdout
 
 def start_zygote():
     global zygote_cmd_pipe, zygote_console_pipe
@@ -354,5 +368,5 @@ def zygote_main(cmd_pipe, console_pipe):
             return
         cmd = cmd.rstrip('\n')
         print >>sys.stderr, 'zygote: starting server', ' '.join(cmd.split('\0'))
-        freeciv.func.py_server_main(cmd.split('\0'))
+        freeciv.func.py_server_main_forking(cmd.split('\0'))
         print >>sys.stderr, 'zygote: server forked'

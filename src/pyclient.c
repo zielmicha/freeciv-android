@@ -724,7 +724,7 @@ PyObject* get_activity_str(struct unit* unit) {
     return ret;
 }
 
-void py_server_main(PyObject* cmd) {
+void py_server_main_forking(PyObject* cmd) {
 #if !__MINGW32__
   char* cmdlist[2048];
   int length = PyList_Size(cmd);
@@ -751,8 +751,24 @@ void py_server_main(PyObject* cmd) {
   for(i=0; i<length+1; i++)
     free(cmdlist[i]);
 #else
-  fprintf(stderr, "py_server_main - forget it on Windows\n");
+  fprintf(stderr, "py_server_main_forking - forget it on Windows\n");
 #endif
+}
+
+void py_server_main_run(PyObject* cmd) {
+  char* cmdlist[2048];
+  int length = PyList_Size(cmd);
+  int i;
+  assert(length < 2048);
+  cmdlist[0] = strdup("freeciv-server");
+  for(i=0; i<length; i++) {
+    PyObject* str = PyList_GetItem(cmd, i);
+    char* buff = strdup(PyString_AsString(str));
+    cmdlist[i + 1] = buff;
+  }
+  civserver_main(length + 1, cmdlist);
+  for(i=0; i<length+1; i++)
+    free(cmdlist[i]);
 }
 
 static void py_setup_const() {

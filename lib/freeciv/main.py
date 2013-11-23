@@ -27,6 +27,7 @@ import uidialog
 import gamescreen
 import ui
 import client
+import client.core
 import features
 import monitor
 import options
@@ -138,7 +139,7 @@ def notify_update(url):
 
     ui.execute_later(lambda: menus.notify_update(url))
 
-client.main = client_main
+client.core.main = client_main
 
 def pause():
     if client.client:
@@ -316,6 +317,12 @@ def set_logical_size():
         graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
 
 def main():
+    if sys.argv[1:] and sys.argv[1] == 'server':
+        from freeciv.client import _freeciv
+        import os
+        _freeciv.func.py_server_main_run(sys.argv[2:])
+        os._exit(0)
+
     sys.excepthook = early_except_hook
     features.parse_options()
     setup_game_version()
@@ -325,7 +332,7 @@ def main():
     maybe_start_remote_debug()
 
     monitor.start()
-    if os.name != 'nt':
+    if features.get('app.fork'):
         save.start_zygote()
 
     init_window()
