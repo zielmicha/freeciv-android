@@ -13,7 +13,7 @@ def main():
     import sys
 
     sys.path = []
-    sys.path = ['modules.zip', os.getcwd()]
+    sys.path = ['modules.zip']
 
     import os
 
