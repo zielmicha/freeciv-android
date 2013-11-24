@@ -138,6 +138,14 @@ def debug_menu():
 
         uidialog.inputbox('Query?', 'defaultval', finish=finish, cancel=cancel)
 
+    def test_eval():
+        import uidialog
+        def finish(text):
+            exec text
+
+        uidialog.inputbox('Expr to exec?', '', finish=finish)
+
+
     menu = ui.Menu()
 
     menu.add('Fake screen size', fake_screen_size_menu)
@@ -148,6 +156,7 @@ def debug_menu():
     menu.add('Cause exception', lambda: 1/0)
     menu.add('Test Market URL', osutil.open_market)
     menu.add('Test inputbox', test_inputbox)
+    menu.add('Eval', test_eval)
 
     ui.set(ui.ScrollWrapper(menu))
 
