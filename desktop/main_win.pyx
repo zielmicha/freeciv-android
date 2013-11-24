@@ -13,13 +13,13 @@ def main():
     import sys
 
     sys.path = []
-    sys.path = ['modules.zip', 'z:\\dist']
+    sys.path = ['modules.zip', os.getcwd()]
 
     import os
 
     unpack_data()
 
-    sys.path = [os.path.abspath('modules.zip'), 'z:\\dist']
+    sys.path = [os.path.abspath('modules.zip'), os.getcwd()]
 
     #import code
     #code.interact()
