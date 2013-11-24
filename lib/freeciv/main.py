@@ -50,6 +50,7 @@ features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
 features.add_feature('app.marketnotice', default=True, type=bool)
 features.add_feature('app.version')
+features.add_feature('app.launch_param', default='{}')
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
