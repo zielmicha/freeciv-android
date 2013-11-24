@@ -241,6 +241,8 @@ def early_except_hook(e_type, e_val, e_tb):
         except_hook_raven(exc_info=(e_type, e_val, e_tb))
     except Exception as err:
         print 'Error while reporting error:', err
+    print 'Error reporting started, waiting 2 sec.'
+    time.sleep(2)
     raise e_type, e_val, e_tb
 
 def except_hook_raven(exc_info=None):
