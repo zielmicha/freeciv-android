@@ -74,13 +74,17 @@ class OptionsPanel(ui.LinearLayoutWidget):
 
 def show_options():
     options = OptionsPanel(marginleft=10)
-    options.add(ui.Label('Touch an option to change'))
+    options.add(ui.Label(('Touch' if osutil.is_android else 'Click') + ' an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
     #options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
     options.add(ui.Button('Change joystick', change_joystick))
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
+
+    if osutil.is_desktop:
+        st = 'Fullscreen (restart to take effect): '
+        options.add_feature_bool(st + 'Yes', st + 'No', 'ui.fullscreen')
 
     options.add(dropbox.DBButton('Login to Dropbox', lambda: dropbox.login()))
 

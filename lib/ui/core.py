@@ -36,7 +36,7 @@ def set_show_fps(val):
 
 def create_window(size):
     graphics.init()
-    graphics.create_window(size)
+    graphics.create_window(size, fullscreen=features.get('ui.fullscreen'))
     if features.get('ui.offscreen'):
         graphics.set_offscreen_window(size)
 
@@ -45,6 +45,7 @@ features.add_feature('ui.enable_anim', type=bool, default=True)
 features.add_feature('ui.fps_limit', type=int, default=30)
 features.add_feature('ui.redraw_fps_limit', type=int, default=60)
 features.add_feature('ui.offscreen', type=bool, default=False)
+features.add_feature('ui.fullscreen', type=bool, default=True)
 
 features.add_feature('stream.enable', type=bool, default=False)
 features.add_feature('stream.fd', type=int, default=2)
