@@ -7,6 +7,8 @@ import save as _save
 
 import functools
 
+from freeciv.dropbox import get_download_path
+
 if osutil.is_android:
     import reflect as jnius_reflect
     DropboxHelper = None
@@ -127,9 +129,6 @@ def _impl_save(name, path):
     ui.async(lambda: sync.request_with_sid('/sync/uploading', name=name,
                                            sharing=features.get('civsync.allow_sharing')))
 
-
-def get_download_path():
-    return _save.get_save_dir() + '/from-dropbox.sav'
 
 def check_downloaded():
     if DropboxHelper.downloaded:

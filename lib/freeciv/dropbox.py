@@ -3,6 +3,7 @@ import time
 import ui
 import features
 from freeciv import help
+import save as _save
 
 features.add_feature('civsync.allow_sharing', 'none')
 
@@ -70,5 +71,10 @@ def ask_if_sharing_allowed(then):
     dialog.add(panel)
     ui.set_dialog(dialog)
 
+def get_download_path():
+    return _save.get_save_dir() + '/from-dropbox.sav'
+
 if osutil.is_android:
     from freeciv.dropbox_java import _impl_save, load_from_dropbox, login
+else:
+    from freeciv.dropbox_civsync import _impl_save, load_from_dropbox, login

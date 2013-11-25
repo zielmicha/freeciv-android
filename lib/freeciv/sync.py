@@ -77,10 +77,15 @@ def get_install_time():
 
 def request(path, **get):
     # don't need HTTPS when not transmitting sid
+    if 'post_data' in get:
+        post_data = get['post_data']
+        del get['post_data']
+    else:
+        post_data = None
     proto = PROTO if 'sid' in get else 'http'
     url = proto + '://' + HOST + path + '?' + urllib.urlencode(get)
     print 'request', url
-    resp = urllib.urlopen(url)
+    resp = urllib.urlopen(url, post_data)
     return resp.read()
 
 def request_with_sid(path, **get):
