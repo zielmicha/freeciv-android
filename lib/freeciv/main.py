@@ -20,6 +20,7 @@ import functools
 import traceback
 import time
 import thread
+import binascii
 
 import save
 import osutil
@@ -331,7 +332,7 @@ def set_logical_size():
 def maybe_setup_launch_param():
     param = features.get('app.launch_param')
     if param:
-        param = param.decode('base64')
+        param = binascii.a2b_base64(param)
         for k, v in json.loads(param).items():
             features.set(k, v, require_safe=True)
 
