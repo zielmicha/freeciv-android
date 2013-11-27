@@ -53,7 +53,7 @@ if osutil.is_desktop:
 else:
     features.set('civsync.ua', 'CivSyncAndroid/%d' % version)
 features.add_feature('civsync.enable', False, type=bool)
-features.add_feature('civsync.sid', None)
+features.add_feature('civsync.sid', None, safe=True)
 
 def get_sid():
     sid = features.get('civsync.sid')

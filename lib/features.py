@@ -17,6 +17,7 @@ features = {}
 appliers = {}
 feature_types = {}
 pernaments = {}
+feature_safety = {}
 
 monitor = None
 
@@ -38,10 +39,11 @@ def set_applier(name, func, type=str, default=None):
     feature_types[name] = type
     features[name] = default
 
-def add_feature(name, default=None, type=str):
+def add_feature(name, default=None, type=str, safe=False):
     appliers[name] = None
     features[name] = default
     feature_types[name] = type
+    feature_safety[name] = safe
 
 def get_feature_file_path():
     import osutil
@@ -102,9 +104,12 @@ def parse_type(t, v):
     else:
         raise TypeError(t)
 
-def set(name, value):
+def set(name, value, require_safe=False):
     if name not in appliers:
         raise ValueError('Unknown feature %r.' % name)
+
+    if require_safe and not feature_safety[name]:
+        raise ValueError('Tried to set unsafe feature %r.' % name)
 
     log('set_feature %s %r' % (name, value))
 

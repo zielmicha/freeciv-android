@@ -37,6 +37,11 @@ import sync
 import gold
 
 try:
+    import json
+except ImportError:
+    import microjson as json
+
+try:
     from ui import ctrl
 except ImportError:
     ctrl = None
@@ -50,7 +55,8 @@ features.add_feature('app.shutdown', default=10, type=int)
 features.add_feature('app.multiplayer', default=False, type=bool)
 features.add_feature('app.marketnotice', default=True, type=bool)
 features.add_feature('app.version')
-features.add_feature('app.launch_param', default='{}')
+features.add_feature('app.launch_param', default=None)
+features.add_feature('app.launch_token', default=None, safe=True)
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
@@ -322,6 +328,20 @@ def set_logical_size():
         print 'scale factor', SCALE
         graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
 
+def maybe_setup_launch_param():
+    param = features.get('app.launch_param')
+    if param:
+        param = param.decode('base64')
+        for k, v in json.loads(param).items():
+            features.set(k, v, require_safe=True)
+
+def maybe_notify_about_launch():
+    token = features.get('app.launch_token')
+    if token:
+        ui.async(lambda: sync.request('/play/notify',
+                                      token=token,
+                                      install_time=str(sync.get_install_time())))
+
 def main():
     if sys.argv[1:] and sys.argv[1] == 'server':
         from freeciv.client import _freeciv
@@ -329,12 +349,17 @@ def main():
         _freeciv.func.py_server_main_run(sys.argv[2:])
         os._exit(0)
 
-    sys.excepthook = early_except_hook
     features.parse_options()
+    if features.get('debug.dsn'):
+        sys.excepthook = early_except_hook
+
+    maybe_setup_launch_param()
+
     setup_game_version()
     setup_android_version()
     setup_errors()
 
+    maybe_notify_about_launch()
     maybe_start_remote_debug()
 
     monitor.start()
