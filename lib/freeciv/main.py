@@ -344,7 +344,8 @@ def main():
     init_window()
     client.window.init_screen()
     osutil.init()
-    set_logical_size()
+    if not osutil.is_desktop:
+        set_logical_size()
 
     ui.init()
     ui.set_fill_image(graphics.load_image('data/user/background.jpg'))

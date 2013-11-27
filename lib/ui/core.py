@@ -36,7 +36,10 @@ def set_show_fps(val):
 
 def create_window(size):
     graphics.init()
-    graphics.create_window(size, fullscreen=features.get('ui.fullscreen'))
+    fullscreen = features.get('ui.fullscreen')
+    if fullscreen:
+        suze = graphics.get_screen_size()
+    graphics.create_window(size, fullscreen=fullscreen)
     if features.get('ui.offscreen'):
         graphics.set_offscreen_window(size)
 
