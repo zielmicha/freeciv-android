@@ -676,7 +676,7 @@ level (1 to 10).  See ai_fuzzy() in common/player.c
 **************************************************************************/
 static int fuzzy_of_skill_level(int level)
 {
-  int f[11] = { -1, 0, 400/*novice*/, 300/*easy*/, 0, 0, 0, 0, 0, 0, 0 };
+  int f[11] = { -1, 0, 600/*novice*/, 300/*easy*/, 0, 0, 0, 0, 0, 0, 0 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
   return f[level];
@@ -691,7 +691,7 @@ science twice as fast as the human
 **************************************************************************/
 static int science_cost_of_skill_level(int level) 
 {
-  int x[11] = { -1, 100, 250/*novice*/, 100/*easy*/, 100, 100, 100, 100, 
+  int x[11] = { -1, 100, 350/*novice*/, 100/*easy*/, 100, 100, 100, 100,
                 100, 100, 100 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
@@ -705,7 +705,7 @@ compared to defaults.  0 means _never_ build new cities, > 100 means to
 **************************************************************************/
 static int expansionism_of_skill_level(int level)
 {
-  int x[11] = { -1, 100, 10/*novice*/, 10/*easy*/, 100, 100, 100, 100, 
+  int x[11] = { -1, 100, 7/*novice*/, 10/*easy*/, 100, 100, 100, 100,
                 100, 100, 100 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
@@ -5604,4 +5604,3 @@ char **freeciv_completion(char *text, int start, int end)
 }
 
 #endif /* HAVE_LIBREADLINE */
-
