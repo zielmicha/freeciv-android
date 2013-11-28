@@ -38,7 +38,7 @@ def create_window(size):
     graphics.init()
     fullscreen = features.get('ui.fullscreen')
     if fullscreen:
-        suze = graphics.get_screen_size()
+        size = graphics.get_screen_size()
     graphics.create_window(size, fullscreen=fullscreen)
     if features.get('ui.offscreen'):
         graphics.set_offscreen_window(size)
