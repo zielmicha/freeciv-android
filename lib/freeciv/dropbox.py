@@ -75,6 +75,6 @@ def get_download_path():
     return _save.get_save_dir() + '/from-dropbox.sav'
 
 if osutil.is_android:
-    from freeciv.dropbox_java import _impl_save, load_from_dropbox, login
+    from freeciv.dropbox_java import _impl_save, load_from_dropbox, login, load_dropbox_save
 else:
-    from freeciv.dropbox_civsync import _impl_save, load_from_dropbox, login
+    from freeciv.dropbox_civsync import _impl_save, load_from_dropbox, login, load_dropbox_save

@@ -20,7 +20,8 @@ def _init():
     if not URLHelper:
         URLHelper = jnius_reflect.autoclass('com.zielm.freeciv.URLHelper')
 
-def urlopen(url):
+def urlopen(url, data=None):
+    assert data is None
     if getattr(_local, 'main', False):
         raise RuntimeError('HTTP request on main thread')
     return Request(url).execute()

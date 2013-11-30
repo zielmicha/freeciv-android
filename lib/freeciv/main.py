@@ -58,6 +58,8 @@ features.add_feature('app.marketnotice', default=True, type=bool)
 features.add_feature('app.version')
 features.add_feature('app.launch_param', default=None)
 features.add_feature('app.launch_token', default=None, safe=True)
+features.add_feature('app.action', default=None, safe=True)
+features.add_feature('app.action_arg', default=None, safe=True)
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
@@ -96,28 +98,13 @@ def client_main():
         ui.main()
 
 def app_main():
-    action = sys.argv[1] if sys.argv[1:] else None
+    action = features.get('app.action')
+    arg = features.get('app.action_arg')
 
-    if action == 'load':
-        savename = sys.argv[2]
-        save.load_game(savename)
-    elif action == 'connect':
-        host, port, username = sys.argv[2:]
-        save.connect(host, int(port), username)
-    elif action == 'eval':
-        exec sys.argv[2] in globals()
-    elif action == 'loadmeet':
-        savename = sys.argv[2]
-        ident = int(sys.argv[3])
-        def callback():
-            client.freeciv.func.py_init_meeting(ident)
-        save.load_game(savename, callback)
-    elif action == 'help':
-        import help
-        help.show()
+    if action == 'load_remote':
+        from freeciv import dropbox
+        dropbox.load_dropbox_save(arg)
     else:
-        if action:
-            print 'unknown action %r, see lib/main.py for actions' % action
         menus.main_menu()
 
 def profile_main():

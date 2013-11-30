@@ -89,18 +89,19 @@ def jlist_to_list(l):
 def load_dialog(entries):
     print entries
 
-    def callback(entry):
-        print 'fetching from Dropbox', entry.path
-        ui.message('downloading save from Dropbox...')
-        DropboxHelper.downloadFile(entry.path, get_download_path())
-        check_downloaded()
-
     menu = ui.LinearLayoutWidget()
     menu.add(ui.Label('Save your games to folder /Applications/Freeciv in your Dropbox.'))
     for entry in entries:
-        menu.add(ui.Button(DropboxHelper.getPath(entry).strip('/'),
-                           functools.partial(callback, entry)))
+        name = DropboxHelper.getPath(entry).strip('/')
+        menu.add(ui.Button(name,
+                           functools.partial(load_dropbox_save, name)))
     ui.set(ui.ScrollWrapper(menu))
+
+def load_dropbox_save(name):
+    print 'fetching from Dropbox', name
+    ui.message('downloading save from Dropbox...')
+    DropboxHelper.downloadFile('/' + name, get_download_path())
+    check_downloaded()
 
 @ui.execute_later_decorator
 def load_from_dropbox():
