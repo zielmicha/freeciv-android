@@ -146,7 +146,6 @@ class Client(object):
     def draw_overview(self, surf, pos, scale):
         dest_surf = window.overview_surface.scale(scale)
         surf.blit(dest_surf, pos)
-        surf.draw_rect((255, 255, 255), pos + scale, 1)
 
     def overview_click(self, x, y):
         freeciv.func.py_overview_click(x, y)

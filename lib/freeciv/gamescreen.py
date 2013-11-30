@@ -459,7 +459,6 @@ class OverviewWidget(ui.Widget):
 
     def draw(self, surf, pos):
         self.client.draw_overview(surf, pos, scale=self.size)
-        surf.draw_rect((255,255,255), pos + self.size, 1)
 
 class ConsoleWidget(ui.LinearLayoutWidget):
     def __init__(self, client):
