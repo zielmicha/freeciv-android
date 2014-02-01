@@ -34,7 +34,7 @@ for name in callauto.c client/*.c *.c client/agents/*.c \
 
     objfile=objectfiles/$(basename $name .c).o
     ev="$ev $objfile"
-    output "$objfile: $SRC/$name"
+    output "$objfile: $name"
     output "	\$(CC) \$(CC_FLAGS) $additional -c -o $objfile $SRC/$name"
 done
 popd
