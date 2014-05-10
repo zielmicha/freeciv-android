@@ -327,7 +327,7 @@ def merge_mouse_events(events):
     return res
 
 def load_font(name, size):
-    return graphics.load_font('fonts/ProcionoTT.ttf', size)
+    return graphics.load_font(name or 'fonts/ProcionoTT.ttf', size)
 
 def load_image(name):
     return graphics.load_image(name)

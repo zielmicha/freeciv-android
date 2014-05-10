@@ -1,4 +1,5 @@
-# Copyright (C) 2011 Michal Zielinski (michal@zielinscy.org.pl)
+# coding=utf-8
+# Copyright (C) 2014 Michal Zielinski (michal@zielinscy.org.pl)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,6 +14,7 @@
 import ui
 import uidialog
 import graphics
+import time
 
 from freeciv import sync
 from freeciv import save
@@ -127,6 +129,11 @@ def main_menu():
         version += ' WARNING! Login with Dropbox in options menu to save your purchases.'
     menu.add(ui.Label('civsync.com; ' + version,
                       color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
+    if should_display_promo_label():
+        menu.add(ui.Button('Podoba ci sie gra? Wspom\xc3\xb3\xc5\xbc autora portu.',
+                           promo_label,
+                           font=ui.consolefont),
+                 (7, 40))
 
     new_game_button = MenuButton('New\ngame', new_game_menu)
     menu.left.add(new_game_button)
@@ -148,6 +155,42 @@ def main_menu():
     menu.right.add(ui.Spacing(0, 0))
 
     ui.replace(menu)
+
+def should_display_promo_label():
+    expire = 1400716800
+    if time.time() > expire:
+        return False
+
+    code = osutil.get_country_code()
+    print 'Coutry code:', code
+    return code == 'PL'
+
+def promo_label():
+    def okay():
+        osutil.open_url('http://polakpotrafi.pl/projekt/cansat')
+
+    font = ui.load_font('fonts/OFLGoudyStMTT.ttf', 20)
+    msg = '''
+Reprezetuję Polskę w finale konkrusu CanSat organizowanym przez
+Europejską Agencję Kosmiczną. Finał odbywa się na północy Norwegii,
+koszt podróźy jednego uczestnika to około 2000 zł.
+Wspomóż nas na portalu polakpotrafi (otrzymasz imienne podziękowania
+lub pamiątkę z konkrsu).
+
+Dziękuję,
+Michał Zieliński, lider drużyny Kraksat, autor portu Freeciv for Android
+
+http://polakpotrafi.pl/projekt/cansat
+'''.strip()
+
+    dialog = ui.LinearLayoutWidget()
+    panel = ui.HorizontalLayoutWidget(spacing=10)
+    panel.add(ui.Button('Odwiedź stronę', okay, font=font))
+    panel.add(ui.Button('Nie teraz', ui.back, font=font))
+    dialog.add(ui.Label(msg, font=font))
+    dialog.add(panel)
+    ui.set_dialog(dialog)
+
 
 def new_game_menu():
     menu = ui.Menu(force_full = False)

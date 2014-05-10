@@ -48,6 +48,8 @@ def init():
 
 _jni_initted = False
 
+Uri = SDLActivity = Intent = None
+
 def init_jni():
     global SDLActivity, Intent, Uri, _jni_initted
     if _jni_initted: return
@@ -103,6 +105,13 @@ def get_dpi():
 
 def _get_activity():
     return SDLActivity.mSingleton
+
+def get_country_code():
+    if is_android:
+        return _get_activity().getResources().getConfiguration().locale.getCountry().upper()
+    else:
+        lang = os.environ.get('LANG', 'en_US')
+        return lang.partition('_')[2].partition('.')[0].upper()
 
 version_map = {
     None: ('desktop', None),
