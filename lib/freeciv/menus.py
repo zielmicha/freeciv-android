@@ -167,7 +167,7 @@ def should_display_promo_label():
 
 def promo_label():
     def okay():
-        osutil.open_url('http://polakpotrafi.pl/projekt/cansat')
+        osutil.open_url('http://goo.gl/3S4Ys4')
 
     font = ui.load_font('fonts/OFLGoudyStMTT.ttf', 20)
     msg = '''
