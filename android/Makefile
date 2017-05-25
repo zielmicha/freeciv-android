@@ -46,7 +46,8 @@ project/jni/src/pyjnius.c:
 	./makejnius.sh
 
 project/jni/freeciv:
-	ln -sf $(PWD)/../src project/jni/freeciv
+	ln -sf ../../../src project/jni/freeciv
+	(cd ../src && python ../gencallglue.py)
 
 project/jni/src/graphics.c: ../lib/graphics.pyx
 	make -C ../lib graphics.c
