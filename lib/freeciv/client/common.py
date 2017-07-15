@@ -41,7 +41,7 @@ def create_sprite(width, height, color):
 
 @freeciv.register
 def color_brightness_score(color):
-    return (color.color.r*299 + color.color.g*587 + color.color.b*114) / 1000;
+    return (color[0]*299 + color[1]*587 + color[2]*114) / 1000;
 
 @freeciv.register
 def get_sprite_dimensions(image):
