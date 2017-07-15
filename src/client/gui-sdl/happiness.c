@@ -11,7 +11,7 @@
    GNU General Public License for more details.
 ***********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include "happiness.h"
@@ -19,6 +19,6 @@
 /* semi-arbitrary number that controls the width of the happiness widget */
 #define HAPPINESS_PIX_WIDTH 23
 
-#define NUM_HAPPINESS_MODIFIERS 5
+#define NUM_HAPPINESS_MODIFIERS 6
 
-enum { CITIES, LUXURIES, BUILDINGS, UNITS, WONDERS };
+enum { CITIES, LUXURIES, BUILDINGS, NATIONALITY, UNITS, WONDERS };

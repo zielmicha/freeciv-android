@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -36,7 +36,7 @@
 #include "client_main.h"
 #include "options.h"
 
-/* gui-gtk-2.0 */
+/* client/gui-gtk-2.0 */
 #include "gui_main.h"
 #include "gui_stuff.h"
 #include "mapview.h"
@@ -70,6 +70,7 @@ enum table_label {
   LABEL_RESEARCHING,
   LABEL_LAST
 };
+
 /******************************************************************/
 struct intel_dialog {
   struct player *pplayer;
@@ -92,7 +93,7 @@ static struct dialog_list *dialog_list;
 static struct intel_dialog *create_intel_dialog(struct player *p);
 
 /****************************************************************
-...
+  Initialize intelligenze dialogs
 *****************************************************************/
 void intel_dialog_init()
 {
@@ -100,7 +101,7 @@ void intel_dialog_init()
 }
 
 /****************************************************************
-...
+  Free resources allocated for intelligenze dialogs
 *****************************************************************/
 void intel_dialog_done()
 {
@@ -108,7 +109,8 @@ void intel_dialog_done()
 }
 
 /****************************************************************
-...
+  Get intelligenze dialog between client user and other player
+  passed as parameter.
 *****************************************************************/
 static struct intel_dialog *get_intel_dialog(struct player *pplayer)
 {
@@ -122,7 +124,7 @@ static struct intel_dialog *get_intel_dialog(struct player *pplayer)
 }
 
 /****************************************************************
-... 
+  Open intelligenze dialog
 *****************************************************************/
 void popup_intel_dialog(struct player *p)
 {
@@ -138,7 +140,7 @@ void popup_intel_dialog(struct player *p)
 }
 
 /****************************************************************
-...
+  Intelligenze dialog destruction requested
 *****************************************************************/
 static void intel_destroy_callback(GtkWidget *w, gpointer data)
 {
@@ -159,7 +161,8 @@ void close_intel_dialog(struct player *p)
 }
 
 /****************************************************************
-...
+  Create new intelligenze dialog between client user and player
+  given as parameter.
 *****************************************************************/
 static struct intel_dialog *create_intel_dialog(struct player *p)
 {
@@ -308,13 +311,13 @@ void update_intel_dialog(struct player *p)
 
   if (pdialog) {
     GtkTreeIter diplstates[DS_LAST];
-    char buf[64];
     int i;
 
     /* window title. */
-    fc_snprintf(buf, sizeof(buf), _("Foreign Intelligence: %s Empire"),
-                nation_adjective_for_player(p));
-    gtk_window_set_title(GTK_WINDOW(pdialog->shell), buf);
+    gchar *title = g_strdup_printf(_("Foreign Intelligence: %s Empire"),
+			  nation_adjective_for_player(p));
+    gtk_window_set_title(GTK_WINDOW(pdialog->shell), title);
+    g_free(title);
 
     /* diplomacy tab. */
     gtk_tree_store_clear(pdialog->diplstates);
@@ -331,13 +334,13 @@ void update_intel_dialog(struct player *p)
       diplstates[i] = it;
     }
 
-    players_iterate(other) {
+    players_iterate_alive(other) {
       const struct player_diplstate *state;
       GtkTreeIter it;
       GValue v = { 0, };
 
-      if (other == p || !other->is_alive) {
-	continue;
+      if (other == p) {
+        continue;
       }
       state = player_diplstate_get(p, other);
       gtk_tree_store_append(pdialog->diplstates, &it,
@@ -346,7 +349,7 @@ void update_intel_dialog(struct player *p)
       g_value_set_static_string(&v, player_name(other));
       gtk_tree_store_set_value(pdialog->diplstates, &it, 0, &v);
       g_value_unset(&v);
-    } players_iterate_end;
+    } players_iterate_alive_end;
 
     /* techs tab. */
     gtk_list_store_clear(pdialog->techs);
@@ -368,30 +371,33 @@ void update_intel_dialog(struct player *p)
     for (i = 0; i < ARRAY_SIZE(pdialog->table_labels); i++) {
       if (pdialog->table_labels[i]) {
         struct city *pcity;
+        gchar *buf = NULL;
+        char tbuf[256];
 
         switch (i) {
         case LABEL_RULER:
-          ruler_title_for_player(p, buf, sizeof(buf));
+          ruler_title_for_player(p, tbuf, sizeof(tbuf));
+          buf = g_strdup(tbuf);
           break;
         case LABEL_GOVERNMENT:
-          sz_strlcpy(buf, government_name_for_player(p));
+          buf = g_strdup(government_name_for_player(p));
           break;
         case LABEL_CAPITAL:
-          pcity = player_palace(p);
+          pcity = player_capital(p);
           /* TRANS: "unknown" location */
-          sz_strlcpy(buf, (!pcity) ? _("(unknown)") : city_name(pcity));
+          buf = g_strdup((!pcity) ? _("(unknown)") : city_name(pcity));
           break;
         case LABEL_GOLD:
-          fc_snprintf(buf, sizeof(buf), "%d", p->economic.gold);
+          buf = g_strdup_printf("%d", p->economic.gold);
           break;
         case LABEL_TAX:
-          fc_snprintf(buf, sizeof(buf), "%d%%", p->economic.tax);
+          buf = g_strdup_printf("%d%%", p->economic.tax);
           break;
         case LABEL_SCIENCE:
-          fc_snprintf(buf, sizeof(buf), "%d%%", p->economic.science);
+          buf = g_strdup_printf("%d%%", p->economic.science);
           break;
         case LABEL_LUXURY:
-          fc_snprintf(buf, sizeof(buf), "%d%%", p->economic.luxury);
+          buf = g_strdup_printf("%d%%", p->economic.luxury);
           break;
         case LABEL_RESEARCHING:
           {
@@ -400,31 +406,30 @@ void update_intel_dialog(struct player *p)
             switch (research->researching) {
             case A_UNKNOWN:
               /* TRANS: "Unknown" advance/technology */
-              fc_snprintf(buf, sizeof(buf), _("(Unknown)"));
+              buf = g_strdup(_("(Unknown)"));
               break;
             case A_UNSET:
               /* TRANS: missing value */
-              fc_snprintf(buf, sizeof(buf), _("(none)"));
+              buf = g_strdup(_("(none)"));
               break;
             default:
-              fc_snprintf(buf, sizeof(buf), "%s(%d/%d)",
-                          advance_name_researching(p),
-                          research->bulbs_researched,
-                          total_bulbs_required(p));
+              buf = g_strdup_printf("%s(%d/%d)",
+				    advance_name_researching(p),
+				    research->bulbs_researched,
+                                    research->client.researching_cost);
               break;
             }
             break;
           }
         default:
-          buf[0] = '\0';
           break;
         }
 
-        if (buf[0] != '\0') {
+        if (buf) {
           gtk_label_set_text(GTK_LABEL(pdialog->table_labels[i]), buf);
+	  g_free(buf);
         }
       }
     }
   }
 }
-

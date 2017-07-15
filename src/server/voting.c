@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <math.h>
@@ -384,6 +384,34 @@ struct vote *vote_new(struct connection *caller,
   return pvote;
 }
 
+/****************************************************************************
+  Return whether the vote would pass immediately when the caller will vote
+  for.
+****************************************************************************/
+bool vote_would_pass_immediately(const struct connection *caller,
+                                 int command_id)
+{
+  struct vote virtual_vote;
+  const struct command *pcmd;
+
+  if (!conn_can_vote(caller, NULL)) {
+    return FALSE;
+  }
+
+  pcmd = command_by_number(command_id);
+  fc_assert(pcmd != NULL);
+  memset(&virtual_vote, 0, sizeof(virtual_vote));
+  virtual_vote.flags = command_vote_flags(pcmd);
+
+  if (virtual_vote.flags & VCF_NOPASSALONE) {
+    return FALSE;
+  }
+
+  virtual_vote.caller_id = caller->id;
+  return (((double) (command_vote_percent(pcmd)
+                     * count_voters(&virtual_vote)) / 100.0) < 1.0);
+}
+
 /**************************************************************************
   Check if we satisfy the criteria for resolving a vote, and resolve it
   if these critera are indeed met. Updates yes and no variables in voting
@@ -433,7 +461,7 @@ static void check_vote(struct vote *pvote)
       break;
     }
 
-    log_error("Unkown vote cast variant: %d.", pvc->vote_cast);
+    log_error("Unknown vote cast variant: %d.", pvc->vote_cast);
     pvote->abstain++;
   } vote_cast_list_iterate_end;
 
@@ -573,7 +601,7 @@ static void check_vote(struct vote *pvote)
   remove_vote(pvote);
 
   if (passed) {
-    handle_stdin_input(NULL, cmdline, FALSE);
+    handle_stdin_input(NULL, cmdline);
   }
 }
 

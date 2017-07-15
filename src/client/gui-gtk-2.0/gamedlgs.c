@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -39,7 +39,7 @@
 #include "client_main.h"
 #include "options.h"
 
-/* gui-gtk-2.0 */
+/* client/gui-gtk-2.0 */
 #include "chatline.h"
 #include "cityrep.h"
 #include "dialogs.h"
@@ -66,7 +66,7 @@ static void rates_changed_callback(GtkAdjustment *adj);
 
 
 /**************************************************************************
-...
+  Set tax values to display
 **************************************************************************/
 static void rates_set_values(int tax, int no_tax_scroll, 
 			     int lux, int no_lux_scroll,
@@ -172,7 +172,7 @@ static void rates_set_values(int tax, int no_tax_scroll,
 
 
 /**************************************************************************
-...
+  User changes rates
 **************************************************************************/
 static void rates_changed_callback(GtkAdjustment *adj)
 {
@@ -203,7 +203,7 @@ static void rates_changed_callback(GtkAdjustment *adj)
 
 
 /**************************************************************************
-...
+  User has responded to rates dialog
 **************************************************************************/
 static void rates_command_callback(GtkWidget *w, gint response_id)
 {
@@ -216,7 +216,7 @@ static void rates_command_callback(GtkWidget *w, gint response_id)
 
 
 /****************************************************************
-... 
+  Create rates dialog
 *****************************************************************/
 static GtkWidget *create_rates_dialog(void)
 {
@@ -337,12 +337,10 @@ static GtkWidget *create_rates_dialog(void)
 
 
 /****************************************************************
-... 
+  Popup rates dialog
 *****************************************************************/
 void popup_rates_dialog(void)
 {
-  char buf[64];
-
   if (!can_client_issue_orders()) {
     return;
   }
@@ -354,10 +352,11 @@ void popup_rates_dialog(void)
     return;
   }
 
-  fc_snprintf(buf, sizeof(buf), _("%s max rate: %d%%"),
+  gchar *buf = g_strdup_printf(_("%s max rate: %d%%"),
       government_name_for_player(client.conn.playing),
       get_player_bonus(client.conn.playing, EFT_MAX_RATES));
   gtk_label_set_text(GTK_LABEL(rates_gov_label), buf);
-  
+  g_free(buf);
+
   gtk_window_present(GTK_WINDOW(rates_dialog_shell));
 }

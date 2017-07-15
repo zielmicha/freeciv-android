@@ -2,7 +2,7 @@
 [spec]
 
 ; Format and options of this spec file:
-options = "+Freeciv-2.3-spec"
+options = "+Freeciv-2.5-spec"
 
 [info]
 
@@ -37,6 +37,7 @@ tiles = { "row", "column", "tag"
   2,  2, "editor.city"
   2,  3, "editor.vision"
   2,  4, "editor.territory"
+  2,  4, "editor.road"
   2,  5, "editor.properties"
   2,  6, "editor.copypaste"
   2,  7, "editor.unit"

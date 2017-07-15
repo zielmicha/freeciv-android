@@ -1,10 +1,12 @@
 [nation_babylonian]
 
+translation_domain="freeciv"
+
 name=_("Babylonian")
 plural=_("?plural:Babylonians")
-groups="Ancient", "Asian"
+groups="Ancient", "Asian", "Core"
 legend=_("Babylon was the dominant city of Mesopotamia from the 18th to\
- 7th centuries BC under a succession of peoples including Amorites,\
+ 7th centuries BCE under a succession of peoples including Amorites,\
  Kassites, Assyrians, and Chaldeans.")
 
 leaders = {
@@ -21,7 +23,6 @@ ruler_titles =
  { "government", "male_title",  "female_title"
  ; /* TRANS: Lugal = Great Man */
  "Monarchy",   _("%s Lugal"),   _("?female:%s Lugal")
- "Communism",  _("%s Ensi"),    _("?female:%s Ensi")
 } 
 
 flag = "babylon"
@@ -30,9 +31,8 @@ city_style = "Babylonian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations = "israeli", "persian", "aramean", "sumerian", "assyrian"
+civilwar_nations = "israelite", "persian", "aramean", "sumerian", "assyrian"
 
 cities =
  "Babilum", ; Babylon

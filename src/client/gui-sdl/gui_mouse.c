@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "log.h"
@@ -89,9 +89,10 @@ static SDL_Cursor *SurfaceToCursor(SDL_Surface *image, int hx, int hy) {
 }
 
 /**************************************************************************
-  ...
+  Draw current cursor.
 **************************************************************************/
-void draw_mouse_cursor() {
+void draw_mouse_cursor(void)
+{
   int cursor_x = 0;
   int cursor_y = 0;
   static SDL_Rect area = {0, 0, 0, 0};
@@ -151,7 +152,7 @@ void load_cursors(void)
 }
 
 /**************************************************************************
-  ...
+  Free all cursors
 **************************************************************************/
 void unload_cursors(void)
 {

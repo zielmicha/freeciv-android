@@ -3,7 +3,7 @@
 name=_("Bavarian")
 plural=_("?plural:Bavarians")
 groups="Medieval", "Early Modern", "European"
-legend=_("Bavaria, before national unification in 1870 AD, was one of the\
+legend=_("Bavaria, before national unification in 1870 CE, was one of the\
  largest of the German kingdoms.") 
 
 leaders = {
@@ -20,8 +20,9 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",         "female_title"
+ "Despotism",       _("Duke %s"),         _("Duchess %s")
  "Fundamentalism",  _("Bishop %s"),       _("Mother Superior %s")
- "Republic",  _("Minister-President %s"), _("?female:Minister-President %s")
+ "Democracy",       _("Minister-President %s"), _("?female:Minister-President %s")
 }
 
 flag="bavarian"
@@ -29,7 +30,6 @@ flag_alt = "-"
 city_style = "European"
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations = "franconian", "austrian", "tyrolian", "palatinate"
 

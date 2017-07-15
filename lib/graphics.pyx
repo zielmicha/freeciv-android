@@ -134,7 +134,6 @@ cdef class Surface(object):
             same_blit_buffer.blit(image, src=src)
             src = newsrc
             image = same_blit_buffer
-
         self._set_target()
 
         if len(dest) == 2:
@@ -499,8 +498,7 @@ cdef object _translate_event(SDL_Event* ev):
         return Event(ev.type, pos=(ev.button.x, ev.button.y),
                      button=ev.button.button)
     elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
-        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym),
-                     unicode=unichr(ev.key.keysym.unicode))
+        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym))
     elif ev.type == SDL_TEXTINPUT:
         return Event(ev.type, text=str(ev.text.text))
     elif ev.type == SDL_TEXTEDITING:

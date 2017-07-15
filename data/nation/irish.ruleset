@@ -50,12 +50,11 @@ city_style = "Celtic"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 ; Similar flags
 conflicts_with="italian"
-civilwar_nations = "cornish", "english", "scottish", "gaelic"
+civilwar_nations = "scottish gaelic", "english", "scottish", "gaelic"
 
 cities =
   "Dublin (river, ocean)",

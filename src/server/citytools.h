@@ -17,16 +17,16 @@
 #include "packets.h"
 #include "unitlist.h"
 
-#define FOOD_WEIGHTING 19
-#define SHIELD_WEIGHTING 17
-#define TRADE_WEIGHTING 12
+#define FOOD_WEIGHTING 25
+#define SHIELD_WEIGHTING 14
+#define TRADE_WEIGHTING 15
 /* The Trade Weighting has to about as large as the Shield Weighting,
    otherwise the AI will build Barracks to create veterans in cities 
    with only 1 shields production.
     8 is too low
    18 is too high
  */
-#define POLLUTION_WEIGHTING 14 /* tentative */
+#define POLLUTION_WEIGHTING 16 /* tentative */
 #define WARMING_FACTOR 50
 #define COOLING_FACTOR WARMING_FACTOR
 
@@ -38,15 +38,15 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
 			 struct unit_list *units, struct city *pcity,
 			 struct city *exclude_city,
 			 int kill_outside, bool verbose);
-void transfer_city(struct player *ptaker, struct city *pcity,
+bool transfer_city(struct player *ptaker, struct city *pcity,
 		   int kill_outside, bool transfer_unit_verbose,
-		   bool resolve_stack, bool raze);
+		   bool resolve_stack, bool raze, bool build_free);
 struct city *find_closest_city(const struct tile *ptile,
                                const struct city *pexclcity,
                                const struct player *pplayer,
                                bool only_ocean, bool only_continent,
                                bool only_known, bool only_player,
-                               bool only_enemy);
+                               bool only_enemy, const struct unit_class *pclass);
 void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger);
 
 bool send_city_suppression(bool now);
@@ -66,11 +66,12 @@ void remove_dumb_city(struct player *pplayer, struct tile *ptile);
 void city_build_free_buildings(struct city *pcity);
 
 void create_city(struct player *pplayer, struct tile *ptile,
-		 const char *name);
+		 const char *name, struct player *nationality);
 void remove_city(struct city *pcity);
 
 void establish_trade_route(struct city *pc1, struct city *pc2);
-void remove_trade_route(struct city *pc1, struct city *pc2);
+void remove_trade_route(struct city *pc1, struct city *pc2,
+                        bool announce, bool source_gone);
 
 void do_sell_building(struct player *pplayer, struct city *pcity,
 		      struct impr_type *pimprove);
@@ -102,10 +103,11 @@ bool city_map_update_tile_now(struct tile *ptile);
 void city_map_update_all(struct city *pcity);
 void city_map_update_all_cities_for_player(struct player *pplayer);
 
-bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers);
+bool city_map_update_radius_sq(struct city *pcity);
 
 void city_landlocked_sell_coastal_improvements(struct tile *ptile);
 void city_refresh_vision(struct city *pcity);
+void refresh_player_cities_vision(struct player *pplayer);
 
 void sync_cities(void);
 

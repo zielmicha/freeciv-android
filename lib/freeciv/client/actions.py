@@ -150,7 +150,7 @@ class Unit(object):
 
     def focus(self):
         freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
-        freeciv.func.set_unit_focus(self.handle)
+        freeciv.func.unit_focus_set(self.handle)
 
     def perform_activity(self, ident):
         # Warning! Safe to use only when `self` is in focus.

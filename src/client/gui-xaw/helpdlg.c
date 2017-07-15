@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -35,6 +35,7 @@
 #include "genlist.h"
 #include "government.h"
 #include "mem.h"
+#include "movement.h"
 #include "shared.h"
 #include "specialist.h"
 #include "tech.h"
@@ -742,12 +743,16 @@ static void help_update_improvement(const struct help_item *pitem,
 		    advance_name_translation(advance_by_number(imp->tech_req)));
     }*/
     
-    /* FIXME: this should show ranges and all the MAX_NUM_REQS reqs. 
+    /* FIXME: this should show ranges, negated reqs, and all the
+     * MAX_NUM_REQS reqs. 
      * Currently it's limited to 1 req but this code is partially prepared
      * to be extended.  Remember MAX_NUM_REQS is a compile-time
      * definition. */
     i = 0;
     requirement_vector_iterate(&imp->reqs, preq) {
+      if (preq->negated) {
+        continue;
+      }
       xaw_set_label(help_improvement_req_data,
                     universal_name_translation(&preq->source,
                                                req_buf, sizeof(req_buf)));
@@ -786,12 +791,16 @@ static void help_update_wonder(const struct help_item *pitem,
 
     sprintf(buf, "%d ", impr_build_shield_cost(imp));
     xaw_set_label(help_improvement_cost_data, buf);
-     /* FIXME: this should show ranges and all the MAX_NUM_REQS reqs. 
+     /* FIXME: this should show ranges, negated reqs, and all the
+      * MAX_NUM_REQS reqs. 
       * Currently it's limited to 1 req but this code is partially prepared
       * to be extended.  Remember MAX_NUM_REQS is a compile-time
       * definition. */
     i = 0;
     requirement_vector_iterate(&imp->reqs, preq) {
+      if (preq->negated) {
+        continue;
+      }
       xaw_set_label(help_improvement_req_data,
                     universal_name_translation(&preq->source,
                                                req_buf, sizeof(req_buf)));
@@ -813,7 +822,7 @@ static void help_update_wonder(const struct help_item *pitem,
     /* can't find wonder */
     xaw_set_label(help_improvement_cost_data, "0 ");
     xaw_set_label(help_improvement_req_data, _("(Never)"));
-    xaw_set_label(help_wonder_obsolete_data, _("None"));
+    xaw_set_label(help_wonder_obsolete_data, Q_("?tech:None"));
     create_tech_tree(help_tech_tree, 0, advance_count(), 3); 
   }
   set_title_topic(pitem);
@@ -839,7 +848,7 @@ static void help_update_unit_type(const struct help_item *pitem,
     xaw_set_label(help_unit_attack_data, buf);
     sprintf(buf, "%d ", punittype->defense_strength);
     xaw_set_label(help_unit_def_data, buf);
-    sprintf(buf, "%d ", punittype->move_rate/3);
+    sprintf(buf, "%s ", move_points_text(punittype->move_rate, TRUE));
     xaw_set_label(help_unit_move_data, buf);
     sprintf(buf, "%d ", punittype->firepower);
     xaw_set_label(help_unit_fp_data, buf);
@@ -858,7 +867,7 @@ static void help_update_unit_type(const struct help_item *pitem,
     }
     create_tech_tree(help_tech_tree, 0, advance_number(punittype->require_advance), 3);
     if (U_NOT_OBSOLETED == punittype->obsoleted_by) {
-      xaw_set_label(help_wonder_obsolete_data, _("None"));
+      xaw_set_label(help_wonder_obsolete_data, Q_("?tech:None"));
     } else {
       xaw_set_label(help_wonder_obsolete_data,
 		    utype_name_translation(punittype->obsoleted_by));
@@ -877,7 +886,7 @@ static void help_update_unit_type(const struct help_item *pitem,
     xaw_set_label(help_unit_visrange_data, "0 ");
     xaw_set_label(help_improvement_req_data, _("(Never)"));
     create_tech_tree(help_tech_tree, 0, advance_count(), 3);
-    xaw_set_label(help_wonder_obsolete_data, _("None"));
+    xaw_set_label(help_wonder_obsolete_data, Q_("?tech:None"));
     XtVaSetValues(help_text, XtNstring, pitem->text, NULL);
   }
   xaw_set_bitmap(help_unit_tile, create_overlay_unit(punittype));
@@ -1006,15 +1015,11 @@ static void help_update_terrain(const struct help_item *pitem,
     }
     xaw_set_label(help_terrain_resources, buf);
 
-    if (pterrain->road_trade_incr > 0) {
-      sprintf(buf, _("+%d Trade / %d"),
-	      pterrain->road_trade_incr,
-	      pterrain->road_time);
-    } else if (pterrain->road_time > 0) {
-      sprintf(buf, _("no extra / %d"), pterrain->road_time);
-    } else {
-      strcpy(buf, _("n/a"));
-    }
+    sprintf(buf, "%d%%/%d%%/%d%% / %d",
+            pterrain->road_output_incr_pct[O_FOOD],
+            pterrain->road_output_incr_pct[O_SHIELD],
+            pterrain->road_output_incr_pct[O_TRADE],
+            pterrain->road_time);
     xaw_set_label(help_terrain_road_result_time_data, buf);
 
     strcpy(buf, _("n/a"));
@@ -1071,7 +1076,7 @@ static void help_update_base(const struct help_item *pitem,
     /* FIXME use actual widgets */
     const char *sep = "";
     buf[0] = '\0';
-    if (pbase->buildable) {
+    if (pbase->buildable && pbase->build_time > 0) {
       /* TRANS: Build cost for bases in help. "MP" = movement points */
       sprintf(buf, _("Build: %d MP\n"), pbase->build_time);
     }
@@ -1092,6 +1097,50 @@ static void help_update_base(const struct help_item *pitem,
     strcat(buf, "\n\n");
     helptext_base(buf + strlen(buf), sizeof(buf) - strlen(buf),
                   client.conn.playing, pitem->text, pbase);
+  }
+  create_help_page(HELP_TEXT);
+  set_title_topic(pitem);
+  XtVaSetValues(help_text, XtNstring, buf, NULL);
+}
+
+/**************************************************************************
+  Help page for roads.
+**************************************************************************/
+static void help_update_road(const struct help_item *pitem,
+                             char *title)
+{
+  char buf[4096];
+  struct road_type *proad = road_type_by_translated_name(title);
+
+  if (!proad) {
+    strcat(buf, pitem->text);
+  } else {
+    /* FIXME use actual widgets */
+    buf[0] = '\0';
+    if (proad->buildable && proad->build_time > 0) {
+      /* TRANS: Build cost for roads in help. "MP" = movement points */
+      sprintf(buf, _("Build: %d MP\n"), proad->build_time);
+    }
+    {
+      bool terrain_specific = FALSE;
+      output_type_iterate(o) {
+        if (proad->tile_incr[o] > 0) {
+          terrain_specific = TRUE;
+          break;
+        }
+      } output_type_iterate_end;
+      if (!terrain_specific) {
+        /* TRANS: Road bonus in help. %s is food/production/trade
+         * stats like "0/0/+1", "0/+50%/0" */
+        sprintf(buf + strlen(buf), _("Bonus (F/P/T): %s\n"),
+                helptext_road_bonus_str(NULL, proad));
+      }
+    }
+    if (buf[0] != '\0') {
+      strcat(buf, "\n");
+    }
+    helptext_road(buf + strlen(buf), sizeof(buf) - strlen(buf),
+                  client.conn.playing, pitem->text, proad);
   }
   create_help_page(HELP_TEXT);
   set_title_topic(pitem);
@@ -1187,6 +1236,9 @@ static void help_update_dialog(const struct help_item *pitem)
   case HELP_BASE:
     help_update_base(pitem, top);
     break;
+  case HELP_ROAD:
+    help_update_road(pitem, top);
+    break;
   case HELP_SPECIALIST:
     help_update_specialist(pitem, top);
     break;
@@ -1194,7 +1246,7 @@ static void help_update_dialog(const struct help_item *pitem)
     help_update_government(pitem, top);
     break;
   case HELP_NATIONS:
-    help_update_nation(pitem, top, nation_by_translated_name(top));
+    help_update_nation(pitem, top, nation_by_translated_plural(top));
     break;
   case HELP_TEXT:
   default:

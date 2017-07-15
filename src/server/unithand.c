@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -38,20 +38,20 @@
 #include "packets.h"
 #include "player.h"
 #include "specialist.h"
+#include "traderoutes.h"
 #include "unit.h"
 #include "unitlist.h"
 
-/* ai */
-#include "aitools.h"
-
 /* server */
 #include "barbarian.h"
+#include "citizenshand.h"
 #include "citytools.h"
 #include "cityturn.h"
 #include "diplomats.h"
 #include "maphand.h"
 #include "notify.h"
 #include "plrhand.h"
+#include "sanitycheck.h"
 #include "spacerace.h"
 #include "srv_main.h"
 #include "techtools.h"
@@ -66,17 +66,15 @@
 static void city_add_unit(struct player *pplayer, struct unit *punit);
 static void city_build(struct player *pplayer, struct unit *punit,
                        const char *name);
-static void unit_activity_handling_targeted(struct unit *punit,
-					    enum unit_activity new_activity,
-					    enum tile_special_type new_target,
-                                            Base_type_id base);
 static void unit_activity_handling_base(struct unit *punit,
                                         Base_type_id base);
+static void unit_activity_handling_road(struct unit *punit,
+                                        Road_type_id road);
 static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id, struct city *pcity_dest);
 static bool unit_bombard(struct unit *punit, struct tile *ptile);
 
 /**************************************************************************
-...
+  Handle airlift request.
 **************************************************************************/
 void handle_unit_airlift(struct player *pplayer, int unit_id, int city_id)
 {
@@ -196,36 +194,6 @@ void handle_unit_upgrade(struct player *pplayer, int unit_id)
 }
 
 /**************************************************************************
-  Convert a single unit to another type.
-**************************************************************************/
-void handle_unit_convert(struct player *pplayer, int unit_id)
-{
-  struct unit *punit = player_unit_by_number(pplayer, unit_id);
-  struct unit_type *to_type, *from_type;
-
-  if (NULL == punit) {
-    /* Probably died or bribed. */
-    log_verbose("handle_unit_convert() invalid unit %d", unit_id);
-    return;
-  }
-
-  from_type = unit_type(punit);
-  to_type = from_type->converted_to;
-
-  if (unit_can_convert(punit)) {
-    transform_unit(punit, to_type, TRUE);
-    notify_player(pplayer, unit_tile(punit), E_UNIT_UPGRADED, ftc_server,
-                  _("%s converted to %s."),
-                  utype_name_translation(from_type),
-                  utype_name_translation(to_type));
-  } else {
-    notify_player(pplayer, unit_tile(punit), E_UNIT_UPGRADED, ftc_server,
-                  _("%s cannot be converted."),
-                  utype_name_translation(from_type));
-  }
-}
-
-/**************************************************************************
   Tell the client the cost of bribing a unit, inciting a revolt, or
   any other parameters needed for action.
 
@@ -250,7 +218,7 @@ void handle_unit_diplomat_query(struct connection *pc,
     return;
   }
 
-  if (!unit_has_type_flag(pdiplomat, F_DIPLOMAT)) {
+  if (!unit_has_type_flag(pdiplomat, UTYF_DIPLOMAT)) {
     /* Shouldn't happen */
     log_error("handle_unit_diplomat_query() %s (%d) is not diplomat",
               unit_rule_name(pdiplomat), diplomat_id);
@@ -260,7 +228,7 @@ void handle_unit_diplomat_query(struct connection *pc,
   switch (action_type) {
   case DIPLOMAT_BRIBE:
     if (punit && diplomat_can_do_action(pdiplomat, DIPLOMAT_BRIBE,
-					punit->tile)) {
+					unit_tile(punit))) {
       dsend_packet_unit_diplomat_answer(pc,
 					diplomat_id, target_id,
 					unit_bribe_cost(punit),
@@ -279,7 +247,7 @@ void handle_unit_diplomat_query(struct connection *pc,
   case DIPLOMAT_SABOTAGE:
     if (pcity && diplomat_can_do_action(pdiplomat, DIPLOMAT_SABOTAGE,
 					pcity->tile)
-     && unit_has_type_flag(pdiplomat, F_SPY)) {
+     && unit_has_type_flag(pdiplomat, UTYF_SPY)) {
       spy_send_sabotage_list(pc, pdiplomat, pcity);
     }
     break;
@@ -290,7 +258,7 @@ void handle_unit_diplomat_query(struct connection *pc,
 }
 
 /**************************************************************************
-...
+  Handle diplomat action request.
 **************************************************************************/
 void handle_unit_diplomat_action(struct player *pplayer,
 				 int diplomat_id,
@@ -309,7 +277,7 @@ void handle_unit_diplomat_action(struct player *pplayer,
     return;
   }
 
-  if (!unit_has_type_flag(pdiplomat, F_DIPLOMAT)) {
+  if (!unit_has_type_flag(pdiplomat, UTYF_DIPLOMAT)) {
     /* Shouldn't happen */
     log_error("handle_unit_diplomat_action() %s (%d) is not diplomat",
               unit_rule_name(pdiplomat), diplomat_id);
@@ -320,13 +288,13 @@ void handle_unit_diplomat_action(struct player *pplayer,
     switch(action_type) {
     case DIPLOMAT_BRIBE:
       if (punit && diplomat_can_do_action(pdiplomat, DIPLOMAT_BRIBE,
-					  punit->tile)) {
+					  unit_tile(punit))) {
 	diplomat_bribe(pplayer, pdiplomat, punit);
       }
       break;
     case SPY_SABOTAGE_UNIT:
       if (punit && diplomat_can_do_action(pdiplomat, SPY_SABOTAGE_UNIT,
-					  punit->tile)) {
+					  unit_tile(punit))) {
 	spy_sabotage_unit(pplayer, pdiplomat, punit);
       }
       break;
@@ -382,10 +350,14 @@ void handle_unit_diplomat_action(struct player *pplayer,
 }
 
 /**************************************************************************
-  Transfer a unit from one homecity to another. This new homecity must
-  be valid for this unit.
+  Transfer a unit from one city (and possibly player) to another.
+  If 'rehome' is not set, only change the player which owns the unit
+  (the new owner is new_pcity's owner). Otherwise the new unit will be
+  given a homecity, even if it was homeless before.
+  This new homecity must be valid for this unit.
 **************************************************************************/
-void unit_change_homecity_handling(struct unit *punit, struct city *new_pcity)
+void unit_change_homecity_handling(struct unit *punit, struct city *new_pcity,
+                                   bool rehome)
 {
   struct city *old_pcity = game_city_by_number(punit->homecity);
   struct player *old_owner = unit_owner(punit);
@@ -396,60 +368,73 @@ void unit_change_homecity_handling(struct unit *punit, struct city *new_pcity)
    * be used that way. */
   fc_assert_ret(new_pcity != old_pcity);
 
+  /* If 'rehome' is not set, this function should only be used to change
+   * which player owns the unit */
+  fc_assert_ret(rehome || new_owner != old_owner);
+
   if (old_owner != new_owner) {
     struct city *pcity = tile_city(punit->tile);
+
+    fc_assert(!utype_player_already_has_this_unique(new_owner,
+                                                    unit_type(punit)));
 
     vision_clear_sight(punit->server.vision);
     vision_free(punit->server.vision);
 
     if (pcity != NULL
         && !can_player_see_units_in_city(old_owner, pcity)) {
-      /* Special case when city is being transfered. At this point city
+      /* Special case when city is being transferred. At this point city
        * itself has changed owner, so it's enemy city now that old owner
-       * cannot see inside. All the normal methods of removing transfered
+       * cannot see inside. All the normal methods of removing transferred
        * unit from previous owner's client think that there's no need to
-       * remove unit as client should't have it in first place. */
+       * remove unit as client shouldn't have it in first place. */
       unit_goes_out_of_sight(old_owner, punit);
     }
 
     /* Remove AI control of the old owner. */
-    CALL_PLR_AI_FUNC(unit_lost, punit->owner, punit);
-
-    /* Activate AI control of the new owner. */
-    CALL_PLR_AI_FUNC(unit_got, new_owner, punit);
+    CALL_PLR_AI_FUNC(unit_lost, old_owner, punit);
 
     unit_list_remove(old_owner->units, punit);
     unit_list_prepend(new_owner->units, punit);
     punit->owner = new_owner;
 
-    punit->server.vision = vision_new(new_owner, punit->tile);
+    /* Activate AI control of the new owner. */
+    CALL_PLR_AI_FUNC(unit_got, new_owner, punit);
+
+    punit->server.vision = vision_new(new_owner, unit_tile(punit));
     unit_refresh_vision(punit);
   }
 
-  /* Remove from old city first and add to new city only after that.
-   * This is more robust in case old_city == new_city (currently
-   * prohibited by fc_assert in the beginning of the function).
-   */
-  if (old_pcity) {
-    /* Even if unit is dead, we have to unlink unit pointer (punit). */
-    unit_list_remove(old_pcity->units_supported, punit);
+  if (rehome) {
+    fc_assert(!unit_has_type_flag(punit, UTYF_NOHOME));
+
+    /* Remove from old city first and add to new city only after that.
+     * This is more robust in case old_city == new_city (currently
+     * prohibited by fc_assert in the beginning of the function).
+     */
+    if (old_pcity) {
+      /* Even if unit is dead, we have to unlink unit pointer (punit). */
+      unit_list_remove(old_pcity->units_supported, punit);
+      /* update unit upkeep */
+      city_units_upkeep(old_pcity);
+    }
+
+    unit_list_prepend(new_pcity->units_supported, punit);
+
     /* update unit upkeep */
-    city_units_upkeep(old_pcity);
+    city_units_upkeep(new_pcity);
+
+    punit->homecity = new_pcity->id;
   }
 
-  unit_list_prepend(new_pcity->units_supported, punit);
-
-  /* update unit upkeep */
-  city_units_upkeep(new_pcity);
-
-  punit->homecity = new_pcity->id;
-  if (old_owner == new_owner) {
-    /* Only changed homecity only owner can see it. */
-    send_unit_info(new_owner, punit);
-  } else {
-    /* Unit owner changed, send info to all able to see it. */
-    send_unit_info(NULL, punit);    
+  if (!can_unit_continue_current_activity(punit)) {
+    /* This is mainly for cases where unit owner changes to one not knowing
+     * Railroad tech when unit is already building railroad. */
+    set_unit_activity(punit, ACTIVITY_IDLE);
   }
+
+  /* Send info to players and observers. */
+  send_unit_info(NULL, punit);
 
   city_refresh(new_pcity);
   send_city_info(new_owner, new_pcity);
@@ -480,7 +465,7 @@ void handle_unit_change_homecity(struct player *pplayer, int unit_id,
   }
 
   if (pcity && can_unit_change_homecity_to(punit, pcity)) {
-    unit_change_homecity_handling(punit, pcity);
+    unit_change_homecity_handling(punit, pcity, TRUE);
   }
 }
 
@@ -499,7 +484,7 @@ void handle_unit_disband(struct player *pplayer, int unit_id)
     return;
   }
 
-  if (unit_has_type_flag(punit, F_UNDISBANDABLE)) {
+  if (unit_has_type_flag(punit, UTYF_UNDISBANDABLE)) {
     /* refuse to kill ourselves */
     notify_player(unit_owner(punit), unit_tile(punit),
                   E_BAD_COMMAND, ftc_server,
@@ -508,35 +493,23 @@ void handle_unit_disband(struct player *pplayer, int unit_id)
     return;
   }
 
-  pcity = tile_city(punit->tile);
+  pcity = tile_city(unit_tile(punit));
   if (pcity) {
     /* If you disband inside a city, it gives some shields to that city.
      *
      * Note: Nowadays it's possible to disband unit in allied city and
      * your ally receives those shields. Should it be like this? Why not?
      * That's why we must use city_owner instead of pplayer -- Zamar */
+    int shields = unit_disband_shields(punit);
 
-    if (unit_has_type_flag(punit, F_HELP_WONDER)) {
-      /* Count this just like a caravan that was added to a wonder.
-       * However don't actually give the city the extra shields unless
-       * they are building a wonder (but switching to a wonder later in
-       * the turn will give the extra shields back). */
-      pcity->caravan_shields += unit_build_shield_cost(punit);
-      if (unit_can_help_build_wonder(punit, pcity)) {
-	pcity->shield_stock += unit_build_shield_cost(punit);
-      } else {
-	pcity->shield_stock += unit_disband_shields(punit);
-      }
-    } else {
-      pcity->shield_stock += unit_disband_shields(punit);
-      /* If we change production later at this turn. No penalty is added. */
-      pcity->disbanded_shields += unit_disband_shields(punit);
-    }
+    pcity->shield_stock += shields;
+    /* If we change production later at this turn. No penalty is added. */
+    pcity->disbanded_shields += shields;
 
     send_city_info(city_owner(pcity), pcity);
   }
 
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_DISBANDED, NULL);
 }
 
 /**************************************************************************
@@ -579,7 +552,7 @@ void city_add_or_build_error(struct player *pplayer, struct unit *punit,
     {
       struct astring astr = ASTRING_INIT;
 
-      if (role_units_translations(&astr, F_CITIES, TRUE)) {
+      if (role_units_translations(&astr, UTYF_CITIES, TRUE)) {
         notify_player(pplayer, ptile, E_BAD_COMMAND, ftc_server,
                       /* TRANS: %s is list of units separated by "or". */
                       _("Only %s can build a city."), astr_str(&astr));
@@ -594,7 +567,7 @@ void city_add_or_build_error(struct player *pplayer, struct unit *punit,
     {
       struct astring astr = ASTRING_INIT;
 
-      if (role_units_translations(&astr, F_ADD_TO_CITY, TRUE)) {
+      if (role_units_translations(&astr, UTYF_ADD_TO_CITY, TRUE)) {
         notify_player(pplayer, ptile, E_BAD_COMMAND, ftc_server,
                       /* TRANS: %s is list of units separated by "or". */
                       _("Only %s can add to a city."), astr_str(&astr));
@@ -653,21 +626,23 @@ void city_add_or_build_error(struct player *pplayer, struct unit *punit,
 **************************************************************************/
 static void city_add_unit(struct player *pplayer, struct unit *punit)
 {
-  struct city *pcity = tile_city(punit->tile);
+  struct city *pcity = tile_city(unit_tile(punit));
 
   fc_assert_ret(unit_pop_value(punit) > 0);
-  pcity->size += unit_pop_value(punit);
+  city_size_add(pcity, unit_pop_value(punit));
   /* Make the new people something, otherwise city fails the checks */
   pcity->specialists[DEFAULT_SPECIALIST] += unit_pop_value(punit);
-  /* update squared city radius; no worker arrangement needed - it is done
-   * unconditionally below */
-  city_map_update_radius_sq(pcity, FALSE);
-  auto_arrange_workers(pcity);
+  citizens_update(pcity, unit_nationality(punit));
+  /* Refresh the city data. */
+  city_refresh(pcity);
   notify_player(pplayer, city_tile(pcity), E_CITY_BUILD, ftc_server,
                 _("%s added to aid %s in growing."),
                 unit_tile_link(punit),
                 city_link(pcity));
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_USED, NULL);
+
+  sanity_check_city(pcity);
+
   send_city_info(NULL, pcity);
 }
 
@@ -682,6 +657,7 @@ static void city_build(struct player *pplayer, struct unit *punit,
 {
   char message[1024];
   int size;
+  struct player *nationality;
 
   if (!is_allowed_city_name(pplayer, name, message, sizeof(message))) {
     notify_player(pplayer, unit_tile(punit), E_BAD_COMMAND, ftc_server,
@@ -689,36 +665,39 @@ static void city_build(struct player *pplayer, struct unit *punit,
     return;
   }
 
-  create_city(pplayer, punit->tile, name);
+  nationality = unit_nationality(punit);
+
+  create_city(pplayer, unit_tile(punit), name, nationality);
   size = unit_type(punit)->city_size;
   if (size > 1) {
-    struct city *pcity = tile_city(punit->tile);
+    struct city *pcity = tile_city(unit_tile(punit));
 
     fc_assert_ret(pcity != NULL);
 
-    city_change_size(pcity, size);
+    city_change_size(pcity, size, nationality);
   }
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_USED, NULL);
 }
 
 /**************************************************************************
-...
+  Try to build city.
+  Return value tells if request was sane. It can be TRUE even if city
+  building failed, as long as the reason was not bad request.
 **************************************************************************/
-void handle_unit_build_city(struct player *pplayer, int unit_id,
-                            const char *name)
+bool unit_build_city(struct player *pplayer, struct unit *punit,
+                     const char *name)
 {
   enum unit_add_build_city_result res;
-  struct unit *punit = player_unit_by_number(pplayer, unit_id);
 
   if (NULL == punit) {
     /* Probably died or bribed. */
-    log_verbose("handle_unit_build_city() invalid unit %d", unit_id);
-    return;
+    log_verbose("unit_build_city() invalid unit.");
+    return FALSE;
   }
 
   if (!unit_can_do_action_now(punit)) {
-    /* Building a city not possible due to unixwaittime setting. */
-    return;
+    /* Building a city not possible due to unitwaittime setting. */
+    return FALSE;
   }
 
   res = unit_add_or_build_city_test(punit);
@@ -729,16 +708,31 @@ void handle_unit_build_city(struct player *pplayer, int unit_id,
     city_add_unit(pplayer, punit);
   } else {
     city_add_or_build_error(pplayer, punit, res);
+    if (res != UAB_NO_MIN_DIST) {
+      return FALSE;
+    }
   }
+
+  return TRUE;
+}
+
+/**************************************************************************
+  Handle city building request. Can result in adding to existing city
+  also.
+**************************************************************************/
+void handle_unit_build_city(struct player *pplayer, int unit_id,
+                            const char *name)
+{
+  unit_build_city(pplayer, player_unit_by_number(pplayer, unit_id), name);
 }
 
 /**************************************************************************
   Handle change in unit activity.
 **************************************************************************/
-void handle_unit_change_activity(struct player *pplayer, int unit_id,
-				 enum unit_activity activity,
-				 enum tile_special_type activity_target,
-                                 Base_type_id activity_base)
+static void handle_unit_change_activity_real(struct player *pplayer,
+                                             int unit_id,
+                                             enum unit_activity activity,
+                                             struct act_tgt* activity_target)
 {
   struct unit *punit = player_unit_by_number(pplayer, unit_id);
 
@@ -749,9 +743,8 @@ void handle_unit_change_activity(struct player *pplayer, int unit_id,
   }
 
   if (punit->activity == activity
-   && punit->activity_target == activity_target
-   && punit->activity_base == activity_base
-   && !punit->ai_controlled) {
+      && cmp_act_tgt(&punit->activity_target, activity_target)
+      && !punit->ai_controlled) {
     /* Treat change in ai.control as change in activity, so
      * idle autosettlers behave correctly when selected --dwp
      */
@@ -760,8 +753,8 @@ void handle_unit_change_activity(struct player *pplayer, int unit_id,
 
   /* Remove city spot reservations for AI settlers on city founding
    * mission, before goto_tile reset. */
-  if (punit->server.adv->role != AIUNIT_NONE) {
-    ai_unit_new_role(punit, AIUNIT_NONE, NULL);
+  if (punit->server.adv->task != AUT_NONE) {
+    adv_unit_new_task(punit, AUT_NONE, NULL);
   }
 
   punit->ai_controlled = FALSE;
@@ -769,16 +762,23 @@ void handle_unit_change_activity(struct player *pplayer, int unit_id,
 
   switch (activity) {
   case ACTIVITY_BASE:
-    if (!base_by_number(activity_base)) {
+    if (!base_by_number(activity_target->obj.base)) {
       /* Illegal base type */
       return;
     }
-    unit_activity_handling_base(punit, activity_base);
+    unit_activity_handling_base(punit, activity_target->obj.base);
+    break;
+
+  case ACTIVITY_GEN_ROAD:
+    if (!road_by_number(activity_target->obj.road)) {
+      /* Illegal road type */
+      return;
+    }
+    unit_activity_handling_road(punit, activity_target->obj.road);
     break;
 
   case ACTIVITY_EXPLORE:
-    unit_activity_handling_targeted(punit, activity,
-                                    activity_target, BASE_NONE);
+    unit_activity_handling_targeted(punit, activity, activity_target);
 
     /* Exploring is handled here explicitly, since the player expects to
      * see an immediate response from setting a unit to auto-explore.
@@ -790,14 +790,62 @@ void handle_unit_change_activity(struct player *pplayer, int unit_id,
     break;
 
   default:
-    unit_activity_handling_targeted(punit, activity, activity_target,
-                                    activity_base);
+    unit_activity_handling_targeted(punit, activity, activity_target);
     break;
   };
 }
 
 /**************************************************************************
-...
+  Handle change in unit activity.
+**************************************************************************/
+void handle_unit_change_activity(struct player *pplayer, int unit_id,
+                                 enum unit_activity activity,
+                                 enum tile_special_type target)
+{
+  struct act_tgt activity_target = { .type = ATT_SPECIAL, .obj.spe = target };
+
+  if (activity == ACTIVITY_BASE || activity == ACTIVITY_GEN_ROAD
+      || (activity == ACTIVITY_PILLAGE && target == S_LAST)) {
+    return;
+  }
+
+  handle_unit_change_activity_real(pplayer, unit_id, activity, &activity_target);
+}
+
+/**************************************************************************
+  Handle change in base targeting unit activity.
+**************************************************************************/
+void handle_unit_change_activity_base(struct player *pplayer, int unit_id,
+                                      enum unit_activity activity,
+                                      Base_type_id base)
+{
+  struct act_tgt activity_target = { .type = ATT_BASE, .obj.base = base };
+
+  if (activity != ACTIVITY_BASE && activity != ACTIVITY_PILLAGE) {
+    return;
+  }
+
+  handle_unit_change_activity_real(pplayer, unit_id, activity, &activity_target);
+}
+
+/**************************************************************************
+  Handle change in road targeting unit activity.
+**************************************************************************/
+void handle_unit_change_activity_road(struct player *pplayer, int unit_id,
+                                      enum unit_activity activity,
+                                      Road_type_id road)
+{
+  struct act_tgt target = { .type = ATT_ROAD, .obj.road = road };
+
+  if (activity != ACTIVITY_GEN_ROAD && activity != ACTIVITY_PILLAGE) {
+    return;
+  }
+
+  handle_unit_change_activity_real(pplayer, unit_id, activity, &target);
+}
+
+/**************************************************************************
+  Handle unit move request.
 **************************************************************************/
 void handle_unit_move(struct player *pplayer, int unit_id, int tile)
 {
@@ -848,8 +896,9 @@ void handle_unit_move(struct player *pplayer, int unit_id, int tile)
  Make sure everyone who can see combat does.
 **************************************************************************/
 static void see_combat(struct unit *pattacker, struct unit *pdefender)
-{  
+{
   struct packet_unit_short_info unit_att_short_packet, unit_def_short_packet;
+  struct packet_unit_info unit_att_packet, unit_def_packet;
 
   /* 
    * Special case for attacking/defending:
@@ -862,28 +911,46 @@ static void see_combat(struct unit *pattacker, struct unit *pdefender)
    * Note these packets must be sent out before unit_versus_unit is called,
    * so that the original unit stats (HP) will be sent.
    */
-  package_short_unit(pattacker, &unit_att_short_packet, FALSE,
-		     UNIT_INFO_IDENTITY, 0);
-  package_short_unit(pdefender, &unit_def_short_packet, FALSE,
-		     UNIT_INFO_IDENTITY, 0);
-  players_iterate(other_player) {
-    /* NOTE: this means the player can see combat between submarines even
-     * if neither sub is visible.  See similar comment in send_combat. */
-    if (map_is_known_and_seen(pattacker->tile, other_player, V_MAIN)
-	|| map_is_known_and_seen(pdefender->tile, other_player, V_MAIN)) {
-      if (!can_player_see_unit(other_player, pattacker)) {
-        fc_assert(other_player != unit_owner(pattacker));
-	lsend_packet_unit_short_info(other_player->connections,
-				     &unit_att_short_packet);
-      }
+  package_short_unit(pattacker, &unit_att_short_packet,
+		     UNIT_INFO_IDENTITY, 0, FALSE);
+  package_short_unit(pdefender, &unit_def_short_packet,
+		     UNIT_INFO_IDENTITY, 0, FALSE);
+  package_unit(pattacker, &unit_att_packet);
+  package_unit(pdefender, &unit_def_packet);
 
-      if (!can_player_see_unit(other_player, pdefender)) {
-        fc_assert(other_player != unit_owner(pdefender));
-	lsend_packet_unit_short_info(other_player->connections,
-				     &unit_def_short_packet);
+  conn_list_iterate(game.est_connections, pconn) {
+    struct player *pplayer = pconn->playing;
+
+    if (pplayer != NULL) {
+
+      /* NOTE: this means the player can see combat between submarines even
+       * if neither sub is visible.  See similar comment in send_combat. */
+      if (map_is_known_and_seen(unit_tile(pattacker), pplayer, V_MAIN)
+          || map_is_known_and_seen(unit_tile(pdefender), pplayer,
+                                   V_MAIN)) {
+
+        /* Units are sent even if they were visible already. They may
+         * have changed orientation for combat. */
+        if (pplayer == unit_owner(pattacker)) {
+          send_packet_unit_info(pconn, &unit_att_packet);
+        } else {
+          send_packet_unit_short_info(pconn,
+                                      &unit_att_short_packet);
+        }
+        
+        if (pplayer == unit_owner(pdefender)) {
+          send_packet_unit_info(pconn, &unit_def_packet);
+        } else {
+          send_packet_unit_short_info(pconn,
+                                      &unit_def_short_packet);
+        }
       }
+    } else if (pconn->observer) {
+      /* Global observer sees everything... */
+      send_packet_unit_info(pconn, &unit_att_packet);
+      send_packet_unit_info(pconn, &unit_def_packet);
     }
-  } players_iterate_end;
+  } conn_list_iterate_end;
 }
 
 /**************************************************************************
@@ -903,8 +970,9 @@ static void send_combat(struct unit *pattacker, struct unit *pdefender,
   players_iterate(other_player) {
     /* NOTE: this means the player can see combat between submarines even
      * if neither sub is visible.  See similar comment in see_combat. */
-    if (map_is_known_and_seen(pattacker->tile, other_player, V_MAIN)
-	|| map_is_known_and_seen(pdefender->tile, other_player, V_MAIN)) {
+    if (map_is_known_and_seen(unit_tile(pattacker), other_player, V_MAIN)
+        || map_is_known_and_seen(unit_tile(pdefender), other_player,
+                                 V_MAIN)) {
       lsend_packet_unit_combat_info(other_player->connections, &combat);
 
       /* 
@@ -951,17 +1019,32 @@ static bool unit_bombard(struct unit *punit, struct tile *ptile)
                           "peace or cease-fire at (%d, %d).",
                           TILE_XY(unit_tile(pdefender)));
     fc_assert_ret_val_msg(!pplayers_allied(unit_owner(punit),
-                                           unit_owner(pdefender))
-                          || (unit_has_type_flag(punit, F_NUCLEAR)
-                              && punit == pdefender), TRUE,
+                                           unit_owner(pdefender)), TRUE,
                           "Trying to attack a unit with which you have "
                           "alliance at (%d, %d).",
                           TILE_XY(unit_tile(pdefender)));
 
     if (is_unit_reachable_at(pdefender, punit, ptile)) {
+      bool adj;
+      enum direction8 facing;
+      int att_hp, def_hp;
+
+      adj = base_get_direction_for_step(punit->tile, pdefender->tile, &facing);
+
+      fc_assert(adj);
+      if (adj) {
+        punit->facing = facing;
+
+        /* Unlike with normal attack, we don't change orientation of
+         * defenders when bombarding */
+      }
+
+      unit_versus_unit(punit, pdefender, TRUE, &att_hp, &def_hp);
+
       see_combat(punit, pdefender);
 
-      unit_versus_unit(punit, pdefender, TRUE);
+      punit->hp = att_hp;
+      pdefender->hp = def_hp;
 
       send_combat(punit, pdefender, 0, 1);
   
@@ -976,16 +1059,12 @@ static bool unit_bombard(struct unit *punit, struct tile *ptile)
   unit_forget_last_activity(punit);
   
   if (pcity
-      && pcity->size > 1
-      && get_city_bonus(pcity, EFT_UNIT_NO_LOSE_POP) == 0
+      && city_size_get(pcity) > 1
+      && get_city_bonus(pcity, EFT_UNIT_NO_LOSE_POP) <= 0
       && kills_citizen_after_attack(punit)) {
     city_reduce_size(pcity, 1, pplayer);
     city_refresh(pcity);
     send_city_info(NULL, pcity);
-  }
-
-  if (maybe_make_veteran(punit)) {
-    notify_unit_experience(punit);
   }
 
   send_unit_info(NULL, punit);
@@ -1004,8 +1083,11 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
   int moves_used, def_moves_used; 
   int old_unit_vet, old_defender_vet, vet;
   int winner_id;
-  struct tile *def_tile = pdefender->tile;
+  struct tile *def_tile = unit_tile(pdefender);
   struct player *pplayer = unit_owner(punit);
+  bool adj;
+  enum direction8 facing;
+  int att_hp, def_hp;
   
   log_debug("Start attack: %s %s against %s %s.",
             nation_rule_name(nation_of_player(pplayer)),
@@ -1018,12 +1100,12 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
                     "Trying to attack a unit with which you have peace "
                     "or cease-fire at (%d, %d).", TILE_XY(def_tile));
   fc_assert_ret_msg(!pplayers_allied(pplayer, unit_owner(pdefender))
-                    || (unit_has_type_flag(punit, F_NUCLEAR)
+                    || (unit_has_type_flag(punit, UTYF_NUCLEAR)
                         && punit == pdefender),
                     "Trying to attack a unit with which you have alliance "
                     "at (%d, %d).", TILE_XY(def_tile));
 
-  if (unit_has_type_flag(punit, F_NUCLEAR)) {
+  if (unit_has_type_flag(punit, UTYF_NUCLEAR)) {
     if ((pcity = sdi_try_defend(pplayer, def_tile))) {
       /* FIXME: Remove the hard coded reference to SDI defense. */
       notify_player(pplayer, unit_tile(punit), E_UNIT_LOST_ATT, ftc_server,
@@ -1032,26 +1114,43 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
       notify_player(city_owner(pcity), def_tile, E_UNIT_WIN, ftc_server,
                     _("The nuclear attack on %s was avoided by"
                       " your SDI defense."), city_link(pcity));
-      pplayer->score.units_lost++;
-      city_owner(pcity)->score.units_killed++;
-      wipe_unit(punit);
+      wipe_unit(punit, ULR_SDI, city_owner(pcity));
       return;
     } 
 
     dlsend_packet_nuke_tile_info(game.est_connections, tile_index(def_tile));
 
-    wipe_unit(punit);
+    wipe_unit(punit, ULR_DETONATED, NULL);
     do_nuclear_explosion(pplayer, def_tile);
     return;
   }
   moves_used = unit_move_rate(punit) - punit->moves_left;
   def_moves_used = unit_move_rate(pdefender) - pdefender->moves_left;
 
-  see_combat(punit, pdefender);
+  adj = base_get_direction_for_step(punit->tile, pdefender->tile, &facing);
+
+  fc_assert(adj);
+  if (adj) {
+    punit->facing = facing;
+    pdefender->facing = opposite_direction(facing);
+  }
 
   old_unit_vet = punit->veteran;
   old_defender_vet = pdefender->veteran;
-  unit_versus_unit(punit, pdefender, FALSE);
+  unit_versus_unit(punit, pdefender, FALSE, &att_hp, &def_hp);
+
+  if ((att_hp <= 0 || uclass_has_flag(unit_class(punit), UCF_MISSILE))
+      && unit_transported(punit)) {
+    /* Dying attacker must be first unloaded so it doesn't die insider transport */
+    unit_transport_unload_send(punit);
+  }
+
+  see_combat(punit, pdefender);
+
+  punit->hp = att_hp;
+  pdefender->hp = def_hp;
+
+  combat_veterans(punit, pdefender);
 
   /* Adjust attackers moves_left _after_ unit_versus_unit() so that
    * the movement attack modifier is correct! --dwp
@@ -1075,14 +1174,14 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
 
   if (punit->hp > 0
       && (pcity = tile_city(def_tile))
-      && pcity->size > 1
-      && get_city_bonus(pcity, EFT_UNIT_NO_LOSE_POP) == 0
+      && city_size_get(pcity) > 1
+      && get_city_bonus(pcity, EFT_UNIT_NO_LOSE_POP) <= 0
       && kills_citizen_after_attack(punit)) {
     city_reduce_size(pcity, 1, pplayer);
     city_refresh(pcity);
     send_city_info(NULL, pcity);
   }
-  if (unit_has_type_flag(punit, F_ONEATTACK)) 
+  if (unit_has_type_flag(punit, UTYF_ONEATTACK)) 
     punit->moves_left = 0;
   pwinner = (punit->hp > 0) ? punit : pdefender;
   winner_id = pwinner->id;
@@ -1123,9 +1222,7 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
                   loser_link,
                   nation_adjective_for_player(unit_owner(pwinner)),
                   winner_link);
-    unit_owner(ploser)->score.units_lost++;
-    unit_owner(pwinner)->score.units_killed++;
-    wipe_unit(ploser);
+    wipe_unit(ploser, ULR_KILLED, unit_owner(pwinner));
   } else {
     /* The defender lost, the attacker punit lives! */
     int winner_id = pwinner->id;
@@ -1141,7 +1238,7 @@ static void unit_attack_handling(struct unit *punit, struct unit *pdefender)
               vet && !uclass_has_flag(unit_class(punit), UCF_MISSILE));
     if (unit_alive(winner_id)) {
       if (uclass_has_flag(unit_class(pwinner), UCF_MISSILE)) {
-        wipe_unit(pwinner);
+        wipe_unit(pwinner, ULR_MISSILE, NULL);
         return;
       }
     } else {
@@ -1186,10 +1283,10 @@ static bool can_unit_move_to_tile_with_notify(struct unit *punit,
 					      struct tile *dest_tile,
 					      bool igzoc)
 {
-  struct tile *src_tile = punit->tile;
+  struct tile *src_tile = unit_tile(punit);
   enum unit_move_result reason =
-      unit_move_to_tile_test(unit_type(punit), unit_owner(punit),
-                             punit->activity, src_tile, dest_tile, igzoc);
+      unit_move_to_tile_test(punit, punit->activity,
+                             src_tile, dest_tile, igzoc);
 
   switch (reason) {
   case MR_OK:
@@ -1200,18 +1297,29 @@ static bool can_unit_move_to_tile_with_notify(struct unit *punit,
                   _("This type of troops cannot take over a city."));
     break;
 
-  case MR_BAD_TYPE_FOR_CITY_TAKE_OVER_FROM_SEA:
+  case MR_BAD_TYPE_FOR_CITY_TAKE_OVER_FROM_NON_NATIVE:
     {
-      struct astring astr = ASTRING_INIT;
+      const char *types[utype_count()];
+      int i = 0;
 
-      if (role_units_translations(&astr, F_MARINES, TRUE)) {
+      unit_type_iterate(utype) {
+        if (can_attack_from_non_native(utype)
+            && utype_can_take_over(utype)) {
+          types[i++] = utype_name_translation(utype);
+        }
+      } unit_type_iterate_end;
+
+      if (0 < i) {
+        struct astring astr = ASTRING_INIT;
+
         notify_player(unit_owner(punit), src_tile, E_BAD_COMMAND, ftc_server,
-                      /* TRANS: %s is list of units separated by "or". */
-                      _("Only %s can attack from sea."), astr_str(&astr));
+                      /* TRANS: %s is a list of units separated by "or". */
+                      _("Only %s can conquer from a non-native tile."),
+                      astr_build_or_list(&astr, types, i));
         astr_free(&astr);
       } else {
         notify_player(unit_owner(punit), src_tile, E_BAD_COMMAND, ftc_server,
-                      _("Cannot attack from sea."));
+                      _("Cannot conquer from a non-native tile."));
       }
     }
     break;
@@ -1242,6 +1350,15 @@ static bool can_unit_move_to_tile_with_notify(struct unit *punit,
     }
     break;
 
+  case MR_CANNOT_DISEMBARK:
+    notify_player(unit_owner(punit), src_tile, E_BAD_COMMAND, ftc_server,
+                  _("%s cannot disembark outside of a city or a native base "
+                    "for %s."),
+                  unit_link(punit),
+                  utype_name_translation(
+                      unit_type(unit_transport_get(punit))));
+    break;
+
   default:
     /* FIXME: need more explanations someday! */
     break;
@@ -1270,11 +1387,12 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
 {
   struct player *pplayer = unit_owner(punit);
   struct city *pcity = tile_city(pdesttile);
+  bool taking_over_city = FALSE;
 
   /*** Phase 1: Basic checks ***/
 
   /* this occurs often during lag, and to the AI due to some quirks -- Syela */
-  if (!is_tiles_adjacent(punit->tile, pdesttile)) {
+  if (!is_tiles_adjacent(unit_tile(punit), pdesttile)) {
     log_debug("tiles not adjacent in move request");
     return FALSE;
   }
@@ -1294,7 +1412,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
 
   /* Caravans.  If city is allied (inc. ours) we would have a popup
    * asking if we are moving on. */
-  if (unit_has_type_flag(punit, F_TRADE_ROUTE) && pcity
+  if (unit_has_type_flag(punit, UTYF_TRADE_ROUTE) && pcity
       && !pplayers_allied(city_owner(pcity), pplayer) ) {
     return base_handle_unit_establish_trade(pplayer, punit->id, pcity);
   }
@@ -1308,7 +1426,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
     struct unit *target = is_non_allied_unit_tile(pdesttile, pplayer);
 
     if (target || is_non_allied_city_tile(pdesttile, pplayer)
-        || !move_diplomat_city) {
+        || (is_allied_city_tile(pdesttile, pplayer) && !move_diplomat_city)) {
       if (is_diplomat_action_available(punit, DIPLOMAT_ANY_ACTION,
 				       pdesttile)) {
 	int target_id = 0;
@@ -1323,7 +1441,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
          * restore cycle when doing goto's, and the unit's movepoints
          * have been restored, but we only send the unit info at the
          * end of the function.) */
-        send_unit_info(pplayer, punit);
+        send_unit_info(player_reply_dest(pplayer), punit);
         
         /* if is_diplomat_action_available() then there must be 
          * a city or a unit */
@@ -1340,13 +1458,14 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
 					   0, DIPLOMAT_MOVE);
         return FALSE;
       } else if (!unit_can_move_to_tile(punit, pdesttile, igzoc)) {
-        if (can_unit_exist_at_tile(punit, punit->tile)) {
+        if (can_unit_exist_at_tile(punit, unit_tile(punit))) {
           notify_player(pplayer, unit_tile(punit), E_BAD_COMMAND, ftc_server,
                         _("No diplomat action possible."));
         } else {
+          struct terrain *pterrain = tile_terrain(unit_tile(punit));
           notify_player(pplayer, unit_tile(punit), E_BAD_COMMAND, ftc_server,
                         _("Unit cannot perform diplomatic action from %s."),
-                        terrain_name_translation(tile_terrain(punit->tile)));
+                        terrain_name_translation(pterrain));
         }
         return FALSE;
       }
@@ -1358,6 +1477,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
   if (is_non_allied_unit_tile(pdesttile, pplayer) 
       || is_non_allied_city_tile(pdesttile, pplayer)) {
     struct unit *victim = NULL;
+    enum unit_attack_result ua_result;
 
     /* We can attack ONLY in enemy cities */
     if ((pcity && !pplayers_at_war(city_owner(pcity), pplayer))
@@ -1371,12 +1491,50 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
       return FALSE;
     }
 
-    if (unit_has_type_flag(punit, F_CAPTURER) && pcity == NULL) {
+    if (unit_has_type_flag(punit, UTYF_CAPTURER) && pcity == NULL) {
       bool capture_possible = TRUE;
+      bv_unit_types unique_on_tile;
 
+      BV_CLR_ALL(unique_on_tile);
       unit_list_iterate(pdesttile->units, to_capture) {
-        if (!unit_has_type_flag(to_capture, F_CAPTURABLE)) {
+        if (!unit_has_type_flag(to_capture, UTYF_CAPTURABLE)) {
           capture_possible = FALSE;
+          break;
+        }
+
+        /* Sanity check: make sure that the capture won't result in the actor
+         * ending up with more than one unit of each unique unit type. */
+
+        /* Check what the player already has. */
+        if (utype_player_already_has_this_unique(pplayer,
+                                                 unit_type(to_capture))) {
+          /* The player already has a unit of this kind. */
+          capture_possible = FALSE;
+        }
+
+        if (utype_has_flag(unit_type(to_capture), UTYF_UNIQUE)) {
+          /* The type of the units at the tile must also be checked. Two allied
+       * players can both have their unique unit at the same tile.
+       * Capturing them both would give the actor two units of a kind that
+       * is supposed to be unique. */
+
+          if (BV_ISSET(unique_on_tile, utype_index(unit_type(to_capture)))) {
+            /* There is another unit of the same kind at this tile. */
+            capture_possible = FALSE;
+          } else {
+            /* Remember the unit type in case another unit of the same kind is
+         * encountered later. */
+            BV_SET(unique_on_tile, utype_index(unit_type(to_capture)));
+          }
+        }
+
+        if (!capture_possible) {
+          log_debug("capture units: already got unique unit");
+          notify_player(pplayer, pdesttile, E_MY_DIPLOMAT_FAILED, ftc_server,
+                        /* TRANS: You can only have one Leader. */
+                        _("You can only have one %s."),
+                        unit_link(to_capture));
+
           break;
         }
       } unit_list_iterate_end;
@@ -1396,7 +1554,8 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
           to_capture = unit_change_owner(to_capture, pplayer,
                                          (game.server.homecaughtunits
                                           ? punit->homecity
-                                          : IDENTITY_NUMBER_ZERO));
+                                          : IDENTITY_NUMBER_ZERO),
+                                         ULR_CAPTURED);
           /* As unit_change_owner() currently remove the old unit and
            * replace by a new one (with a new id), we want to make link to
            * the new unit. */
@@ -1405,8 +1564,9 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
           /* Notify players */
           notify_player(pplayer, pdesttile, E_MY_DIPLOMAT_BRIBE, ftc_server,
                         /* TRANS: <unit> ... <unit> */
-                        _("Your %s succeeded in capturing the %s."),
-                        capturer_link, victim_link);
+                        _("Your %s succeeded in capturing the %s %s."),
+                        capturer_link, nation_adjective_for_player(uplayer),
+                        victim_link);
           notify_player(uplayer, pdesttile,
                         E_ENEMY_DIPLOMAT_BRIBE, ftc_server,
                         /* TRANS: <unit> ... <Poles> */
@@ -1419,17 +1579,17 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
         if (punit->moves_left < 0) {
           punit->moves_left = 0;
         }
-        send_unit_info(pplayer, punit);
+        send_unit_info(NULL, punit);
 
         return TRUE;
       }
     }
 
     /* Are we a bombarder? */
-    if (unit_has_type_flag(punit, F_BOMBARDER)) {
-      /* Only land can be bombarded, if the target is on ocean, fall
-       * through to attack. */
-      if (!is_ocean_tile(pdesttile)) {
+    if (unit_has_type_flag(punit, UTYF_BOMBARDER)) {
+      /* Only land can be bombarded; if the target is on ocean (or is
+       * an empty city), fall through to attack/conquer. */
+      if (!is_ocean_tile(pdesttile) && unit_list_size(pdesttile->units) > 0) {
 	if (can_unit_bombard(punit)) {
 	  unit_bombard(punit, pdesttile);
 	  return TRUE;
@@ -1445,9 +1605,36 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
     /* Depending on 'unreachableprotects' setting, must be physically able
      * to attack EVERY unit there or must be physically able to attack SOME
      * unit there */
-    if (NULL == pcity && !can_unit_attack_units_at_tile(punit, pdesttile)) {
-      notify_player(pplayer, unit_tile(punit), E_BAD_COMMAND, ftc_server,
-                    _("You can't attack there."));
+    ua_result = unit_attack_units_at_tile_result(punit, pdesttile);
+    if (NULL == pcity && ua_result != ATT_OK) {
+      struct tile *src_tile = unit_tile(punit);
+
+      switch (ua_result) {
+      case ATT_NON_ATTACK:
+        notify_player(pplayer, src_tile, E_BAD_COMMAND, ftc_server,
+                      _("%s is not an attack unit."), unit_name_translation(punit));
+        break;
+      case ATT_UNREACHABLE:
+        notify_player(pplayer, src_tile, E_BAD_COMMAND, ftc_server,
+                      _("You can't attack there since there's an unreachable unit."));
+        break;
+      case ATT_NONNATIVE_SRC:
+        notify_player(pplayer, src_tile, E_BAD_COMMAND, ftc_server,
+                      _("%s can't launch attack from %s."),
+                        unit_name_translation(punit),
+                        terrain_name_translation(tile_terrain(src_tile)));
+        break;
+      case ATT_NONNATIVE_DST:
+        notify_player(pplayer, src_tile, E_BAD_COMMAND, ftc_server,
+                      _("%s can't attack to %s."),
+                        unit_name_translation(punit),
+                        terrain_name_translation(tile_terrain(pdesttile)));
+        break;
+      case ATT_OK:
+        fc_assert(ua_result != ATT_OK);
+        break;
+      }
+
       return FALSE;
     }
 
@@ -1461,14 +1648,15 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
       fc_assert_ret_val(is_enemy_city_tile(pdesttile, pplayer) != NULL,
                         TRUE);
 
-      if (unit_has_type_flag(punit, F_NUCLEAR)) {
-        if (move_unit(punit, pcity->tile, 0)) {
+      if (unit_has_type_flag(punit, UTYF_NUCLEAR)) {
+        if (unit_move(punit, pcity->tile, 0)) {
           /* Survived dangers of moving */
           unit_attack_handling(punit, punit); /* Boom! */
         }
         return TRUE;
       }
 
+      taking_over_city = TRUE;
       /* Taking over a city is considered a move, so fall through */
     }
   }
@@ -1478,10 +1666,12 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
   /* We cannot move a transport into a tile that holds
    * units or cities not allied with all of our cargo. */
   if (get_transporter_capacity(punit) > 0) {
-    unit_list_iterate(punit->tile->units, pcargo) {
-      if (pcargo->transported_by == punit->id
+    unit_list_iterate(unit_tile(punit)->units, pcargo) {
+      if (unit_contained_in(pcargo, punit)
           && (is_non_allied_unit_tile(pdesttile, unit_owner(pcargo))
-              || is_non_allied_city_tile(pdesttile, unit_owner(pcargo)))) {
+              || (!taking_over_city
+                  && is_non_allied_city_tile(pdesttile,
+                                             unit_owner(pcargo))))) {
          notify_player(pplayer, unit_tile(punit), E_BAD_COMMAND, ftc_server,
                        _("A transported unit is not allied to all "
                          "units or city on target tile."));
@@ -1493,7 +1683,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
   if (can_unit_move_to_tile_with_notify(punit, pdesttile, igzoc)) {
     int move_cost = map_move_cost_unit(punit, pdesttile);
 
-    move_unit(punit, pdesttile, move_cost);
+    unit_move(punit, pdesttile, move_cost);
 
     return TRUE;
   } else {
@@ -1502,7 +1692,7 @@ bool unit_move_handling(struct unit *punit, struct tile *pdesttile,
 }
 
 /**************************************************************************
-...
+  Handle request to help in wonder building.
 **************************************************************************/
 void handle_unit_help_build_wonder(struct player *pplayer, int unit_id)
 {
@@ -1516,10 +1706,10 @@ void handle_unit_help_build_wonder(struct player *pplayer, int unit_id)
     return;
   }
 
-  if (!unit_has_type_flag(punit, F_HELP_WONDER)) {
+  if (!unit_has_type_flag(punit, UTYF_HELP_WONDER)) {
     return;
   }
-  pcity_dest = tile_city(punit->tile);
+  pcity_dest = tile_city(unit_tile(punit));
   
   if (!pcity_dest || !unit_can_help_build_wonder(punit, pcity_dest)) {
     return;
@@ -1542,24 +1732,29 @@ void handle_unit_help_build_wonder(struct player *pplayer, int unit_id)
                 city_link(pcity_dest), 
                 abs(build_points_left(pcity_dest)));
 
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_USED, NULL);
   send_player_info_c(pplayer, pplayer->connections);
   send_city_info(pplayer, pcity_dest);
   conn_list_do_unbuffer(pplayer->connections);
 }
 
 /**************************************************************************
-...
+  Handle request to establish traderoute. If pcity_dest is NULL, assumes
+  that unit is inside target city.
 **************************************************************************/
 static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id, struct city *pcity_dest)
 {
   char homecity_link[MAX_LEN_LINK], destcity_link[MAX_LEN_LINK];
   char punit_link[MAX_LEN_LINK];
   int revenue, i;
-  bool can_establish, home_full = FALSE, dest_full = FALSE;
-  struct city *pcity_homecity; 
+  bool can_establish;
+  int home_overbooked = 0;
+  int dest_overbooked = 0;
+  int home_max;
+  int dest_max;
+  struct city *pcity_homecity;
   struct unit *punit = player_unit_by_number(pplayer, unit_id);
-  struct city *pcity_out_of_home = NULL, *pcity_out_of_dest = NULL;
+  struct city_list *cities_out_of_home, *cities_out_of_dest;
 
   if (NULL == punit) {
     /* Probably died or bribed. */
@@ -1568,14 +1763,14 @@ static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id
     return FALSE;
   }
 
-  if (!unit_has_type_flag(punit, F_TRADE_ROUTE)) {
+  if (!unit_has_type_flag(punit, UTYF_TRADE_ROUTE)) {
     return FALSE;
   }
 
   /* if no destination city is passed in,
    *  check whether the unit is already in the city */
   if (!pcity_dest) { 
-    pcity_dest = tile_city(punit->tile);
+    pcity_dest = tile_city(unit_tile(punit));
   }
 
   if (!pcity_dest) {
@@ -1607,59 +1802,69 @@ static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id
   }
 
   sz_strlcpy(punit_link, unit_tile_link(punit));
+  cities_out_of_home = city_list_new();
+  cities_out_of_dest = city_list_new();
 
   /* This part of code works like can_establish_trade_route, except
    * that we actually do the action of making the trade route. */
 
   /* If we can't make a new trade route we can still get the trade bonus. */
   can_establish = !have_cities_trade_route(pcity_homecity, pcity_dest);
-    
+
   if (can_establish) {
-    home_full = (city_num_trade_routes(pcity_homecity) == NUM_TRADE_ROUTES);
-    dest_full = (city_num_trade_routes(pcity_dest) == NUM_TRADE_ROUTES);
+    home_max = max_trade_routes(pcity_homecity);
+    dest_max = max_trade_routes(pcity_dest);
+    home_overbooked = city_num_trade_routes(pcity_homecity) - home_max;
+    dest_overbooked = city_num_trade_routes(pcity_dest) - dest_max;
   }
-  
-  if (home_full || dest_full) {
-    int slot, trade = trade_between_cities(pcity_homecity, pcity_dest);
+
+  if (can_establish && (home_overbooked >= 0 || dest_overbooked >= 0)) {
+    int trade = trade_between_cities(pcity_homecity, pcity_dest);
 
     /* See if there's a trade route we can cancel at the home city. */
-    if (home_full) {
-      if (get_city_min_trade_route(pcity_homecity, &slot) < trade) {
-        pcity_out_of_home = game_city_by_number(pcity_homecity->trade[slot]);
-        fc_assert(pcity_out_of_home != NULL);
-      } else {
+    if (home_overbooked >= 0) {
+      if (home_max <= 0
+          || (city_trade_removable(pcity_homecity, cities_out_of_home)
+              >= trade)) {
         notify_player(pplayer, city_tile(pcity_dest),
                       E_BAD_COMMAND, ftc_server,
                      _("Sorry, your %s cannot establish"
                        " a trade route here!"),
                        punit_link);
-        notify_player(pplayer, city_tile(pcity_dest),
-                      E_BAD_COMMAND, ftc_server,
-                      _("      The city of %s already has %d "
-                        "better trade routes!"),
-                      homecity_link,
-                      NUM_TRADE_ROUTES);
+        if (home_max > 0) {
+          notify_player(pplayer, city_tile(pcity_dest),
+                        E_BAD_COMMAND, ftc_server,
+                        PL_("      The city of %s already has %d "
+                            "better trade route!",
+                            "      The city of %s already has %d "
+                            "better trade routes!", home_max),
+                        homecity_link,
+                        home_max);
+        }
 	can_establish = FALSE;
       }
     }
-    
+
     /* See if there's a trade route we can cancel at the dest city. */
-    if (can_establish && dest_full) {
-      if (get_city_min_trade_route(pcity_dest, &slot) < trade) {
-        pcity_out_of_dest = game_city_by_number(pcity_dest->trade[slot]);
-        fc_assert(pcity_out_of_dest != NULL);
-      } else {
+    if (can_establish && dest_overbooked >= 0) {
+      if (dest_max <= 0
+          || (city_trade_removable(pcity_dest, cities_out_of_dest)
+              >= trade)) {
         notify_player(pplayer, city_tile(pcity_dest),
                       E_BAD_COMMAND, ftc_server,
                       _("Sorry, your %s cannot establish"
                         " a trade route here!"),
                       punit_link);
-        notify_player(pplayer, city_tile(pcity_dest),
-                      E_BAD_COMMAND, ftc_server,
-                      _("      The city of %s already has %d "
-                        "better trade routes!"),
-                      destcity_link,
-                      NUM_TRADE_ROUTES);
+        if (dest_max > 0) {
+          notify_player(pplayer, city_tile(pcity_dest),
+                        E_BAD_COMMAND, ftc_server,
+                        PL_("      The city of %s already has %d "
+                            "better trade route!",
+                            "      The city of %s already has %d "
+                            "better trade routes!", dest_max),
+                        destcity_link,
+                        dest_max);
+        }
 	can_establish = FALSE;
       }
     }
@@ -1687,7 +1892,7 @@ static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id
                 homecity_link,
                 destcity_link,
                 revenue);
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_USED, NULL);
   pplayer->economic.gold += revenue;
   /* add bulbs and check for finished research */
   update_bulbs(pplayer, revenue, TRUE);
@@ -1718,86 +1923,51 @@ static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id
     }
 
     /* Now cancel any less profitable trade route from the home city. */
-    if (pcity_out_of_home) {
-      remove_trade_route(pcity_homecity, pcity_out_of_home);
-      fc_assert(pplayer == city_owner(pcity_homecity));
-      if (pplayer == city_owner(pcity_out_of_home)) {
-        notify_player(city_owner(pcity_out_of_home),
-                      city_tile(pcity_out_of_home),
-                      E_CARAVAN_ACTION, ftc_server,
-                      _("Trade route between %s and %s canceled."),
-                      homecity_link,
-                      city_link(pcity_out_of_home));
-      } else {
-        notify_player(city_owner(pcity_out_of_home),
-                      city_tile(pcity_out_of_home),
-                      E_CARAVAN_ACTION, ftc_server,
-                      _("Sorry, the %s canceled the trade route "
-                        "from %s to your city %s."),
-                      nation_plural_for_player(pplayer),
-                      homecity_link,
-                      city_link(pcity_out_of_home));
-      }
-    }
+    city_list_iterate(cities_out_of_home, pcity) {
+      remove_trade_route(pcity_homecity, pcity, TRUE, FALSE);
+    } city_list_iterate_end;
 
     /* And the same for the dest city. */
-    if (pcity_out_of_dest) {
-      remove_trade_route(pcity_dest, pcity_out_of_dest);
-      if (city_owner(pcity_dest) == city_owner(pcity_out_of_dest)) {
-        notify_player(city_owner(pcity_out_of_dest),
-                      city_tile(pcity_out_of_dest),
-                      E_CARAVAN_ACTION, ftc_server,
-                      _("Trade route between %s and %s canceled."),
-                      destcity_link,
-                      city_link(pcity_out_of_dest));
-      } else {
-        notify_player(city_owner(pcity_out_of_dest),
-                      city_tile(pcity_out_of_dest),
-                      E_CARAVAN_ACTION, ftc_server,
-                      _("Sorry, the %s canceled the trade route "
-                        "from %s to your city %s."),
-                      nation_plural_for_player(city_owner(pcity_dest)),
-                      destcity_link,
-                      city_link(pcity_out_of_dest));
-      }
-    }
+    city_list_iterate(cities_out_of_dest, pcity) {
+      remove_trade_route(pcity_dest, pcity, TRUE, FALSE);
+    } city_list_iterate_end;
 
     /* Actually create the new trade route */
-    for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+    for (i = 0; i < MAX_TRADE_ROUTES; i++) {
       if (pcity_homecity->trade[i] == 0) {
         pcity_homecity->trade[i] = pcity_dest->id;
         break;
       }
     }
-    fc_assert(i < NUM_TRADE_ROUTES);
+    fc_assert(i < MAX_TRADE_ROUTES);
 
-    for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+    for (i = 0; i < MAX_TRADE_ROUTES; i++) {
       if (pcity_dest->trade[i] == 0) {
         pcity_dest->trade[i] = pcity_homecity->id;
         break;
       }
     }
-    fc_assert(i < NUM_TRADE_ROUTES);
+    fc_assert(i < MAX_TRADE_ROUTES);
 
     /* Refresh the cities. */
     city_refresh(pcity_homecity);
     city_refresh(pcity_dest);
-    if (pcity_out_of_home) {
-      city_refresh(pcity_out_of_home);
-    }
-    if (pcity_out_of_dest) {
-      city_refresh(pcity_out_of_dest);
-    }
+    city_list_iterate(cities_out_of_home, pcity) {
+      city_refresh(pcity);
+    } city_list_iterate_end;
+    city_list_iterate(cities_out_of_dest, pcity) {
+      city_refresh(pcity);
+    } city_list_iterate_end;
 
     /* Notify the owners of the cities. */
     send_city_info(pplayer, pcity_homecity);
     send_city_info(city_owner(pcity_dest), pcity_dest);
-    if(pcity_out_of_home) {
-      send_city_info(city_owner(pcity_out_of_home), pcity_out_of_home);
-    }
-    if(pcity_out_of_dest) {
-      send_city_info(city_owner(pcity_out_of_dest), pcity_out_of_dest);
-    }
+    city_list_iterate(cities_out_of_home, pcity) {
+      send_city_info(city_owner(pcity), pcity);
+    } city_list_iterate_end;
+    city_list_iterate(cities_out_of_dest, pcity) {
+      send_city_info(city_owner(pcity), pcity);
+    } city_list_iterate_end;
 
     /* Notify each player about the other cities so that they know about
      * its size for the trade calculation . */
@@ -1806,51 +1976,41 @@ static bool base_handle_unit_establish_trade(struct player *pplayer, int unit_id
       send_city_info(pplayer, pcity_dest);
     }
 
-    if (pcity_out_of_home) {
-      if (city_owner(pcity_dest) != city_owner(pcity_out_of_home)) {
-        send_city_info(city_owner(pcity_dest), pcity_out_of_home);
-	 send_city_info(city_owner(pcity_out_of_home), pcity_dest);
+    city_list_iterate(cities_out_of_home, pcity) {
+      if (city_owner(pcity_dest) != city_owner(pcity)) {
+        send_city_info(city_owner(pcity_dest), pcity);
+        send_city_info(city_owner(pcity), pcity_dest);
       }
-      if (pplayer != city_owner(pcity_out_of_home)) {
-        send_city_info(pplayer, pcity_out_of_home);
-	 send_city_info(city_owner(pcity_out_of_home), pcity_homecity);
+      if (pplayer != city_owner(pcity)) {
+        send_city_info(pplayer, pcity);
+        send_city_info(city_owner(pcity), pcity_homecity);
       }
-      if (pcity_out_of_dest && city_owner(pcity_out_of_home) !=
-					city_owner(pcity_out_of_dest)) {
-	 send_city_info(city_owner(pcity_out_of_home), pcity_out_of_dest);
-      }
-    }
+    } city_list_iterate_end;
 
-    if (pcity_out_of_dest) {
-      if (city_owner(pcity_dest) != city_owner(pcity_out_of_dest)) {
-        send_city_info(city_owner(pcity_dest), pcity_out_of_dest);
-	 send_city_info(city_owner(pcity_out_of_dest), pcity_dest);
+    city_list_iterate(cities_out_of_dest, pcity) {
+      if (city_owner(pcity_dest) != city_owner(pcity)) {
+        send_city_info(city_owner(pcity_dest), pcity);
+        send_city_info(city_owner(pcity), pcity_dest);
       }
-      if (pplayer != city_owner(pcity_out_of_dest)) {
-	 send_city_info(pplayer, pcity_out_of_dest);
-	 send_city_info(city_owner(pcity_out_of_dest), pcity_homecity);
+      if (pplayer != city_owner(pcity)) {
+        send_city_info(pplayer, pcity);
+        send_city_info(city_owner(pcity), pcity_homecity);
       }
-      if (pcity_out_of_home && city_owner(pcity_out_of_home) !=
-					city_owner(pcity_out_of_dest)) {
-	 send_city_info(city_owner(pcity_out_of_dest), pcity_out_of_home);
-      }
-    }
+    } city_list_iterate_end;
   }
-  
-  /* The research has changed, we have to update all
-   * players sharing it */
-  players_iterate(aplayer) {
-    if (!players_on_same_team(pplayer, aplayer)) {
-      continue;
-    }
-    send_player_info_c(aplayer, aplayer->connections);
-  } players_iterate_end;
+
   conn_list_do_unbuffer(pplayer->connections);
+
+  /* Free data. */
+  city_list_destroy(cities_out_of_home);
+  city_list_destroy(cities_out_of_dest);
+
   return TRUE;
 }
 
 /**************************************************************************
-...
+  Handle request to establish traderoute between unit homecity and the
+  city its currently in.
 **************************************************************************/
 void handle_unit_establish_trade(struct player *pplayer, int unit_id)
 {
@@ -1878,7 +2038,7 @@ void handle_unit_battlegroup(struct player *pplayer,
 }
 
 /**************************************************************************
-...
+  Handle request to set unit to autosettler mode.
 **************************************************************************/
 void handle_unit_autosettlers(struct player *pplayer, int unit_id)
 {
@@ -1894,27 +2054,32 @@ void handle_unit_autosettlers(struct player *pplayer, int unit_id)
     return;
 
   punit->ai_controlled = TRUE;
-  send_unit_info(pplayer, punit);
+  send_unit_info(NULL, punit);
 }
 
 /**************************************************************************
-...
+  Update everything that needs changing when unit activity changes from
+  old activity to new one.
 **************************************************************************/
 static void unit_activity_dependencies(struct unit *punit,
 				       enum unit_activity old_activity,
-				       enum tile_special_type old_target)
+                                       struct act_tgt *old_target)
 {
   switch (punit->activity) {
   case ACTIVITY_IDLE:
     switch (old_activity) {
     case ACTIVITY_PILLAGE: 
       {
-        enum tile_special_type prereq =
-	  get_infrastructure_prereq(old_target);
+        enum tile_special_type prereq = S_LAST;
+
+        if (old_target->type == ATT_SPECIAL) {
+	  prereq = get_infrastructure_prereq(old_target->obj.spe);
+        }
         if (prereq != S_LAST) {
-          unit_list_iterate (punit->tile->units, punit2)
-            if ((punit2->activity == ACTIVITY_PILLAGE) &&
-                (punit2->activity_target == prereq)) {
+          unit_list_iterate (unit_tile(punit)->units, punit2)
+            if (punit2->activity == ACTIVITY_PILLAGE
+                && punit2->activity_target.type == ATT_SPECIAL
+                && punit2->activity_target.obj.spe == prereq) {
               set_unit_activity(punit2, ACTIVITY_IDLE);
               send_unit_info(NULL, punit2);
             }
@@ -1942,49 +2107,58 @@ static void unit_activity_dependencies(struct unit *punit,
 }
 
 /**************************************************************************
-...
+  Handle request for changing activity.
 **************************************************************************/
 void unit_activity_handling(struct unit *punit,
                             enum unit_activity new_activity)
 {
   /* Must specify target for ACTIVITY_BASE */
-  fc_assert_ret(new_activity != ACTIVITY_BASE);
+  fc_assert_ret(new_activity != ACTIVITY_BASE
+                && new_activity != ACTIVITY_GEN_ROAD);
   
   if (new_activity == ACTIVITY_PILLAGE) {
+    struct act_tgt target = { .type = ATT_SPECIAL, .obj.spe = S_LAST };
+
     /* Assume untargeted pillaging if no target specified */
-    unit_activity_handling_targeted(punit, new_activity, S_LAST, BASE_NONE);
+    unit_activity_handling_targeted(punit, new_activity, &target);
   } else if (can_unit_do_activity(punit, new_activity)) {
     enum unit_activity old_activity = punit->activity;
-    enum tile_special_type old_target = punit->activity_target;
+    struct act_tgt old_target = punit->activity_target;
 
     free_unit_orders(punit);
     set_unit_activity(punit, new_activity);
     send_unit_info(NULL, punit);
-    unit_activity_dependencies(punit, old_activity, old_target);
+    unit_activity_dependencies(punit, old_activity, &old_target);
   }
 }
 
 /**************************************************************************
   Handle request for targeted activity.
 **************************************************************************/
-static void unit_activity_handling_targeted(struct unit *punit,
-					    enum unit_activity new_activity,
-					    enum tile_special_type new_target,
-                                            Base_type_id base)
+void unit_activity_handling_targeted(struct unit *punit,
+                                     enum unit_activity new_activity,
+                                     struct act_tgt *new_target)
 {
   if (!activity_requires_target(new_activity)) {
     unit_activity_handling(punit, new_activity);
-  } else if (can_unit_do_activity_targeted(punit, new_activity, new_target,
-                                           base)) {
+  } else if (can_unit_do_activity_targeted(punit, new_activity, new_target)) {
     enum unit_activity old_activity = punit->activity;
-    enum tile_special_type old_target = punit->activity_target;
+    struct act_tgt old_target = punit->activity_target;
+    enum unit_activity stored_activity = new_activity;
 
     free_unit_orders(punit);
     unit_assign_specific_activity_target(punit,
-                                         &new_activity, &new_target, &base);
-    set_unit_activity_targeted(punit, new_activity, new_target, base);
-    send_unit_info(NULL, punit);    
-    unit_activity_dependencies(punit, old_activity, old_target);
+                                         &new_activity, new_target);
+    if (new_activity != stored_activity
+        && !activity_requires_target(new_activity)) {
+      /* unit_assign_specific_activity_target() changed our target activity
+       * (to ACTIVITY_IDLE in practice) */
+      unit_activity_handling(punit, new_activity);
+    } else {
+      set_unit_activity_targeted(punit, new_activity, new_target);
+      send_unit_info(NULL, punit);    
+      unit_activity_dependencies(punit, old_activity, &old_target);
+    }
   }
 }
 
@@ -1996,12 +2170,29 @@ static void unit_activity_handling_base(struct unit *punit,
 {
   if (can_unit_do_activity_base(punit, base)) {
     enum unit_activity old_activity = punit->activity;
-    enum tile_special_type old_target = punit->activity_target;
+    struct act_tgt old_target = punit->activity_target;
 
     free_unit_orders(punit);
     set_unit_activity_base(punit, base);
     send_unit_info(NULL, punit);
-    unit_activity_dependencies(punit, old_activity, old_target);
+    unit_activity_dependencies(punit, old_activity, &old_target);
+  }
+}
+
+/**************************************************************************
+  Handle request for road building.
+**************************************************************************/
+static void unit_activity_handling_road(struct unit *punit,
+                                        Road_type_id road)
+{
+  if (can_unit_do_activity_road(punit, road)) {
+    enum unit_activity old_activity = punit->activity;
+    struct act_tgt old_target = punit->activity_target;
+
+    free_unit_orders(punit);
+    set_unit_activity_road(punit, road);
+    send_unit_info(NULL, punit);
+    unit_activity_dependencies(punit, old_activity, &old_target);
   }
 }
 
@@ -2033,7 +2224,7 @@ void handle_unit_load(struct player *pplayer, int cargo_id, int trans_id)
   }
 
   /* Load the unit and send out info to clients. */
-  load_unit_onto_transporter(pcargo, ptrans);
+  unit_transport_load_send(pcargo, ptrans);
 }
 
 /****************************************************************************
@@ -2067,12 +2258,12 @@ void handle_unit_unload(struct player *pplayer, int cargo_id, int trans_id)
     return;
   }
 
-  if (!can_unit_survive_at_tile(pcargo, pcargo->tile)) {
+  if (!can_unit_survive_at_tile(pcargo, unit_tile(pcargo))) {
     return;
   }
 
   /* Unload the unit and send out info to clients. */
-  unload_unit_from_transporter(pcargo);
+  unit_transport_unload_send(pcargo);
 }
 
 /**************************************************************************
@@ -2088,11 +2279,16 @@ void handle_unit_nuke(struct player *pplayer, int unit_id)
     return;
   }
 
+  if (!unit_can_do_action_now(punit)) {
+    /* Exploding nuke not possible due to unitwaittime setting. */
+    return;
+  }
+
   unit_attack_handling(punit, punit);
 }
 
 /**************************************************************************
-...
+  Handle paradrop request.
 **************************************************************************/
 void handle_unit_paradrop_to(struct player *pplayer, int unit_id, int tile)
 {
@@ -2124,6 +2320,8 @@ void handle_unit_orders(struct player *pplayer,
   int length = packet->length, i;
   struct unit *punit = player_unit_by_number(pplayer, packet->unit_id);
   struct tile *src_tile = index_to_tile(packet->src_tile);
+  struct tile *dest_tile = index_to_tile(packet->dest_tile);
+  const struct vision_site *psite;
 
   if (NULL == punit) {
     /* Probably died or bribed. */
@@ -2174,11 +2372,9 @@ void handle_unit_orders(struct player *pplayer,
     case ORDER_ACTIVITY:
       switch (packet->activity[i]) {
       case ACTIVITY_POLLUTION:
-      case ACTIVITY_ROAD:
       case ACTIVITY_MINE:
       case ACTIVITY_IRRIGATE:
       case ACTIVITY_FORTRESS:
-      case ACTIVITY_RAILROAD:
       case ACTIVITY_TRANSFORM:
       case ACTIVITY_AIRBASE:
 	/* Simple activities. */
@@ -2193,6 +2389,12 @@ void handle_unit_orders(struct player *pplayer,
         if (!base_by_number(packet->base[i])) {
           return;
         }
+        break;
+      case ACTIVITY_GEN_ROAD:
+        if (!road_by_number(packet->road[i])) {
+          return;
+        }
+        break;
       default:
 	return;
       }
@@ -2214,9 +2416,7 @@ void handle_unit_orders(struct player *pplayer,
    * settlers on city founding mission, city spot reservation
    * from goto_tile must be freed, and free_unit_orders() loses
    * goto_tile information */
-  if (punit->server.adv->role != AIUNIT_NONE) {
-    ai_unit_new_role(punit, AIUNIT_NONE, NULL);
-  }
+  adv_unit_new_task(punit, AUT_NONE, NULL);
 
   free_unit_orders(punit);
   /* If we waited on a tile, reset punit->done_moving */
@@ -2240,10 +2440,34 @@ void handle_unit_orders(struct player *pplayer,
     punit->orders.list[i].dir = packet->dir[i];
     punit->orders.list[i].activity = packet->activity[i];
     punit->orders.list[i].base = packet->base[i];
+    punit->orders.list[i].road = packet->road[i];
+  }
+
+  /* Determine if the last move is safe or not. */
+  punit->server.last_order_move_is_safe = TRUE;
+  if (dest_tile != NULL) {
+    /* Is a city visible for player? */
+    psite = map_get_player_city(dest_tile, pplayer);
+    if (psite != NULL
+        && psite->identity > IDENTITY_NUMBER_ZERO
+        && psite->owner != NULL
+        && !pplayers_allied(pplayer, psite->owner)) {
+      punit->server.last_order_move_is_safe = FALSE;
+    }
+
+    if (punit->server.last_order_move_is_safe) {
+      unit_list_iterate(dest_tile->units, aunit) {
+        if (!pplayers_allied(pplayer, unit_owner(aunit))
+            && can_player_see_unit(pplayer, aunit)) {
+          punit->server.last_order_move_is_safe = FALSE;
+          break;
+        }
+      } unit_list_iterate_end;
+    }
   }
 
   if (!packet->repeat) {
-    punit->goto_tile = index_to_tile(packet->dest_tile);
+    punit->goto_tile = dest_tile;
   }
 
 #ifdef DEBUG

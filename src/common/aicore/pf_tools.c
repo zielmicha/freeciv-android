@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -40,20 +40,37 @@ static inline int single_move_cost(const struct pf_parameter *param,
                                    const struct tile *dest_tile)
 {
   if (!tile_city(dest_tile)
-      && BV_ISSET(param->unit_flags, F_TRIREME)
+      && BV_ISSET(param->unit_flags, UTYF_TRIREME)
       && !is_safe_ocean(dest_tile)) {
     return PF_IMPOSSIBLE_MC;
-  } else if (uclass_has_flag(param->uclass, UCF_TERRAIN_SPEED)) {
-    return map_move_cost(param->owner, src_tile, dest_tile);
   } else {
-    return SINGLE_MOVE;
+    return map_move_cost(param->owner, param->uclass, src_tile, dest_tile);
   }
+}
+
+/***************************************************************************
+  Whether there is potentially a transport that can be used as a waypoint
+  for the planned move.
+***************************************************************************/
+static bool
+pf_potential_unit_class_transport(const struct pf_parameter *param,
+                                  const struct tile *ptile)
+{
+  unit_list_iterate(ptile->units, punit) {
+    if (pplayers_allied(unit_owner(punit), param->owner)
+        && can_unit_type_transport(unit_type(punit), param->uclass)
+        && !unit_has_orders(punit)) {
+      return TRUE;
+    }
+  } unit_list_iterate_end;
+
+  return FALSE;
 }
 
 /* ===================== Move Cost Callbacks ========================= */
 
 /*************************************************************
-  A cost function for SEA_MOVING.  Allows shore bombardment.
+  A cost function for UMT_SEA.  Allows shore bombardment.
   Should be used in conjunction with a TB callback which 
   prohibits going through an enemy city/tile.
 *************************************************************/
@@ -90,7 +107,7 @@ static int airmove(const struct tile *ptile, enum direction8 dir,
 }
 
 /**************************************************************************
-  A cost function for SEA_MOVING.  Does not allow shore bombardment.
+  A cost function for UMT_SEA.  Does not allow shore bombardment.
 ***************************************************************************/
 static int seamove_no_bombard(const struct tile *ptile, enum direction8 dir,
                               const struct tile *ptile1,
@@ -163,13 +180,20 @@ static int normal_move_unit(const struct tile *ptile, enum direction8 dir,
   int move_cost;
 
   if (!is_native_tile_to_class(param->uclass, ptile1)) {
-    if (unit_class_transporter_capacity(ptile1, param->owner, param->uclass) > 0) {
+    if (pf_potential_unit_class_transport(param, ptile1)) {
       move_cost = SINGLE_MOVE;
+    } else if (tile_city(ptile1)
+               && (uclass_has_flag(param->uclass, UCF_BUILD_ANYWHERE)
+                   || is_native_near_tile(param->uclass, ptile)
+                   || (1 == game.info.citymindist
+                       && is_city_channel_tile(param->uclass, ptile, NULL)))) {
+      move_cost = single_move_cost(param, ptile, ptile1);
     } else {
       move_cost = PF_IMPOSSIBLE_MC;
     }
   } else if (!is_native_tile_to_class(param->uclass, ptile)) {
-    if (!BV_ISSET(param->unit_flags, F_MARINES)
+    if (!BV_ISSET(param->unit_flags, UTYF_MARINES)
+        && !uclass_has_flag(param->uclass, UCF_ATT_FROM_NON_NATIVE)
         && (is_non_allied_unit_tile(ptile1, param->owner) 
             || is_non_allied_city_tile(ptile1, param->owner))) {
       move_cost = PF_IMPOSSIBLE_MC;
@@ -197,8 +221,7 @@ static int land_attack_move(const struct tile *src_tile,
   if (!is_native_tile_to_class(param->uclass, tgt_tile)) {
 
     /* Any-to-Sea */
-    if (unit_class_transporter_capacity(tgt_tile, param->owner,
-                                        param->uclass) > 0) {
+    if (pf_potential_unit_class_transport(param, tgt_tile)) {
       move_cost = SINGLE_MOVE;
     } else {
       move_cost = PF_IMPOSSIBLE_MC;
@@ -209,7 +232,8 @@ static int land_attack_move(const struct tile *src_tile,
     if (!is_non_allied_unit_tile(tgt_tile, param->owner)
         && !is_non_allied_city_tile(tgt_tile, param->owner)) {
       move_cost = tile_terrain(tgt_tile)->movement_cost * SINGLE_MOVE;
-    } else if (BV_ISSET(param->unit_flags, F_MARINES)) {
+    } else if (BV_ISSET(param->unit_flags, UTYF_MARINES)
+               || uclass_has_flag(param->uclass, UCF_ATT_FROM_NON_NATIVE)) {
       /* Can attack!! */
       move_cost = single_move_cost(param, src_tile, tgt_tile);
     } else {
@@ -278,7 +302,7 @@ static int reverse_move_unit(const struct tile *tile0,
 {
   int move_cost = PF_IMPOSSIBLE_MC;
 
-  if (!is_native_to_class(param->uclass, ptile)) {
+  if (!is_native_tile_to_class(param->uclass, ptile)) {
     if (unit_class_transporter_capacity(ptile, param->owner,
                                         param->uclass) > 0) {
       /* Landing */
@@ -296,7 +320,7 @@ static int reverse_move_unit(const struct tile *tile0,
 
   return move_cost;
 }
-#endif
+#endif /* UNUSED */
 
 /************************************************************ 
   IGTER_MOVE cost function for a unit 
@@ -311,24 +335,27 @@ static int igter_move_unit(const struct tile *ptile,
   if (!is_native_tile_to_class(param->uclass, ptile1)) {
     if (unit_class_transporter_capacity(ptile1, param->owner,
                                         param->uclass) > 0) {
-      move_cost = MOVE_COST_ROAD;
+      move_cost = MOVE_COST_IGTER;
     } else {
       move_cost = PF_IMPOSSIBLE_MC;
     }
   } else if (!is_native_tile_to_class(param->uclass, ptile)) {
-    if (!BV_ISSET(param->unit_flags, F_MARINES)
+    if (!BV_ISSET(param->unit_flags, UTYF_MARINES)
+        && !uclass_has_flag(param->uclass, UCF_ATT_FROM_NON_NATIVE)
         && (is_non_allied_unit_tile(ptile1, param->owner) 
             || is_non_allied_city_tile(ptile1, param->owner))) {
       move_cost = PF_IMPOSSIBLE_MC;
+    } else if (game.info.slow_invasions
+               && tile_city(ptile1) == NULL) {
+      move_cost = param->move_rate;
     } else {
-      move_cost = MOVE_COST_ROAD;
+      move_cost = MOVE_COST_IGTER;
     }
-  } else if (uclass_has_flag(param->uclass, UCF_TERRAIN_SPEED)) {
-    move_cost = (map_move_cost(param->owner, ptile, ptile1) != 0
-                 ? MOVE_COST_ROAD : 0);
   } else {
-    move_cost = SINGLE_MOVE;
+    move_cost = map_move_cost(param->owner, param->uclass, ptile, ptile1);
+    move_cost = MIN(move_cost, MOVE_COST_IGTER);
   }
+
   return move_cost;
 }
 
@@ -344,24 +371,24 @@ static int reverse_igter_move_unit(const struct tile *tile0,
 {
   int move_cost;
 
-  if (!is_native_to_class(param->uclass, ptile)) {
+  if (!is_native_tile_to_class(param->uclass, ptile)) {
     if (unit_class_transporter_capacity(ptile, param->owner,
                                         param->uclass) > 0) {
       /* Landing */
-      move_cost = MOVE_COST_ROAD;
+      move_cost = MOVE_COST_IGTER;
     } else {
       move_cost = PF_IMPOSSIBLE_MC;
     }
-  } else if (!is_native_to_class(param->uclass, tile0)) {
+  } else if (!is_native_tile_to_class(param->uclass, tile0)) {
     /* Boarding */
-    move_cost = MOVE_COST_ROAD;
+    move_cost = MOVE_COST_IGTER;
   } else {
     move_cost =
-	(ptile->move_cost[DIR_REVERSE(dir)] != 0 ? MOVE_COST_ROAD : 0);
+	(ptile->move_cost[DIR_REVERSE(dir)] != 0 ? MOVE_COST_IGTER : 0);
   }
   return move_cost;
 }
-#endif
+#endif /* UNUSED */
 
 
 /****************************************************************************
@@ -386,7 +413,7 @@ static int amphibious_move(const struct tile *ptile, enum direction8 dir,
     cost = amphibious->sea.get_MC(ptile, dir, ptile1, &amphibious->sea);
     scale = amphibious->sea_scale;
   } else if (src_ferry && dst_psng) {
-    /* Disembark; use land movement function to handle F_MARINES */
+    /* Disembark; use land movement function to handle UTYF_MARINES */
     cost = amphibious->land.get_MC(ptile, dir, ptile1, &amphibious->land);
     scale = amphibious->land_scale;
   } else if (src_ferry) {
@@ -430,7 +457,7 @@ static int afraid_of_dark_forest(const struct tile *ptile,
 
   return 0;
 }
-#endif
+#endif /* UNUSED */
 
 /****************************************************************************
   Extra cost call back for amphibious movement
@@ -569,13 +596,14 @@ static bool is_possible_base_fuel(const struct tile *ptile,
     return TRUE;
   }
 
-  base_type_iterate(pbase) {
-    /* All airbases are considered possible, simply attack enemies. */
-    if (tile_has_base(ptile, pbase)
-        && is_native_base_to_uclass(pbase, param->uclass)) {
-      return TRUE;
-    }
-  } base_type_iterate_end;
+  if (param->uclass->cache.refuel_bases != NULL) {
+    base_type_list_iterate(param->uclass->cache.refuel_bases, pbase) {
+      /* All airbases are considered possible, simply attack enemies. */
+      if (tile_has_base(ptile, pbase)) {
+        return TRUE;
+      }
+    } base_type_list_iterate_end;
+  }
 
   if (tile_known == TILE_KNOWN_UNSEEN) {
     /* Cannot see units */
@@ -585,6 +613,7 @@ static bool is_possible_base_fuel(const struct tile *ptile,
   /* Check for carriers */
   unit_list_iterate(ptile->units, ptrans) {
     if (can_unit_type_transport(unit_type(ptrans), param->uclass)
+        && !unit_has_orders(ptrans)
         && (get_transporter_occupancy(ptrans)
             < get_transporter_capacity(ptrans))) {
       return TRUE;
@@ -624,17 +653,18 @@ static int get_fuel_moves_left_req(const struct tile *ptile,
                                    enum known_type known,
                                    const struct pf_parameter *param)
 {
-  int dist, max, mli;
+  int dist, max;
 
   if (is_possible_base_fuel(ptile, param)) {
     return 0;
   }
 
-  mli = param->moves_left_initially;
-  max = MAX(mli + ((mli - 1) * param->move_rate),
+  /* Upper bound for search for refuel point. Sometimes unit can have more
+   * moves left than its own move rate due to wonder transfer. Compare
+   * pf_moves_left_initially(). */
+  max = MAX(param->moves_left_initially
+            + (param->fuel_left_initially - 1) * param->move_rate,
             param->move_rate * param->fuel);
-  /* Sometimes, unit can have bigger moves left than its own move rate,
-   * due to wonder transfer. See comment for get_turn() in path_finding.c. */
   dist = get_closest_safe_tile_distance(ptile, param, max / SINGLE_MOVE);
 
   return dist != -1 ? dist * SINGLE_MOVE : PF_IMPOSSIBLE_MC;
@@ -674,19 +704,8 @@ static void pft_fill_default_parameter(struct pf_parameter *parameter,
   parameter->unknown_MC = SINGLE_MOVE;
 
   if (uclass_has_flag(punitclass, UCF_TERRAIN_SPEED)) {
-    /* Unit is subject to terrain movement costs */
-    bv_special specials;
-    bv_bases bases;
-
-    BV_CLR_ALL(specials); /* This works at the moment, since road is
-                           * only special that affects is_native_terrain()
-                           * Even if tile contains road, we can safely
-                           * ignore it since movement cost for it is
-                           * certainly less than SINGLE_MOVE. */
-    BV_CLR_ALL(bases);
-
     terrain_type_iterate(pterrain) {
-      if (is_native_terrain(punittype, pterrain, specials, bases)) {
+      if (is_native_terrain(punittype, pterrain, NULL, NULL)) {
         /* Exact movement cost matters only if we can enter
          * the tile. */
         int mr = 2 * pterrain->movement_cost;
@@ -698,7 +717,7 @@ static void pft_fill_default_parameter(struct pf_parameter *parameter,
       }
     } terrain_type_iterate_end;
   }
-  if (uclass_move_type(punitclass) == SEA_MOVING) {
+  if (uclass_move_type(punitclass) == UMT_SEA) {
     /* Sailing units explore less */
     parameter->unknown_MC *= 2;
   }
@@ -737,7 +756,7 @@ static void pft_fill_utype_default_parameter(struct pf_parameter *parameter,
   }
   parameter->owner = powner;
 
-  if (!BV_ISSET(parameter->unit_flags, F_CIVILIAN)) {
+  if (!BV_ISSET(parameter->unit_flags, UTYF_CIVILIAN)) {
     parameter->can_invade_tile = player_can_invade_tile;
   } else {
     parameter->can_invade_tile = NULL;
@@ -766,7 +785,7 @@ static void pft_fill_unit_default_parameter(struct pf_parameter *parameter,
   }
   parameter->owner = unit_owner(punit);
 
-  if (!BV_ISSET(parameter->unit_flags, F_CIVILIAN)) {
+  if (!BV_ISSET(parameter->unit_flags, UTYF_CIVILIAN)) {
     parameter->can_invade_tile = player_can_invade_tile;
   } else {
     parameter->can_invade_tile = NULL;
@@ -782,21 +801,21 @@ static void pft_fill_parameter(struct pf_parameter *parameter,
                                const struct unit_type *punittype)
 {
   switch (utype_move_type(punittype)) {
-  case LAND_MOVING:
-    if (utype_has_flag(punittype, F_IGTER)) {
+  case UMT_LAND:
+    if (utype_has_flag(punittype, UTYF_IGTER)) {
       parameter->get_MC = igter_move_unit;
     } else {
       parameter->get_MC = normal_move_unit;
     }
     break;
-  case SEA_MOVING:
+  case UMT_SEA:
     if (can_attack_non_native(punittype)) {
       parameter->get_MC = seamove;
     } else {
       parameter->get_MC = seamove_no_bombard;
     }
     break;
-  case BOTH_MOVING:
+  case UMT_BOTH:
     parameter->get_MC = airmove;
     break;
   default:
@@ -849,14 +868,14 @@ static void pft_fill_overlap_param(struct pf_parameter *parameter,
                                    const struct unit_type *punittype)
 {
   switch (utype_move_type(punittype)) {
-  case LAND_MOVING:
+  case UMT_LAND:
     parameter->get_MC = land_overlap_move;
     parameter->get_TB = dont_cross_ocean;
     break;
-  case SEA_MOVING:
+  case UMT_SEA:
     parameter->get_MC = sea_overlap_move;
     break;
-  case BOTH_MOVING:
+  case UMT_BOTH:
     parameter->get_MC = airmove; /* very crude */
     break;
   default:
@@ -906,13 +925,13 @@ static void pft_fill_attack_param(struct pf_parameter *parameter,
                                   const struct unit_type *punittype)
 {
   switch (utype_move_type(punittype)) {
-  case LAND_MOVING:
+  case UMT_LAND:
     parameter->get_MC = land_attack_move;
     break;
-  case SEA_MOVING:
+  case UMT_SEA:
     parameter->get_MC = sea_attack_move;
     break;
-  case BOTH_MOVING:
+  case UMT_BOTH:
     parameter->get_MC = airmove; /* very crude */
     break;
   default:
@@ -989,66 +1008,3 @@ void pft_fill_amphibious_parameter(struct pft_amphibious *parameter)
   parameter->combined.data = parameter;
 }
 
-/**********************************************************************
-  Concatenate two paths together.  The additional segment (src_path)
-  should start where the initial segment (dest_path) stops.  The
-  overlapping position is removed.
-
-  If dest_path == NULL, we just copy the src_path and nothing else.
-***********************************************************************/
-struct pf_path *pft_concat(struct pf_path *dest_path,
-			   const struct pf_path *src_path)
-{
-  if (!dest_path) {
-    dest_path = fc_malloc(sizeof(*dest_path));
-    dest_path->length = src_path->length;
-    dest_path->positions =
-	fc_malloc(sizeof(*dest_path->positions) * dest_path->length);
-    memcpy(dest_path->positions, src_path->positions,
-	   sizeof(*dest_path->positions) * dest_path->length);
-  } else {
-    int old_length = dest_path->length;
-
-    fc_assert_ret_val(pf_path_last_position(dest_path)->tile
-                      == src_path->positions[0].tile, NULL);
-    fc_assert_ret_val(pf_path_last_position(dest_path)->moves_left
-                      == src_path->positions[0].moves_left, NULL);
-    dest_path->length += src_path->length - 1;
-    dest_path->positions =
-	fc_realloc(dest_path->positions,
-		   sizeof(*dest_path->positions) * dest_path->length);
-    /* Be careful to include the first position of src_path, it contains
-     * the direction (it is undefined in the last position of dest_path) */
-    memcpy(dest_path->positions + old_length - 1, src_path->positions,
-	   src_path->length * sizeof(*dest_path->positions));
-  }
-  return dest_path;
-}
-
-/****************************************************************************
-  Remove the part of a path leading up to a given tile.
-  If given tile is on the path more than once
-  then the first occurrance will be the one used.
-  If tile is not on the path at all, returns FALSE and
-  path is not changed at all.
-****************************************************************************/
-bool pft_advance_path(struct pf_path *path, struct tile *ptile)
-{
-  int i;
-  struct pf_position *new_positions;
-
-  for (i = 0; path->positions[i].tile != ptile ; i++) {
-    if (i >= path->length) {
-      return FALSE;
-    }
-  }
-  fc_assert_ret_val(i < path->length, FALSE);
-  path->length -= i;
-  new_positions = fc_malloc(sizeof(*path->positions) * path->length);
-  memcpy(new_positions, path->positions + i,
-	 path->length * sizeof(*path->positions));
-  free(path->positions);
-  path->positions = new_positions;
-
-  return TRUE;
-}

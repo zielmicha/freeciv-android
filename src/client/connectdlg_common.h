@@ -13,11 +13,12 @@ Freeciv - Copyright (C) 2003 - The Freeciv Project
 #ifndef FC__CONNECTDLG_COMMON_H
 #define FC__CONNECTDLG_COMMON_H
 
-#include "shared.h"
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-#if defined(HAVE_WORKING_FORK) || defined(WIN32_NATIVE)
-# define CLIENT_CAN_LAUNCH_SERVER
-#endif
+/* utility */
+#include "support.h" /* bool */
 
 bool client_start_server(void);
 void client_kill_server(bool force);
@@ -26,8 +27,12 @@ bool is_server_running(void);
 bool can_client_access_hack(void);
 
 void send_client_wants_hack(const char *filename);
-void send_save_game(char *filename);
+void send_save_game(const char *filename);
 
 void set_ruleset(const char *ruleset);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__CONNECTDLG_COMMON_H */ 

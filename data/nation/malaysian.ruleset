@@ -17,10 +17,9 @@ leaders = {
 }
 
 ruler_titles = {
- "government",      "male_title",           "female_title"
- "Monarchy",        _("Sultan %s"),         _("Sultana %s")
- "Republic",        _("Tun %s"),            _("?female:Tun %s")
- "Democracy",       _("Prime Minister %s"), _("?female:Prime Minister %s")
+ "government",      "male_title",            "female_title"
+ "Fundamentalism",  _("Mullah %s"),          _("?female:Mullah %s")
+ "Monarchy",        _("Paramount Ruler %s"), _("?female:Paramount Ruler %s")
 }
 
 flag = "malaysia"
@@ -29,12 +28,11 @@ city_style = "Tropical"
 
 init_techs = ""
 init_buildings = ""
-init_government = "Despotism"
 init_units = ""
 
 ; Similar flags
 conflicts_with = "american"
-civilwar_nations = "singaporean", "indonesian", "malagasy"
+civilwar_nations = "singaporean", "indonesian", "bruneian"
 
 cities =
  "Kuala Lumpur",

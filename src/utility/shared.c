@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #ifdef HAVE_SYS_TYPES_H
@@ -30,17 +30,34 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef HAVE_LOCALE_H
+#include <locale.h>
+#endif
+
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+/* Must be before <windows.h> */
+#ifdef HAVE_WINSOCK
+#ifdef HAVE_WINSOCK2
+#include <winsock2.h>
+#else  /* HAVE_WINSOCK2 */
+#include <winsock.h>
+#endif /* HAVE_WINSOCK2 */
+#endif /* HAVE_WINSOCK */
+
 #ifdef WIN32_NATIVE
 #include <windows.h>
 #include <lmcons.h>	/* UNLEN */
 #include <shlobj.h>
-#endif
+#ifdef HAVE_DIRECT_H
+#include <direct.h>
+#endif /* HAVE_DIRECT_H */
+#endif /* WIN32_NATIVE */
 
 /* utility */
 #include "astring.h"
@@ -78,7 +95,7 @@
 #ifndef DEFAULT_SCENARIO_PATH
 #define DEFAULT_SCENARIO_PATH                          \
   "." PATH_SEPARATOR                                   \
-  "data/scenario" PATH_SEPARATOR                       \
+  "data/scenarios" PATH_SEPARATOR                      \
   "~/.freeciv/" DATASUBDIR "/scenarios" PATH_SEPARATOR \
   "~/.freeciv/scenarios"
 #endif /* DEFAULT_SCENARIO_PATH */
@@ -102,8 +119,19 @@
 static char *grouping = NULL;
 static char *grouping_sep = NULL;
 
+/* As well as base64 functions, this string is used for checking for
+ * 'safe' filenames, so should not contain / \ . */
 static const char base64url[] =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+static struct strvec *data_dir_names = NULL;
+static struct strvec *save_dir_names = NULL;
+static struct strvec *scenario_dir_names = NULL;
+
+static char *mc_group = NULL;
+static char *home_dir = NULL;
+
+static struct astring realfile = ASTRING_INIT;
 
 static int compare_file_mtime_ptrs(const struct fileinfo *const *ppa,
                                    const struct fileinfo *const *ppb);
@@ -219,7 +247,8 @@ char *get_option_malloc(const char *option_name,
 }
 
 /***************************************************************
-...
+  Is option some form of option_name. option_name must be
+  full length long version such as "--help"
 ***************************************************************/
 bool is_option(const char *option_name,char *option)
 {
@@ -579,7 +608,7 @@ char *skip_leading_spaces(char *s)
   Removes leading spaces in string pointed to by 's'.
   Note 's' must point to writeable memory!
 ***************************************************************************/
-static void remove_leading_spaces(char *s)
+void remove_leading_spaces(char *s)
 {
   char *t;
 
@@ -597,7 +626,7 @@ static void remove_leading_spaces(char *s)
   Terminates string pointed to by 's' to remove traling spaces;
   Note 's' must point to writeable memory!
 ***************************************************************************/
-static void remove_trailing_spaces(char *s)
+void remove_trailing_spaces(char *s)
 {
   char *t;
   size_t len;
@@ -727,14 +756,13 @@ char *user_home_dir(void)
 {
 #ifdef AMIGA
   return "PROGDIR:";
-#else
-  static bool init = FALSE;
-  static char *home_dir = NULL;
+#else  /* AMIGA */
 
-  if (!init) {
+  if (home_dir == NULL) {
     char *env = getenv("HOME");
+
     if (env) {
-      home_dir = fc_strdup(env);        /* never free()d */
+      home_dir = fc_strdup(env);
       log_verbose("HOME is %s", home_dir);
     } else {
 
@@ -780,16 +808,26 @@ char *user_home_dir(void)
         log_error("Could not find home directory "
                   "(SHGetSpecialFolderLocation() failed).");
       }
-#else
+#else  /* WIN32_NATIVE */
       log_error("Could not find home directory (HOME is not set).");
       home_dir = NULL;
-#endif
+#endif /* WIN32_NATIVE */
     }
-    init = TRUE;
   }
 
   return home_dir;
-#endif
+#endif /* AMIGA */
+}
+
+/***************************************************************************
+  Free user home directory information
+***************************************************************************/
+void free_user_home_dir(void)
+{
+  if (home_dir != NULL) {
+    free(home_dir);
+    home_dir = NULL;
+  }
 }
 
 /***************************************************************************
@@ -834,7 +872,7 @@ char *user_username(char *buf, size_t bufsz)
       }
     }
   }
-#endif
+#endif /* HAVE_GETPWUID */
 
 #ifdef WIN32_NATIVE
   /* On win32 the GetUserName function will give us the login name. */
@@ -850,7 +888,7 @@ char *user_username(char *buf, size_t bufsz)
       }
     }
   }
-#endif
+#endif /* WIN32_NATIVE */
 
 #ifdef ALWAYS_ROOT
   fc_strlcpy(buf, "name", bufsz);
@@ -924,10 +962,30 @@ static struct strvec *base_get_dirs(const char *dir_list)
 }
 
 /***************************************************************************
+  Free data dir name vectors.
+***************************************************************************/
+void free_data_dir_names(void)
+{
+  if (data_dir_names != NULL) {
+    strvec_destroy(data_dir_names);
+    data_dir_names = NULL;
+  }
+  if (save_dir_names != NULL) {
+    strvec_destroy(save_dir_names);
+    save_dir_names = NULL;
+  }
+  if (scenario_dir_names != NULL) {
+    strvec_destroy(scenario_dir_names);
+    scenario_dir_names = NULL;
+  }
+}
+
+/***************************************************************************
   Returns a list of data directory paths, in the order in which they should
   be searched.  These paths are specified internally or may be set as the
-  environment variable $FREECIV_PATH (a separated list of directories,
+  environment variable $FREECIV_DATA PATH (a separated list of directories,
   where the separator itself is specified internally, platform-dependent).
+  FREECIV_PATH may also be consulted for backward compatibility.
   '~' at the start of a component (provided followed by '/' or '\0') is
   expanded as $HOME.
 
@@ -936,12 +994,10 @@ static struct strvec *base_get_dirs(const char *dir_list)
 ***************************************************************************/
 const struct strvec *get_data_dirs(void)
 {
-  static struct strvec *dirs = NULL;
-
   /* The first time this function is called it will search and
    * allocate the directory listing.  Subsequently we will already
    * know the list and can just return it. */
-  if (NULL == dirs) {
+  if (NULL == data_dir_names) {
     const char *path;
 
     if ((path = getenv(FREECIV_DATA_PATH)) && '\0' == path[0]) {
@@ -957,21 +1013,22 @@ const struct strvec *get_data_dirs(void)
                 FREECIV_PATH, DEFAULT_DATA_PATH);
       path = NULL;
     }
-    dirs = base_get_dirs(NULL != path ? path : DEFAULT_DATA_PATH);
-    strvec_remove_duplicate(dirs, strcmp);      /* Don't set a path both. */
-    strvec_iterate(dirs, dirname) {
+    data_dir_names = base_get_dirs(NULL != path ? path : DEFAULT_DATA_PATH);
+    strvec_remove_duplicate(data_dir_names, strcmp); /* Don't set a path both. */
+    strvec_iterate(data_dir_names, dirname) {
       log_verbose("Data path component: %s", dirname);
     } strvec_iterate_end;
   }
 
-  return dirs;
+  return data_dir_names;
 }
 
 /***************************************************************************
   Returns a list of save directory paths, in the order in which they should
   be searched.  These paths are specified internally or may be set as the
-  environment variable $FREECIV_PATH (a separated list of directories,
+  environment variable $FREECIV_SAVE_PATH (a separated list of directories,
   where the separator itself is specified internally, platform-dependent).
+  FREECIV_PATH may also be consulted for backward compatibility.
   '~' at the start of a component (provided followed by '/' or '\0') is
   expanded as $HOME.
 
@@ -980,12 +1037,10 @@ const struct strvec *get_data_dirs(void)
 ***************************************************************************/
 const struct strvec *get_save_dirs(void)
 {
-  static struct strvec *dirs = NULL;
-
   /* The first time this function is called it will search and
    * allocate the directory listing.  Subsequently we will already
    * know the list and can just return it. */
-  if (NULL == dirs) {
+  if (NULL == save_dir_names) {
     const char *path;
     bool from_freeciv_path = FALSE;
 
@@ -1006,33 +1061,34 @@ const struct strvec *get_save_dirs(void)
         from_freeciv_path = TRUE;
       }
     }
-    dirs = base_get_dirs(NULL != path ? path : DEFAULT_SAVE_PATH);
+    save_dir_names = base_get_dirs(NULL != path ? path : DEFAULT_SAVE_PATH);
     if (from_freeciv_path) {
       /* Then also append a "/saves" suffix to every directory. */
       char buf[512];
       size_t i;
 
-      for (i = 0; i < strvec_size(dirs); i++) {
-        path = strvec_get(dirs, i);
+      for (i = 0; i < strvec_size(save_dir_names); i++) {
+        path = strvec_get(save_dir_names, i);
         fc_snprintf(buf, sizeof(buf), "%s/saves", path);
-        strvec_insert(dirs, ++i, buf);
+        strvec_insert(save_dir_names, ++i, buf);
       }
     }
-    strvec_remove_duplicate(dirs, strcmp);      /* Don't set a path both. */
-    strvec_iterate(dirs, dirname) {
+    strvec_remove_duplicate(save_dir_names, strcmp); /* Don't set a path both. */
+    strvec_iterate(save_dir_names, dirname) {
       log_verbose("Save path component: %s", dirname);
     } strvec_iterate_end;
   }
 
-  return dirs;
+  return save_dir_names;
 }
 
 /***************************************************************************
   Returns a list of scenario directory paths, in the order in which they
   should be searched.  These paths are specified internally or may be set
-  as the environment variable $FREECIV_PATH (a separated list of
+  as the environment variable $FREECIV_SCENARIO_PATH (a separated list of
   directories, where the separator itself is specified internally,
-  platform-dependent).  '~' at the start of a component (provided followed
+  platform-dependent).  FREECIV_PATH may also be consulted for backward
+  compatibility.  '~' at the start of a component (provided followed
   by '/' or '\0') is expanded as $HOME.
 
   The returned pointer is static and shouldn't be modified, nor destroyed
@@ -1040,17 +1096,15 @@ const struct strvec *get_save_dirs(void)
 ***************************************************************************/
 const struct strvec *get_scenario_dirs(void)
 {
-  static struct strvec *dirs = NULL;
-
   /* The first time this function is called it will search and
    * allocate the directory listing.  Subsequently we will already
    * know the list and can just return it. */
-  if (NULL == dirs) {
+  if (NULL == scenario_dir_names) {
     const char *path;
     bool from_freeciv_path = FALSE;
 
     if ((path = getenv(FREECIV_SCENARIO_PATH)) && '\0' == path[0]) {
-      /* TRANS: <FREECIV_SAVE_PATH> configuration error */
+      /* TRANS: <FREECIV_SCENARIO_PATH> configuration error */
       log_error(_("\"%s\" is set but empty; trying \"%s\" instead."),
                 FREECIV_SCENARIO_PATH, FREECIV_PATH);
       path = NULL;
@@ -1066,7 +1120,7 @@ const struct strvec *get_scenario_dirs(void)
         from_freeciv_path = TRUE;
       }
     }
-    dirs = base_get_dirs(NULL != path ? path : DEFAULT_SCENARIO_PATH);
+    scenario_dir_names = base_get_dirs(NULL != path ? path : DEFAULT_SCENARIO_PATH);
     if (from_freeciv_path) {
       /* Then also append subdirs every directory. */
       const char *subdirs[] = {
@@ -1076,21 +1130,21 @@ const struct strvec *get_scenario_dirs(void)
       const char **subdir;
       size_t i;
 
-      for (i = 0; i < strvec_size(dirs); i++) {
-        path = strvec_get(dirs, i);
+      for (i = 0; i < strvec_size(scenario_dir_names); i++) {
+        path = strvec_get(scenario_dir_names, i);
         for (subdir = subdirs; NULL != *subdir; subdir++) {
           fc_snprintf(buf, sizeof(buf), "%s/%s", path, *subdir);
-          strvec_insert(dirs, ++i, buf);
+          strvec_insert(scenario_dir_names, ++i, buf);
         }
       }
     }
-    strvec_remove_duplicate(dirs, strcmp);      /* Don't set a path both. */
-    strvec_iterate(dirs, dirname) {
+    strvec_remove_duplicate(scenario_dir_names, strcmp);      /* Don't set a path both. */
+    strvec_iterate(scenario_dir_names, dirname) {
       log_verbose("Scenario path component: %s", dirname);
     } strvec_iterate_end;
   }
 
-  return dirs;
+  return scenario_dir_names;
 }
 
 /***************************************************************************
@@ -1174,11 +1228,11 @@ struct strvec *fileinfolist(const struct strvec *dirs, const char *suffix)
   read-opened.)  The returned pointer points to static memory, so this
   function can only supply one filename at a time.  Don't free that
   pointer.
+
+  TODO: Make this re-entrant
 ***************************************************************************/
 const char *fileinfoname(const struct strvec *dirs, const char *filename)
 {
-  static struct astring realfile = ASTRING_INIT;
-
   if (NULL == dirs) {
     return NULL;
   }
@@ -1195,6 +1249,7 @@ const char *fileinfoname(const struct strvec *dirs, const char *filename)
         astr_add(&realfile, "%s", dirname);
       }
     } strvec_iterate_end;
+
     return astr_str(&realfile);
   }
 
@@ -1208,7 +1263,16 @@ const char *fileinfoname(const struct strvec *dirs, const char *filename)
   } strvec_iterate_end;
 
   log_verbose("Could not find readable file \"%s\" in data path.", filename);
+
   return NULL;
+}
+
+/**************************************************************************
+  Free resources allocated for fileinfoname service
+**************************************************************************/
+void free_fileinfo_data(void)
+{
+  astr_free(&realfile);
 }
 
 /**************************************************************************
@@ -1334,30 +1398,6 @@ struct fileinfo_list *fileinfolist_infix(const struct strvec *dirs,
 }
 
 /***************************************************************************
-  As datafilename(), above, except die with an appropriate log
-  message if we can't find the file in the datapath.
-***************************************************************************/
-const char *fileinfoname_required(const struct strvec *dirs,
-                                  const char *filename)
-{
-  const char *dname;
-
-  fc_assert_exit(NULL != filename);
-  dname = fileinfoname(dirs, filename);
-
-  if (dname) {
-    return dname;
-  } else {
-    /* TRANS: <FREECIV_PATH> configuration error */
-    log_error(_("The path may be set via the \"%s\" environment variable."),
-              FREECIV_PATH);
-    log_error(_("Current path is: \"%s\""), fileinfoname(dirs, NULL));
-    log_fatal(_("The \"%s\" file is required ... aborting!"), filename);
-    exit(EXIT_FAILURE);
-  }
-}
-
-/***************************************************************************
   Language environmental variable (with emulation).
 ***************************************************************************/
 char *get_langname(void)
@@ -1416,12 +1456,7 @@ char *get_langname(void)
       case LANG_DUTCH:
         return "nl";
       case LANG_NORWEGIAN:
-        switch (SUBLANGID(GetUserDefaultLangID())) {
-          case SUBLANG_NORWEGIAN_BOKMAL:
-            return "nb";
-          default:
-            return "no";
-        }
+        return "nb";
       case LANG_POLISH:
         return "pl";
       case LANG_PORTUGUESE:
@@ -1474,7 +1509,7 @@ void init_nls(void)
     fc_snprintf(envstr, sizeof(envstr), "LANG=%s", langname);
     putenv(envstr);
   }
-#endif
+#endif /* WIN32_NATIVE */
 
   (void) setlocale(LC_ALL, "");
   (void) bindtextdomain(PACKAGE, LOCALEDIR);
@@ -1511,7 +1546,26 @@ void init_nls(void)
     free(grouping_sep);
     grouping_sep = fc_strdup(lc->thousands_sep);
   }
-#endif
+
+  {
+    char *autocap_opt_in[] = { "fi", NULL };
+    int i;
+    bool ac_enabled = FALSE;
+
+    char *lang = getenv("LANG");
+
+    if (lang != NULL && lang[0] != '\0' && lang[1] != '\0') {
+      for (i = 0; autocap_opt_in[i] != NULL && !ac_enabled; i++) {
+        if (lang[0] == autocap_opt_in[i][0]
+            && lang[1] == autocap_opt_in[i][1]) {
+          ac_enabled = TRUE;
+          capitalization_opt_in();
+        }
+      }
+    }
+  }
+
+#endif /* ENABLE_NLS */
 }
 
 /***************************************************************************
@@ -1546,7 +1600,7 @@ void dont_run_as_root(const char *argv0, const char *fallback)
     fc_fprintf(stderr, _("Use a non-privileged account instead.\n"));
     exit(EXIT_FAILURE);
   }
-#endif
+#endif /* ALWAYS_ROOT */
 }
 
 /***************************************************************************
@@ -1658,31 +1712,41 @@ enum m_pre_result match_prefix_full(m_pre_accessor_fn_t accessor_fn,
 ***************************************************************************/
 char *get_multicast_group(bool ipv6_prefered)
 {
-  static bool init = FALSE;
-  static char *group = NULL;
   static char *default_multicast_group_ipv4 = "225.1.1.1";
 #ifdef IPV6_SUPPORT
   /* TODO: Get useful group (this is node local) */
   static char *default_multicast_group_ipv6 = "FF31::8000:15B4";
-#endif
+#endif /* IPv6 support */
 
-  if (!init) {
+  if (mc_group == NULL) {
     char *env = getenv("FREECIV_MULTICAST_GROUP");
+
     if (env) {
-      group = fc_strdup(env);
+      mc_group = fc_strdup(env);
     } else {
 #ifdef IPV6_SUPPORT
       if (ipv6_prefered) {
-        group = fc_strdup(default_multicast_group_ipv6);
+        mc_group = fc_strdup(default_multicast_group_ipv6);
       } else
 #endif /* IPv6 support */
       {
-        group = fc_strdup(default_multicast_group_ipv4);
+        mc_group = fc_strdup(default_multicast_group_ipv4);
       }
     }
-    init = TRUE;
   }
-  return group;
+
+  return mc_group;
+}
+
+/***************************************************************************
+  Free multicast group resources
+***************************************************************************/
+void free_multicast_group(void)
+{
+  if (mc_group != NULL) {
+    free(mc_group);
+    mc_group = NULL;
+  }
 }
 
 /***************************************************************************
@@ -1794,11 +1858,11 @@ bool path_is_absolute(const char *filename)
   if (strchr(filename, ':')) {
     return TRUE;
   }
-#else
+#else  /* WIN32_NATIVE */
   if (filename[0] == '/') {
     return TRUE;
   }
-#endif
+#endif /* WIN32_NATIVE */
 
   return FALSE;
 }
@@ -2112,7 +2176,7 @@ int fc_vsnprintcf(char *buf, size_t buf_len, const char *format,
   const char *f = format;
   char *const max = buf + buf_len - 1;
   char *b = buf, *c;
-  const char *const cmax = cformat + sizeof(cformat - 2);
+  const char *const cmax = cformat + sizeof(cformat) - 2;
   int i, j;
 
   if ((size_t) -1 == sequences_num) {

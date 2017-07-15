@@ -3,11 +3,11 @@
 name=_("Australian")
 plural=_("?plural:Australians")
 groups="Modern", "Oceanian"
-legend=_("Australia was founded as a British penal colony in 1788 AD.\
- Originally comprising of several colonies (New South Wales, Victoria,\
+legend=_("Australia was founded as a British penal colony in 1788 CE.\
+ Originally comprising several colonies (New South Wales, Victoria,\
  Queensland, South Australia, Western Australia and Tasmania) it\
  became a single country in 1902.\
- It is the only country on earth to occupy an entire continent.")
+ It is the only country on Earth to occupy an entire continent.")
 
 leaders = {
  "name",                "sex"
@@ -22,8 +22,8 @@ leaders = {
 }
 
 ruler_titles = {
- "government",      "male_title",           "female_title"
- "Democracy",       _("Prime Minister %s"), _("?female:Prime Minister %s")
+ "government",      "male_title",   "female_title"
+ "Fundamentalism",  _("Bishop %s"), _("?female:Bishop %s")
 }
 
 flag="australia"
@@ -32,9 +32,8 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations="Australian Aboriginal", "British"
+civilwar_nations="Australian Aboriginal", "Nauruan"
 
 cities =
  "Canberra (river, hills, forest, !desert, !ocean)",

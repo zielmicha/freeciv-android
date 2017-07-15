@@ -12,131 +12,28 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
+
+/* utility */
+#include "shared.h"
+#include "mem.h"
 
 #include "SDL.h"
 #include "SDL_image.h"
 
-/* utility */
-#include "fcintl.h"
-#include "log.h"
-#include "mem.h"
+struct color {
+  SDL_Color *color;
+};
 
 /* client/gui-sdl */
-#include "graphics.h"
 
-#include "sprite.h"
 
-static struct sprite *ctor_sprite(SDL_Surface *pSurface);
+struct sprite {
+  struct SDL_Surface *psurface;
+};
 
-/****************************************************************************
-  Return a NULL-terminated, permanently allocated array of possible
-  graphics types extensions.  Extensions listed first will be checked
-  first.
-****************************************************************************/
-const char **gfx_fileextensions(void)
-{
-  static const char *ext[] = {
-    "png",
-    "xpm",
-    NULL
-  };
 
-  return ext;
-}
-
-/****************************************************************************
-  Load the given graphics file into a sprite.  This function loads an
-  entire image file, which may later be broken up into individual sprites
-  with crop_sprite.
-****************************************************************************/
-struct sprite * load_gfxfile(const char *filename)
-{
-  SDL_Surface *pNew = NULL;
-  SDL_Surface *pBuf = NULL;
-
-  if ((pBuf = IMG_Load(filename)) == NULL) {
-    log_error(_("load_gfxfile: Unable to load graphic file %s!"), filename);
-    return NULL;		/* Should I use abotr() ? */
-  }
-
-  if (pBuf->flags & SDL_SRCCOLORKEY) {
-    /* convert colorkey to alpha */
-    SDL_SetColorKey(pBuf, SDL_SRCCOLORKEY, pBuf->format->colorkey);
-    pNew = SDL_DisplayFormatAlpha(pBuf);
-    FREESURFACE(pBuf);
-    pBuf = pNew;
-  }
-
-  pNew = pBuf;
-  
-  return ctor_sprite(pNew);
-}
-
-/****************************************************************************
-  Create a new sprite by cropping and taking only the given portion of
-  the image.
-
-  source gives the sprite that is to be cropped.
-
-  x,y, width, height gives the rectangle to be cropped.  The pixel at
-  position of the source sprite will be at (0,0) in the new sprite, and
-  the new sprite will have dimensions (width, height).
-
-  mask gives an additional mask to be used for clipping the new
-  sprite. Only the transparency value of the mask is used in
-  crop_sprite. The formula is: dest_trans = src_trans *
-  mask_trans. Note that because the transparency is expressed as an
-  integer it is common to divide it by 256 afterwards.
-
-  mask_offset_x, mask_offset_y is the offset of the mask relative to the
-  origin of the source image.  The pixel at (mask_offset_x,mask_offset_y)
-  in the mask image will be used to clip pixel (0,0) in the source image
-  which is pixel (-x,-y) in the new image.
-****************************************************************************/
-struct sprite *crop_sprite(struct sprite *source,
-			   int x, int y, int width, int height,
-			   struct sprite *mask,
-			   int mask_offset_x, int mask_offset_y)
-{
-  SDL_Rect src_rect = {(Sint16) x, (Sint16) y, (Uint16) width, (Uint16) height};
-  SDL_Surface *pSrc = crop_rect_from_surface(GET_SURF(source), &src_rect);
-  SDL_Surface *pDest = NULL;
-
-  if (mask) {
-    pDest = mask_surface(pSrc, mask->psurface, x - mask_offset_x, y - mask_offset_y);
-    FREESURFACE(pSrc);    
-    return ctor_sprite(pDest);
-  }
-
-  return ctor_sprite(pSrc);
-}
-
-/****************************************************************************
-  Find the dimensions of the sprite.
-****************************************************************************/
-void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
-{
-  *width = GET_SURF(sprite)->w;
-  *height = GET_SURF(sprite)->h;
-}
-
-/****************************************************************************
-  Free a sprite and all associated image data.
-****************************************************************************/
-void free_sprite(struct sprite *s)
-{
-  fc_assert_ret(s != NULL);
-  FREESURFACE(GET_SURF_REAL(s));
-  FC_FREE(s);
-}
-
-/*************************************************************************/
-
-/**************************************************************************
-  Create a sprite struct and fill it with SDL_Surface pointer
-**************************************************************************/
 static struct sprite * ctor_sprite(SDL_Surface *pSurface)
 {
   struct sprite *result = fc_malloc(sizeof(struct sprite));
@@ -145,3 +42,96 @@ static struct sprite * ctor_sprite(SDL_Surface *pSurface)
 
   return result;
 }
+
+#define SDL_PublicSurface	(current_video->visible)
+
+#define SDL_HWSURFACE	0x00000001	/**< Surface is in video memory */
+#define SDL_SRCALPHA	0x00010000	/**< Blit uses source alpha blending */
+#define SDL_RLEACCELOK	0x00002000	/**< Private flag */
+
+/*
+ * Convert a surface into a format that's suitable for blitting to
+ * the screen, but including an alpha channel.
+ */
+SDL_Surface *SDL_DisplayFormatAlpha(SDL_Surface *surface)
+{
+	SDL_PixelFormat *vf;
+	SDL_PixelFormat *format;
+	SDL_Surface *converted;
+	Uint32 flags;
+	/* default to ARGB8888 */
+	Uint32 amask = 0xff000000;
+	Uint32 rmask = 0x00ff0000;
+	Uint32 gmask = 0x0000ff00;
+	Uint32 bmask = 0x000000ff;
+
+/*	if ( ! SDL_PublicSurface ) {
+		SDL_SetError("No video mode has been set");
+		return(NULL);
+	}
+	vf = SDL_PublicSurface->format;
+
+	switch(vf->BytesPerPixel) {
+	    case 2:*/
+		/* For XGY5[56]5, use, AXGY8888, where {X, Y} = {R, B}.
+		   For anything else (like ARGB4444) it doesn't matter
+		   since we have no special code for it anyway */
+/*		if ( (vf->Rmask == 0x1f) &&
+		     (vf->Bmask == 0xf800 || vf->Bmask == 0x7c00)) {
+			rmask = 0xff;
+			bmask = 0xff0000;
+		}
+		break;
+
+	    case 3:
+	    case 4:*/
+		/* Keep the video format, as long as the high 8 bits are
+		   unused or alpha */
+		if ( (vf->Rmask == 0xff) && (vf->Bmask == 0xff0000) ) {
+			rmask = 0xff;
+			bmask = 0xff0000;
+		} else if ( vf->Rmask == 0xFF00 && (vf->Bmask == 0xFF000000) ) {
+			amask = 0x000000FF;
+			rmask = 0x0000FF00;
+			gmask = 0x00FF0000;
+			bmask = 0xFF000000;
+		}
+/*		break;
+
+	    default:*/
+		/* We have no other optimised formats right now. When/if a new
+		   optimised alpha format is written, add the converter here */
+/*		break;
+	}*/
+	format = SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888);
+	flags = /*SDL_PublicSurface->flags & */SDL_HWSURFACE;
+	flags |= surface->flags & (SDL_SRCALPHA | SDL_RLEACCELOK);
+flags=0;
+	converted = SDL_ConvertSurface(surface, format, flags);
+	SDL_FreeFormat(format);
+	return(converted);
+}
+
+/****************************************************************************
+  Create a sprite with the given height, width and color.
+****************************************************************************/
+struct sprite *create_sprite(int width, int height, struct color *pcolor)
+{
+  SDL_Surface *mypixbuf = NULL;
+  SDL_Surface *pmask = NULL;
+
+  fc_assert_ret_val(width > 0, NULL);
+  fc_assert_ret_val(height > 0, NULL);
+  fc_assert_ret_val(pcolor != NULL, NULL);
+
+  mypixbuf = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 32,
+                                  0x00ff0000, 0x0000ff00, 0x000000ff,
+                                  0xff000000);
+real_output_window_append("create_sprite: code desactive", 0,0);
+  pmask = SDL_DisplayFormatAlpha(mypixbuf);
+SDL_FillRect(mypixbuf, NULL, 0xff000000);
+//  SDL_FillRect(mypixbuf, NULL, map_rgba(pmask->format, *pcolor->color));
+
+  return ctor_sprite(mypixbuf);
+}
+

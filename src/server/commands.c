@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996-2004 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,13 +12,17 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
+/* utility */
 #include "fcintl.h"
 
+/* common */
 #include "connection.h"
+#include "mapimg.h"
 
+/* server */
 #include "commands.h"
 #include "voting.h"
 
@@ -33,6 +37,9 @@ struct command {
   const char *synopsis;   /* one or few-line summary of usage */
   const char *short_help; /* one line (about 70 chars) description */
   const char *extra_help; /* extra help information; will be line-wrapped */
+  char *(*extra_help_func)(void);
+                          /* dynamically generated help; if non-NULL,
+                           * extra_help is ignored. Must be pre-translated. */
   enum cmd_echo echo;     /* Who will be notified when used. */
   int vote_flags;         /* how to handle votes */
   int vote_percent;       /* percent required, meaning depends on flags */
@@ -52,7 +59,7 @@ static struct command commands[] = {
       "choose their nation, and then the game will begin. "
       "This command is also required after loading a savegame "
       "for the game to recommence. Once the game is running this command "
-      "is no longer available, since it would have no effect."),
+      "is no longer available, since it would have no effect."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
 
@@ -70,30 +77,43 @@ static struct command commands[] = {
       "Otherwise the argument is taken as a command name or option name, "
       "and help is given for that command or option. For options, the help "
       "information includes the current and default values for that option. "
-      "The argument may be abbreviated where unambiguous."),
+      "The argument may be abbreviated where unambiguous."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
 
   {"list",	ALLOW_INFO,
    /* no translatable parameters */
    SYN_ORIG_("list\n"
+             "list colors\n"
              "list connections\n"
+             "list delegations\n"
              "list ignored users\n"
+             "list map image definitions\n"
              "list players\n"
              "list scenarios\n"
+             "list nationsets\n"
              "list teams\n"
              "list votes\n"),
    N_("Show a list of various things."),
-   N_("Show a list of connections to the server, your ignore list, "
-      "the list of the players in the game, the available scenarios, "
-      "the teams of players, or the running votes. The argument may be "
-      "abbreviated, and defaults to 'players' if absent."),
+   N_("Show a list of:\n"
+      " - the player colors,\n"
+      " - connections to the server,\n"
+      " - all player delegations,\n"
+      " - your ignore list,\n"
+      " - the list of defined map images,\n"
+      " - the list of the players in the game,\n"
+      " - the available scenarios,\n"
+      " - the available nation sets in this ruleset,\n"
+      " - the teams of players or\n"
+      " - the running votes.\n"
+      "The argument may be abbreviated, and defaults to 'players' if "
+      "absent."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"quit",	ALLOW_HACK,
    /* no translatable parameters */
    SYN_ORIG_("quit"),
-   N_("Quit the game and shutdown the server."), NULL,
+   N_("Quit the game and shutdown the server."), NULL, NULL,
    CMD_ECHO_ALL, VCF_NONE, 0
   },
   {"cut",	ALLOW_CTRL,
@@ -104,6 +124,7 @@ static struct command commands[] = {
       "from the game. If the game has not yet started that client's player "
       "is removed from the game, otherwise there is no effect on the player. "
       "Note that this command now takes connection names, not player names."),
+   NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"explain",	ALLOW_INFO,
@@ -115,6 +136,7 @@ static struct command commands[] = {
       "and is included for backward compatibility. With no arguments it "
       "gives a list of options (like 'help options'), and with an argument "
       "it gives help for a particular option (like 'help <option-name>')."),
+   NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"show",	ALLOW_INFO,
@@ -137,7 +159,7 @@ static struct command commands[] = {
       "options with this level. With \"changed\", it shows only the options "
       "which have been modified, while with \"locked\" all settings locked "
       "by the ruleset will be listed. With \"ruleset\", it will show the "
-      "current ruleset directory name."),
+      "current ruleset directory name."), NULL,
     CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"wall",	ALLOW_ADMIN,
@@ -145,7 +167,7 @@ static struct command commands[] = {
    N_("wall <message>"),
    N_("Send message to all connections."),
    N_("For each connected client, pops up a window showing the message "
-      "entered."),
+      "entered."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"connectmsg", ALLOW_ADMIN,
@@ -153,7 +175,7 @@ static struct command commands[] = {
    N_("connectmsg <message>"),
    N_("Set message to show to connecting players."),
    N_("Set message to send to clients when they connect.\n"
-      "Empty message means that no message is sent."),
+      "Empty message means that no message is sent."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"vote",	ALLOW_BASIC,
@@ -170,13 +192,13 @@ static struct command commands[] = {
       "The vote will pass immediately if more than half of the voters "
       "who have not abstained vote for it, or fail immediately if at "
       "least half of the voters who have not abstained vote against it."),
+   NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"debug",	ALLOW_CTRL,
    /* TRANS: translate text between <> only */
    N_("debug diplomacy <player>\n"
       "debug ferries\n"
-      "debug player <player>\n"
       "debug tech <player>\n"
       "debug city <x> <y>\n"
       "debug units <x> <y>\n"
@@ -185,7 +207,7 @@ static struct command commands[] = {
       "debug info"),
    N_("Turn on or off AI debugging of given entity."),
    N_("Print AI debug information about given entity and turn continuous "
-      "debugging output for this entity on or off."),
+      "debugging output for this entity on or off."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"set",	ALLOW_CTRL,
@@ -198,7 +220,7 @@ static struct command commands[] = {
       "\"bitwise\", in that they consist of a choice from a set of values; "
       "separate these with |, for instance, '/set topology wrapx|iso'. For "
       "these options, use syntax like '/set topology \"\"' to set no "
-      "values."),
+      "values."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"team",	ALLOW_CTRL,
@@ -210,29 +232,30 @@ static struct command commands[] = {
       "with averaged individual scores. Each player is always a member "
       "of a team (possibly the only member). This command changes which "
       "team a player is a member of. Use \"\" if names contain whitespace."),
+   NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"rulesetdir", ALLOW_CTRL,
    /* TRANS: translate text between <> only */
    N_("rulesetdir <directory>"),
    N_("Choose new ruleset directory or modpack."),
-   N_("Choose new ruleset directory or modpack."),
+   NULL, NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"metamessage", ALLOW_CTRL,
    /* TRANS: translate text between <> only */
-   N_("metainfo <meta-line>"),
+   N_("metamessage <meta-line>"),
    N_("Set metaserver info line."),
    N_("Set user defined metaserver info line. If parameter is omitted, "
       "previously set metamessage will be removed. For most of the time "
       "user defined metamessage will be used instead of automatically "
-      "generated messages, if it is available."),
+      "generated messages, if it is available."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"metapatches", ALLOW_HACK,
    /* TRANS: translate text between <> only */
-   N_("metapatch <meta-line>"),
-   N_("Set metaserver patches line."), NULL,
+   N_("metapatches <meta-line>"),
+   N_("Set metaserver patches line."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"metaconnection",	ALLOW_ADMIN,
@@ -243,19 +266,21 @@ static struct command commands[] = {
    N_("Control metaserver connection."),
    N_("'metaconnection ?' reports on the status of the connection to metaserver. "
       "'metaconnection down' or 'metac d' brings the metaserver connection down. "
-      "'metaconnection up' or 'metac u' brings the metaserver connection up."),
+      "'metaconnection up' or 'metac u' brings the metaserver connection up. "
+      "'metaconnection persistent' or 'metac p' is like 'up', but keeps trying after failures. "),
+   NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"metaserver",	ALLOW_ADMIN,
    /* TRANS: translate text between <> only */
    N_("metaserver <address>"),
-   N_("Set address (URL) for metaserver to report to."), NULL,
+   N_("Set address (URL) for metaserver to report to."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"aitoggle",	ALLOW_CTRL,
    /* TRANS: translate text between <> only */
    N_("aitoggle <player-name>"),
-   N_("Toggle AI status of player."), NULL,
+   N_("Toggle AI status of player."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"take",    ALLOW_INFO,
@@ -269,6 +294,7 @@ static struct command commands[] = {
       "player name and the connection does not already control a player, one "
       "is created and assigned to the connection. The 'allowtake' option "
       "controls which players may be taken and in what circumstances."),
+   NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"observe",    ALLOW_INFO,
@@ -281,7 +307,7 @@ static struct command commands[] = {
       "only the [player-name] argument is allowed. If the console gives no "
       "player-name or the connection uses no arguments, then the connection "
       "is attached to a global observer. The 'allowtake' option controls "
-      "which players may be observed and in what circumstances."),
+      "which players may be observed and in what circumstances."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"detach",    ALLOW_INFO,
@@ -289,25 +315,31 @@ static struct command commands[] = {
    N_("detach <connection-name>"),
    N_("Detach from a player."),
    N_("Only the console and connections with cmdlevel 'hack' can force "
-      "other connections to detach from a player."),
+      "other connections to detach from a player."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"create",	ALLOW_CTRL,
    /* TRANS: translate text between <> only */
-   N_("create <player-name>"),
+   N_("create <player-name> [ai type]"),
    N_("Create an AI player with a given name."),
+   /* TRANS: don't translate text between single quotes */
    N_("With the 'create' command a new player with the given name is "
       "created.\n"
-      "If the game was started, the command checks for free player slots "
-      "and, if no free slots are available, it tries to reuse the slots of "
-      "dead players. The new player has no units or cities."),
+      "The 'ai type' parameter can be used to select which AI module will be "
+      "used for the created player. This requires that Freeciv has been "
+      "compiled with loadable AI module support and that the respective module "
+      "has been loaded.\n"
+      "If the game has already started, the new player will have no units or "
+      "cities; also, if no free player slots are available, the slot of a "
+      "dead player can be reused (removing all record of that player from the "
+      "running game)."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"away",	ALLOW_BASIC,
    /* no translatable parameters */
    SYN_ORIG_("away"),
    N_("Set yourself in away mode. The AI will watch your back."),
-   N_("The AI will govern your nation but do minimal changes."),
+   N_("The AI will govern your nation but do minimal changes."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 50
   },
   {"novice",	ALLOW_CTRL,
@@ -317,7 +349,7 @@ static struct command commands[] = {
    N_("Set one or all AI players to 'novice'."),
    N_("With no arguments, sets all AI players to skill level 'novice', and "
       "sets the default level for any new AI players to 'novice'. With an "
-      "argument, sets the skill level for that player only."),
+      "argument, sets the skill level for that player only."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"easy",	ALLOW_CTRL,
@@ -327,7 +359,7 @@ static struct command commands[] = {
    N_("Set one or all AI players to 'easy'."),
    N_("With no arguments, sets all AI players to skill level 'easy', and "
       "sets the default level for any new AI players to 'easy'. With an "
-      "argument, sets the skill level for that player only."),
+      "argument, sets the skill level for that player only."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"normal",	ALLOW_CTRL,
@@ -337,7 +369,7 @@ static struct command commands[] = {
    N_("Set one or all AI players to 'normal'."),
    N_("With no arguments, sets all AI players to skill level 'normal', and "
       "sets the default level for any new AI players to 'normal'. With an "
-      "argument, sets the skill level for that player only."),
+      "argument, sets the skill level for that player only."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"hard",	ALLOW_CTRL,
@@ -347,7 +379,7 @@ static struct command commands[] = {
    N_("Set one or all AI players to 'hard'."),
    N_("With no arguments, sets all AI players to skill level 'hard', and "
       "sets the default level for any new AI players to 'hard'. With an "
-      "argument, sets the skill level for that player only."),
+      "argument, sets the skill level for that player only."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"cheating",  ALLOW_CTRL,
@@ -357,7 +389,7 @@ static struct command commands[] = {
    N_("Set one or all AI players to 'cheating'."),
    N_("With no arguments, sets all AI players to skill level 'cheating', and "
       "sets the default level for any new AI players to 'cheating'. With an "
-      "argument, sets the skill level for that player only."),
+      "argument, sets the skill level for that player only."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"experimental",	ALLOW_CTRL,
@@ -369,7 +401,7 @@ static struct command commands[] = {
       "sets the default level for any new AI players to this. With an "
       "argument, sets the skill level for that player only. THIS IS ONLY "
       "FOR TESTING OF NEW AI FEATURES! For ordinary servers, this option "
-      "has no effect."),
+      "has no effect."), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"cmdlevel",	ALLOW_ADMIN,
@@ -400,23 +432,23 @@ static struct command commands[] = {
       "Command access levels do not persist if a client disconnects, "
       "because some untrusted person could reconnect with the same name. "
       "Note that this command now takes connection names, not player names."
-      ),
+      ), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"first", ALLOW_BASIC,
    /* no translatable parameters */
    SYN_ORIG_("first"),
    N_("If there is none, become the game organizer with increased permissions."),
-   NULL,
+   NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"timeoutincrease", ALLOW_CTRL, 
    /* TRANS: translate text between <> only */
    N_("timeoutincrease <turn> <turninc> <value> <valuemult>"), 
-   N_("See \"help timeoutincrease\"."),
+   N_("See \"/help timeoutincrease\"."),
    N_("Every <turn> turns, add <value> to timeout timer, then add <turninc> "
       "to <turn> and multiply <value> by <valuemult>. Use this command in "
-      "concert with the option \"timeout\". Defaults are 0 0 0 1"),
+      "concert with the option \"timeout\". Defaults are 0 0 0 1"), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"cancelvote", ALLOW_BASIC,
@@ -425,11 +457,11 @@ static struct command commands[] = {
       "cancelvote <vote number>\n"
       "cancelvote all\n"),
    /* TRANS: "vote" as a process */
-   N_("Cancel a running vote.\n"),
+   N_("Cancel a running vote."),
    /* TRANS: "vote" as a process */
    N_("With no arguments this command removes your own vote. If you have "
       "an admin access level, you can cancel any vote by vote number, or "
-      "all votes with the \'all\' argument."),
+      "all votes with the \'all\' argument."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"ignore", ALLOW_INFO,
@@ -442,7 +474,7 @@ static struct command commands[] = {
       "(if omitted) is to match against the username. The pattern supports "
       "unix glob style wildcards, i.e., * matches zero or more character, ? "
       "exactly one character, [abc] exactly one of 'a' 'b' or 'c', etc. "
-      "To access your current ignore list, issue \"/list ignore\"."),
+      "To access your current ignore list, issue \"/list ignore\"."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"unignore", ALLOW_INFO,
@@ -455,13 +487,35 @@ static struct command commands[] = {
       "separated by a dash '-'. If the first number is omitted, it is "
       "assumed to be 1; if the last is omitted, it is assumed to be "
       "the last valid ignore list index. To access your current ignore "
-      "list, issue \"/list ignore\"."),
+      "list, issue \"/list ignore\"."), NULL,
+   CMD_ECHO_NONE, VCF_NONE, 0
+  },
+  {"playercolor", ALLOW_ADMIN,
+   /* TRANS: translate text between <> */
+   N_("playercolor <player-name> <color>\n"
+      "playercolor <player-name> reset"),
+   N_("Define the color of a player."),
+   N_("This command sets the color of a specific player, overriding any color "
+      "assigned according to the 'plrcolormode' setting.\n"
+      "The color is defined using hexadecimal notation (hex) for the "
+      "combination of Red, Green, and Blue color components (RGB), similarly "
+      "to HTML. For each component, the lowest (darkest) value is 0 (in "
+      "hex: 00), and the highest value is 255 (in hex: FF). The color "
+      "definition is simply the three hex values concatenated together "
+      "(RRGGBB). For example, the following command sets Caesar to pure red:\n"
+      "  playercolor Caesar ff0000\n"
+      "Before the game starts, this command can only be used if the "
+      "'plrcolormode' setting is set to 'PLR_SET'; a player's color can be "
+      "unset again by specifying 'reset'.\n"
+      "Once the game has started and colors have been assigned, this command "
+      "changes the player color in any mode; 'reset' cannot be used.\n"
+      "To list the player colors, use 'list colors'."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"endgame",	ALLOW_ADMIN,
    /* no translatable parameters */
    SYN_ORIG_("endgame"),
-   N_("End the game immediately in a draw."), NULL,
+   N_("End the game immediately in a draw."), NULL, NULL,
    CMD_ECHO_ALL, VCF_NONE, 0
   },
   {"surrender",	ALLOW_BASIC,
@@ -470,7 +524,7 @@ static struct command commands[] = {
    N_("Concede the game."),
    N_("This tells everyone else that you concede the game, and if all "
       "but one player (or one team) have conceded the game in this way "
-      "then the game ends."),
+      "then the game ends."), NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   },
   {"remove",	ALLOW_CTRL,
@@ -478,7 +532,7 @@ static struct command commands[] = {
    N_("remove <player-name>"),
    N_("Fully remove player from game."),
    N_("This *completely* removes a player from the game, including "
-      "all cities and units etc. Use with care!"),
+      "all cities and units etc. Use with care!"), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"save",	ALLOW_ADMIN,
@@ -491,46 +545,64 @@ static struct command commands[] = {
       "To reload a savegame created by 'save', start the server with "
       "the command-line argument:\n"
       "    '--file <filename>' or '-f <filename>'\n"
-      "and use the 'start' command once players have reconnected."),
+      "and use the 'start' command once players have reconnected."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
+#ifdef DEBUG
+  {"scensave",	ALLOW_ADMIN,
+   /* TRANS: translate text between <> only */
+   N_("scensave\n"
+      "scensave <file-name>"),
+   N_("Save game to file as scenario."),
+   N_("Save the current game to file <file-name> as scenario. If no file-name "
+      "argument is given saves to \"<auto-save name prefix><year>m.sav[.gz]\". "
+      "To reload a savegame created by 'scensave', start the server with "
+      "the command-line argument:\n"
+      "    '--file <filename>' or '-f <filename>'\n"
+      "and use the 'start' command once players have reconnected."), NULL,
+   CMD_ECHO_ADMINS, VCF_NONE, 0
+  },
+#endif /* DEBUG */
   {"load",      ALLOW_CTRL,
    /* TRANS: translate text between <> only */
    N_("load\n"
       "load <file-name>"),
    N_("Load game from file."),
    N_("Load a game from <file-name>. Any current data including players, "
-      "rulesets and server options are lost."),
+      "rulesets and server options are lost."), NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"read",	ALLOW_CTRL,
    /* TRANS: translate text between <> only */
    N_("read <file-name>"),
-   N_("Process server commands from file."), NULL,
+   N_("Process server commands from file."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"write",	ALLOW_HACK,
    /* TRANS: translate text between <> only */
    N_("write <file-name>"),
-   N_("Write current settings as server commands to file."), NULL,
+   N_("Write current settings as server commands to file."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"reset",	ALLOW_CTRL,
    /* no translatable parameters */
-   SYN_ORIG_("reset"),
+   SYN_ORIG_("reset [game|ruleset|script|default]"),
    N_("Reset all server settings."),
    N_("Reset all settings if it is possible. The following levels are "
       "supported:\n"
       "  game     - using the values defined at the game start\n"
       "  ruleset  - using the values defined in the ruleset\n"
       "  script   - using default values and rereading the start script\n"
-      "  default  - using default values\n"),
+      "  default  - using default values\n"), NULL,
    CMD_ECHO_ALL, VCF_NONE, 50
   },
   {"lua", ALLOW_ADMIN,
    /* TRANS: translate text between <> only */
-   N_("lua <script>"),
-   N_("Evaluate a line of freeciv script in the current game."), NULL,
+   N_("lua cmd <script line>\n"
+      "lua file <script file>\n"
+      "lua <script line> (deprecated)"),
+   N_("Evaluate a line of Freeciv script or a Freeciv script file in the "
+      "current game."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"kick", ALLOW_CTRL,
@@ -539,26 +611,73 @@ static struct command commands[] = {
     N_("Cut a connection and disallow reconnect."),
     N_("The connection given by the 'user' argument will be cut from the "
        "server and not allowed to reconnect. The time the user wouldn't be "
-       "able to reconnect is controlled by the 'kicktime' setting."),
+       "able to reconnect is controlled by the 'kicktime' setting."), NULL,
    CMD_ECHO_ADMINS, VCF_NOPASSALONE, 50
+  },
+  {"delegate", ALLOW_BASIC,
+   /* TRANS: translate only text between [] and <> */
+   N_("delegate to <username> [player-name]\n"
+      "delegate cancel [player-name]\n"
+      "delegate take <player-name>\n"
+      "delegate restore\n"
+      "delegate show <player-name>"),
+   N_("Delegate control to another user."),
+   N_("Delegation allows a user to nominate another user who can temporarily "
+      "take over control of their player while they are away.\n"
+      "'delegate to <username>': allow <username> to 'delegate take' your "
+      "player.\n"
+      "'delegate cancel': nominated user can no longer take your player.\n"
+      "'delegate take <player-name>': take control of a player who has been "
+      "delegated to you. (Behaves like 'take', except that the 'allowtake' "
+      "restrictions are not enforced.)\n"
+      "'delegate restore': relinquish control of a delegated player (opposite "
+      "of 'delegate take') and restore your previous view, if any. (This also "
+      "happens automatically if the player's owner reconnects.)\n"
+      "'delegate show': show who control of your player is currently "
+      "delegated to, if anyone.\n"
+      "The [player-name] argument can only be used by connections with "
+      "cmdlevel 'admin' or above to force the corresponding change of the "
+      "delegation status."), NULL,
+   CMD_ECHO_NONE, VCF_NONE, 0
+  },
+  {"fcdb", ALLOW_ADMIN,
+   /* TRANS: translate text between <> only */
+   N_("fcdb reload\n"
+      "fcdb lua <script>"),
+   N_("Manage the authentication database."),
+   N_("The argument 'reload' causes the database script file to be re-read "
+      "after a change, while the argument 'lua' evaluates a line of Lua "
+      "script in the context of the Lua instance for the database."), NULL,
+   CMD_ECHO_ADMINS, VCF_NONE, 0
+  },
+  {"mapimg",   ALLOW_ADMIN,
+   /* TRANS: translate text between <> only */
+   N_("mapimg define <mapdef>\n"
+      "mapimg show <id>|all\n"
+      "mapimg create <id>|all\n"
+      "mapimg delete <id>|all\n"
+      "mapimg colortest"),
+   N_("Create image files of the world/player map."),
+   NULL, mapimg_help,
+   CMD_ECHO_ADMINS, VCF_NONE, 50
   },
   {"rfcstyle",	ALLOW_HACK,
    /* no translatable parameters */
    SYN_ORIG_("rfcstyle"),
-   N_("Switch server output between 'RFC-style' and normal style."), NULL,
+   N_("Switch server output between 'RFC-style' and normal style."), NULL, NULL,
    CMD_ECHO_ADMINS, VCF_NONE, 0
   },
   {"serverid",	ALLOW_INFO,
    /* no translatable parameters */
    SYN_ORIG_("serverid"),
-   N_("Simply returns the id of the server."),
+   N_("Simply returns the id of the server."), NULL, NULL,
    CMD_ECHO_NONE, VCF_NONE, 0
   }
 };
 
 
 /**************************************************************************
-  ...
+  Return command by its number.
 **************************************************************************/
 const struct command *command_by_number(int i)
 {
@@ -567,7 +686,7 @@ const struct command *command_by_number(int i)
 }
 
 /**************************************************************************
-  ...
+  Return name of the command
 **************************************************************************/
 const char *command_name(const struct command *pcommand)
 {
@@ -575,7 +694,7 @@ const char *command_name(const struct command *pcommand)
 }
 
 /**************************************************************************
-  ...
+  Return name of the command by commands number.
 **************************************************************************/
 const char *command_name_by_number(int i)
 {
@@ -600,10 +719,18 @@ const char *command_short_help(const struct command *pcommand)
 
 /**************************************************************************
   Returns the extra help text of the command (translated).
+  The caller must free this string.
 **************************************************************************/
-const char *command_extra_help(const struct command *pcommand)
+char *command_extra_help(const struct command *pcommand)
 {
-  return _(pcommand->extra_help);
+  if (pcommand->extra_help_func) {
+    fc_assert(pcommand->extra_help == NULL);
+    return pcommand->extra_help_func();
+  } else if (pcommand->extra_help) {
+    return fc_strdup(_(pcommand->extra_help));
+  } else {
+    return NULL;
+  }
 }
 
 /**************************************************************************

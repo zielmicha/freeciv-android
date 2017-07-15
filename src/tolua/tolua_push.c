@@ -3,7 +3,7 @@
  ** Written by Waldemar Celes
  ** TeCGraf/PUC-Rio
  ** Apr 2003
- ** $Id: $
+ ** $Id: tolua_push.c,v 1.7 2010/01/22 15:39:29 fabraham Exp $
  */
 
 /* This code is free software; you can redistribute it and/or modify it.

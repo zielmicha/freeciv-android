@@ -18,6 +18,10 @@
 #ifndef FC__TILESPEC_H
 #define FC__TILESPEC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "log.h"                /* enum log_level */
 
@@ -76,7 +80,7 @@ enum mapview_layer {
   LAYER_BACKGROUND,
   LAYER_TERRAIN1,
   LAYER_TERRAIN2,
-  LAYER_TERRAIN3,
+  LAYER_TERRAIN3, /* Adjust also TERRAIN_LAYER_COUNT if changing these */
   LAYER_WATER,
   LAYER_ROADS,
   LAYER_SPECIAL1,
@@ -89,12 +93,15 @@ enum mapview_layer {
   LAYER_CITY2,
   LAYER_GRID2,
   LAYER_OVERLAYS,
+  LAYER_TILELABEL,
   LAYER_CITYBAR,
   LAYER_FOCUS_UNIT,
   LAYER_GOTO,
   LAYER_EDITOR,
   LAYER_COUNT
 };
+
+#define TERRAIN_LAYER_COUNT 3
 
 #define mapview_layer_iterate(layer)			                    \
 {									    \
@@ -127,9 +134,13 @@ void tileset_init(struct tileset *t);
 void tileset_free(struct tileset *tileset);
 void tileset_load_tiles(struct tileset *t);
 void tileset_free_tiles(struct tileset *t);
+void tileset_ruleset_reset(struct tileset *t);
+bool tileset_is_fully_loaded(void);
+
+void finish_loading_sprites(struct tileset *t);
 
 void tilespec_try_read(const char *tileset_name, bool verbose);
-void tilespec_reread(const char *tileset_name);
+void tilespec_reread(const char *tileset_name, bool game_fully_initialized);
 void tilespec_reread_callback(struct option *poption);
 
 void tileset_setup_specialist_type(struct tileset *t, Specialist_type_id id);
@@ -142,6 +153,8 @@ void tileset_setup_tile_type(struct tileset *t,
 			     const struct terrain *pterrain);
 void tileset_setup_resource(struct tileset *t,
 			    const struct resource *presource);
+void tileset_setup_road(struct tileset *t,
+                        struct road_type *proad);
 void tileset_setup_base(struct tileset *t,
                         const struct base_type *pbase);
 void tileset_setup_government(struct tileset *t,
@@ -149,6 +162,10 @@ void tileset_setup_government(struct tileset *t,
 void tileset_setup_nation_flag(struct tileset *t, 
 			       struct nation_type *nation);
 void tileset_setup_city_tiles(struct tileset *t, int style);
+
+void tileset_player_init(struct tileset *t, struct player *pplayer);
+void tileset_background_init(struct tileset *t);
+void tileset_background_free(struct tileset *t);
 
 /* Gfx support */
 
@@ -158,11 +175,15 @@ int fill_sprite_array(struct tileset *t,
 		      const struct tile_edge *pedge,
 		      const struct tile_corner *pcorner,
 		      const struct unit *punit, const struct city *pcity,
-		      const struct city *citymode);
+                      const struct city *citymode,
+                      const struct unit_type *putype);
 int fill_basic_terrain_layer_sprite_array(struct tileset *t,
                                           struct drawn_sprite *sprs,
                                           int layer,
                                           struct terrain *pterrain);
+int fill_basic_road_sprite_array(const struct tileset *t,
+                                 struct drawn_sprite *sprs,
+                                 const struct road_type *proad);
 int fill_basic_base_sprite_array(const struct tileset *t,
                                  struct drawn_sprite *sprs,
                                  const struct base_type *pbase);
@@ -174,6 +195,7 @@ void toggle_focus_unit_state(struct tileset *t);
 struct unit *get_drawable_unit(const struct tileset *t,
 			       struct tile *ptile,
 			       const struct city *citymode);
+bool unit_drawn_with_city_outline(const struct unit *punit, bool check_focus);
 
 
 enum cursor_type {
@@ -243,6 +265,7 @@ struct editor_sprites {
     *vision,
     *territory,
     *properties,
+    *road,
     *military_base;
 };
 
@@ -262,7 +285,9 @@ struct sprite *get_building_sprite(const struct tileset *t,
 struct sprite *get_government_sprite(const struct tileset *t,
 				     const struct government *gov);
 struct sprite *get_unittype_sprite(const struct tileset *t,
-				   const struct unit_type *punittype);
+				   const struct unit_type *punittype,
+                                   enum direction8 facing,
+                                   bool icon);
 struct sprite *get_sample_city_sprite(const struct tileset *t,
 				      int city_style);
 struct sprite *get_arrow_sprite(const struct tileset *t,
@@ -316,13 +341,20 @@ int tileset_full_tile_width(const struct tileset *t);
 int tileset_full_tile_height(const struct tileset *t);
 int tileset_unit_width(const struct tileset *t);
 int tileset_unit_height(const struct tileset *t);
+int tileset_unit_with_upkeep_height(const struct tileset *t);
+int tileset_unit_layout_offset_y(const struct tileset *t);
 int tileset_small_sprite_width(const struct tileset *t);
 int tileset_small_sprite_height(const struct tileset *t);
 int tileset_citybar_offset_y(const struct tileset *t);
+int tileset_tilelabel_offset_y(const struct tileset *t);
 const char *tileset_main_intro_filename(const struct tileset *t);
 const char *tileset_mini_intro_filename(const struct tileset *t);
 int tileset_num_city_colors(const struct tileset *t);
 void tileset_use_prefered_theme(const struct tileset *t);
 bool tileset_use_hard_coded_fog(const struct tileset *t);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__TILESPEC_H */

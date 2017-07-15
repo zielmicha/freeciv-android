@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2005 - The Freeciv Team
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -34,6 +34,7 @@
 #ifdef AUDIO_SDL
 #include "audio_sdl.h"
 #endif
+#include "client_main.h"
 
 #include "audio.h"
 
@@ -139,13 +140,14 @@ bool audio_select_plugin(const char *const name)
 **************************************************************************/
 void audio_init(void)
 {
-  audio_none_init();
-  fc_assert(num_plugins_used == 1);
-  selected_plugin = 0;
-
 #ifdef AUDIO_SDL
   audio_sdl_init();
 #endif
+
+  /* Initialize dummy plugin last, as lowest priority plugin. This
+   * affects which plugin gets selected as default in new installations. */
+  audio_none_init();
+  selected_plugin = 0;
 }
 
 /**************************************************************************
@@ -208,7 +210,7 @@ void audio_real_init(const char *const spec_name,
     log_error("Cannot find sound spec-file \"%s\".", spec_name);
     log_normal(_("To get sound you need to download a sound set!"));
     log_normal(_("Get sound sets from <%s>."),
-               "ftp://ftp.freeciv.org/freeciv/contrib/audio/soundsets");
+               "http://www.freeciv.org/wiki/Sounds");
     log_normal(_("Proceeding with sound support disabled."));
     tagfile = NULL;
     return;
@@ -257,6 +259,17 @@ void audio_real_init(const char *const spec_name,
   log_normal(_("No real audio subsystem managed to initialize!"));
   log_normal(_("Perhaps there is some misconfiguration or bad permissions."));
   log_normal(_("Proceeding with sound support disabled."));
+}
+
+/**************************************************************************
+  Switch soundset
+**************************************************************************/
+void audio_restart(const char *soundset_name)
+{
+  audio_stop(); /* Fade down old one */
+
+  sz_strlcpy(sound_set_name, soundset_name);
+  audio_real_init(sound_set_name, sound_plugin_name);
 }
 
 /**************************************************************************

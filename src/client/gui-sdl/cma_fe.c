@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
@@ -63,11 +63,17 @@ static void set_cma_hscrollbars(void);
 
 /* =================================================================== */
 
+/**************************************************************************
+  User interacted with cma dialog.
+**************************************************************************/
 static int cma_dlg_callback(struct widget *pWindow)
 {
   return -1;
 }
 
+/**************************************************************************
+  User interacted with cma dialog close button.
+**************************************************************************/
 static int exit_cma_dialog_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -78,7 +84,7 @@ static int exit_cma_dialog_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User released mouse button while in scrollbar.
 **************************************************************************/
 static Uint16 scroll_mouse_button_up(SDL_MouseButtonEvent *pButtonEvent, void *pData)
 {
@@ -86,7 +92,7 @@ static Uint16 scroll_mouse_button_up(SDL_MouseButtonEvent *pButtonEvent, void *p
 }
 
 /**************************************************************************
-  ...
+  User moved mouse while holding scrollbar.
 **************************************************************************/
 static Uint16 scroll_mouse_motion_handler(SDL_MouseMotionEvent *pMotionEvent, void *pData)
 {
@@ -136,6 +142,9 @@ static Uint16 scroll_mouse_motion_handler(SDL_MouseMotionEvent *pMotionEvent, vo
   return ID_ERROR;
 }
 
+/**************************************************************************
+  User interacted with minimal horizontal cma scrollbar
+**************************************************************************/
 static int min_horiz_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -145,7 +154,7 @@ static int min_horiz_cma_callback(struct widget *pWidget)
     pMotion.min = pWidget->next->size.x + pWidget->next->size.w + 5;
     pMotion.max = pMotion.min + 70;
     pMotion.base = -20;
-    
+
     MOVE_STEP_X = 2;
     MOVE_STEP_Y = 0;
     /* Filter mouse motion events */
@@ -171,6 +180,9 @@ static int min_horiz_cma_callback(struct widget *pWidget)
   return -1;
 }
 
+/**************************************************************************
+  User interacted with factor horizontal cma scrollbar
+**************************************************************************/
 static int factor_horiz_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -206,6 +218,9 @@ static int factor_horiz_cma_callback(struct widget *pWidget)
   return -1;
 }
 
+/**************************************************************************
+  User interacted with cma celebrating -toggle.
+**************************************************************************/
 static int toggle_cma_celebrating_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -219,11 +234,17 @@ static int toggle_cma_celebrating_callback(struct widget *pWidget)
 
 /* ============================================================= */
 
+/**************************************************************************
+  User interacted with widget that result in cma window getting saved.
+**************************************************************************/
 static int save_cma_window_callback(struct widget *pWindow)
 {
   return -1;
 }
 
+/**************************************************************************
+  User interacted with "yes" button from save cma dialog.
+**************************************************************************/
 static int ok_save_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -248,9 +269,9 @@ static int ok_save_cma_callback(struct widget *pWidget)
   return -1;
 }
 
-/* -------------------------------------------------------------------- */
-/*   Cancel : SAVE, LOAD, DELETE Dialogs				*/
-/* -------------------------------------------------------------------- */
+/**************************************************************************
+  Cancel : SAVE, LOAD, DELETE Dialogs				
+**************************************************************************/
 static int cancel_SLD_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -265,6 +286,9 @@ static int cancel_SLD_cma_callback(struct widget *pWidget)
   return -1;
 }
 
+/**************************************************************************
+  User interacted with cma setting saving button.
+**************************************************************************/
 static int save_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -298,24 +322,24 @@ static int save_cma_callback(struct widget *pWidget)
     /* label */
     pStr = create_str16_from_char(_("What should we name the preset?"), adj_font(10));
     pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_CMA_TEXT);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_CMA_TEXT);
     
     pText = create_text_surf_from_str16(pStr);
     FREESTRING16(pStr);
     area.w = MAX(area.w, pText->w);
     area.h += pText->h + adj_size(5);
     /* ============================================================= */
-    
+
     pBuf = create_edit(NULL, pWindow->dst,
                   create_str16_from_char(_("new preset"), adj_font(12)), adj_size(100),
                           (WF_RESTORE_BACKGROUND|WF_FREE_STRING));
     set_wstate(pBuf, FC_WS_NORMAL);
     area.h += pBuf->size.h;
     area.w = MAX(area.w, pBuf->size.w);
-    
+
     add_to_gui_list(ID_EDIT, pBuf);
     /* ============================================================= */
-    
+
     pBuf = create_themeicon_button_from_chars(pTheme->OK_Icon, pWindow->dst,
                                                 _("Yes"), adj_font(12), 0);
   
@@ -344,7 +368,7 @@ static int save_cma_callback(struct widget *pWidget)
     area.w += adj_size(20);
     area.h += adj_size(15);
 
-    resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+    resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                   (pWindow->size.w - pWindow->area.w) + area.w,
                   (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -387,8 +411,12 @@ static int save_cma_callback(struct widget *pWidget)
   }
   return -1;
 }
+
 /* ================================================== */
 
+/**************************************************************************
+   User interacted with some preset cma button.
+**************************************************************************/
 static int LD_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -399,7 +427,7 @@ static int LD_cma_callback(struct widget *pWidget)
                                 pCma->pAdv->pEndWidgetList);
     FC_FREE(pCma->pAdv->pScroll);
     FC_FREE(pCma->pAdv);
-    
+
     if(load) {
       cm_copy_parameter(&pCma->edited_cm_parm, cmafec_preset_get_parameter(index));
       set_cma_hscrollbars();
@@ -418,7 +446,9 @@ static int LD_cma_callback(struct widget *pWidget)
   return -1;
 }
 
-
+/**************************************************************************
+  User clicked either load or delete preset widget.
+**************************************************************************/
 static void popup_load_del_presets_dialog(bool load, struct widget *pButton)
 {
   int hh, count, i;
@@ -560,6 +590,9 @@ static void popup_load_del_presets_dialog(bool load, struct widget *pButton)
   widget_flush(pWindow);
 }
 
+/**************************************************************************
+  User interacted with load cma settings -widget
+**************************************************************************/
 static int load_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -568,6 +601,9 @@ static int load_cma_callback(struct widget *pWidget)
   return -1;
 }
 
+/**************************************************************************
+  User interacted with delete cma settings -widget
+**************************************************************************/
 static int del_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -609,6 +645,9 @@ static int run_cma_once_callback(struct widget *pWidget)
   return -1;
 }
 
+/**************************************************************************
+  User interacted with release city from cma -widget
+**************************************************************************/
 static int stop_cma_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -620,6 +659,9 @@ static int stop_cma_callback(struct widget *pWidget)
 
 /* ===================================================================== */
 
+/**************************************************************************
+  Setup horizontal cma scrollbars
+**************************************************************************/
 static void set_cma_hscrollbars(void)
 {
   struct widget *pBuf;
@@ -636,7 +678,7 @@ static void set_cma_hscrollbars(void)
     pBuf = pBuf->prev;
     fc_snprintf(cBuf, sizeof(cBuf), "%d", *(int *)pBuf->prev->data.ptr);
     copy_chars_to_string16(pBuf->string16, cBuf);
-        
+
     /* min scrollbar */
     pBuf = pBuf->prev;
     pBuf->size.x = pBuf->next->size.x
@@ -666,7 +708,9 @@ static void set_cma_hscrollbars(void)
     
 }
 
-/* ===================================================================== */
+/**************************************************************************
+  Update cma dialog
+**************************************************************************/
 void update_city_cma_dialog(void)
 {
   SDL_Color bg_color = {255, 255, 255, 136};
@@ -689,7 +733,7 @@ void update_city_cma_dialog(void)
 
   if(result->found_a_valid) {
     /* redraw Citizens */
-    count = pCma->pCity->size;
+    count = city_size_get(pCma->pCity);
     
     pText = get_tax_surface(O_LUXURY);
     step = (pBuf->size.w - adj_size(20)) / pText->w;
@@ -746,7 +790,7 @@ void update_city_cma_dialog(void)
   SDL_FillRectAlpha(pBuf->dst->surface, &dst, &bg_color);
   putframe(pBuf->dst->surface,
            dst.x, dst.y, dst.x + dst.w - 1, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+           get_theme_color(COLOR_THEME_CMA_FRAME));
   
   dst.x += adj_size(5);
   dst.y += adj_size(5);
@@ -818,6 +862,9 @@ void update_city_cma_dialog(void)
   cm_result_destroy(result);
 }
 
+/**************************************************************************
+  Open cma dialog for city.
+**************************************************************************/
 void popup_city_cma_dialog(struct city *pCity)
 {
   SDL_Color bg_color = {255, 255, 255, 136};
@@ -897,7 +944,7 @@ void popup_city_cma_dialog(struct city *pCity)
     
 
     add_to_gui_list(ID_LABEL, pBuf);
-    
+
     /* minimal scrollbar */
     pBuf = create_horizontal(pTheme->Horiz, pWindow->dst, adj_size(30),
 			(WF_RESTORE_BACKGROUND));
@@ -931,7 +978,7 @@ void popup_city_cma_dialog(struct city *pCity)
   copy_chars_to_string16(pStr, _("Celebrate"));
   pText[O_LAST] = create_text_surf_from_str16(pStr);
   FREESTRING16(pStr);
-  
+
   /* happy factor label */
   pBuf = create_iconlabel(NULL, pWindow->dst,
     		create_str16_from_char("999", adj_font(10)),
@@ -1017,12 +1064,12 @@ void popup_city_cma_dialog(struct city *pCity)
 	  (pWindow->prev->prev->size.w + adj_size(5 + 70 + 5) +
 			  pWindow->prev->prev->size.w + adj_size(5 + 55 + 15)), w);
   area.h = adj_size(390) - (pWindow->size.w - pWindow->area.w);
-#else
+#else  /* SMALL_SCREEN */
   area.w = MAX(pCity_Map->w + adj_size(150) + text_w + adj_size(10) +
 	  (pWindow->prev->prev->size.w + adj_size(5 + 70 + 5) +
 			  pWindow->prev->prev->size.w + adj_size(5 + 55 + 15)), area.w);
   area.h = adj_size(360) - (pWindow->size.w - pWindow->area.w);
-#endif
+#endif /* SMALL_SCREEN */
 
   pLogo = theme_get_background(theme, BACKGROUND_CITYGOVDLG);
   if(resize_window(pWindow, pLogo, NULL,
@@ -1066,7 +1113,7 @@ void popup_city_cma_dialog(struct city *pCity)
   SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
   putframe(pWindow->theme,
            area.x, area.y, area.x + area.w - 1, area.y + area.h - 1,
-           get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+           get_theme_color(COLOR_THEME_CMA_FRAME));
   
   area.x = dst.x + text_w + adj_size(10);
   alphablit(pMinimal, NULL, pWindow->theme, &area);
@@ -1099,7 +1146,7 @@ void popup_city_cma_dialog(struct city *pCity)
     SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
     putframe(pWindow->theme,
              area.x, area.y, area.x + area.w - 1, area.y + area.h - 1,
-             get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+             get_theme_color(COLOR_THEME_CMA_FRAME));
     
     /* factor label */
     pBuf = pBuf->prev;
@@ -1118,7 +1165,7 @@ void popup_city_cma_dialog(struct city *pCity)
     SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
     putframe(pWindow->theme,
              area.x, area.y, area.x + area.w - 1, area.y + area.h - 1,
-             get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+             get_theme_color(COLOR_THEME_CMA_FRAME));
         
     alphablit(pText[i], NULL, pWindow->theme, &dst);
     dst.y += pText[i]->h + adj_size(6);
@@ -1143,7 +1190,7 @@ void popup_city_cma_dialog(struct city *pCity)
   SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
   putframe(pWindow->theme,
            area.x, area.y, area.x + area.w - 1, area.y + area.h - 1,
-           get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+           get_theme_color(COLOR_THEME_CMA_FRAME));
   
   /* celebrate cbox */
   pBuf = pBuf->prev;
@@ -1169,7 +1216,7 @@ void popup_city_cma_dialog(struct city *pCity)
   SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
   putframe(pWindow->theme,
            area.x, area.y, area.x + area.w - 1, area.y + area.h - 1,
-           get_game_colorRGB(COLOR_THEME_CMA_FRAME));
+           get_theme_color(COLOR_THEME_CMA_FRAME));
   
   /* load */
   pBuf = pBuf->prev;
@@ -1203,11 +1250,14 @@ void popup_city_cma_dialog(struct city *pCity)
   if (cs != pIcons->style) {
     reload_citizens_icons(cs);
   }
-  
+
   set_cma_hscrollbars();
   update_city_cma_dialog();
 }
 
+/**************************************************************************
+  Close cma dialog
+**************************************************************************/
 void popdown_city_cma_dialog(void)
 {
   if(pCma) {

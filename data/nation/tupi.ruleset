@@ -1,8 +1,10 @@
 [nation_tupi]
 
+translation_domain="freeciv"
+
 name=_("Tupi")
 plural=_("?plural:Tupi")
-groups="American"
+groups="American", "Core"
 
 legend=_("The Tupi are a native Brazilian people related to the Guarani who\
  inhabited the modern Brazilian states of Paraiba, Pernambuco, Ceara, Rio\
@@ -18,14 +20,18 @@ leaders = {
  "Jugasu",      "Male"
  "Konyan Bebe", "Male"
 }
-
+ruler_titles = {
+ "government",      "male_title",           "female_title"
+ "Democracy",      _("Principal Chief %s"), _("?female:Principal Chief %s")
+ "Fundamentalism", _("Shaman %s"),          _("?female:Shaman %s")
+ "Monarchy",       _("Great Chief %s"),     _("?female:Great Chief %s")
+}
 flag         = "tupi"
 flag_alt     = "-"
 city_style   = "Tropical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations = "taino", "tairona", "guarani"

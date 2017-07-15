@@ -20,7 +20,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -87,6 +87,7 @@ static void get_units_report_data(struct units_entry *entries,
     if (punit->homecity) {
       output_type_iterate(o) {
         entries[uti].upkeep[o] += punit->upkeep[o];
+        total->upkeep[o] += punit->upkeep[o];
       } output_type_iterate_end;
     }
   } unit_list_iterate_end;
@@ -94,10 +95,17 @@ static void get_units_report_data(struct units_entry *entries,
   city_list_iterate(client.conn.playing->cities, pCity) {
     if (VUT_UTYPE == pCity->production.kind) {
       struct unit_type *pUnitType = pCity->production.value.utype;
-      (total->building_count)++;
-      entries[utype_index(pUnitType)].soonest_completions =
-	MIN(entries[utype_index(pUnitType)].soonest_completions,
-	    city_production_turns_to_build(pCity, TRUE));
+      Unit_type_id uti = utype_index(pUnitType);
+      int num_units;
+      /* Account for build slots in city */
+      (void) city_production_build_units(pCity, TRUE, &num_units);
+      /* Unit is in progress even if it won't be done this turn */
+      num_units = MAX(num_units, 1);
+      (entries[uti].building_count) += num_units;
+      (total->building_count) += num_units;
+      entries[uti].soonest_completions =
+        MIN(entries[uti].soonest_completions,
+            city_production_turns_to_build(pCity, TRUE));
     }
   } city_list_iterate_end;
 }
@@ -211,7 +219,7 @@ static int popup_upgrade_unit_callback(struct widget *pWidget)
     /* create text label */
     pStr = create_str16_from_char(cBuf, adj_font(10));
     pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_UNITUPGRADE_TEXT);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_UNITUPGRADE_TEXT);
     
     pText = create_text_surf_from_str16(pStr);
     FREESTRING16(pStr);
@@ -248,7 +256,7 @@ static int popup_upgrade_unit_callback(struct widget *pWidget)
     
     pUnits_Upg_Dlg->pBeginWidgetList = pBuf;
 
-    resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+    resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                   (pWindow->size.w - pWindow->area.w) + area.w,
                   (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -329,7 +337,6 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   char cBuf[64];
   SDL_Rect dst;
   bool upgrade = FALSE;
-  struct unit_type *pUnit;
   SDL_Rect area;
     
   if(pUnitsDlg) {
@@ -448,10 +455,9 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
     if ((units[utype_index(i)].active_count > 0)
      || (units[utype_index(i)].building_count > 0)) {
       upgrade = (can_upgrade_unittype(client.conn.playing, i) != NULL);
-      pUnit = i;
 	
       /* unit type icon */
-      pBuf = create_iconlabel(adj_surf(get_unittype_surface(i)), pWindow->dst, NULL,
+      pBuf = create_iconlabel(adj_surf(get_unittype_surface(i, direction8_invalid())), pWindow->dst, NULL,
 			WF_RESTORE_BACKGROUND | WF_FREE_THEME);
       if(count > adj_size(72)) {
 	set_wflag(pBuf, WF_HIDDEN);
@@ -465,11 +471,11 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
       pBuf = create_iconlabel(NULL, pWindow->dst, pStr,
 			(WF_RESTORE_BACKGROUND|WF_SELLECT_WITHOUT_BAR));
       if(upgrade) {
-	pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_UNITUPGRADE_TEXT);
+	pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_UNITUPGRADE_TEXT);
 	pBuf->action = popup_upgrade_unit_callback;
 	set_wstate(pBuf, FC_WS_NORMAL);
       } else {
-        pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_UNITSREP_TEXT);
+        pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_UNITSREP_TEXT);
       }
       pBuf->string16->style &= ~SF_CENTER;
       if(count > adj_size(72)) {
@@ -583,9 +589,9 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   if (count > 0) {
     pUnitsDlg->pEndActiveWidgetList = pLast->prev;
     pUnitsDlg->pBeginActiveWidgetList = pUnitsDlg->pBeginWidgetList;
-    if(count > adj_size(80)) {
+    if (count > adj_size(80)) {
       pUnitsDlg->pActiveWidgetList = pUnitsDlg->pEndActiveWidgetList;
-      if(pUnitsDlg->pScroll) {
+      if (pUnitsDlg->pScroll) {
 	pUnitsDlg->pScroll->count = count;
       }
       ww = create_vertical_scrollbar(pUnitsDlg, 8, 10, TRUE, TRUE);
@@ -618,8 +624,6 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
                       (Main.screen->w - pWindow->size.w) / 2,
                       (Main.screen->h - pWindow->size.h) / 2);
   
-  ww -= (pWindow->size.w - pWindow->area.w);
-  
   /* exit button */
   pBuf = pWindow->prev;
   pBuf->size.x = area.x + area.w - pBuf->size.w - 1;
@@ -634,7 +638,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
   
   dst.y += 1;
   dst.x += ((name_w + tileset_full_tile_width(tileset) * 2 + adj_size(5)) - pText3->w) / 2;
@@ -645,27 +649,27 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   pBuf = pBuf->prev;
   pBuf->size.x = area.x + name_w +
                  tileset_full_tile_width(tileset) * 2 + adj_size(17);
-  pBuf->size.y = area.y + dst.y;
+  pBuf->size.y = dst.y;
   
   /* total shields cost widget */
   pBuf = pBuf->prev;
   pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
-  pBuf->size.y = area.y + dst.y;
+  pBuf->size.y = dst.y;
   
   /* total food cost widget */
   pBuf = pBuf->prev;
   pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
-  pBuf->size.y = area.y + dst.y;
+  pBuf->size.y = dst.y;
   
   /* total gold cost widget */
   pBuf = pBuf->prev;
   pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
-  pBuf->size.y = area.y + dst.y;
+  pBuf->size.y = dst.y;
   
   /* total building count widget */
   pBuf = pBuf->prev;
   pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
-  pBuf->size.y = area.y + dst.y;
+  pBuf->size.y = dst.y;
   
   /* units background and labels */
   dst.x = area.x + adj_size(2);
@@ -676,7 +680,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
   
   dst.y += 1;
   dst.x += ((name_w + tileset_full_tile_width(tileset) * 2 + adj_size(5))- pText4->w) / 2;
@@ -692,7 +696,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
     
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
     
   dst.x += adj_size(3);
   alphablit(pText1, NULL, pWindow->theme, &dst);
@@ -709,7 +713,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
   
   dst.y = area.y + adj_size(3);
   dst.x += ((ww - pIcons->pBIG_Shield->w) / 2);
@@ -725,7 +729,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
   
   dst.y = area.y + adj_size(3);
   dst.x += ((ww - pIcons->pBIG_Food->w) / 2);
@@ -741,7 +745,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
   
   dst.y = area.y + adj_size(3);
   dst.x += ((ww - pIcons->pBIG_Coin->w) / 2);
@@ -758,7 +762,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
 			  
   dst.x += adj_size(3);
   alphablit(pText2, NULL, pWindow->theme, &dst);
@@ -773,7 +777,7 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_UNITSREP_FRAME));
+           get_theme_color(COLOR_THEME_UNITSREP_FRAME));
 			  
   dst.x += adj_size(3);
   alphablit(pText5, NULL, pWindow->theme, &dst);
@@ -787,36 +791,44 @@ static void real_activeunits_report_dialog_update(struct units_entry *units,
     pBuf = pBuf->prev;
     while(TRUE)
     {
+      /* Unit type icon */
       pBuf->size.x = start_x + (mod ? tileset_full_tile_width(tileset) : 0);
       pBuf->size.y = start_y;
       hh = pBuf->size.h;
       mod ^= 1;
       
+      /* Unit type name */
       pBuf = pBuf->prev;
       pBuf->size.w = name_w;
       pBuf->size.x = start_x + tileset_full_tile_width(tileset) * 2 + adj_size(5);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Number active */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Shield upkeep */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Food upkeep */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Gold upkeep */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Number under construction */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
       
+      /* Soonest completion */
       pBuf = pBuf->prev;
       pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w + adj_size(10);
       pBuf->size.y = start_y + (hh - pBuf->size.h) / 2;
@@ -905,7 +917,7 @@ void real_units_report_dialog_update(void)
 
             pBuf = pBuf->prev; /* unit type name */
             if(upgrade) {
-              pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_UNITUPGRADE_TEXT);
+              pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_UNITUPGRADE_TEXT);
               pBuf->action = popup_upgrade_unit_callback;
               set_wstate(pBuf, FC_WS_NORMAL);
             }
@@ -1003,6 +1015,11 @@ void real_units_report_dialog_update(void)
     /* total food cost widget */
     pBuf = pBuf->prev;
     fc_snprintf(cBuf, sizeof(cBuf), "%d", units_total.upkeep[O_FOOD]);
+    copy_chars_to_string16(pBuf->string16, cBuf);
+  
+    /* total gold cost widget */
+    pBuf = pBuf->prev;
+    fc_snprintf(cBuf, sizeof(cBuf), "%d", units_total.upkeep[O_GOLD]);
     copy_chars_to_string16(pBuf->string16, cBuf);
   
     /* total building count */
@@ -1558,7 +1575,7 @@ static int popup_sell_impv_callback(struct widget *pWidget)
     /* create text label */
     pStr = create_str16_from_char(cBuf, adj_font(10));
     pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_SELLIMPR_TEXT);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_SELLIMPR_TEXT);
     
     pText = create_text_surf_from_str16(pStr);
     FREESTRING16(pStr);
@@ -1596,7 +1613,7 @@ static int popup_sell_impv_callback(struct widget *pWidget)
     
     pEconomy_Sell_Dlg->pBeginWidgetList = pBuf;
     
-    resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+    resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                   (pWindow->size.w - pWindow->area.w) + area.w,
                   (pWindow->size.h - pWindow->area.h) + area.h);
     
@@ -1682,9 +1699,9 @@ void real_economy_report_dialog_update(void)
     copy_chars_to_string16(pBuf->string16, cBuf);
     remake_label_size(pBuf);
     if(tax - total < 0) {
-      pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_ECONOMYDLG_NEG_TEXT);
+      pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_ECONOMYDLG_NEG_TEXT);
     } else {
-      pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_ECONOMYDLG_TEXT);
+      pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_ECONOMYDLG_TEXT);
     }
   
   
@@ -1744,15 +1761,10 @@ void economy_report_dialog_popup(bool make_modal)
   struct government *pGov = government_of_player(client.conn.playing);
 
   SDL_Surface *pTreasuryText;
-  struct widget *pTreasuryValue;
   SDL_Surface *pTaxRateText;
-  struct widget *pTaxRateValue;
   SDL_Surface *pTotalIncomeText;
-  struct widget *pTotalIncomeValue;
   SDL_Surface *pTotalCostText;
-  struct widget *pTotalCostValue;
   SDL_Surface *pNetIncomeText;
-  struct widget *pNetIncomeValue;
   SDL_Surface *pMaxRateText;
   
   if(pEconomyDlg) {
@@ -1801,8 +1813,6 @@ void economy_report_dialog_popup(bool make_modal)
   
   add_to_gui_list(ID_LABEL, pBuf);
 
-  pTreasuryValue = pBuf;
-
   w = MAX(w, pBuf->size.w);
   h += pBuf->size.h;
   
@@ -1822,8 +1832,6 @@ void economy_report_dialog_popup(bool make_modal)
     
   add_to_gui_list(ID_LABEL, pBuf);
 
-  pTaxRateValue = pBuf;
-
   w = MAX(w, pBuf->size.w + pBuf->next->size.w);
   h += pBuf->size.h;
 
@@ -1842,8 +1850,6 @@ void economy_report_dialog_popup(bool make_modal)
     
   add_to_gui_list(ID_LABEL, pBuf);
 
-  pTotalIncomeValue = pBuf;
-
   w = MAX(w, pBuf->size.w);
   h += pBuf->size.h;
 
@@ -1860,9 +1866,7 @@ void economy_report_dialog_popup(bool make_modal)
   pBuf = create_iconlabel(NULL, pWindow->dst, pStr, WF_RESTORE_BACKGROUND);
     
   add_to_gui_list(ID_LABEL, pBuf);
-  
-  pTotalCostValue = pBuf;
-  
+
   w = MAX(w, pBuf->size.w);
   h += pBuf->size.h;
   
@@ -1878,15 +1882,13 @@ void economy_report_dialog_popup(bool make_modal)
   pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
   
   if(tax - total < 0) {
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_ECONOMYDLG_NEG_TEXT);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_ECONOMYDLG_NEG_TEXT);
   }
   
   pBuf = create_iconlabel(NULL, pWindow->dst, pStr, WF_RESTORE_BACKGROUND);
 			  
   add_to_gui_list(ID_LABEL, pBuf);
-  
-  pNetIncomeValue = pBuf;
-  
+
   w = MAX(w, pBuf->size.w);
   h += pBuf->size.h;
 
@@ -2023,7 +2025,7 @@ void economy_report_dialog_popup(bool make_modal)
     SDL_FillRect(pBackground, NULL, map_rgba(pBackground->format, bg_color));
     putframe(pBackground,
              0, 0, pBackground->w - 1, pBackground->h - 1,
-             get_game_colorRGB(COLOR_THEME_ECONOMYDLG_FRAME));
+             get_theme_color(COLOR_THEME_ECONOMYDLG_FRAME));
     
     pStr = create_string16(NULL, 0, adj_font(10));
     pStr->style |= (SF_CENTER|TTF_STYLE_BOLD);
@@ -2205,7 +2207,7 @@ void economy_report_dialog_popup(bool make_modal)
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w - 1, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_ECONOMYDLG_FRAME));
+           get_theme_color(COLOR_THEME_ECONOMYDLG_FRAME));
   
   /* draw statical strings */
   dst.x = area.x + adj_size(10);
@@ -2253,7 +2255,7 @@ void economy_report_dialog_popup(bool make_modal)
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w - 1, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_ECONOMYDLG_FRAME));
+           get_theme_color(COLOR_THEME_ECONOMYDLG_FRAME));
   
   /* lock icon */
   pBuf = pBuf->prev;
@@ -2277,7 +2279,7 @@ void economy_report_dialog_popup(bool make_modal)
   
   putframe(pWindow->theme,
            dst.x, dst.y, dst.x + dst.w - 1, dst.y + dst.h - 1,
-           get_game_colorRGB(COLOR_THEME_ECONOMYDLG_FRAME));
+           get_theme_color(COLOR_THEME_ECONOMYDLG_FRAME));
   
   /* science lock icon */
   pBuf = pBuf->prev;
@@ -2349,7 +2351,7 @@ SDL_Surface * create_sellect_tech_icon(SDL_String16 *pStr, Tech_type_id tech_id,
       w = adj_size(135);
       break;
     case MED_MODE:
-      color = *get_game_colorRGB(COLOR_THEME_SCIENCEDLG_MED_TECHICON_BG);
+      color = *get_theme_color(COLOR_THEME_SCIENCEDLG_MED_TECHICON_BG);
     default:
       h = adj_size(200);
       w = adj_size(100);
@@ -2371,7 +2373,7 @@ SDL_Surface * create_sellect_tech_icon(SDL_String16 *pStr, Tech_type_id tech_id,
   SDL_FillRect(pSurf, NULL, map_rgba(pSurf->format, color));
   putframe(pSurf,
            0,0, pSurf->w - 1, pSurf->h - 1,
-           get_game_colorRGB(COLOR_THEME_SCIENCEDLG_FRAME));
+           get_theme_color(COLOR_THEME_SCIENCEDLG_FRAME));
   
   pTmp = get_tech_icon(tech_id);
   
@@ -2449,7 +2451,7 @@ SDL_Surface * create_sellect_tech_icon(SDL_String16 *pStr, Tech_type_id tech_id,
     unit_type_iterate(un) {
       pUnit = un;
       if (advance_number(pUnit->require_advance) == tech_id) {
-        Surf_Array[w++] = adj_surf(get_unittype_surface(un));
+        Surf_Array[w++] = adj_surf(get_unittype_surface(un, direction8_invalid()));
       }
     } unit_type_iterate_end;
 
@@ -2550,7 +2552,7 @@ void real_science_report_dialog_update(void)
     pChangeResearchGoalButton = pWindow->prev->prev;
     
     if (A_UNSET != player_research_get(client.conn.playing)->researching) {
-      cost = total_bulbs_required(client.conn.playing);
+      cost = player_research_get(client_player())->client.researching_cost;
     } else {
       cost = 0;
     }        
@@ -2569,7 +2571,7 @@ void real_science_report_dialog_update(void)
     /* research progress text */
     pStr = create_str16_from_char(science_dialog_text(), adj_font(12));
     pStr->style |= SF_CENTER;
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_SCIENCEDLG_TEXT);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_SCIENCEDLG_TEXT);
   
     pSurf = create_text_surf_from_str16(pStr);
       
@@ -2586,7 +2588,7 @@ void real_science_report_dialog_update(void)
     /* separator */
     putline(pWindow->dst->surface,
             dest.x, dest.y, (area.x + area.w - adj_size(16)), dest.y,
-            get_game_colorRGB(COLOR_THEME_SCIENCEDLG_FRAME));
+            get_theme_color(COLOR_THEME_SCIENCEDLG_FRAME));
 
     dest.y += adj_size(6);
     
@@ -2600,49 +2602,51 @@ void real_science_report_dialog_update(void)
     copy_chars_to_string16(pStr, cBuf);
     
     pSurf = create_text_surf_from_str16(pStr);
-    
+
     dest.x = pChangeResearchButton->size.x + pChangeResearchButton->size.w + adj_size(10);
-    
+
     alphablit(pSurf, NULL, pWindow->dst->surface, &dest);
 
     dest.y += pSurf->h + adj_size(4);
-    
+
     FREESURFACE(pSurf);
 
     /* progress bar */
-    dest.w = cost * pColb_Surface->w;
-    step = pColb_Surface->w;
-    if (dest.w > (area.w - dest.x - adj_size(16))) {
-      dest.w = (area.w - dest.x - adj_size(16));
-      step = ((area.w - dest.x - adj_size(16)) - pColb_Surface->w) / (cost - 1);
+    if (cost > 0) {
+      dest.w = cost * pColb_Surface->w;
+      step = pColb_Surface->w;
+      if (dest.w > (area.w - dest.x - adj_size(16))) {
+        int cost_div_safe = cost - 1;
 
-      if (step == 0) {
-        step = 1;
+        cost_div_safe = (cost_div_safe != 0 ? cost_div_safe : 1); 
+        dest.w = (area.w - dest.x - adj_size(16));
+        step = ((area.w - dest.x - adj_size(16)) - pColb_Surface->w) / cost_div_safe;
+
+        if (step == 0) {
+          step = 1;
+        }
       }
-    }
 
-    dest.h = pColb_Surface->h + adj_size(4);
-    SDL_FillRectAlpha(pWindow->dst->surface, &dest, &bg_color);
-  
-    putframe(pWindow->dst->surface,
-             dest.x - 1, dest.y - 1, dest.x + dest.w, dest.y + dest.h,
-             get_game_colorRGB(COLOR_THEME_SCIENCEDLG_FRAME));
-  
-    if (cost > adj_size(286))
-    {
-      cost =
-        adj_size(286) * ((float) player_research_get(client.conn.playing)->bulbs_researched / cost);
-    }
-    else
-    {
-      cost =
-        (float)cost * ((float)player_research_get(client.conn.playing)->bulbs_researched/cost);
-    }
-  
-    dest.y += adj_size(2);
-    for (i = 0; i < cost; i++) {
-      alphablit(pColb_Surface, NULL, pWindow->dst->surface, &dest);
-      dest.x += step;
+      dest.h = pColb_Surface->h + adj_size(4);
+      SDL_FillRectAlpha(pWindow->dst->surface, &dest, &bg_color);
+
+      putframe(pWindow->dst->surface,
+               dest.x - 1, dest.y - 1, dest.x + dest.w, dest.y + dest.h,
+               get_theme_color(COLOR_THEME_SCIENCEDLG_FRAME));
+
+      if (cost > adj_size(286)) {
+        cost =
+          adj_size(286) * ((float) player_research_get(client.conn.playing)->bulbs_researched / cost);
+      } else {
+        cost =
+          (float)cost * ((float)player_research_get(client.conn.playing)->bulbs_researched/cost);
+      }
+
+      dest.y += adj_size(2);
+      for (i = 0; i < cost; i++) {
+        alphablit(pColb_Surface, NULL, pWindow->dst->surface, &dest);
+        dest.x += step;
+      }
     }
 
     /* improvement icons */
@@ -2668,14 +2672,18 @@ void real_science_report_dialog_update(void)
     unit_type_iterate(un) {
       pUnit = un;
       if (advance_number(pUnit->require_advance) == player_research_get(client.conn.playing)->researching) {
-	if (get_unittype_surface(un)->w > 64) {
-	  float zoom = DEFAULT_ZOOM * (64.0 / get_unittype_surface(un)->w);
-	  pSurf = zoomSurface(get_unittype_surface(un), zoom, zoom, 1);
+        SDL_Surface *surf = get_unittype_surface(un, direction8_invalid());
+        int w = surf->w;
+
+	if (w > 64) {
+	  float zoom = DEFAULT_ZOOM * (64.0 / w);
+
+	  pSurf = zoomSurface(surf, zoom, zoom, 1);
 	  alphablit(pSurf, NULL, pWindow->dst->surface, &dest);
           dest.x += pSurf->w + adj_size(2);          
 	  FREESURFACE(pSurf);
 	} else {
-          pSurf = adj_surf(get_unittype_surface(un));
+          pSurf = adj_surf(surf);
           alphablit(pSurf, NULL, pWindow->dst->surface, &dest);
           dest.x += pSurf->w + adj_size(2);
 	}
@@ -2689,7 +2697,7 @@ void real_science_report_dialog_update(void)
 
     putline(pWindow->dst->surface,
             dest.x, dest.y, (area.x + area.w - adj_size(16)), dest.y,
-            get_game_colorRGB(COLOR_THEME_SCIENCEDLG_FRAME));
+            get_theme_color(COLOR_THEME_SCIENCEDLG_FRAME));
     
     dest.x = pChangeResearchButton->size.x;
     dest.y += adj_size(6);
@@ -2744,14 +2752,18 @@ void real_science_report_dialog_update(void)
       unit_type_iterate(un) {
         pUnit = un;
         if (advance_number(pUnit->require_advance) == player_research_get(client.conn.playing)->tech_goal) {
-	  if (get_unittype_surface(un)->w > 64) {
-	    float zoom = DEFAULT_ZOOM * (64.0 / get_unittype_surface(un)->w);
-	    pSurf = zoomSurface(get_unittype_surface(un), zoom, zoom, 1);
+          SDL_Surface *surf = get_unittype_surface(un, direction8_invalid());
+          int w = surf->w;
+
+	  if (w > 64) {
+	    float zoom = DEFAULT_ZOOM * (64.0 / w);
+
+	    pSurf = zoomSurface(surf, zoom, zoom, 1);
 	    alphablit(pSurf, NULL, pWindow->dst->surface, &dest);
             dest.x += pSurf->w + adj_size(2);
 	    FREESURFACE(pSurf);
 	  } else {
-            pSurf = adj_surf(get_unittype_surface(un));
+            pSurf = adj_surf(surf);
             alphablit(pSurf, NULL, pWindow->dst->surface, &dest);
             dest.x += pSurf->w + adj_size(2);
 	  }
@@ -3035,7 +3047,7 @@ static void popup_change_research_goal_dialog(void)
    * hist will hold afterwards the techid of the current choice
    */
   advance_index_iterate(A_FIRST, i) {
-    if (player_invention_reachable(client.conn.playing, i, FALSE)
+    if (player_invention_reachable(client.conn.playing, i, TRUE)
         && TECH_KNOWN != player_invention_state(client.conn.playing, i)
 	&& (11 > num_unknown_techs_for_goal(client.conn.playing, i)
 	    || i == player_research_get(client.conn.playing)->tech_goal)) {
@@ -3109,7 +3121,7 @@ static void popup_change_research_goal_dialog(void)
   count = 0;
   h = col * max_row;
   advance_index_iterate(A_FIRST, i) {
-    if (player_invention_reachable(client.conn.playing, i, FALSE)
+    if (player_invention_reachable(client.conn.playing, i, TRUE)
         && TECH_KNOWN != player_invention_state(client.conn.playing, i)
 	&& (11 > (num = num_unknown_techs_for_goal(client.conn.playing, i))
 	    || i == player_research_get(client.conn.playing)->tech_goal)) {
@@ -3299,9 +3311,9 @@ void science_report_dialog_popup(bool raise)
   /* count number of researchable techs */
   count = 0;
   advance_index_iterate(A_FIRST, i) {
-    if (player_invention_reachable(client.conn.playing, i, FALSE)
+    if (player_invention_reachable(client.conn.playing, i, TRUE)
      && TECH_KNOWN != player_invention_state(client.conn.playing, i)) {
-	count++;	  
+	count++;
     }
   }  advance_index_iterate_end;
 
@@ -3383,27 +3395,41 @@ void science_report_dialog_redraw(void)
 /* ======================== Endgame Report ============================= */
 /* ===================================================================== */
 
+static char eg_buffer[150 * MAX_NUM_PLAYERS];
+static int eg_player_count = 0;
+static int eg_players_received = 0;
+
 /****************************************************************
   Show a dialog with player statistics at endgame.
   TODO: Display all statistics in packet_endgame_report.
 *****************************************************************/
-void endgame_report_dialog_popup(const struct packet_endgame_report *packet)
+void endgame_report_dialog_start(const struct packet_endgame_report *packet)
 {
-  char buffer[150 * MAX_NUM_PLAYERS];
-  int i;
-
-  buffer[0] = '\0';
-  for (i = 0; i < packet->player_num; i++) {
-    const struct player *pplayer = player_by_number(packet->player_id[i]);
-
-    cat_snprintf(buffer, sizeof(buffer),
-                 PL_("%2d: The %s ruler %s scored %d point\n",
-                     "%2d: The %s ruler %s scored %d points\n",
-                     packet->score[i]),
-                 i + 1, nation_adjective_for_player(pplayer),
-                 player_name(pplayer), packet->score[i]);
-  }
-  popup_notify_dialog(_("Final Report:"),
-                      _("The Greatest Civilizations in the world."),
-                      buffer);
+  eg_buffer[0] = '\0';
+  eg_player_count = packet->player_num;
+  eg_players_received = 0;
 }
+
+/****************************************************************
+  Received endgame report information about single player
+*****************************************************************/
+void endgame_report_dialog_player(const struct packet_endgame_player *packet)
+{
+  const struct player *pplayer = player_by_number(packet->player_id);
+
+  eg_players_received++;
+
+  cat_snprintf(eg_buffer, sizeof(eg_buffer),
+               PL_("%2d: The %s ruler %s scored %d point\n",
+                   "%2d: The %s ruler %s scored %d points\n",
+                   packet->score),
+               eg_players_received, nation_adjective_for_player(pplayer),
+               player_name(pplayer), packet->score);
+
+  if (eg_players_received == eg_player_count) {
+    popup_notify_dialog(_("Final Report:"),
+                        _("The Greatest Civilizations in the world."),
+                        eg_buffer);
+  }
+}
+

@@ -4,13 +4,13 @@
 pkgdatadir = $(datadir)/$(PACKAGE)/experimental
 
 pkgdata_DATA =          \
-	ai_effects.ruleset \
 	buildings.ruleset \
 	cities.ruleset	\
 	effects.ruleset	\
 	script.lua	\
 	game.ruleset	\
 	governments.ruleset \
+	nations.ruleset	\
 	techs.ruleset	\
 	terrain.ruleset	\
 	units.ruleset

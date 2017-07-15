@@ -13,6 +13,10 @@
 #ifndef FC__FEATURED_TEXT_H
 #define FC__FEATURED_TEXT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "support.h"            /* bool type. */
 
@@ -138,7 +142,7 @@ struct ft_color {
   const char *foreground;
   const char *background;
 };
-#define FT_COLOR(fg, bg) { .foreground = fg, .background = bg }
+#define FT_COLOR(fg, bg) { fg, bg }
 /**************************************************************************
   Constructor.
 **************************************************************************/
@@ -154,8 +158,8 @@ static inline struct ft_color ft_color(const char *foreground,
 **************************************************************************/
 static inline bool ft_color_requested(const struct ft_color color)
 {
-  return ((NULL != color.foreground && '\0' != color.foreground)
-          || (NULL != color.background && '\0' != color.background));
+  return ((NULL != color.foreground && '\0' != color.foreground[0])
+          || (NULL != color.background && '\0' != color.background[0]));
 }
 
 /* Predefined colors. */
@@ -167,7 +171,7 @@ extern const struct ft_color ftc_server;
 extern const struct ft_color ftc_client;
 extern const struct ft_color ftc_editor;
 extern const struct ft_color ftc_command;
-extern const struct ft_color ftc_changed;
+extern       struct ft_color ftc_changed;
 extern const struct ft_color ftc_server_prompt;
 extern const struct ft_color ftc_player_lost;
 extern const struct ft_color ftc_game_start;
@@ -175,6 +179,7 @@ extern const struct ft_color ftc_game_start;
 extern const struct ft_color ftc_chat_public;
 extern const struct ft_color ftc_chat_ally;
 extern const struct ft_color ftc_chat_private;
+extern const struct ft_color ftc_chat_luaconsole;
 
 extern const struct ft_color ftc_vote_public;
 extern const struct ft_color ftc_vote_team;
@@ -184,10 +189,17 @@ extern const struct ft_color ftc_vote_yes;
 extern const struct ft_color ftc_vote_no;
 extern const struct ft_color ftc_vote_abstain;
 
+extern const struct ft_color ftc_luaconsole_input;
+extern const struct ft_color ftc_luaconsole_error;
+extern const struct ft_color ftc_luaconsole_normal;
+extern const struct ft_color ftc_luaconsole_verbose;
+extern const struct ft_color ftc_luaconsole_debug;
+
 /* Main functions. */
 size_t featured_text_to_plain_text(const char *featured_text,
                                    char *plain_text, size_t plain_text_len,
-                                   struct text_tag_list **tags);
+                                   struct text_tag_list **tags,
+                                   bool replace_link_text);
 size_t featured_text_apply_tag(const char *text_source,
                                char *featured_text, size_t featured_text_len,
                                enum text_tag_type tag_type,
@@ -228,5 +240,9 @@ const char *city_tile_link(const struct city *pcity);
 const char *tile_link(const struct tile *ptile);
 const char *unit_link(const struct unit *punit);
 const char *unit_tile_link(const struct unit *punit);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__FEATURED_TEXT_H */

@@ -15,8 +15,10 @@ noinst_HEADERS = \
 	gotodlg_g.h	\
 	graphics_g.h	\
 	gui_main_g.h	\
+	gui_proto_constructor.h \
 	helpdlg_g.h	\
 	inteldlg_g.h	\
+	luaconsole_g.h	\
 	mapctrl_g.h	\
 	mapview_g.h	\
 	menu_g.h	\

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -21,16 +21,22 @@
 
 /* common */
 #include "city.h"
+#include "connection.h"
 #include "player.h"
 
 /* client/include */
 #include "citydlg_g.h"
 #include "cityrep_g.h"
+#include "dialogs_g.h"
 #include "gui_main_g.h"
 #include "menu_g.h"
 #include "pages_g.h"
 #include "plrdlg_g.h"
 #include "repodlgs_g.h"
+
+/* client */
+#include "client_main.h"
+#include "connectdlg_common.h"
 
 #include "update_queue.h"
 
@@ -481,6 +487,20 @@ void set_client_page(enum client_pages page)
 }
 
 /****************************************************************************
+  Start server and then, set the client page.
+****************************************************************************/
+void client_start_server_and_set_page(enum client_pages page)
+{
+  log_debug("Requested server start + page: %s.", client_pages_name(page));
+
+  if (client_start_server()) {
+    update_queue_connect_processing_finished(client.conn.client.last_request_id_used,
+                                             set_client_page_callback,
+                                             FC_INT_TO_PTR(page));
+  }
+}
+
+/****************************************************************************
   Returns the next client page.
 ****************************************************************************/
 enum client_pages get_client_page(void)
@@ -495,6 +515,13 @@ enum client_pages get_client_page(void)
   }
 }
 
+/****************************************************************************
+  Returns whether there's page switching already in progress.
+****************************************************************************/
+bool update_queue_is_switching_page(void)
+{
+  return update_queue_has_callback(set_client_page_callback);
+}
 
 /****************************************************************************
   Update the menus.
@@ -537,7 +564,7 @@ static void cities_update_callback(void *data)
     action;                                                                 \
     need_update &= ~city_update;                                            \
   }
-#else
+#else  /* DEBUG */
 #define NEED_UPDATE(city_update, action)                                    \
   if (city_update & need_update) {                                          \
     action;                                                                 \
@@ -644,4 +671,12 @@ void economy_report_dialog_update(void)
 void units_report_dialog_update(void)
 {
   update_queue_add(UQ_CALLBACK(real_units_report_dialog_update), NULL);
+}
+
+/****************************************************************************
+  Update the units report.
+****************************************************************************/
+void unit_select_dialog_update(void)
+{
+//  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
 }

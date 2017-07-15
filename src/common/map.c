@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 #include <string.h>             /* strlen */
 
@@ -31,6 +31,7 @@
 #include "movement.h"
 #include "nation.h"
 #include "packets.h"
+#include "road.h"
 #include "unit.h"
 #include "unitlist.h"
 
@@ -50,7 +51,7 @@ static void startpos_destroy(struct startpos *psp);
 
 /* struct startpos_hash and related functions. */
 #define SPECHASH_TAG startpos
-#define SPECHASH_KEY_TYPE const struct tile *
+#define SPECHASH_KEY_TYPE struct tile *
 #define SPECHASH_DATA_TYPE struct startpos *
 #define SPECHASH_DATA_FREE startpos_destroy
 #include "spechash.h"
@@ -87,6 +88,12 @@ struct terrain_misc terrain_control;
 const int DIR_DX[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 const int DIR_DY[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
 
+static bool dir_cardinality[9]; /* Including invalid one */
+static bool dir_validity[9];    /* Including invalid one */
+
+static bool is_valid_dir_calculate(enum direction8 dir);
+static bool is_cardinal_dir_calculate(enum direction8 dir);
+
 static bool restrict_infra(const struct player *pplayer, const struct tile *t1,
                            const struct tile *t2);
 
@@ -94,7 +101,7 @@ static bool restrict_infra(const struct player *pplayer, const struct tile *t1,
   Return a bitfield of the specials on the tile that are infrastructure.
 ****************************************************************************/
 bv_special get_tile_infrastructure_set(const struct tile *ptile,
-					  int *pcount)
+                                       int *pcount)
 {
   bv_special pspresent;
   int i, count = 0;
@@ -133,6 +140,48 @@ bv_bases get_tile_pillageable_base_set(const struct tile *ptile, int *pcount)
     *pcount = count;
   }
   return bspresent;
+}
+
+/****************************************************************************
+  Return a bitfield of the pillageable roads on the tile.
+****************************************************************************/
+bv_roads get_tile_pillageable_road_set(const struct tile *ptile, int *pcount)
+{
+  bv_roads rspresent;
+  int count = 0;
+
+  BV_CLR_ALL(rspresent);
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)) {
+      if (proad->pillageable) {
+        struct tile *roadless = tile_virtual_new(ptile);
+        bool dependency = FALSE;
+
+        tile_remove_road(roadless, proad);
+        road_type_iterate(pdependant) {
+          if (tile_has_road(ptile, pdependant)) {
+            if (!are_reqs_active(NULL, NULL, NULL, roadless,
+                                 NULL, NULL, NULL,
+                                 &pdependant->reqs, RPT_POSSIBLE)) {
+              dependency = TRUE;
+              break;
+            }
+          }
+        } road_type_iterate_end;
+
+        tile_virtual_destroy(roadless);
+
+        if (!dependency) {
+          BV_SET(rspresent, road_index(proad));
+          count++;
+        }
+      }
+    }
+  } road_type_iterate_end;
+  if (pcount) {
+    *pcount = count;
+  }
+  return rspresent;
 }
 
 /***************************************************************
@@ -183,6 +232,7 @@ void map_init(void)
     map.server.have_resources = FALSE;
     map.server.have_rivers_overlay = FALSE;
     map.server.have_huts = FALSE;
+    map.server.team_placement = MAP_DEFAULT_TEAM_PLACEMENT;
   }
 }
 
@@ -230,13 +280,13 @@ static void generate_map_indices(void)
    * case we're not concerned with going too far and wrapping around, so we
    * just have to make sure we go far enough if we're at one edge of the
    * map. */
-  nat_min_x = (topo_has_flag(TF_WRAPX) ? 0 : (nat_center_x - map.xsize + 1));
-  nat_min_y = (topo_has_flag(TF_WRAPY) ? 0 : (nat_center_y - map.ysize + 1));
+  nat_min_x = (current_topo_has_flag(TF_WRAPX) ? 0 : (nat_center_x - map.xsize + 1));
+  nat_min_y = (current_topo_has_flag(TF_WRAPY) ? 0 : (nat_center_y - map.ysize + 1));
 
-  nat_max_x = (topo_has_flag(TF_WRAPX)
+  nat_max_x = (current_topo_has_flag(TF_WRAPX)
 	       ? (map.xsize - 1)
 	       : (nat_center_x + map.xsize - 1));
-  nat_max_y = (topo_has_flag(TF_WRAPY)
+  nat_max_y = (current_topo_has_flag(TF_WRAPY)
 	       ? (map.ysize - 1)
 	       : (nat_center_y + map.ysize - 1));
   tiles = (nat_max_x - nat_min_x + 1) * (nat_max_y - nat_min_y + 1);
@@ -285,42 +335,48 @@ static void generate_map_indices(void)
 /****************************************************************************
   map_init_topology needs to be called after map.topology_id is changed.
 
-  If map.size is changed, map.xsize and map.ysize must be set before
-  calling map_init_topology(TRUE).  This is done by the mapgen code
-  (server) and packhand code (client).
-
-  If map.xsize and map.ysize are changed, call map_init_topology(FALSE) to
-  calculate map.size.  This should be done in the client or when loading
-  savegames, since the [xy]size values are already known.
+  map.xsize and map.ysize must be set before calling map_init_topology().
+  This is done by the map generator code (server), when loading a savegame
+  or a scenario with map (server), and packhand code (client).
 ****************************************************************************/
-void map_init_topology(bool set_sizes)
+void map_init_topology(void)
 {
   enum direction8 dir;
 
-  if (!set_sizes && is_server()) {
-    /* Set map.size based on map.xsize and map.ysize. */
-    map.server.size = (float)(map_num_tiles()) / 1000.0 + 0.5;
-  }
-  
   /* sanity check for iso topologies*/
   fc_assert(!MAP_IS_ISOMETRIC || (map.ysize % 2) == 0);
 
   /* The size and ratio must satisfy the minimum and maximum *linear*
    * restrictions on width */
-  fc_assert(MAP_WIDTH >= MAP_MIN_LINEAR_SIZE);
-  fc_assert(MAP_HEIGHT >= MAP_MIN_LINEAR_SIZE);
-  fc_assert(MAP_WIDTH <= MAP_MAX_LINEAR_SIZE);
-  fc_assert(MAP_HEIGHT <= MAP_MAX_LINEAR_SIZE);
+  fc_assert(map.xsize >= MAP_MIN_LINEAR_SIZE);
+  fc_assert(map.ysize >= MAP_MIN_LINEAR_SIZE);
+  fc_assert(map.xsize <= MAP_MAX_LINEAR_SIZE);
+  fc_assert(map.ysize <= MAP_MAX_LINEAR_SIZE);
+  fc_assert(map_num_tiles() >= MAP_MIN_SIZE * 1000);
+  fc_assert(map_num_tiles() <= MAP_MAX_SIZE * 1000);
 
   map.num_valid_dirs = map.num_cardinal_dirs = 0;
+
+  /* Values for direction8_invalid() */
+  fc_assert(direction8_invalid() == 8);
+  dir_validity[8] = FALSE;
+  dir_cardinality[8] = FALSE;
+
+  /* Values for actual directions */
   for (dir = 0; dir < 8; dir++) {
-    if (is_valid_dir(dir)) {
+    if (is_valid_dir_calculate(dir)) {
       map.valid_dirs[map.num_valid_dirs] = dir;
       map.num_valid_dirs++;
+      dir_validity[dir] = TRUE;
+    } else {
+      dir_validity[dir] = FALSE;
     }
-    if (is_cardinal_dir(dir)) {
+    if (is_cardinal_dir_calculate(dir)) {
       map.cardinal_dirs[map.num_cardinal_dirs] = dir;
       map.num_cardinal_dirs++;
+      dir_cardinality[dir] = TRUE;
+    } else {
+      dir_cardinality[dir] = FALSE;
     }
   }
   fc_assert(map.num_valid_dirs > 0 && map.num_valid_dirs <= 8);
@@ -329,13 +385,15 @@ void map_init_topology(bool set_sizes)
 }
 
 /***************************************************************
-...
+  Initialize tile structure
 ***************************************************************/
 static void tile_init(struct tile *ptile)
 {
   ptile->continent = 0;
 
-  tile_clear_all_specials (ptile);
+  tile_clear_all_specials(ptile);
+  BV_CLR_ALL(ptile->bases);
+  BV_CLR_ALL(ptile->roads);
   ptile->resource = NULL;
   ptile->terrain  = T_UNKNOWN;
   ptile->units    = unit_list_new();
@@ -351,17 +409,19 @@ static void tile_init(struct tile *ptile)
 ****************************************************************************/
 struct tile *mapstep(const struct tile *ptile, enum direction8 dir)
 {
-  int x, y;
+  int dx, dy, tile_x, tile_y;
 
   if (!is_valid_dir(dir)) {
     return NULL;
   }
 
-  DIRSTEP(x, y, dir);
-  x += ptile->x;
-  y += ptile->y;
+  index_to_map_pos(&tile_x, &tile_y, tile_index(ptile)); 
+  DIRSTEP(dx, dy, dir);
 
-  return map_pos_to_tile(x, y);
+  tile_x += dx;
+  tile_y += dy;
+
+  return map_pos_to_tile(tile_x, tile_y);
 }
 
 /****************************************************************************
@@ -372,19 +432,18 @@ struct tile *mapstep(const struct tile *ptile, enum direction8 dir)
 ****************************************************************************/
 static inline struct tile *base_native_pos_to_tile(int nat_x, int nat_y)
 {
+  /* Wrap in X and Y directions, as needed. */
   /* If the position is out of range in a non-wrapping direction, it is
    * unreal. */
-  if (!((topo_has_flag(TF_WRAPX) || (nat_x >= 0 && nat_x < map.xsize))
-	&& (topo_has_flag(TF_WRAPY) || (nat_y >= 0 && nat_y < map.ysize)))) {
+  if (current_topo_has_flag(TF_WRAPX)) {
+    nat_x = FC_WRAP(nat_x, map.xsize);
+  } else if (nat_x < 0 || nat_x >= map.xsize) {
     return NULL;
   }
-
-  /* Wrap in X and Y directions, as needed. */
-  if (topo_has_flag(TF_WRAPX)) {
-    nat_x = FC_WRAP(nat_x, map.xsize);
-  }
-  if (topo_has_flag(TF_WRAPY)) {
+  if (current_topo_has_flag(TF_WRAPY)) {
     nat_y = FC_WRAP(nat_y, map.ysize);
+  } else if (nat_y < 0 || nat_y >= map.ysize) {
+    return NULL;
   }
 
   return map.tiles + native_pos_to_index(nat_x, nat_y);
@@ -437,14 +496,20 @@ struct tile *index_to_tile(int index)
 }
 
 /***************************************************************
-...
+  Free memory associated with one tile.
 ***************************************************************/
 static void tile_free(struct tile *ptile)
 {
   unit_list_destroy(ptile->units);
+
   if (ptile->spec_sprite) {
     free(ptile->spec_sprite);
     ptile->spec_sprite = NULL;
+  }
+
+  if (ptile->label) {
+    FC_FREE(ptile->label);
+    ptile->label = NULL;
   }
 }
 
@@ -465,12 +530,7 @@ void map_allocate(void)
    * better to do a manual loop here. */
   whole_map_iterate(ptile) {
     ptile->index = ptile - map.tiles;
-    index_to_map_pos(&ptile->x, &ptile->y, tile_index(ptile));
-    index_to_native_pos(&ptile->nat_x, &ptile->nat_y, tile_index(ptile));
     CHECK_INDEX(tile_index(ptile));
-    CHECK_MAP_POS(ptile->x, ptile->y);
-    CHECK_NATIVE_POS(ptile->nat_x, ptile->nat_y);
-
     tile_init(ptile);
   } whole_map_iterate_end;
 
@@ -514,7 +574,7 @@ void map_free(void)
 ****************************************************************************/
 static int map_vector_to_distance(int dx, int dy)
 {
-  if (topo_has_flag(TF_HEX)) {
+  if (current_topo_has_flag(TF_HEX)) {
     /* Hex: all directions are cardinal so the distance is equivalent to
      * the real distance. */
     return map_vector_to_real_distance(dx, dy);
@@ -530,8 +590,8 @@ int map_vector_to_real_distance(int dx, int dy)
 {
   const int absdx = abs(dx), absdy = abs(dy);
 
-  if (topo_has_flag(TF_HEX)) {
-    if (topo_has_flag(TF_ISO)) {
+  if (current_topo_has_flag(TF_HEX)) {
+    if (current_topo_has_flag(TF_ISO)) {
       /* Iso-hex: you can't move NE or SW. */
       if ((dx < 0 && dy > 0)
 	  || (dx > 0 && dy < 0)) {
@@ -564,7 +624,7 @@ int map_vector_to_real_distance(int dx, int dy)
 ****************************************************************************/
 int map_vector_to_sq_distance(int dx, int dy)
 {
-  if (topo_has_flag(TF_HEX)) {
+  if (current_topo_has_flag(TF_HEX)) {
     /* Hex: The square distance is just the square of the real distance; we
      * don't worry about pythagorean calculations. */
     int dist = map_vector_to_real_distance(dx, dy);
@@ -576,7 +636,7 @@ int map_vector_to_sq_distance(int dx, int dy)
 }
 
 /***************************************************************
-...
+  Return real distance between two tiles.
 ***************************************************************/
 int real_map_distance(const struct tile *tile0, const struct tile *tile1)
 {
@@ -587,7 +647,7 @@ int real_map_distance(const struct tile *tile0, const struct tile *tile1)
 }
 
 /***************************************************************
-...
+  Return squared distance between two tiles.
 ***************************************************************/
 int sq_map_distance(const struct tile *tile0, const struct tile *tile1)
 {
@@ -600,7 +660,7 @@ int sq_map_distance(const struct tile *tile0, const struct tile *tile1)
 }
 
 /***************************************************************
-...
+  Return Manhattan distance between two tiles.
 ***************************************************************/
 int map_distance(const struct tile *tile0, const struct tile *tile1)
 {
@@ -610,16 +670,6 @@ int map_distance(const struct tile *tile0, const struct tile *tile1)
 
   map_distance_vector(&dx, &dy, tile0, tile1);
   return map_vector_to_distance(dx, dy);
-}
-
-/*************************************************************************
-  This is used in mapgen for rivers going into ocen.  The name is 
-  intentionally made awkward to prevent people from using it in place of
-  is_ocean_near_tile
-*************************************************************************/
-bool is_cardinally_adj_to_ocean(const struct tile *ptile)
-{
-  return count_terrain_flag_near_tile(ptile, TRUE, FALSE, TER_OCEANIC) > 0;
 }
 
 /****************************************************************************
@@ -637,9 +687,11 @@ bool is_safe_ocean(const struct tile *ptile)
 }
 
 /***************************************************************
-...
+  Can tile be irrigated by given unit? Unit can be NULL to check if
+  any settler type unit of any player can irrigate.
 ***************************************************************/
-bool is_water_adjacent_to_tile(const struct tile *ptile)
+bool can_be_irrigated(const struct tile *ptile,
+                      const struct unit *punit)
 {
   struct terrain* pterrain = tile_terrain(ptile);
 
@@ -647,27 +699,7 @@ bool is_water_adjacent_to_tile(const struct tile *ptile)
     return FALSE;
   }
 
-  if (tile_has_special(ptile, S_RIVER)
-   || tile_has_special(ptile, S_IRRIGATION)
-   || terrain_has_flag(pterrain, TER_OCEANIC)) {
-    return TRUE;
-  }
-
-  cardinal_adjc_iterate(ptile, tile1) {
-    struct terrain* pterrain1 = tile_terrain(tile1);
-
-    if (T_UNKNOWN == pterrain1) {
-      continue;
-    }
-
-    if (tile_has_special(tile1, S_RIVER)
-     || tile_has_special(tile1, S_IRRIGATION)
-     || terrain_has_flag(pterrain1, TER_OCEANIC)) {
-      return TRUE;
-    }
-  } cardinal_adjc_iterate_end;
-
-  return FALSE;
+  return get_tile_bonus(ptile, punit, EFT_IRRIG_POSSIBLE) > 0;
 }
 
 /**************************************************************************
@@ -677,7 +709,8 @@ a sufficient number of adjacent tiles that are not ocean.
 **************************************************************************/
 bool can_reclaim_ocean(const struct tile *ptile)
 {
-  int land_tiles = 100 - count_ocean_near_tile(ptile, FALSE, TRUE);
+  int land_tiles = 100 - count_terrain_class_near_tile(ptile, FALSE, TRUE,
+                                                       TC_OCEAN);
 
   return land_tiles >= terrain_control.ocean_reclaim_requirement_pct;
 }
@@ -689,7 +722,7 @@ a sufficient number of adjacent tiles that are ocean.
 **************************************************************************/
 bool can_channel_land(const struct tile *ptile)
 {
-  int ocean_tiles = count_ocean_near_tile(ptile, FALSE, TRUE);
+  int ocean_tiles = count_terrain_class_near_tile(ptile, FALSE, TRUE, TC_OCEAN);
 
   return ocean_tiles >= terrain_control.land_channel_requirement_pct;
 }
@@ -700,80 +733,120 @@ bool can_channel_land(const struct tile *ptile)
   the tiles are assumed to be adjacent, and the (x,y)
   values are used only to get the river bonus correct.
 
-  May also be used with punit==NULL, in which case punit
+  May also be used with punit == NULL, in which case punit
   tests are not done (for unit-independent results).
 ***************************************************************/
-static int tile_move_cost_ptrs(const struct unit *punit,
-                               const struct player *pplayer,
-			       const struct tile *t1, const struct tile *t2)
+int tile_move_cost_ptrs(const struct unit *punit,
+                        const struct unit_class *pclass,
+                        const struct player *pplayer,
+                        const struct tile *t1, const struct tile *t2)
 {
-  bool cardinal_move;
-  struct unit_class *pclass = NULL;
   bool native = TRUE;
+  int cost = tile_terrain(t2)->movement_cost * SINGLE_MOVE;
+  bool cardinality_checked = FALSE;
+  bool cardinal_move = FALSE;
+  bool ri;
 
   if (punit) {
-    pclass = unit_class(punit);
-    native = is_native_tile(unit_type(punit), t2);
+    struct unit_class *puclass = unit_class(punit);
+
+    fc_assert(pclass == NULL || puclass == pclass);
+
+    pclass = puclass;
+    native = is_native_tile_to_class(pclass, t2);
   }
 
-  if (game.info.slow_invasions
-      && punit
-      && tile_city(t1) == NULL
-      && !is_native_tile(unit_type(punit), t1)
-      && is_native_tile(unit_type(punit), t2)) {
-    /* If "slowinvasions" option is turned on, units moving from
-     * non-native terrain (from transport) to native terrain lose all their
-     * movement.
-     * e.g. ground units moving from sea to land */
-    return punit->moves_left;
+  if (pclass
+      && !is_native_tile_to_class(pclass, t1)
+      && native) {
+    if (game.info.slow_invasions
+        && tile_city(t1) == NULL) {
+      /* If "slowinvasions" option is turned on, units moving from
+       * non-native terrain (from transport) to native terrain lose all their
+       * movement.
+       * e.g. ground units moving from sea to land */
+      if (punit != NULL) {
+        return punit->moves_left;
+      } else {
+        /* Needs to be bigger than SINGLE_MOVE * move_rate * MAX(1, fuel)
+         * for the most mobile unit possible. */
+        return FC_INFINITY;
+      }
+    } else {
+      /* Disembarking / leaving port. */
+      if (punit && unit_has_type_flag(punit, UTYF_IGTER)) {
+        /* UTYF_IGTER units get move benefit. */
+        return MOVE_COST_IGTER;
+      } else {
+        return SINGLE_MOVE;
+      }
+    }
   }
 
-  if (punit && !uclass_has_flag(pclass, UCF_TERRAIN_SPEED)) {
+  if (pclass && !uclass_has_flag(pclass, UCF_TERRAIN_SPEED)) {
     return SINGLE_MOVE;
   }
 
-  /* Railroad check has to be before F_IGTER check so that F_IGTER
-   * units are not penalized. F_IGTER affects also entering and
-   * leaving ships, so F_IGTER check has to be before native terrain
+  /* Railroad check has to be before UTYF_IGTER check so that UTYF_IGTER
+   * units are not penalized. UTYF_IGTER affects also entering and
+   * leaving ships, so UTYF_IGTER check has to be before native terrain
    * check. We want to give railroad bonus only to native units. */
-  if (tile_has_special(t1, S_RAILROAD) && tile_has_special(t2, S_RAILROAD)
-      && native && !restrict_infra(pplayer, t1, t2)) {
-    return MOVE_COST_RAIL;
-  }
-  if (punit && unit_has_type_flag(punit, F_IGTER)) {
-    return SINGLE_MOVE/3;
+  ri = restrict_infra(pplayer, t1, t2);
+
+  road_type_list_iterate(pclass->cache.bonus_roads, proad) {
+    if ((!ri || road_has_flag(proad, RF_UNRESTRICTED_INFRA))
+        && tile_has_road(t1, proad) && tile_has_road(t2, proad)) {
+      if (cost > proad->move_cost) {
+
+        if (proad->move_mode == RMM_FAST_ALWAYS) {
+          cost = proad->move_cost;
+        } else {
+          if (!cardinality_checked) {
+            cardinal_move = (ALL_DIRECTIONS_CARDINAL() || is_move_cardinal(t1, t2));
+            cardinality_checked = TRUE;
+          }
+          if (cardinal_move) {
+            cost = proad->move_cost;
+          } else {
+            switch (proad->move_mode) {
+            case RMM_CARDINAL:
+              break;
+            case RMM_RELAXED:
+              if (cost > proad->move_cost * 2) {
+                cardinal_between_iterate(t1, t2, between) {
+                  if (tile_has_road(between, proad)) {
+                    /* TODO: Should we restrict this more?
+                     * Should we check against enemy cities on between tile?
+                     * Should we check against non-native terrain on between tile?
+                     */
+                    cost = proad->move_cost * 2;
+                  }
+                } cardinal_between_iterate_end;
+              }
+              break;
+            case RMM_FAST_ALWAYS:
+              fc_assert(proad->move_mode != RMM_FAST_ALWAYS); /* Already handled above */
+              cost = proad->move_cost;
+              break;
+            case RMM_NO_BONUS:
+              fc_assert(proad->move_mode != RMM_NO_BONUS);
+              break;
+            }
+          }
+        }
+      }
+    }
+  } road_type_list_iterate_end;
+
+  if (punit && unit_has_type_flag(punit, UTYF_IGTER)) {
+    return MIN(cost, MOVE_COST_IGTER);
   }
   if (!native) {
     /* Loading to transport or entering port */
     return SINGLE_MOVE;
   }
-  if (tile_has_special(t1, S_ROAD) && tile_has_special(t2, S_ROAD)
-      && !restrict_infra(pplayer, t1, t2)) {
-    return MOVE_COST_ROAD;
-  }
 
-  if (tile_has_special(t1, S_RIVER) && tile_has_special(t2, S_RIVER)) {
-    cardinal_move = is_move_cardinal(t1, t2);
-    switch (terrain_control.river_move_mode) {
-    case RMV_NORMAL:
-      break;
-    case RMV_FAST_STRICT:
-      if (cardinal_move)
-	return MOVE_COST_RIVER;
-      break;
-    case RMV_FAST_RELAXED:
-      if (cardinal_move)
-	return MOVE_COST_RIVER;
-      else
-	return 2 * MOVE_COST_RIVER;
-    case RMV_FAST_ALWAYS:
-      return MOVE_COST_RIVER;
-    default:
-      break;
-    }
-  }
-
-  return tile_terrain(t2)->movement_cost * SINGLE_MOVE;
+  return cost;
 }
 
 /****************************************************************************
@@ -799,78 +872,8 @@ static bool restrict_infra(const struct player *pplayer, const struct tile *t1,
   return FALSE;
 }
 
-/****************************************************************************
-  map_move_cost_ai returns the move cost as
-  calculated by tile_move_cost_ptrs (with no unit pointer to get
-  unit-independent results) EXCEPT if either of the source or
-  destination tile is an ocean tile. Then the result of the method
-  shows if a ship can take the step from the source position to the
-  destination position (return value is MOVE_COST_FOR_VALID_SEA_STEP)
-  or not.  An arbitrarily high value will be returned if the move is
-  impossible.
-
-  FIXME: this function can't be used for air units because it returns
-  sea<->land moves as impossible.
-****************************************************************************/
-int map_move_cost_ai(const struct player *pplayer, const struct tile *tile0,
-                     const struct tile *tile1)
-{
-  const int maxcost = 72; /* Arbitrary. */
-
-  fc_assert_ret_val(!is_server()
-                    || (tile_terrain(tile0) != T_UNKNOWN
-                        && tile_terrain(tile1) != T_UNKNOWN), FC_INFINITY);
-
-  /* A ship can take the step if:
-   * - both tiles are ocean or
-   * - one of the tiles is ocean and the other is a city or is unknown
-   *
-   * Note tileX->terrain will only be T_UNKNOWN at the client. */
-  if (is_ocean_tile(tile0) && is_ocean_tile(tile1)) {
-    return MOVE_COST_FOR_VALID_SEA_STEP;
-  }
-
-  if (is_ocean_tile(tile0)
-      && (tile_city(tile1) || tile_terrain(tile1) == T_UNKNOWN)) {
-    return MOVE_COST_FOR_VALID_SEA_STEP;
-  }
-
-  if (is_ocean_tile(tile1)
-      && (tile_city(tile0) || tile_terrain(tile0) == T_UNKNOWN)) {
-    return MOVE_COST_FOR_VALID_SEA_STEP;
-  }
-
-  if (is_ocean_tile(tile0) || is_ocean_tile(tile1)) {
-    /* FIXME: Shouldn't this return MOVE_COST_FOR_VALID_AIR_STEP?
-     * Note that MOVE_COST_FOR_VALID_AIR_STEP is currently equal to
-     * MOVE_COST_FOR_VALID_SEA_STEP. */
-    return maxcost;
-  }
-
-  return tile_move_cost_ptrs(NULL, pplayer, tile0, tile1);
-}
-
 /***************************************************************
-  The cost to move punit from where it is to tile x,y.
-  It is assumed the move is a valid one, e.g. the tiles are adjacent.
-***************************************************************/
-int map_move_cost_unit(struct unit *punit, const struct tile *ptile)
-{
-  return tile_move_cost_ptrs(punit, unit_owner(punit),
-                             punit->tile, ptile);
-}
-
-/***************************************************************
-  Move cost between two tiles
-***************************************************************/
-int map_move_cost(const struct player *pplayer,
-                  const struct tile *src_tile, const struct tile *dst_tile)
-{
-  return tile_move_cost_ptrs(NULL, pplayer, src_tile, dst_tile);
-}
-
-/***************************************************************
-...
+  Are two tiles adjacent to each other.
 ***************************************************************/
 bool is_tiles_adjacent(const struct tile *tile0, const struct tile *tile1)
 {
@@ -887,6 +890,9 @@ bool same_pos(const struct tile *tile1, const struct tile *tile2)
   return (tile1 == tile2);
 }
 
+/***************************************************************
+  Is given position real position
+***************************************************************/
 bool is_real_map_pos(int x, int y)
 {
   return normalize_map_pos(&x, &y);
@@ -919,8 +925,7 @@ bool normalize_map_pos(int *x, int *y)
   struct tile *ptile = map_pos_to_tile(*x, *y);
 
   if (ptile) {
-    *x = ptile->x;
-    *y = ptile->y;
+    index_to_map_pos(x, y, tile_index(ptile)); 
     return TRUE;
   } else {
     return FALSE;
@@ -936,10 +941,10 @@ struct tile *nearest_real_tile(int x, int y)
   int nat_x, nat_y;
 
   MAP_TO_NATIVE_POS(&nat_x, &nat_y, x, y);
-  if (!topo_has_flag(TF_WRAPX)) {
+  if (!current_topo_has_flag(TF_WRAPX)) {
     nat_x = CLIP(0, nat_x, map.xsize - 1);
   }
-  if (!topo_has_flag(TF_WRAPY)) {
+  if (!current_topo_has_flag(TF_WRAPY)) {
     nat_y = CLIP(0, nat_y, map.ysize - 1);
   }
   NATIVE_TO_MAP_POS(&x, &y, nat_x, nat_y);
@@ -963,7 +968,7 @@ int map_num_tiles(void)
 void base_map_distance_vector(int *dx, int *dy,
 			      int x0, int y0, int x1, int y1)
 {
-  if (topo_has_flag(TF_WRAPX) || topo_has_flag(TF_WRAPY)) {
+  if (current_topo_has_flag(TF_WRAPX) || current_topo_has_flag(TF_WRAPY)) {
     /* Wrapping is done in native coordinates. */
     MAP_TO_NATIVE_POS(&x0, &y0, x0, y0);
     MAP_TO_NATIVE_POS(&x1, &y1, x1, y1);
@@ -972,11 +977,11 @@ void base_map_distance_vector(int *dx, int *dy,
      * map distance vector but is easier to wrap. */
     *dx = x1 - x0;
     *dy = y1 - y0;
-    if (topo_has_flag(TF_WRAPX)) {
+    if (current_topo_has_flag(TF_WRAPX)) {
       /* Wrap dx to be in [-map.xsize/2, map.xsize/2). */
       *dx = FC_WRAP(*dx + map.xsize / 2, map.xsize) - map.xsize / 2;
     }
-    if (topo_has_flag(TF_WRAPY)) {
+    if (current_topo_has_flag(TF_WRAPY)) {
       /* Wrap dy to be in [-map.ysize/2, map.ysize/2). */
       *dy = FC_WRAP(*dy + map.ysize / 2, map.ysize) - map.ysize / 2;
     }
@@ -1010,11 +1015,14 @@ void base_map_distance_vector(int *dx, int *dy,
     -map.ysize   <  dy <  map.ysize
 ****************************************************************************/
 void map_distance_vector(int *dx, int *dy,
-			 const struct tile *tile0,
-			 const struct tile *tile1)
+                         const struct tile *tile0,
+                         const struct tile *tile1)
 {
-  base_map_distance_vector(dx, dy,
-			   tile0->x, tile0->y, tile1->x, tile1->y);
+  int tx0, ty0, tx1, ty1;
+
+  index_to_map_pos(&tx0, &ty0, tile_index(tile0));
+  index_to_map_pos(&tx1, &ty1, tile_index(tile1)); 
+  base_map_distance_vector(dx, dy, tx0, ty0, tx1, ty1);
 }
 
 /**************************************************************************
@@ -1091,9 +1099,9 @@ struct tile *rand_map_pos_filtered(void *data,
 
     positions = fc_calloc(MAP_INDEX_SIZE, sizeof(*positions));
 
-    whole_map_iterate(ptile) {
-      if (filter(ptile, data)) {
-	positions[count] = tile_index(ptile);
+    whole_map_iterate(check_tile) {
+      if (filter(check_tile, data)) {
+	positions[count] = tile_index(check_tile);
 	count++;
       }
     } whole_map_iterate_end;
@@ -1196,19 +1204,20 @@ enum direction8 dir_ccw(enum direction8 dir)
 }
 
 /**************************************************************************
-  Returns TRUE iff the given direction is a valid one.
+  Returns TRUE iff the given direction is a valid one. Does not use
+  value from the cache, but can be used to calculate the cache.
 **************************************************************************/
-bool is_valid_dir(enum direction8 dir)
+static bool is_valid_dir_calculate(enum direction8 dir)
 {
   switch (dir) {
   case DIR8_SOUTHEAST:
   case DIR8_NORTHWEST:
     /* These directions are invalid in hex topologies. */
-    return !(topo_has_flag(TF_HEX) && !topo_has_flag(TF_ISO));
+    return !(current_topo_has_flag(TF_HEX) && !current_topo_has_flag(TF_ISO));
   case DIR8_NORTHEAST:
   case DIR8_SOUTHWEST:
     /* These directions are invalid in iso-hex topologies. */
-    return !(topo_has_flag(TF_HEX) && topo_has_flag(TF_ISO));
+    return !(current_topo_has_flag(TF_HEX) && current_topo_has_flag(TF_ISO));
   case DIR8_NORTH:
   case DIR8_EAST:
   case DIR8_SOUTH:
@@ -1220,12 +1229,23 @@ bool is_valid_dir(enum direction8 dir)
 }
 
 /**************************************************************************
-  Returns TRUE iff the given direction is a cardinal one.
+  Returns TRUE iff the given direction is a valid one.
+**************************************************************************/
+bool is_valid_dir(enum direction8 dir)
+{
+  fc_assert_ret_val(dir <= direction8_invalid(), FALSE);
+
+  return dir_validity[dir];
+}
+
+/**************************************************************************
+  Returns TRUE iff the given direction is a cardinal one. Does not use
+  value from the cache, but can be used to calculate the cache.
 
   Cardinal directions are those in which adjacent tiles share an edge not
   just a vertex.
 **************************************************************************/
-bool is_cardinal_dir(enum direction8 dir)
+static bool is_cardinal_dir_calculate(enum direction8 dir)
 {
   switch (dir) {
   case DIR8_NORTH:
@@ -1236,13 +1256,26 @@ bool is_cardinal_dir(enum direction8 dir)
   case DIR8_SOUTHEAST:
   case DIR8_NORTHWEST:
     /* These directions are cardinal in iso-hex topologies. */
-    return topo_has_flag(TF_HEX) && topo_has_flag(TF_ISO);
+    return current_topo_has_flag(TF_HEX) && current_topo_has_flag(TF_ISO);
   case DIR8_NORTHEAST:
   case DIR8_SOUTHWEST:
     /* These directions are cardinal in hexagonal topologies. */
-    return topo_has_flag(TF_HEX) && !topo_has_flag(TF_ISO);
+    return current_topo_has_flag(TF_HEX) && !current_topo_has_flag(TF_ISO);
   }
   return FALSE;
+}
+
+/**************************************************************************
+  Returns TRUE iff the given direction is a cardinal one.
+
+  Cardinal directions are those in which adjacent tiles share an edge not
+  just a vertex.
+**************************************************************************/
+bool is_cardinal_dir(enum direction8 dir)
+{
+  fc_assert_ret_val(dir <= direction8_invalid(), FALSE);
+
+  return dir_cardinality[dir];
 }
 
 /**************************************************************************
@@ -1265,8 +1298,8 @@ bool base_get_direction_for_step(const struct tile *start_tile,
 }
 
 /**************************************************************************
-Return the direction which is needed for a step on the map from
-(start_x, start_y) to (end_x, end_y).
+  Return the direction which is needed for a step on the map from
+ (start_x, start_y) to (end_x, end_y).
 **************************************************************************/
 int get_direction_for_step(const struct tile *start_tile,
 			   const struct tile *end_tile)
@@ -1288,7 +1321,13 @@ int get_direction_for_step(const struct tile *start_tile,
 bool is_move_cardinal(const struct tile *start_tile,
 		      const struct tile *end_tile)
 {
-  return is_cardinal_dir(get_direction_for_step(start_tile, end_tile));
+  cardinal_adjc_dir_iterate(start_tile, test_tile, test_dir) {
+    if (same_pos(end_tile, test_tile)) {
+      return TRUE;
+    }
+  } cardinal_adjc_dir_iterate_end;
+
+  return FALSE;
 }
 
 /****************************************************************************
@@ -1301,13 +1340,16 @@ bool is_move_cardinal(const struct tile *start_tile,
 ****************************************************************************/
 bool is_singular_tile(const struct tile *ptile, int dist)
 {
-  do_in_natural_pos(ntl_x, ntl_y, ptile->x, ptile->y) {
+  int tile_x, tile_y;
+
+  index_to_map_pos(&tile_x, &tile_y, tile_index(ptile)); 
+  do_in_natural_pos(ntl_x, ntl_y, tile_x, tile_y) {
     /* Iso-natural coordinates are doubled in scale. */
     dist *= MAP_IS_ISOMETRIC ? 2 : 1;
 
-    return ((!topo_has_flag(TF_WRAPX) 
+    return ((!current_topo_has_flag(TF_WRAPX) 
 	     && (ntl_x < dist || ntl_x >= NATURAL_WIDTH - dist))
-	    || (!topo_has_flag(TF_WRAPY)
+	    || (!current_topo_has_flag(TF_WRAPY)
 		&& (ntl_y < dist || ntl_y >= NATURAL_HEIGHT - dist)));
   } do_in_natural_pos_end;
 }
@@ -1639,4 +1681,21 @@ struct iterator *map_startpos_iter_init(struct map_startpos_iter *iter)
 {
   return startpos_hash_value_iter_init((struct startpos_hash_iter *) iter,
                                        map.startpos_table);
+}
+
+/****************************************************************************
+  Return random direction that is valid in current map.
+****************************************************************************/
+enum direction8 rand_direction(void)
+{
+  return map.valid_dirs[fc_rand(map.num_valid_dirs)];
+}
+
+
+/****************************************************************************
+  Return direction that is opposite to given one.
+****************************************************************************/
+enum direction8 opposite_direction(enum direction8 dir)
+{
+  return direction8_max() - dir;
 }

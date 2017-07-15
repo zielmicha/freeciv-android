@@ -11,7 +11,7 @@
    GNU General Public License for more details.
 ***********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <unistd.h>
@@ -25,7 +25,7 @@
 #include "string_vector.h"
 #include "support.h"
 
-/* include */
+/* client/include */
 #include "themes_g.h"
 
 /* client */
@@ -81,6 +81,7 @@ void init_themes(void)
 	get_useable_themes_in_directory(directories[i].path,
 					&(directories[i].num_themes));
   }
+  free(gui_directories);
 }
 
 /****************************************************************************

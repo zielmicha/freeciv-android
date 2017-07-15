@@ -64,14 +64,16 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
+/* utility */
 #include "astring.h"
+#include "fcintl.h"
 #include "ioz.h"
 #include "log.h"
 #include "mem.h"
@@ -140,7 +142,7 @@ static bool read_a_line(struct inputfile *inf);
 
 #define inf_log(inf, level, message, ...)                                   \
   if (log_do_output_for_level(level)) {                                     \
-    do_log(__FILE__, __FUNCTION__, __LINE__, FALSE, level, "%s",            \
+    do_log(__FILE__, __FUNCTION__, __FC_LINE__, FALSE, level, "%s",         \
            inf_log_str(inf, message, ## __VA_ARGS__));                      \
   }
 #define inf_warn(inf, message)                                              \
@@ -193,7 +195,7 @@ static bool inf_sanity_check(struct inputfile *inf)
   if (inf->included_from && !inf_sanity_check(inf->included_from)) {
     return FALSE;
   }
-#endif
+#endif /* DEBUG */
   return TRUE;
 }
 
@@ -476,6 +478,9 @@ static bool read_a_line(struct inputfile *inf)
 
     if (!ret) {
       /* fgets failed */
+      if (pos > 0) {
+        inf_log(inf, LOG_ERROR, _("End-of-file not in line of its own"));
+      }
       inf->at_eof = TRUE;
       if (inf->in_string) {
         /* Note: Don't allow multi-line strings to cross "include"
@@ -575,7 +580,7 @@ char *inf_log_str(struct inputfile *inf, const char *message, ...)
 }
 
 /********************************************************************** 
-  ...
+  Returns token of given type from given inputfile.
 ***********************************************************************/
 const char *inf_token(struct inputfile *inf, enum inf_token_type type)
 {
@@ -588,7 +593,7 @@ const char *inf_token(struct inputfile *inf, enum inf_token_type type)
 
   name = tok_tab[type].name ? tok_tab[type].name : "(unnamed)";
   func = tok_tab[type].func;
-  
+
   if (!func) {
     log_error("token type %d (%s) not supported yet", type, name);
     c = NULL;
@@ -622,7 +627,9 @@ int inf_discard_tokens(struct inputfile *inf, enum inf_token_type type)
 }
 
 /********************************************************************** 
-  ...
+  Returns section name in current position of inputfile. Returns NULL
+  if there is no section name on that position. Sets inputfile position
+  after section name.
 ***********************************************************************/
 static const char *get_token_section_name(struct inputfile *inf)
 {
@@ -649,7 +656,8 @@ static const char *get_token_section_name(struct inputfile *inf)
 }
 
 /********************************************************************** 
-  ...
+  Returns next entry name from inputfile. Skips white spaces and
+  comments. Sets inputfile position after entry name.
 ***********************************************************************/
 static const char *get_token_entry_name(struct inputfile *inf)
 {
@@ -688,7 +696,8 @@ static const char *get_token_entry_name(struct inputfile *inf)
 }
 
 /********************************************************************** 
-  ...
+  If inputfile is at end-of-line, frees current line, and returns " ".
+  If there is still something on that line, returns NULL. 
 ***********************************************************************/
 static const char *get_token_eol(struct inputfile *inf)
 {
@@ -738,7 +747,7 @@ static const char *get_token_white_char(struct inputfile *inf,
 }
 
 /********************************************************************** 
-  ...
+  Get flag token for table start, or NULL if that is not next token.
 ***********************************************************************/
 static const char *get_token_table_start(struct inputfile *inf)
 {
@@ -746,7 +755,7 @@ static const char *get_token_table_start(struct inputfile *inf)
 }
 
 /********************************************************************** 
-  ...
+  Get flag token for table end, or NULL if that is not next token.
 ***********************************************************************/
 static const char *get_token_table_end(struct inputfile *inf)
 {
@@ -754,7 +763,7 @@ static const char *get_token_table_end(struct inputfile *inf)
 }
 
 /********************************************************************** 
-  ...
+  Get flag token comma, or NULL if that is not next token.
 ***********************************************************************/
 static const char *get_token_comma(struct inputfile *inf)
 {
@@ -793,7 +802,7 @@ static const char *get_token_value(struct inputfile *inf)
       return NULL;
     }
     /* If its a comma, we don't want to obliterate it permanently,
-     * so rememeber it: */
+     * so remember it: */
     trailing = *c;
     *((char *) c) = '\0';       /* Tricky. */
 

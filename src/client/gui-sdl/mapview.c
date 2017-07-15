@@ -20,12 +20,11 @@
  *********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-/* #define SDL_CVS */
-
-#include "SDL.h"
+/* SDL */
+#include "SDL/SDL.h"
 
 /* utility */
 #include "astring.h"
@@ -81,7 +80,7 @@ static struct canvas *terrain_canvas;
 
 /* ================================================================ */
 
-void update_map_canvas_scrollbars_size()
+void update_map_canvas_scrollbars_size(void)
 {
   /* No scrollbars */
 }
@@ -315,8 +314,8 @@ void set_indicator_icons(struct sprite *bulb, struct sprite *sol,
                                     government_name_for_player(client.conn.playing));
   } else {
     fc_snprintf(cBuf, sizeof(cBuf), "%s (%s)\n%s", _("Revolution"), "Ctrl+Shift+R",
-                                    _("None"));
-  }        
+                                    Q_("?gov:None"));
+  }
   copy_chars_to_string16(pBuf->info_label, cBuf);
       
   widget_redraw(pBuf);
@@ -332,13 +331,13 @@ void set_indicator_icons(struct sprite *bulb, struct sprite *sol,
   if (NULL == client.conn.playing) {
     /* TRANS: Research report action */
     fc_snprintf(cBuf, sizeof(cBuf), "%s (%s)\n%s (%d/%d)", _("Research"), "F6",
-                                    _("None"), 0, 0);
+                Q_("?tech:None"), 0, 0);
   } else if (A_UNSET != player_research_get(client.conn.playing)->researching) {
     /* TRANS: Research report action */
     fc_snprintf(cBuf, sizeof(cBuf), "%s (%s)\n%s (%d/%d)", _("Research"), "F6",
 		advance_name_researching(client.conn.playing),
 		player_research_get(client.conn.playing)->bulbs_researched,
-		total_bulbs_required(client.conn.playing));
+                player_research_get(client_player())->client.researching_cost);
   } else {
     /* TRANS: Research report action */
     fc_snprintf(cBuf, sizeof(cBuf), "%s (%s)\n%s (%d/%d)", _("Research"), "F6",
@@ -404,7 +403,7 @@ void update_info_label(void)
 
   /* set text settings */
   pText->style |= TTF_STYLE_BOLD;
-  pText->fgcol = *get_game_colorRGB(COLOR_THEME_MAPVIEW_INFO_TEXT);
+  pText->fgcol = *get_theme_color(COLOR_THEME_MAPVIEW_INFO_TEXT);
   pText->bgcol = (SDL_Color) {0, 0, 0, 0};
 
   if (NULL != client.conn.playing) {
@@ -441,18 +440,18 @@ void update_info_label(void)
     /* Horizontal lines */
     putline(Main.gui->surface,
                area.x + 1, area.y, area.x + area.w - 2, area.y,
-               get_game_colorRGB(COLOR_THEME_MAPVIEW_INFO_FRAME));
+               get_theme_color(COLOR_THEME_MAPVIEW_INFO_FRAME));
     putline(Main.gui->surface,
                area.x + 1, area.y + area.h - 1, area.x + area.w - 2, area.y + area.h - 1,
-               get_game_colorRGB(COLOR_THEME_MAPVIEW_INFO_FRAME));
+               get_theme_color(COLOR_THEME_MAPVIEW_INFO_FRAME));
   
     /* vertical lines */
     putline(Main.gui->surface,
                area.x + area.w - 1, area.y + 1, area.x + area.w - 1, area.y + area.h - 2,
-               get_game_colorRGB(COLOR_THEME_MAPVIEW_INFO_FRAME));
+               get_theme_color(COLOR_THEME_MAPVIEW_INFO_FRAME));
     putline(Main.gui->surface,
                area.x, area.y + 1, area.x, area.y + area.h - 2,
-               get_game_colorRGB(COLOR_THEME_MAPVIEW_INFO_FRAME));
+               get_theme_color(COLOR_THEME_MAPVIEW_INFO_FRAME));
   
     /* blit text to screen */  
     blit_entire_src(pTmp, Main.gui->surface, area.x + adj_size(5), area.y + adj_size(2));
@@ -480,7 +479,7 @@ static int fucus_units_info_callback(struct widget *pWidget)
     struct unit *pUnit = pWidget->data.unit;
     if (pUnit) {
       request_new_unit_activity(pUnit, ACTIVITY_IDLE);
-      set_unit_focus(pUnit);
+      unit_focus_set(pUnit);
     }
   }
   return -1;
@@ -498,46 +497,52 @@ void redraw_unit_info_label(struct unit_list *punitlist)
   SDL_Surface *pBuf_Surf, *pTmpSurf;
   SDL_String16 *pStr;
   struct canvas *destcanvas;
-  struct unit *pUnit = unit_list_get(punitlist, 0);
+  struct unit *pUnit;
+
+  if (punitlist != NULL && unit_list_size(punitlist) > 0) {
+    pUnit = unit_list_get(punitlist, 0);
+  } else {
+    pUnit = NULL;
+  }
 
   if (SDL_Client_Flags & CF_UNITINFO_SHOWN) {
-    
     pInfo_Window = get_unit_info_window_widget();
 
     /* blit theme surface */
     widget_redraw(pInfo_Window);
 
     if (pUnit) {
-
       SDL_Surface *pName, *pVet_Name = NULL, *pInfo, *pInfo_II = NULL;
       int sy, y, width, height, n;
       bool right;
       char buffer[512];
-      struct tile *pTile = pUnit->tile;
+      struct tile *pTile = unit_tile(pUnit);
+      const char *vetname;
 
       /* get and draw unit name (with veteran status) */
       pStr = create_str16_from_char(unit_name_translation(pUnit), adj_font(12));
       pStr->style |= TTF_STYLE_BOLD;
       pStr->bgcol = (SDL_Color) {0, 0, 0, 0};
       pName = create_text_surf_from_str16(pStr);
-      
+
       pStr->style &= ~TTF_STYLE_BOLD;
-      
+
       if (pInfo_Window->size.w > 1.8 * 
-           ((pInfo_Window->size.w - pInfo_Window->area.w) + DEFAULT_UNITS_W)) {
+          ((pInfo_Window->size.w - pInfo_Window->area.w) + DEFAULT_UNITS_W)) {
 	width = pInfo_Window->area.w / 2;
 	right = TRUE;
       } else {
 	width = pInfo_Window->area.w;
 	right = FALSE;
       }
-      
-      if(pUnit->veteran) {
-	copy_chars_to_string16(pStr, _("veteran"));
+
+      vetname = utype_veteran_name_translation(unit_type(pUnit), pUnit->veteran);
+      if (vetname != NULL) {
+        copy_chars_to_string16(pStr, vetname);
         change_ptsize16(pStr, adj_font(10));
-	pStr->fgcol = *get_game_colorRGB(COLOR_THEME_MAPVIEW_UNITINFO_VETERAN_TEXT);
+        pStr->fgcol = *get_theme_color(COLOR_THEME_MAPVIEW_UNITINFO_VETERAN_TEXT);
         pVet_Name = create_text_surf_from_str16(pStr);
-        pStr->fgcol = *get_game_colorRGB(COLOR_THEME_MAPVIEW_UNITINFO_TEXT);
+        pStr->fgcol = *get_theme_color(COLOR_THEME_MAPVIEW_UNITINFO_TEXT);
       }
 
       /* get and draw other info (MP, terran, city, etc.) */
@@ -562,8 +567,8 @@ void redraw_unit_info_label(struct unit_list *punitlist)
 
           if (BORDERS_DISABLED != game.info.borders && !pCity) {
 	    const char *diplo_nation_plural_adjectives[DS_LAST] =
-                        {Q_("?nation:Neutral"), Q_("?nation:Hostile"),
-     			"" /* unused, DS_CEASEFIRE*/,
+                       {"" /* unused, DS_ARMISTICE */, Q_("?nation:Hostile"),
+                        "" /* unused, DS_CEASEFIRE */,
      			Q_("?nation:Peaceful"), Q_("?nation:Friendly"), 
      			Q_("?nation:Mysterious")};
             if (tile_owner(pTile) == client.conn.playing) {
@@ -573,12 +578,18 @@ void redraw_unit_info_label(struct unit_list *punitlist)
                 struct player_diplstate *ds
                   = player_diplstate_get(client.conn.playing,
                                          tile_owner(pTile));
-                if (DS_CEASEFIRE == ds->type){
+                if (DS_CEASEFIRE == ds->type) {
                   int turns = ds->turns_left;
-		  cat_snprintf(buffer, sizeof(buffer),
-		  	PL_("\n%s territory (%d turn ceasefire)",
-				"\n%s territory (%d turn ceasefire)", turns),
-		 		nation_adjective_for_player(tile_owner(pTile)), turns);
+                  cat_snprintf(buffer, sizeof(buffer),
+                        PL_("\n%s territory (%d turn ceasefire)",
+                            "\n%s territory (%d turn ceasefire)", turns),
+                        nation_adjective_for_player(tile_owner(pTile)), turns);
+                } else if (DS_ARMISTICE == ds->type) {
+                  int turns = ds->turns_left;
+                  cat_snprintf(buffer, sizeof(buffer),
+                        PL_("\n%s territory (%d turn armistice)",
+                            "\n%s territory (%d turn armistice)", turns),
+                        nation_adjective_for_player(tile_owner(pTile)), turns);
                 } else {
                   cat_snprintf(buffer, sizeof(buffer), _("\nTerritory of the %s %s"),
                     diplo_nation_plural_adjectives[ds->type],
@@ -594,18 +605,15 @@ void redraw_unit_info_label(struct unit_list *punitlist)
             /* Look at city owner, not tile owner (the two should be the same, if
              * borders are in use). */
             struct player *pOwner = city_owner(pCity);
-            bool citywall;
 /*            bool barrack = FALSE, airport = FALSE, port = FALSE;*/
 	    const char *diplo_city_adjectives[DS_LAST] =
-    			{Q_("?city:Neutral"), Q_("?city:Hostile"),
-     			  "" /*unused, DS_CEASEFIRE */, Q_("?city:Peaceful"),
+			{Q_("?city:Neutral"), Q_("?city:Hostile"),
+			  Q_("?city:Neutral"), Q_("?city:Peaceful"),
 			  Q_("?city:Friendly"), Q_("?city:Mysterious")};
 			  
 	    cat_snprintf(buffer, sizeof(buffer),
 			 _("\nCity of %s"),
 			 city_name(pCity));
-
-	    citywall = pCity->client.walls;
                           
 #if 0       
             /* This has hardcoded assumption that EFT_LAND_REGEN is always
@@ -660,7 +668,7 @@ void redraw_unit_info_label(struct unit_list *punitlist)
 	if (pInfo_Window->size.h > 
             4 * h + (DEFAULT_UNITS_H + (pInfo_Window->size.h - pInfo_Window->area.h)) || right) {
           cat_snprintf(buffer, sizeof(buffer), _("\nFood/Prod/Trade: %s"),
-				get_tile_output_text(pUnit->tile));
+				get_tile_output_text(unit_tile(pUnit)));
 	}
 	
 	copy_chars_to_string16(pStr, buffer);
@@ -704,7 +712,7 @@ void redraw_unit_info_label(struct unit_list *punitlist)
       FREESURFACE(pName);
       
       /* draw unit sprite */
-      pTmpSurf = ResizeSurfaceBox(get_unittype_surface(unit_type(pUnit)),
+      pTmpSurf = ResizeSurfaceBox(get_unittype_surface(unit_type(pUnit), pUnit->facing),
                                   adj_size(80), adj_size(80), 1, TRUE, TRUE);
       pBuf_Surf = blend_surface(pTmpSurf, 32);
       FREESURFACE(pTmpSurf);
@@ -762,25 +770,31 @@ void redraw_unit_info_label(struct unit_list *punitlist)
 	pDock = pInfo_Window;
 	n = 0;
         unit_list_iterate(pTile->units, aunit) {
-          if (aunit == pUnit) {
-	    continue;
-	  }
-	    
-	  pUType = unit_type(aunit);
-          pHome_City = game_city_by_number(aunit->homecity);
-          fc_snprintf(buffer, sizeof(buffer), "%s (%d,%d,%d)%s\n%s\n(%d/%d)\n%s",
-		utype_name_translation(pUType),
-		pUType->attack_strength,
-		pUType->defense_strength, pUType->move_rate / SINGLE_MOVE,
-                (aunit->veteran ? _("\nveteran") : ""),
-                unit_activity_text(aunit),
-		aunit->hp, pUType->hp,
-		pHome_City ? city_name(pHome_City) : _("None"));
-      
-	  pBuf_Surf = create_surf(tileset_full_tile_width(tileset),
-	    				tileset_full_tile_height(tileset), SDL_SWSURFACE);
+          const char *vetname;
 
-          destcanvas = canvas_create(tileset_full_tile_width(tileset), tileset_full_tile_height(tileset));
+          if (aunit == pUnit) {
+            continue;
+	  }
+
+          pUType = unit_type(aunit);
+          vetname = utype_veteran_name_translation(pUType, aunit->veteran);
+          pHome_City = game_city_by_number(aunit->homecity);
+          fc_snprintf(buffer, sizeof(buffer), "%s (%d,%d,%s)%s%s\n%s\n(%d/%d)\n%s",
+                      utype_name_translation(pUType),
+                      pUType->attack_strength,
+                      pUType->defense_strength,
+                      move_points_text(pUType->move_rate, FALSE),
+                      (vetname != NULL ? "\n" : ""),
+                      (vetname != NULL ? vetname : ""),
+                      unit_activity_text(aunit),
+                      aunit->hp, pUType->hp,
+                      pHome_City ? city_name(pHome_City) : Q_("?homecity:None"));
+
+	  pBuf_Surf = create_surf(tileset_full_tile_width(tileset),
+                                  tileset_full_tile_height(tileset), SDL_SWSURFACE);
+
+          destcanvas = canvas_create(tileset_full_tile_width(tileset),
+                                     tileset_full_tile_height(tileset));
   
           put_unit(aunit, destcanvas, 0, 0);
           
@@ -891,7 +905,8 @@ void redraw_unit_info_label(struct unit_list *punitlist)
 	hide_scrollbar(pInfo_Window->private_data.adv_dlg->pScroll);
       }
 
-      if (NULL != client.conn.playing) {
+      if (!client_is_observer() && !client.conn.playing->phase_done
+          && (!client.conn.playing->ai_controlled || ai_manual_turn_done)) {
         char buf[256];
         fc_snprintf(buf, sizeof(buf), "%s\n%s\n%s",
                     _("End of Turn"), _("Press"), _("Shift+Return"));
@@ -958,7 +973,7 @@ void real_focus_units_changed(void)
   the square under the current unit, for specified unit.  Note that in
   practice punit is always the focus unit.
 
-  Clears label if punit is NULL.
+  Clears label if punitlist is NULL or empty.
 
   Typically also updates the cursor for the map_canvas (this is related
   because the info label may includes  "select destination" prompt etc).
@@ -1049,7 +1064,7 @@ void get_overview_area_dimensions(int *width, int *height)
   int overview_tile_size_bak = OVERVIEW_TILE_SIZE;
   
   int xfact = MAP_IS_ISOMETRIC ? 2 : 1;
-  int shift = (MAP_IS_ISOMETRIC && !topo_has_flag(TF_WRAPX)) ? -1 : 0;
+  int shift = (MAP_IS_ISOMETRIC && !current_topo_has_flag(TF_WRAPX)) ? -1 : 0;
   
   OVERVIEW_TILE_SIZE = MIN((DEFAULT_OVERVIEW_W - 1) / (map.xsize * xfact),
                            (DEFAULT_OVERVIEW_H - 1) / map.ysize) + 1;
@@ -1114,7 +1129,7 @@ void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h)
   /* PORTME */
   putframe(Main.map,
            canvas_x, canvas_y, canvas_x + w, canvas_y + h,
-           get_game_colorRGB(COLOR_THEME_SELECTIONRECTANGLE));
+           get_theme_color(COLOR_THEME_SELECTIONRECTANGLE));
 }
 
 /**************************************************************************

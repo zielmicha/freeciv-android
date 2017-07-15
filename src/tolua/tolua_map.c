@@ -3,7 +3,7 @@
  ** Written by Waldemar Celes
  ** TeCGraf/PUC-Rio
  ** Apr 2003
- ** $Id: $
+ ** $Id: tolua_map.c,v 1.10 2011/01/13 13:43:46 fabraham Exp $
  */
 
 /* This code is free software; you can redistribute it and/or modify it.
@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+int tolua_bnd_takeownership(lua_State *L);
 
 static char toluaname[128] = "tolua.";
 static const char* TOLUANAME (const char* n)  
@@ -123,18 +124,19 @@ static int tolua_bnd_type (lua_State* L)
 
 /* Take ownership
  */
-static int tolua_bnd_takeownership (lua_State* L)
+int tolua_bnd_takeownership (lua_State* L)
 {
   lua_CFunction func = 0;
   if (lua_isuserdata(L,1))
   {
     if (lua_getmetatable(L,1))        /* if metatable? */
     {
+      void* u;
       lua_pushstring(L,".collector");
       lua_rawget(L,-2);
       func = lua_iscfunction(L,-1) ? lua_tocfunction(L,-1) : NULL; 
       lua_pop(L,2);
-      void* u = *((void**)lua_touserdata(L,1));
+      u = *((void**)lua_touserdata(L,1));
       tolua_clone(L,u,func);
     }
   }
@@ -195,6 +197,14 @@ static int tolua_bnd_release (lua_State* L)
   if (value)
     tolua_release(L,value);
   return 1;
+}
+
+static void tolua_push_globals_table (lua_State* L)
+{
+  lua_pushvalue(L,LUA_REGISTRYINDEX); /* registry */
+  lua_pushnumber(L,LUA_RIDX_GLOBALS); /* registry globalsindex */
+  lua_rawget(L, -2);                  /* registry registry[globalsindex] */
+  lua_remove(L, -2);                  /* registry[globalsindex] */
 }
 
 TOLUA_API void tolua_open (lua_State* L)
@@ -258,12 +268,15 @@ TOLUA_API void* tolua_copy (lua_State* L, void* value, unsigned int size)
  */
 TOLUA_API void tolua_release (lua_State* L, void* value)
 {
+  void** p;
   lua_pushstring(L,"tolua_ubox");
   lua_rawget(L,LUA_REGISTRYINDEX); /* stack: ubox */
   lua_pushlightuserdata(L,value);  /* stack: ubox u */
   /* set userdata pointer to NULL: this pointer might be reused by C/C++ */
   lua_rawget(L,-2);                /* stack: ubox ud */
-  *((void**)lua_touserdata(L,1)) = NULL;
+  p = (void**)lua_touserdata(L,-1);
+  if (p) *p = NULL;
+      /* fixed bug: thanks to Ulrik Sverdrup -- it was 1 instead of -1 */
   lua_pop(L,1);                    /* stack: ubox */
   /* remove value from ubox */
   lua_pushlightuserdata(L,value);  /* stack: ubox u */
@@ -312,7 +325,7 @@ TOLUA_API void tolua_beginmodule (lua_State* L, const char* name)
     lua_rawget(L,-2);
   }
   else
-    lua_pushvalue(L,LUA_GLOBALSINDEX);
+    tolua_push_globals_table(L);
 }
 
 /* End module
@@ -344,10 +357,7 @@ TOLUA_API void tolua_module (lua_State* L, const char* name, int hasvar)
     }
   }
   else
-  {
-    /* global table */
-    lua_pushvalue(L,LUA_GLOBALSINDEX);
-  }
+    tolua_push_globals_table(L);
   if (hasvar)
   {
     if (!tolua_ismodulemetatable(L))  /* check if it already has a module metatable */
@@ -372,10 +382,7 @@ TOLUA_API void tolua_module (lua_State* L, const char* name, int hasvar)
     lua_newtable(L);
   }
   else
-  {
-    /* global table */
-    lua_pushvalue(L,LUA_GLOBALSINDEX);
-  }
+    tolua_push_globals_table(L);
   if (hasvar)
   {
     /* create metatable to get/set C/C++ variable */

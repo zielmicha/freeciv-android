@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <errno.h>
@@ -39,11 +39,6 @@
                given as 'struct dbv' and the information can be accessed
                using the functions dbv_*(). They uses the BV_* macros. */
 
-/* Maximal size of a dynamic bitvector; for the map known bitvector it must
-   be larger than the biggest possible map size (approx. MAP_MAX_SIZE * 1000)
-   Use a large value to be on the save side (512kbits = 64kb). */
-#define MAX_DBV_LENGTH 512 * 1024
-
 /***************************************************************************
   Initialize a dynamic bitvector of size 'bits'. 'bits' must be greater
   than 0 and lower than the maximal size given by MAX_DBV_LENGTH. The
@@ -51,8 +46,13 @@
 ***************************************************************************/
 void dbv_init(struct dbv *pdbv, int bits)
 {
-  fc_assert_ret(pdbv->vec == NULL);
-  fc_assert_ret(pdbv->bits == 0);
+  /* Here used to be asserts checking if pdbv->vec is NULL
+   * and pdbv->bits is 0, but that's just broken. One would
+   * assume that _init() function can be called when the thing
+   * is currently uninitialized, i.e., can have any values.
+   * Those fc_assert_ret()s caused this function to return
+   * without actually initializing the structure, leading to
+   * crash later. */
 
   fc_assert_ret(bits > 0 && bits < MAX_DBV_LENGTH);
 
@@ -243,7 +243,8 @@ bool bv_check_mask(const unsigned char *vec1, const unsigned char *vec2,
 }
 
 /***************************************************************************
-  ...
+  Compares elements of two bitvectors. Both vectors are expected to have
+  same number of elements, i.e. , size1 must be equal to size2.
 ***************************************************************************/
 bool bv_are_equal(const unsigned char *vec1, const unsigned char *vec2,
                   size_t size1, size_t size2)

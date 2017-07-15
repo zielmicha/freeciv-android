@@ -42,7 +42,7 @@
  *    struct foo_hash_iter;
  *
  * function typedefs:
- *    typedef genhash_val_t (*foo_hash_key_val_fn_t) (const key_t, size_t);
+ *    typedef genhash_val_t (*foo_hash_key_val_fn_t) (const key_t);
  *    typedef bool (*foo_hash_key_comp_fn_t) (const key_t, const key_t);
  *    typedef key_t (*foo_hash_key_copy_fn_t) (const key_t);
  *    typedef void (*foo_hash_key_free_fn_t) (key_t);
@@ -118,9 +118,14 @@
  * should be included _once_, inside a .h file which _is_ itself protected
  * against multiple inclusions. */
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "genhash.h"
 #include "iterator.h"
+#include "support.h"
 
 #ifndef SPECHASH_TAG
 #error Must define a SPECHASH_TAG to use this header
@@ -134,10 +139,10 @@
 
 /* Default functions. */
 #ifndef SPECHASH_KEY_VAL
-#define SPECHASH_KEY_VAL genhash_ptr_val_func
+#define SPECHASH_KEY_VAL NULL
 #endif
 #ifndef SPECHASH_KEY_COMP
-#define SPECHASH_KEY_COMP genhash_ptr_comp_func
+#define SPECHASH_KEY_COMP NULL
 #endif
 #ifndef SPECHASH_KEY_COPY
 #define SPECHASH_KEY_COPY NULL
@@ -184,7 +189,7 @@ SPECHASH_ITER;
 
 /* Function related typedefs. */
 typedef genhash_val_t
-(*SPECHASH_FOO(_hash_key_val_fn_t)) (const SPECHASH_KEY_TYPE, size_t);
+(*SPECHASH_FOO(_hash_key_val_fn_t)) (const SPECHASH_KEY_TYPE);
 typedef bool (*SPECHASH_FOO(_hash_key_comp_fn_t)) (const SPECHASH_KEY_TYPE,
                                                    const SPECHASH_KEY_TYPE);
 typedef SPECHASH_KEY_TYPE
@@ -413,10 +418,10 @@ SPECHASH_FOO(_hash_replace_full) (SPECHASH_HASH *tthis,
                                   &key_ptr, &data_ptr);
 
   if (NULL != old_pkey) {
-    *old_pkey = SPECHASH_PTR_TO_KEY(key_ptr);
+    *old_pkey = (SPECHASH_KEY_TYPE) SPECHASH_PTR_TO_KEY(key_ptr);
   }
   if (NULL != old_pdata) {
-    *old_pdata = SPECHASH_PTR_TO_DATA(data_ptr);
+    *old_pdata = (SPECHASH_DATA_TYPE) SPECHASH_PTR_TO_DATA(data_ptr);
   }
   return ret;
 }
@@ -433,7 +438,7 @@ static inline bool SPECHASH_FOO(_hash_lookup) (const SPECHASH_HASH *tthis,
                             SPECHASH_KEY_TO_PTR(key), &data_ptr);
 
   if (NULL != pdata) {
-    *pdata = SPECHASH_PTR_TO_DATA(data_ptr);
+    *pdata = (SPECHASH_DATA_TYPE) SPECHASH_PTR_TO_DATA(data_ptr);
   }
   return ret;
 }
@@ -462,10 +467,10 @@ SPECHASH_FOO(_hash_remove_full) (SPECHASH_HASH *tthis,
                                  &key_ptr, &data_ptr);
 
   if (NULL != deleted_pkey) {
-    *deleted_pkey = SPECHASH_PTR_TO_KEY(key_ptr);
+    *deleted_pkey = (SPECHASH_KEY_TYPE) SPECHASH_PTR_TO_KEY(key_ptr);
   }
   if (NULL != deleted_pdata) {
-    *deleted_pdata = SPECHASH_PTR_TO_DATA(data_ptr);
+    *deleted_pdata = (SPECHASH_DATA_TYPE) SPECHASH_PTR_TO_DATA(data_ptr);
   }
   return ret;
 }
@@ -609,3 +614,10 @@ SPECHASH_FOO(_hash_value_iter_init) (SPECHASH_ITER *iter,
   } genhash_iterate_end;
 
 #endif /* FC__SPECHASH_H */
+
+/* This is after #endif FC__SPECHASH_H on purpose.
+   extern "C" portion begins well before latter part of the header
+   is guarded against multiple inclusions. */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

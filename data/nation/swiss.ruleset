@@ -33,10 +33,9 @@ leaders = {
 }
 
 ruler_titles = {
- "government",  "male_title",             "female_title"
- "Anarchy",     _("General %s"),          _("?female:General %s")
- "Despotism",   _("Bailiff %s"),          _("?female:Bailiff %s")
- "Democracy", _("Federal Councillor %s"), _("?female:Federal Councillor %s")
+ "government",     "male_title",               "female_title"
+ "Despotism",      _("Bailiff %s"),            _("?female:Bailiff %s")
+ "Democracy",      _("Federal Councillor %s"), _("?female:Federal Councillor %s")
 }
 
 flag="switzerland"
@@ -45,9 +44,8 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations="austrian", "french", "italian"
+civilwar_nations="austrian", "french", "italian", "romansh"
 
 cities =
  "Bern (river)",

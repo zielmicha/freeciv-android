@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -21,6 +21,7 @@
 
 /* common */
 #include "fc_types.h"
+#include "version.h"
 
 /* client */
 #include "connectdlg_common.h"
@@ -137,6 +138,8 @@ static void show_main_page(void)
   SDL_Surface *pBackground;
   int h = 0;
   SDL_Rect area;
+  char verbuf[200];
+  const char *rev_ver = fc_svn_revision();
     
   /* create dialog */
   pStartMenu = fc_calloc(1, sizeof(struct SMALL_DLG));
@@ -146,12 +149,33 @@ static void show_main_page(void)
   pStartMenu->pEndWidgetList = pWindow;
 
   area = pWindow->area;
-  
+
   /* Freeciv version */
-  pWidget = create_iconlabel_from_chars(NULL, pWindow->dst, "Freeciv "VERSION,
+  if (rev_ver == NULL) {
+    /* TRANS: Freeciv 2.4.0 */
+    fc_snprintf(verbuf, sizeof(verbuf), _("Freeciv %s"), VERSION_STRING);
+  } else {
+    /* TRANS: Freeciv 2.4.0 (r25000) */
+    fc_snprintf(verbuf, sizeof(verbuf), _("Freeciv %s (%s)"), VERSION_STRING, rev_ver);
+  }
+  pWidget = create_iconlabel_from_chars(NULL, pWindow->dst, verbuf,
             adj_font(12),
             (WF_SELLECT_WITHOUT_BAR|WF_RESTORE_BACKGROUND|WF_FREE_DATA));
 
+   
+  pWidget->string16->style |= SF_CENTER | TTF_STYLE_BOLD;
+  
+  area.w = MAX(area.w, pWidget->size.w);
+  h = MAX(h, pWidget->size.h);
+  count++;
+  
+  add_to_gui_list(ID_LABEL, pWidget);
+
+  /* TRANS: gui-sdl client */
+  fc_snprintf(verbuf, sizeof(verbuf), _("%s client"), client_string);
+  pWidget = create_iconlabel_from_chars(NULL, pWindow->dst, verbuf,
+            adj_font(12),
+            (WF_SELLECT_WITHOUT_BAR|WF_RESTORE_BACKGROUND|WF_FREE_DATA));
    
   pWidget->string16->style |= SF_CENTER | TTF_STYLE_BOLD;
   
@@ -284,7 +308,7 @@ static void show_main_page(void)
 
   setup_vertical_widgets_position(1, area.x, area.y, area.w, h, pWidget, pWindow->prev);
   
-  area.h = h;
+  area.h = h * 2;
   SDL_FillRectAlpha(pWindow->theme, &area, &bg_color);
   
   widget_set_position(pWindow,
@@ -296,12 +320,21 @@ static void show_main_page(void)
   redraw_group(pStartMenu->pBeginWidgetList, pStartMenu->pEndWidgetList, FALSE);
 
   putline(pWindow->dst->surface,
-          area.x, area.y + (h - 1),
-          area.x + area.w - 1, area.y + (h - 1),
+          area.x, area.y + (h * 2 - 1),
+          area.x + area.w - 1, area.y + (h * 2 - 1),
           line_color);
   
   set_output_window_text(_("SDLClient welcomes you..."));
-  chat_welcome_message();
+
+  rev_ver = fc_git_revision();
+  if (rev_ver != NULL) {
+    char buffer[512];
+
+    fc_snprintf(buffer, sizeof(buffer), _("Commit: %s"), rev_ver);
+    set_output_window_text(buffer);
+  }
+
+  chat_welcome_message(FALSE);
 
   meswin_dialog_popup(TRUE);
 
@@ -365,7 +398,7 @@ void real_set_client_page(enum client_pages page)
       show_game_page();
       enable_main_widgets();
       update_info_label();
-      update_unit_focus();
+      unit_focus_update();
       update_unit_info_label(get_units_in_focus());
       update_turn_done_button_state();
       refresh_overview();

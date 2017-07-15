@@ -22,7 +22,7 @@
 #ifndef FC__GUI_TILESPEC_H
 #define FC__GUI_TILESPEC_H
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 #include "tilespec.h"
 
@@ -181,11 +181,8 @@ struct City_Icon {
   SDL_Surface *pFemale_Unhappy;
   SDL_Surface *pMale_Angry;
   SDL_Surface *pFemale_Angry;
-	
-  SDL_Surface *pSpec_Lux; /* Elvis */
-  SDL_Surface *pSpec_Tax; /* TaxMan */
-  SDL_Surface *pSpec_Sci; /* Scientist */
 
+  SDL_Surface *specialists[SP_MAX];
 };
 
 extern struct Theme *pTheme;
@@ -211,7 +208,7 @@ SDL_Color * get_tech_color(Tech_type_id tech_id);
 
 /**************************************************************************
   Return a surface for the given citizen.  The citizen's type is given,
-  as well as their index (in the range [0..pcity->size)).
+  as well as their index (in the range [0..city_size_get(pcity))).
 **************************************************************************/
 static inline SDL_Surface *get_citizen_surface(enum citizen_category type,
                                                int citizen_index)
@@ -239,9 +236,10 @@ static inline SDL_Surface *get_building_surface(struct impr_type *pimprove)
   return GET_SURF(get_building_sprite(tileset, pimprove));
 }
 
-static inline SDL_Surface *get_unittype_surface(const struct unit_type *punittype)
+static inline SDL_Surface *get_unittype_surface(const struct unit_type *punittype,
+                                                enum direction8 facing)
 {
-  return GET_SURF(get_unittype_sprite(tileset, punittype));
+  return GET_SURF(get_unittype_sprite(tileset, punittype, facing, TRUE));
 }
 
 static inline SDL_Surface *get_tax_surface(Output_type_id otype)

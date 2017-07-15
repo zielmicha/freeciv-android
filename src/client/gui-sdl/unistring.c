@@ -20,12 +20,12 @@
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
 
-#include "SDL_types.h"
+#include "SDL/SDL_types.h"
 
 /* utility */
 #include "mem.h"

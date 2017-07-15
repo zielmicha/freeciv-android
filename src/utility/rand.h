@@ -13,8 +13,14 @@
 #ifndef FC__RAND_H
 #define FC__RAND_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include <stdint.h>
 
+/* Utility */
+#include "log.h"
 #include "support.h"            /* bool type */
 
 /* This is duplicated in shared.h to avoid extra includes: */
@@ -29,7 +35,7 @@ typedef struct {
 } RANDOM_STATE;
 
 #define fc_rand(_size) \
-  fc_rand_debug((_size), "fc_rand", __LINE__, __FILE__)
+  fc_rand_debug((_size), "fc_rand", __FC_LINE__, __FILE__)
 
 RANDOM_TYPE fc_rand_debug(RANDOM_TYPE size, const char *called_as,
                           int line, const char *file);
@@ -45,10 +51,14 @@ void test_random1(int n);
 /*===*/
 
 #define fc_randomly(_seed, _size) \
-  fc_randomly_debug((_seed), (_size), "fc_randomly", __LINE__, __FILE__)
+  fc_randomly_debug((_seed), (_size), "fc_randomly", __FC_LINE__, __FILE__)
 
 RANDOM_TYPE fc_randomly_debug(RANDOM_TYPE seed, RANDOM_TYPE size,
                               const char *called_as,
                               int line, const char *file);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__RAND_H */

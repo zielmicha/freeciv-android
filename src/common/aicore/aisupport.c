@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -44,12 +44,11 @@ struct player *player_leading_spacerace(void)
     return NULL;
   }
 
-  players_iterate(pplayer) {
+  players_iterate_alive(pplayer) {
     struct player_spaceship *ship = &pplayer->spaceship;
     int arrival = (int) ship->travel_time + ship->launch_year;
 
-    if (!pplayer->is_alive || is_barbarian(pplayer)
-        || ship->state == SSHIP_NONE) {
+    if (is_barbarian(pplayer) || ship->state == SSHIP_NONE) {
       continue;
     }
 
@@ -63,7 +62,7 @@ struct player *player_leading_spacerace(void)
       best_arrival = arrival;
       best = pplayer;
     }
-  } players_iterate_end;
+  } players_iterate_alive_end;
 
   return best;
 }
@@ -111,33 +110,35 @@ int city_gold_worth(struct city *pcity)
   struct player *pplayer = city_owner(pcity);
   int worth = 0, i;
   struct unit_type *u
-    = best_role_unit_for_player(city_owner(pcity), F_CITIES);
+    = best_role_unit_for_player(city_owner(pcity), UTYF_CITIES);
 
   if (u) {
     worth += utype_buy_gold_cost(u, 0); /* cost of settler */
   }
-  for (i = 1; i < pcity->size; i++) {
+  for (i = 1; i < city_size_get(pcity); i++) {
     worth += city_granary_size(i); /* cost of growing city */
   }
   output_type_iterate(o) {
     worth += pcity->prod[o] * 10;
   } output_type_iterate_end;
   unit_list_iterate(pcity->units_supported, punit) {
-    if (same_pos(punit->tile, pcity->tile)) {
+    if (same_pos(unit_tile(punit), pcity->tile)) {
       struct unit_type *punittype = unit_type(punit)->obsoleted_by;
 
       if (punittype && can_city_build_unit_direct(pcity, punittype)) {
-        worth += unit_disband_shields(punit) / 2; /* obsolete */
+        worth += unit_disband_shields(punit); /* obsolete, candidate for disbanding */
       } else {
-        worth += unit_disband_shields(punit); /* good stuff */
+        worth += unit_build_shield_cost(punit); /* good stuff */
       }
     }
   } unit_list_iterate_end;
   city_built_iterate(pcity, pimprove) {
     if (improvement_obsolete(pplayer, pimprove)) {
-      worth += impr_sell_gold(pimprove) / 4;
+      worth += impr_sell_gold(pimprove); /* obsolete, candidate for selling */
+    } else if (!is_wonder(pimprove)) {
+      worth += impr_build_shield_cost(pimprove) * 2; /* Buy cost, with nonzero shield amount */
     } else {
-      worth += impr_sell_gold(pimprove);
+      worth += impr_build_shield_cost(pimprove) * 4;
     }
   } city_built_iterate_end;
   if (city_unhappy(pcity)) {
@@ -145,4 +146,3 @@ int city_gold_worth(struct city *pcity)
   }
   return worth;
 }
-

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -23,17 +23,20 @@
 #include <gtk/gtk.h>
 #include "gtkpixcomm.h"
 
-/* common & utility */
-#include "city.h"
+/* utility */
 #include "fcintl.h"
-#include "government.h"
 #include "mem.h"
 #include "shared.h"
+#include "support.h"
+
+/* common */
+#include "city.h"
+#include "government.h"
+#include "movement.h"
 #include "specialist.h"
 #include "tech.h"
 #include "unit.h"
 #include "map.h"
-#include "support.h"
 #include "version.h"
 
 /* client */
@@ -70,6 +73,7 @@ static GtkWidget *help_wtable;
 static GtkWidget *help_utable;
 static GtkWidget *help_ttable;
 static GtkWidget *help_btable;
+static GtkWidget *help_rtable;
 static GtkWidget *help_tree;
 static GtkTreeStore *tstore;
 
@@ -82,6 +86,7 @@ static GtkWidget *help_wlabel[6];
 static GtkWidget *help_ulabel[5][5];
 static GtkWidget *help_tlabel[4][5];
 static GtkWidget *help_blabel[4];
+static GtkWidget *help_rlabel[4];
 
 static bool help_advances[A_LAST];
 
@@ -108,8 +113,8 @@ static const char *help_tlabel_name[4][5] =
 {
     { N_("Move/Defense:"),	NULL, NULL, N_("Food/Res/Trade:"),	NULL },
     { N_("Resources:"),		NULL, NULL, NULL,			NULL },
-    { N_("Road Rslt/Time:"),	NULL, NULL, N_("Irrig. Rslt/Time:"),	NULL },
-    { N_("Mine Rslt/Time:"),	NULL, NULL, N_("Trans. Rslt/Time:"),	NULL }
+    { N_("Irrig. Rslt/Time:"),	NULL, NULL, N_("Mine Rslt/Time:"),	NULL },
+    { N_("Trans. Rslt/Time:"),	NULL, NULL, NULL,                       NULL }
 };
 
 static const char *help_blabel_name[4] =
@@ -120,7 +125,16 @@ static const char *help_blabel_name[4] =
  * that can't be built on the same tile as this one. */
   N_("Conflicts with:"), NULL };
 
-#define REQ_LABEL_NONE _("None")
+static const char *help_rlabel_name[4] =
+/* TRANS: Label for build cost for roads in help. Will be followed by
+ * something like "3 MP" (where MP = Movement Points) */
+{ N_("Build:"), NULL,
+/* TRANS: Road bonus in help. Will be followed by food/production/trade
+ * stats like "0/0/+1", "0/+50%/0" */
+  N_("Bonus (F/P/T):"), NULL };
+
+
+#define REQ_LABEL_NONE _("?tech:None")
 #define REQ_LABEL_NEVER _("(Never)")
 
 static void create_help_dialog(void);
@@ -133,7 +147,7 @@ static void help_command_update(void);
 static void help_command_callback(GtkWidget *w, gint response_id);
 
 /****************************************************************
-...
+  Set topic specific title for help_frame
 *****************************************************************/
 static void set_title_topic(char *topic)
 {
@@ -146,7 +160,7 @@ static void set_title_topic(char *topic)
 }
 
 /****************************************************************
-...
+  Close help dialog
 *****************************************************************/
 void popdown_help_dialog(void)
 {
@@ -156,7 +170,7 @@ void popdown_help_dialog(void)
 }
 
 /****************************************************************
-...
+  Popup help dialog for given item of given type.
 *****************************************************************/
 void popup_help_dialog_typed(const char *item, enum help_page_type htype)
 {
@@ -171,8 +185,7 @@ void popup_help_dialog_typed(const char *item, enum help_page_type htype)
 
 
 /****************************************************************
-...
-Not sure if this should call _(item) as it does, or whether all
+Not sure if this should call Q_(item) as it does, or whether all
 callers of this function should do so themselves... --dwp
 *****************************************************************/
 void popup_help_dialog_string(const char *item)
@@ -294,7 +307,7 @@ static void help_tech_tree_collapse_callback(GtkWidget *w, gpointer data)
 }
 
 /**************************************************************************
-...
+  Hyperlink clicked
 **************************************************************************/
 static void help_hyperlink_callback(GtkWidget *w)
 {
@@ -308,13 +321,13 @@ static void help_hyperlink_callback(GtkWidget *w)
      below, depending on which i18n is done elsewhere.
   */
   if (strcmp(s, REQ_LABEL_NEVER) != 0
-      && strcmp(s, REQ_LABEL_NONE) != 0
+      && strcmp(s, skip_intl_qualifier_prefix(REQ_LABEL_NONE)) != 0
       && strcmp(s, advance_name_translation(advance_by_number(A_NONE))) != 0)
     select_help_item_string(s, type);
 }
 
 /**************************************************************************
-...
+  Create new hyperlink button
 **************************************************************************/
 static GtkWidget *help_hyperlink_new(GtkWidget *label, enum help_page_type type)
 {
@@ -333,7 +346,7 @@ static GtkWidget *help_hyperlink_new(GtkWidget *label, enum help_page_type type)
 }
 
 /**************************************************************************
-...
+  Create new hyperlink button with text
 **************************************************************************/
 static GtkWidget *help_slink_new(const gchar *txt, enum help_page_type type)
 {
@@ -346,7 +359,7 @@ static GtkWidget *help_slink_new(const gchar *txt, enum help_page_type type)
 }
 
 /**************************************************************************
-...
+  Hide help box
 **************************************************************************/
 static void help_box_hide(void)
 {
@@ -359,7 +372,8 @@ static void help_box_hide(void)
   gtk_widget_hide(help_utable);
   gtk_widget_hide(help_ttable);
   gtk_widget_hide(help_btable);
-  
+  gtk_widget_hide(help_rtable);
+
   gtk_widget_hide(help_tile); /* FIXME: twice? */
 
   gtk_widget_hide(help_vbox);
@@ -370,7 +384,7 @@ static void help_box_hide(void)
 }
 
 /**************************************************************************
-...
+  Completely destory help dialog
 **************************************************************************/
 static void help_destroy_callback(GtkWidget *w, gpointer data)
 {
@@ -379,7 +393,7 @@ static void help_destroy_callback(GtkWidget *w, gpointer data)
 }
 
 /**************************************************************************
-...
+  New topic activated from help dialog
 **************************************************************************/
 static void activated_topic(GtkTreeView *view, gpointer data)
 {
@@ -405,7 +419,7 @@ static void activated_topic(GtkTreeView *view, gpointer data)
       g_ptr_array_index(help_history, help_history_pos) == (gpointer) pitem) {
     return;
   }
-  
+
   help_update_dialog(pitem);
 
   /* add to history. */
@@ -419,8 +433,8 @@ static void activated_topic(GtkTreeView *view, gpointer data)
 }
 
 /**************************************************************************
-  ...
- **************************************************************************/
+  Create help dialog
+**************************************************************************/
 static void create_help_dialog(void)
 {
   GtkWidget *hbox;
@@ -614,13 +628,25 @@ static void create_help_dialog(void)
   help_btable = gtk_table_new(1, 4, FALSE);
   gtk_box_pack_start(GTK_BOX(help_box), help_btable, FALSE, FALSE, 0);
 
-  for (i=0; i<4; i++) {
+  for (i = 0; i < 4; i++) {
     help_blabel[i] =
       gtk_label_new(help_blabel_name[i] ? _(help_blabel_name[i]) : "");
     gtk_table_attach_defaults(GTK_TABLE(help_btable),
                               help_blabel[i], i, i+1, 0, 1);
     gtk_widget_set_name(help_blabel[i], "help_label");
     gtk_widget_show(help_blabel[i]);
+  }
+
+  help_rtable = gtk_table_new(1, 2, FALSE);
+  gtk_box_pack_start(GTK_BOX(help_box), help_rtable, FALSE, FALSE, 0);
+
+  for (i = 0; i < 4; i++) {
+    help_rlabel[i] =
+      gtk_label_new(help_rlabel_name[i] ? _(help_rlabel_name[i]) : "");
+    gtk_table_attach_defaults(GTK_TABLE(help_rtable),
+                              help_rlabel[i], i, i+1, 0, 1);
+    gtk_widget_set_name(help_rlabel[i], "help_label");
+    gtk_widget_show(help_rlabel[i]);
   }
 
   help_vbox = gtk_vbox_new(FALSE, 1);
@@ -706,14 +732,14 @@ static void create_help_dialog(void)
 
 
 /**************************************************************************
-...
+  Create page for help type
 **************************************************************************/
 static void create_help_page(enum help_page_type type)
 {
 }
 
 /**************************************************************************
-...
+  Display updated help about improvement
 **************************************************************************/
 static void help_update_improvement(const struct help_item *pitem,
 				    char *title)
@@ -724,7 +750,7 @@ static void help_update_improvement(const struct help_item *pitem,
   create_help_page(HELP_IMPROVEMENT);
 
   if (imp  &&  !is_great_wonder(imp)) {
-    const char *req = REQ_LABEL_NONE;
+    const char *req = skip_intl_qualifier_prefix(REQ_LABEL_NONE);
     char req_buf[512];
 
     sprintf(buf, "%d", impr_build_shield_cost(imp));
@@ -732,11 +758,15 @@ static void help_update_improvement(const struct help_item *pitem,
     sprintf(buf, "%d", imp->upkeep);
     gtk_label_set_text(GTK_LABEL(help_ilabel[3]), buf);
 
-    /* FIXME: this should show ranges and all the MAX_NUM_REQS reqs. 
+    /* FIXME: this should show ranges, negated reqs, and all the
+     * MAX_NUM_REQS reqs. 
      * Currently it's limited to 1 req but this code is partially prepared
      * to be extended.  Remember MAX_NUM_REQS is a compile-time
      * definition. */
     requirement_vector_iterate(&imp->reqs, preq) {
+      if (preq->negated) {
+        continue;
+      }
       req = universal_name_translation(&preq->source, req_buf, sizeof(req_buf));
       break;
     } requirement_vector_iterate_end;
@@ -757,7 +787,7 @@ static void help_update_improvement(const struct help_item *pitem,
 }
   
 /**************************************************************************
-...
+  Display updated help about wonder
 **************************************************************************/
 static void help_update_wonder(const struct help_item *pitem,
 			       char *title)
@@ -767,19 +797,23 @@ static void help_update_wonder(const struct help_item *pitem,
 
   create_help_page(HELP_WONDER);
 
-  if (imp  &&  is_great_wonder(imp)) {
+  if (imp && is_great_wonder(imp)) {
     int i;
     char req_buf[512];
 
     sprintf(buf, "%d", impr_build_shield_cost(imp));
     gtk_label_set_text(GTK_LABEL(help_wlabel[1]), buf);
 
-    /* FIXME: this should show ranges and all the MAX_NUM_REQS reqs. 
+    /* FIXME: this should show ranges, negated reqs, and all the
+     * MAX_NUM_REQS reqs. 
      * Currently it's limited to 1 req but this code is partially prepared
      * to be extended.  Remember MAX_NUM_REQS is a compile-time
      * definition. */
     i = 0;
     requirement_vector_iterate(&imp->reqs, preq) {
+      if (preq->negated) {
+        continue;
+      }
       gtk_label_set_text(GTK_LABEL(help_wlabel[3 + i]),
 			 universal_name_translation(&preq->source,
 					     req_buf, sizeof(req_buf)));
@@ -793,12 +827,11 @@ static void help_update_wonder(const struct help_item *pitem,
       gtk_label_set_text(GTK_LABEL(help_wlabel[5]), REQ_LABEL_NEVER);
     }
 /*    create_tech_tree(help_improvement_tree, 0, imp->tech_req, 3);*/
-  }
-  else {
+  } else {
     /* can't find wonder */
     gtk_label_set_text(GTK_LABEL(help_wlabel[1]), "0");
     gtk_label_set_text(GTK_LABEL(help_wlabel[3]), REQ_LABEL_NEVER);
-    gtk_label_set_text(GTK_LABEL(help_wlabel[5]), REQ_LABEL_NONE);
+    gtk_label_set_text(GTK_LABEL(help_wlabel[5]), skip_intl_qualifier_prefix(REQ_LABEL_NONE));
 /*    create_tech_tree(help_improvement_tree, 0, advance_count(), 3); */
   }
   gtk_widget_show(help_wtable);
@@ -809,7 +842,7 @@ static void help_update_wonder(const struct help_item *pitem,
 }
 
 /**************************************************************************
-...
+  Display updated help about unit type
 **************************************************************************/
 static void help_update_unit_type(const struct help_item *pitem,
 				  char *title)
@@ -826,7 +859,7 @@ static void help_update_unit_type(const struct help_item *pitem,
     gtk_label_set_text(GTK_LABEL(help_ulabel[0][4]), buf);
     sprintf(buf, "%d", utype->defense_strength);
     gtk_label_set_text(GTK_LABEL(help_ulabel[1][1]), buf);
-    sprintf(buf, "%d", utype->move_rate/3);
+    sprintf(buf, "%s", move_points_text(utype->move_rate, TRUE));
     gtk_label_set_text(GTK_LABEL(help_ulabel[1][4]), buf);
     sprintf(buf, "%d", utype->firepower);
     gtk_label_set_text(GTK_LABEL(help_ulabel[2][1]), buf);
@@ -845,7 +878,7 @@ static void help_update_unit_type(const struct help_item *pitem,
     }
 /*    create_tech_tree(help_improvement_tree, 0, advance_number(utype->require_advance), 3);*/
     if (U_NOT_OBSOLETED == utype->obsoleted_by) {
-      gtk_label_set_text(GTK_LABEL(help_ulabel[4][4]), REQ_LABEL_NONE);
+      gtk_label_set_text(GTK_LABEL(help_ulabel[4][4]), skip_intl_qualifier_prefix(REQ_LABEL_NONE));
     } else {
       gtk_label_set_text(GTK_LABEL(help_ulabel[4][4]),
 			 utype_name_translation(utype->obsoleted_by));
@@ -862,7 +895,7 @@ static void help_update_unit_type(const struct help_item *pitem,
 
       store.type = CANVAS_PIXCOMM;
       store.v.pixcomm = GTK_PIXCOMM(help_tile);
-      create_overlay_unit(&store, utype);
+      create_overlay_unit(&store, utype, direction8_invalid());
     }
     gtk_pixcomm_thaw(GTK_PIXCOMM(help_tile));
     gtk_widget_show(help_tile);
@@ -879,7 +912,7 @@ static void help_update_unit_type(const struct help_item *pitem,
 
     gtk_label_set_text(GTK_LABEL(help_ulabel[4][1]), REQ_LABEL_NEVER);
 /*    create_tech_tree(help_improvement_tree, 0, A_LAST, 3);*/
-    gtk_label_set_text(GTK_LABEL(help_ulabel[4][4]), REQ_LABEL_NONE);
+    gtk_label_set_text(GTK_LABEL(help_ulabel[4][4]), skip_intl_qualifier_prefix(REQ_LABEL_NONE));
 
     gtk_text_buffer_set_text(help_text, buf, -1);
     gtk_widget_show(help_text_sw);
@@ -888,9 +921,9 @@ static void help_update_unit_type(const struct help_item *pitem,
 }
 
 /**************************************************************************
-...
+  Cut str to at max len bytes in a utf8 friendly way
 **************************************************************************/
-static char *my_chomp(char *str, size_t len)
+static char *fc_chomp(char *str, size_t len)
 {
   gchar *i;
 
@@ -907,7 +940,7 @@ static char *my_chomp(char *str, size_t len)
 }
 
 /**************************************************************************
-...
+  Display updated help about tech
 **************************************************************************/
 static void help_update_tech(const struct help_item *pitem, char *title)
 {
@@ -934,7 +967,7 @@ static void help_update_tech(const struct help_item *pitem, char *title)
 
     helptext_advance(buf, sizeof(buf), client.conn.playing, pitem->text, i);
     len = strlen(buf);
-    my_chomp(buf, len);
+    fc_chomp(buf, len);
 
     if (get_tech_sprite(tileset, i)) {
       GdkPixbuf *pixbuf = sprite_get_pixbuf(get_tech_sprite(tileset, i));
@@ -963,9 +996,25 @@ static void help_update_tech(const struct help_item *pitem, char *title)
     gtk_box_pack_start(GTK_BOX(help_vbox), w, TRUE, TRUE, 5);
     gtk_widget_show(w);
 
-    improvement_iterate(pimprove) {
+    governments_iterate(pgov) {
       /* FIXME: need a more general mechanism for this, since this
        * helptext needs to be shown in all possible req source types. */
+      requirement_vector_iterate(&pgov->reqs, preq) {
+	if (VUT_ADVANCE == preq->source.kind
+	    && preq->source.value.advance == padvance) {
+	  hbox = gtk_hbox_new(FALSE, 0);
+	  gtk_container_add(GTK_CONTAINER(help_vbox), hbox);
+	  w = gtk_label_new(_("Allows"));
+	  gtk_box_pack_start(GTK_BOX(hbox), w, FALSE, FALSE, 0);
+	  w = help_slink_new(government_name_translation(pgov),
+                             HELP_GOVERNMENT);
+	  gtk_box_pack_start(GTK_BOX(hbox), w, FALSE, FALSE, 0);
+	  gtk_widget_show_all(hbox);
+	}
+      } requirement_vector_iterate_end;
+    } governments_iterate_end;
+
+    improvement_iterate(pimprove) {
       requirement_vector_iterate(&pimprove->reqs, preq) {
 	if (VUT_ADVANCE == preq->source.kind
 	    && preq->source.value.advance == padvance) {
@@ -1057,7 +1106,7 @@ static void help_update_tech(const struct help_item *pitem, char *title)
 }
 
 /**************************************************************************
-...
+  Display updated help about terrain
 **************************************************************************/
 static void help_update_terrain(const struct help_item *pitem,
 				char *title)
@@ -1068,10 +1117,16 @@ static void help_update_terrain(const struct help_item *pitem,
   create_help_page(HELP_TERRAIN);
 
   if (pterrain) {
-    sprintf(buf, "%d/%d.%d",
-	    pterrain->movement_cost,
-	    (int)((pterrain->defense_bonus + 100) / 100),
-	    (pterrain->defense_bonus + 100) % 100 / 10);
+    {
+      /* 25 => "1.25"; 50 => "1.5"; 100 => "2.0" */
+      int defbonus = pterrain->defense_bonus + 100;
+      int frac = defbonus % 100;
+      if ((frac % 10) == 0) {
+        frac /= 10;
+      }
+      sprintf(buf, "%d/%d.%d",
+              pterrain->movement_cost, defbonus / 100, frac);
+    }
     gtk_label_set_text(GTK_LABEL(help_tlabel[0][1]), buf);
 
     sprintf(buf, "%d/%d/%d",
@@ -1099,18 +1154,6 @@ static void help_update_terrain(const struct help_item *pitem,
     }
     gtk_label_set_text(GTK_LABEL(help_tlabel[1][1]), buf);
 
-    if (pterrain->road_trade_incr > 0) {
-      sprintf(buf, _("+%d Trade / %d"),
-	      pterrain->road_trade_incr,
-	      pterrain->road_time);
-    } else if (pterrain->road_time > 0) {
-      sprintf(buf, _("no extra / %d"),
-	      pterrain->road_time);
-    } else {
-      strcpy(buf, _("n/a"));
-    }
-    gtk_label_set_text(GTK_LABEL(help_tlabel[2][1]), buf);
-
     strcpy(buf, _("n/a"));
     if (pterrain->irrigation_result == pterrain) {
       if (pterrain->irrigation_food_incr > 0) {
@@ -1123,7 +1166,7 @@ static void help_update_terrain(const struct help_item *pitem,
 	      terrain_name_translation(pterrain->irrigation_result),
 	      pterrain->irrigation_time);
     }
-    gtk_label_set_text(GTK_LABEL(help_tlabel[2][4]), buf);
+    gtk_label_set_text(GTK_LABEL(help_tlabel[2][1]), buf);
 
     strcpy(buf, _("n/a"));
     if (pterrain->mining_result == pterrain) {
@@ -1137,7 +1180,7 @@ static void help_update_terrain(const struct help_item *pitem,
 	      terrain_name_translation(pterrain->mining_result),
 	      pterrain->mining_time);
     }
-    gtk_label_set_text(GTK_LABEL(help_tlabel[3][1]), buf);
+    gtk_label_set_text(GTK_LABEL(help_tlabel[2][4]), buf);
 
     if (pterrain->transform_result != T_NONE) {
       sprintf(buf, "%s / %d",
@@ -1146,7 +1189,7 @@ static void help_update_terrain(const struct help_item *pitem,
     } else {
       strcpy(buf, "n/a");
     }
-    gtk_label_set_text(GTK_LABEL(help_tlabel[3][4]), buf);
+    gtk_label_set_text(GTK_LABEL(help_tlabel[3][1]), buf);
   }
 
   helptext_terrain(buf, sizeof(buf), client.conn.playing, pitem->text, pterrain);
@@ -1172,8 +1215,13 @@ static void help_update_base(const struct help_item *pitem, char *title)
   } else {
     /* Cost to build */
     if (pbase->buildable) {
-      /* TRANS: "MP" = movement points */
-      sprintf(buf, _("%d MP"), pbase->build_time);
+      if (pbase->build_time != 0) {
+        /* TRANS: "MP" = movement points */
+        sprintf(buf, _("%d MP"), pbase->build_time);
+      } else {
+        /* TRANS: Build time depends on terrain. */
+        sprintf(buf, _("Terrain specific"));
+      }
     } else {
       sprintf(buf, "-");
     }
@@ -1193,6 +1241,59 @@ static void help_update_base(const struct help_item *pitem, char *title)
     helptext_base(buf, sizeof(buf), client.conn.playing, pitem->text, pbase);
   }
   gtk_widget_show(help_btable);
+
+  gtk_text_buffer_set_text(help_text, buf, -1);
+  gtk_widget_show(help_text_sw);
+}
+
+/**************************************************************************
+  Help page for roads.
+**************************************************************************/
+static void help_update_road(const struct help_item *pitem, char *title)
+{
+  char buf[8192];
+  struct road_type *proad = road_type_by_translated_name(title);
+
+  create_help_page(HELP_ROAD);
+
+  if (!proad) {
+    strcat(buf, pitem->text);
+  } else {
+    /* Cost to build */
+    if (proad->buildable) {
+      if (proad->build_time != 0) {
+        /* TRANS: "MP" = movement points */
+        sprintf(buf, _("%d MP"), proad->build_time);
+      } else {
+        /* TRANS: Build time depends on terrain. */
+        sprintf(buf, _("Terrain specific"));
+      }
+    } else {
+      sprintf(buf, "-");
+    }
+    gtk_label_set_text(GTK_LABEL(help_rlabel[1]), buf);
+    /* Bonus */
+    {
+      const char *bonus = NULL;
+      output_type_iterate(o) {
+        if (proad->tile_incr[o] > 0) {
+          /* TRANS: Road bonus depends on terrain. */
+          bonus = _("Terrain specific");
+          break;
+        }
+      } output_type_iterate_end;
+      if (!bonus) {
+        bonus = helptext_road_bonus_str(NULL, proad);
+      }
+      if (!bonus) {
+        /* TRANS: No output bonus from a road */
+        bonus = Q_("?bonus:None");
+      }
+      gtk_label_set_text(GTK_LABEL(help_rlabel[3]), bonus);
+    }
+    helptext_road(buf, sizeof(buf), client.conn.playing, pitem->text, proad);
+  }
+  gtk_widget_show(help_rtable);
 
   gtk_text_buffer_set_text(help_text, buf, -1);
   gtk_widget_show(help_text_sw);
@@ -1256,7 +1357,7 @@ static void help_update_nation(const struct help_item *pitem, char *title,
 }
 
 /**************************************************************************
-...
+  Display updated help dialog
 **************************************************************************/
 static void help_update_dialog(const struct help_item *pitem)
 {
@@ -1290,6 +1391,9 @@ static void help_update_dialog(const struct help_item *pitem)
   case HELP_BASE:
     help_update_base(pitem, top);
     break;
+  case HELP_ROAD:
+    help_update_road(pitem, top);
+    break;
   case HELP_SPECIALIST:
     help_update_specialist(pitem, top);
     break;
@@ -1297,7 +1401,7 @@ static void help_update_dialog(const struct help_item *pitem)
     help_update_government(pitem, top);
     break;
   case HELP_NATIONS:
-    help_update_nation(pitem, top, nation_by_translated_name(top));
+    help_update_nation(pitem, top, nation_by_translated_plural(top));
     break;
   case HELP_TEXT:
   default:
@@ -1315,7 +1419,7 @@ static void help_update_dialog(const struct help_item *pitem)
 
 
 /**************************************************************************
-...
+  Add item at path to selection and scroll to its cell
 **************************************************************************/
 static void help_item_zoom(GtkTreePath *path)
 {
@@ -1341,7 +1445,7 @@ static void help_item_zoom(GtkTreePath *path)
 }
 
 /****************************************************************
-...
+  Return path to help item.
 *****************************************************************/
 static GtkTreePath *help_item_path(const struct help_item *pitem)
 {
@@ -1383,7 +1487,7 @@ static GtkTreePath *help_item_path(const struct help_item *pitem)
 }
 
 /****************************************************************
-...
+  Add item to selection
 *****************************************************************/
 static void select_help_item_string(const char *item, enum help_page_type htype)
 {
@@ -1405,7 +1509,7 @@ static void select_help_item_string(const char *item, enum help_page_type htype)
 }
 
 /**************************************************************************
-...
+  Set sensitivity of help dialog response buttons.
 **************************************************************************/
 static void help_command_update(void)
 {
@@ -1428,7 +1532,7 @@ static void help_command_update(void)
 }
 
 /**************************************************************************
-...
+  User gave response to help dialog
 **************************************************************************/
 static void help_command_callback(GtkWidget *w, gint response_id)
 {

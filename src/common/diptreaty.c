@@ -12,12 +12,15 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "game.h"
+/* utility */
 #include "log.h"
 #include "mem.h"
+
+/* common */
+#include "game.h"
 #include "player.h"
 
 #include "diptreaty.h"
@@ -35,6 +38,11 @@ bool diplomacy_possible(const struct player *pplayer1,
     return (!pplayer1->ai_controlled && !pplayer2->ai_controlled);
   case DIPLO_FOR_AIS:
     return (pplayer1->ai_controlled && pplayer2->ai_controlled);
+  case DIPLO_NO_AIS:
+    return (!pplayer1->ai_controlled || !pplayer2->ai_controlled);
+  case DIPLO_NO_MIXED:
+    return ((pplayer1->ai_controlled && pplayer2->ai_controlled)
+            || (!pplayer1->ai_controlled && !pplayer2->ai_controlled));
   case DIPLO_FOR_TEAMS:
     return players_on_same_team(pplayer1, pplayer2);
   case DIPLO_DISABLED:
@@ -55,6 +63,8 @@ bool could_meet_with_player(const struct player *pplayer,
           && aplayer->is_alive
           && pplayer != aplayer
           && diplomacy_possible(pplayer,aplayer)
+          && get_player_bonus(pplayer, EFT_NO_DIPLOMACY) <= 0
+          && get_player_bonus(aplayer, EFT_NO_DIPLOMACY) <= 0
           && (player_has_embassy(aplayer, pplayer) 
               || player_has_embassy(pplayer, aplayer)
               || player_diplstate_get(pplayer, aplayer)->contact_turns_left
@@ -64,7 +74,7 @@ bool could_meet_with_player(const struct player *pplayer,
 }
 
 /**************************************************************************
-  Returns TRUE iff pplayer could do diplomatic meetings with aplayer.
+  Returns TRUE iff pplayer can get intelligence about aplayer.
 **************************************************************************/
 bool could_intel_with_player(const struct player *pplayer,
 			     const struct player *aplayer)
@@ -79,7 +89,7 @@ bool could_intel_with_player(const struct player *pplayer,
 }
 
 /****************************************************************
-...
+  Initialize treaty structure between two players.
 *****************************************************************/
 void init_treaty(struct Treaty *ptreaty, 
 		 struct player *plr0, struct player *plr1)
@@ -103,14 +113,14 @@ void clear_treaty(struct Treaty *ptreaty)
 }
 
 /****************************************************************
-...
+  Remove clause from treaty
 *****************************************************************/
 bool remove_clause(struct Treaty *ptreaty, struct player *pfrom, 
 		  enum clause_type type, int val)
 {
   clause_list_iterate(ptreaty->clauses, pclause) {
-    if(pclause->type==type && pclause->from==pfrom &&
-       pclause->value==val) {
+    if (pclause->type == type && pclause->from == pfrom
+        && pclause->value == val) {
       clause_list_remove(ptreaty->clauses, pclause);
       free(pclause);
 
@@ -126,7 +136,7 @@ bool remove_clause(struct Treaty *ptreaty, struct player *pfrom,
 
 
 /****************************************************************
-...
+  Add clause to treaty.
 *****************************************************************/
 bool add_clause(struct Treaty *ptreaty, struct player *pfrom, 
 		enum clause_type type, int val)
@@ -178,31 +188,31 @@ bool add_clause(struct Treaty *ptreaty, struct player *pfrom,
     return FALSE;
   }
 
-  clause_list_iterate(ptreaty->clauses, pclause) {
-    if(pclause->type==type
-       && pclause->from==pfrom
-       && pclause->value==val) {
+  clause_list_iterate(ptreaty->clauses, old_clause) {
+    if (old_clause->type == type
+        && old_clause->from == pfrom
+        && old_clause->value == val) {
       /* same clause already there */
       return FALSE;
     }
-    if(is_pact_clause(type) &&
-       is_pact_clause(pclause->type)) {
+    if (is_pact_clause(type) &&
+        is_pact_clause(old_clause->type)) {
       /* pact clause already there */
       ptreaty->accept0 = FALSE;
       ptreaty->accept1 = FALSE;
-      pclause->type=type;
+      old_clause->type = type;
       return TRUE;
     }
-    if (type == CLAUSE_GOLD && pclause->type==CLAUSE_GOLD &&
-        pclause->from==pfrom) {
+    if (type == CLAUSE_GOLD && old_clause->type == CLAUSE_GOLD &&
+        old_clause->from == pfrom) {
       /* gold clause there, different value */
       ptreaty->accept0 = FALSE;
       ptreaty->accept1 = FALSE;
-      pclause->value=val;
+      old_clause->value = val;
       return TRUE;
     }
   } clause_list_iterate_end;
-   
+
   pclause = fc_malloc(sizeof(*pclause));
 
   pclause->type=type;

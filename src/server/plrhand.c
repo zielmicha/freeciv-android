@@ -1,4 +1,4 @@
-/**********************************************************************
+/********************************************************************** 
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -27,21 +27,25 @@
 #include "support.h"
 
 /* common */
+#include "citizens.h"
 #include "diptreaty.h"
 #include "game.h"
 #include "government.h"
 #include "movement.h"
+#include "nation.h"
 #include "packets.h"
 #include "player.h"
 #include "research.h"
+#include "rgbcolor.h"
 #include "tech.h"
 #include "unitlist.h"
 
-/* scripting */
-#include "script.h"
+/* common/scriptcore */
+#include "luascript_types.h"
 
 /* server */
 #include "aiiface.h"
+#include "barbarian.h"
 #include "citytools.h"
 #include "cityturn.h"
 #include "connecthand.h"
@@ -63,9 +67,14 @@
 #include "advdata.h"
 #include "autosettlers.h"
 
+/* server/scripting */
+#include "script_server.h"
+
 /* ai */
-#include "advdiplomacy.h"
-#include "advmilitary.h"
+#include "aitraits.h"
+
+
+struct rgbcolor;
 
 static void package_player_common(struct player *plr,
                                   struct packet_player_info *packet);
@@ -89,8 +98,14 @@ static void send_player_info_c_real(struct player *src,
 static void send_player_diplstate_c_real(struct player *src,
                                          struct conn_list *dest);
 
+static void send_nation_availability_real(struct conn_list *dest,
+                                          bool nationset_change);
+
 /* Used by shuffle_players() and shuffled_player(). */
 static int shuffled_order[MAX_NUM_PLAYER_SLOTS];
+
+/* Used by player_info_freeze() and player_info_thaw(). */
+static int player_info_frozen_level = 0;
 
 /**************************************************************************
   Murder a player in cold blood.
@@ -101,6 +116,7 @@ static int shuffled_order[MAX_NUM_PLAYER_SLOTS];
 void kill_player(struct player *pplayer)
 {
   bool palace;
+  struct player *barbarians = NULL;
 
   pplayer->is_alive = FALSE;
 
@@ -116,8 +132,10 @@ void kill_player(struct player *pplayer)
 
   cancel_all_meetings(pplayer);
 
-  /* Show entire map for players who are *not* in a team. */
-  if (player_list_size(team_members(pplayer->team)) == 1) {
+  /* Show entire map for players who are *not* in a team if revealmap is set
+   * to REVEAL_MAP_DEAD. */
+  if (game.server.revealmap & REVEAL_MAP_DEAD
+      && player_list_size(team_members(pplayer->team)) == 1) {
     map_know_and_see_all(pplayer);
   }
 
@@ -131,25 +149,72 @@ void kill_player(struct player *pplayer)
      rightful owners, if they are still around */
   palace = game.server.savepalace;
   game.server.savepalace = FALSE; /* moving it around is dumb */
-  city_list_iterate(pplayer->cities, pcity) {
+  city_list_iterate_safe(pplayer->cities, pcity) {
     if (pcity->original != pplayer && pcity->original->is_alive) {
       /* Transfer city to original owner, kill all its units outside of
          a radius of 3, give verbose messages of every unit transferred,
          and raze buildings according to raze chance (also removes palace) */
-      transfer_city(pcity->original, pcity, 3, TRUE, TRUE, TRUE);
+      (void) transfer_city(pcity->original, pcity, 3, TRUE, TRUE, TRUE,
+                           TRUE);
     }
-  } city_list_iterate_end;
+  } city_list_iterate_safe_end;
+  game.server.savepalace = palace;
+
+  /* let there be civil war */
+  if (game.info.gameloss_style & GAMELOSS_STYLE_CWAR) {
+    if (city_list_size(pplayer->cities) >= 2 + MIN(GAME_MIN_CIVILWARSIZE, 2)) {
+      log_verbose("Civil war strikes the remaining empire of %s",
+                  pplayer->name);
+      /* out of sheer cruelty we reanimate the player 
+       * so he can behold what happens to his empire */
+      pplayer->is_alive = TRUE;
+      (void) civil_war(pplayer);
+    } else {
+      log_verbose("The empire of %s is too small for civil war.",
+                  pplayer->name);
+    }
+  }
+  pplayer->is_alive = FALSE;
+
+  if (game.info.gameloss_style & GAMELOSS_STYLE_BARB) {
+    /* if parameter, create a barbarian, if possible */
+    barbarians = create_barbarian_player(LAND_BARBARIAN);
+  }
+
+  /* if there are barbarians around, they will take the remaining cities */
+  /* vae victis! */
+  if (barbarians) {
+    /* Moving victim's palace around is a waste of time, as they're dead */
+    bool palace = game.server.savepalace;
+    game.server.savepalace = FALSE;
+
+    log_verbose("Barbarians take the empire of %s", pplayer->name);
+    adv_data_phase_init(barbarians, TRUE);
+
+    /* Transfer any remaining cities */
+    city_list_iterate_safe(pplayer->cities, pcity) {
+      (void) transfer_city(barbarians, pcity, -1, FALSE, FALSE, FALSE,
+                           FALSE);
+    } city_list_iterate_safe_end;
+
+    game.server.savepalace = palace;
+      
+    resolve_unit_stacks(pplayer, barbarians, FALSE);
+
+    /* Barbarians don't get free buildings like Palaces, so we don't
+     * call city_build_free_buildings().
+     * FIXME: maybe this should be a ruleset option? */
+  } else {
+    /* Destroy any remaining cities */
+    city_list_iterate(pplayer->cities, pcity) {
+      remove_city(pcity);
+    } city_list_iterate_end;
+  }
 
   /* Remove all units that are still ours */
   unit_list_iterate_safe(pplayer->units, punit) {
-    wipe_unit(punit);
+    wipe_unit(punit, ULR_PLAYER_DIED, NULL);
   } unit_list_iterate_safe_end;
-
-  /* Destroy any remaining cities */
-  city_list_iterate(pplayer->cities, pcity) {
-    remove_city(pcity);
-  } city_list_iterate_end;
-  game.server.savepalace = palace;
 
   /* Remove ownership of tiles */
   whole_map_iterate(ptile) {
@@ -164,6 +229,21 @@ void kill_player(struct player *pplayer)
   send_spaceship_info(pplayer, NULL);
 
   send_player_info_c(pplayer, game.est_connections);
+}
+
+/**************************************************************************
+  Return player maxrate in legal range.
+**************************************************************************/
+static int get_player_maxrate(struct player *pplayer)
+{
+  int maxrate = get_player_bonus(pplayer, EFT_MAX_RATES);
+
+  if (maxrate == 0) {
+    return 100; /* effects not initialized yet */
+  }
+
+  /* 34 + 33 + 33 = 100 */
+  return CLIP(34, maxrate, 100);
 }
 
 /**************************************************************************
@@ -190,7 +270,7 @@ void handle_player_rates(struct player *pplayer,
       || science > 100) {
     return;
   }
-  maxrate = get_player_bonus(pplayer, EFT_MAX_RATES);
+  maxrate = get_player_maxrate(pplayer);
   if (tax > maxrate || luxury > maxrate || science > maxrate) {
     const char *rtype;
 
@@ -238,14 +318,14 @@ static void finish_revolution(struct player *pplayer)
             government_rule_name(government),
             pplayer->revolution_finishes, game.info.turn);
   notify_player(pplayer, NULL, E_REVOLT_DONE, ftc_server,
-                _("%s now governs the %s as a %s."),
-                player_name(pplayer),
+                _("%s now governs the %s as a %s."), 
+                player_name(pplayer), 
                 nation_plural_for_player(pplayer),
                 government_name_translation(government));
 
   if (!pplayer->ai_controlled) {
     /* Keep luxuries if we have any.  Try to max out science. -GJW */
-    int max = get_player_bonus(pplayer, EFT_MAX_RATES);
+    int max = get_player_maxrate(pplayer);
 
     /* only change rates if one exceeds the maximal rate */
     if (pplayer->economic.science > max || pplayer->economic.tax > max
@@ -263,7 +343,7 @@ static void finish_revolution(struct player *pplayer)
       notify_player(pplayer, NULL, E_REVOLT_DONE, ftc_server,
                     _("The tax rates for the %s are changed from "
                       "%3d%%/%3d%%/%3d%% (tax/luxury/science) to "
-                      "%3d%%/%3d%%/%3d%%."),
+                      "%3d%%/%3d%%/%3d%%."), 
                     nation_plural_for_player(pplayer),
                     save_tax, save_luxury, save_science,
                     pplayer->economic.tax, pplayer->economic.luxury,
@@ -304,7 +384,7 @@ void handle_player_change_government(struct player *pplayer, int government)
      * a government). */
     turns = pplayer->revolution_finishes - game.info.turn;
   } else if ((pplayer->ai_controlled && !ai_handicap(pplayer, H_REVOLUTION))
-	     || get_player_bonus(pplayer, EFT_NO_ANARCHY)) {
+	     || get_player_bonus(pplayer, EFT_NO_ANARCHY) > 0) {
     /* AI players without the H_REVOLUTION handicap can skip anarchy */
     turns = 0;
   } else if (game.server.revolution_length == 0) {
@@ -437,24 +517,70 @@ void check_player_max_rates(struct player *pplayer)
   }
 }
 
-/**************************************************************************
+/****************************************************************************
   After the alliance is breaken, we need to do two things:
   - Inform clients that they cannot see units inside the former's ally
     cities
   - Remove units stacked together
-**************************************************************************/
-void update_players_after_alliance_breakup(struct player* pplayer,
-                                          struct player* pplayer2)
+  Note that you shouldn't use the units listed in 'pplayer_seen_units'
+  and 'pplayer2_seen_units' after calling this function because these
+  units might have died during the process.
+****************************************************************************/
+void update_players_after_alliance_breakup(struct player *pplayer,
+                                           struct player *pplayer2,
+                                           const struct unit_list
+                                               *pplayer_seen_units,
+                                           const struct unit_list
+                                               *pplayer2_seen_units)
 {
   /* The client needs updated diplomatic state, because it is used
    * during calculation of new states of occupied flags in cities */
    send_player_all_c(pplayer, NULL);
    send_player_all_c(pplayer2, NULL);
-   remove_allied_visibility(pplayer, pplayer2);
-   remove_allied_visibility(pplayer2, pplayer);
+   remove_allied_visibility(pplayer, pplayer2, pplayer_seen_units);
+   remove_allied_visibility(pplayer2, pplayer, pplayer2_seen_units);
    resolve_unit_stacks(pplayer, pplayer2, TRUE);
 }
 
+/**************************************************************************
+  If there's any units of new_owner on tile, they claim bases.
+**************************************************************************/
+static void maybe_claim_base(struct tile *ptile, struct player *new_owner,
+                             struct player *old_owner)
+{
+  bool claim = FALSE;
+
+  unit_list_iterate(ptile->units, punit) {
+    if (unit_owner(punit) == new_owner
+        && tile_has_claimable_base(ptile, unit_type(punit))) {
+      claim = TRUE;
+      break;
+    }
+  } unit_list_iterate_end;
+
+  if (claim) {
+    base_type_iterate(pbase) {
+      map_claim_base(ptile, pbase, new_owner, old_owner);
+    } base_type_iterate_end;
+  }
+}
+
+/**************************************************************************
+  Two players enter war.
+**************************************************************************/
+void enter_war(struct player *pplayer, struct player *pplayer2)
+{
+  /* Claim bases where units are already standing */
+  whole_map_iterate(ptile) {
+    struct player *old_owner = base_owner(ptile);
+
+    if (old_owner == pplayer2) {
+      maybe_claim_base(ptile, pplayer, old_owner);
+    } else if (old_owner == pplayer) {
+      maybe_claim_base(ptile, pplayer2, old_owner);
+    }
+  } whole_map_iterate_end;
+}
 
 /**************************************************************************
   Handles a player cancelling a "pact" with another player.
@@ -475,8 +601,9 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
   bool repeat = FALSE;
   struct player *pplayer2 = player_by_number(other_player_id);
   struct player_diplstate *ds_plrplr2, *ds_plr2plr;
+  struct unit_list *pplayer_seen_units, *pplayer2_seen_units;
 
-  if (NULL == pplayer2) {
+  if (NULL == pplayer2 || players_on_same_team(pplayer, pplayer2)) {
     return;
   }
 
@@ -515,23 +642,15 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
   /* else, breaking a treaty */
 
   /* check what the new status will be */
-  switch(old_type) {
-  case DS_NO_CONTACT: /* possible if someone declares war on our ally */
-  case DS_ARMISTICE:
-  case DS_CEASEFIRE:
-  case DS_PEACE:
-    new_type = DS_WAR;
-    break;
-  case DS_ALLIANCE:
-    new_type = DS_ARMISTICE;
-    break;
-  default:
-    log_error("non-pact diplstate in handle_player_cancel_pact");
-    return;
-  }
+  new_type = cancel_pact_result(old_type);
 
   ds_plrplr2 = player_diplstate_get(pplayer, pplayer2);
   ds_plr2plr = player_diplstate_get(pplayer2, pplayer);
+
+  if (old_type == DS_ALLIANCE) {
+    pplayer_seen_units = get_units_seen_via_ally(pplayer, pplayer2);
+    pplayer2_seen_units = get_units_seen_via_ally(pplayer2, pplayer);
+  }
 
   /* do the change */
   ds_plrplr2->type = ds_plr2plr->type = new_type;
@@ -540,7 +659,11 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
   /* If the old state was alliance, the players' units can share tiles
      illegally, and we need to call resolve_unit_stacks() */
   if (old_type == DS_ALLIANCE) {
-    update_players_after_alliance_breakup(pplayer, pplayer2);
+    update_players_after_alliance_breakup(pplayer, pplayer2,
+                                          pplayer_seen_units,
+                                          pplayer2_seen_units);
+    unit_list_destroy(pplayer_seen_units);
+    unit_list_destroy(pplayer2_seen_units);
   }
 
   /* if there's a reason to cancel the pact, do it without penalty */
@@ -562,26 +685,17 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
   }
   if (new_type == DS_WAR) {
     call_incident(INCIDENT_WAR, pplayer, pplayer2);
+
+    enter_war(pplayer, pplayer2);
   }
   ds_plrplr2->has_reason_to_cancel = 0;
 
   send_player_all_c(pplayer, NULL);
   send_player_all_c(pplayer2, NULL);
 
-  if (old_type == DS_ALLIANCE) {
-    /* Inform clients about units that have been hidden.  Units in cities
-     * and transporters are visible to allies but not visible once the
-     * alliance is broken.  We have to call this after resolve_unit_stacks
-     * because that function may change units' locations.  It also sends
-     * out new city info packets to tell the client about occupied cities,
-     * so it should also come after the send_player_all_c calls above. */
-    remove_allied_visibility(pplayer, pplayer2);
-    remove_allied_visibility(pplayer2, pplayer);
-  }
-
-  /*
+  /* 
    * Refresh all cities which have a unit of the other side within
-   * city range.
+   * city range. 
    */
   city_map_update_all_cities_for_player(pplayer);
   city_map_update_all_cities_for_player(pplayer2);
@@ -603,8 +717,8 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
                 diplstate_text(new_type));
 
   /* Check fall-out of a war declaration. */
-  players_iterate(other) {
-    if (other->is_alive && other != pplayer && other != pplayer2
+  players_iterate_alive(other) {
+    if (other != pplayer && other != pplayer2
         && new_type == DS_WAR && pplayers_allied(pplayer2, other)
         && pplayers_allied(pplayer, other)) {
       if (!players_on_same_team(pplayer, other)) {
@@ -620,7 +734,7 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
         handle_diplomacy_cancel_pact(other, player_number(pplayer),
                                      CLAUSE_ALLIANCE);
       } else {
-        /* We are in the same team as the agressor; we cannot break
+        /* We are in the same team as the agressor; we cannot break 
          * alliance with him. We trust our team mate and break alliance
          * with the attacked player */
         notify_player(other, NULL, E_TREATY_BROKEN, ftc_server,
@@ -632,7 +746,7 @@ void handle_diplomacy_cancel_pact(struct player *pplayer,
         handle_diplomacy_cancel_pact(other, player_number(pplayer2), CLAUSE_ALLIANCE);
       }
     }
-  } players_iterate_end;
+  } players_iterate_alive_end;
 }
 
 /**************************************************************************
@@ -650,6 +764,30 @@ static void send_player_remove_info_c(const struct player_slot *pslot,
   conn_list_iterate(dest, pconn) {
     dsend_packet_player_remove(pconn, player_slot_index(pslot));
   } conn_list_iterate_end;
+}
+
+/****************************************************************************
+  Do not compute and send PACKET_PLAYER_INFO or PACKET_NATION_AVAILABILITY
+  until a call to player_info_thaw(). This is used during savegame load
+  or ruleset (re)load cycles, to avoid sending infos to the client that
+  depend on ruleset data it does not yet have.
+****************************************************************************/
+void player_info_freeze(void)
+{
+  player_info_frozen_level++;
+}
+
+/****************************************************************************
+  If the frozen level is back to 0, send all players' infos, and nation
+  availability, to all connections.
+****************************************************************************/
+void player_info_thaw(void)
+{
+  if (0 == --player_info_frozen_level) {
+    send_nation_availability_real(game.est_connections, FALSE);
+    send_player_info_c(NULL, NULL);
+  }
+  fc_assert(0 <= player_info_frozen_level);
 }
 
 /**************************************************************************
@@ -681,6 +819,10 @@ void send_player_all_c(struct player *src, struct conn_list *dest)
 **************************************************************************/
 void send_player_info_c(struct player *src, struct conn_list *dest)
 {
+  if (0 < player_info_frozen_level) {
+    return; /* Discard, see comment for player_info_freeze(). */
+  }
+
   if (src != NULL) {
     send_player_info_c_real(src, dest);
     return;
@@ -788,9 +930,9 @@ static void package_player_common(struct player *plr,
   packet->playerno = player_number(plr);
   sz_strlcpy(packet->name, player_name(plr));
   sz_strlcpy(packet->username, plr->username);
-  packet->nation = plr->nation ? nation_number(plr->nation) : -1;
+  packet->nation = plr->nation ? nation_number(plr->nation) : NATION_NONE;
   packet->is_male=plr->is_male;
-  packet->team = plr->team ? team_number(plr->team) : -1;
+  packet->team = plr->team ? team_number(plr->team) : team_count();
   packet->is_ready = plr->is_ready;
   packet->was_created = plr->was_created;
   if (city_styles != NULL) {
@@ -855,6 +997,27 @@ static void package_player_info(struct player *plr,
     }
   } players_iterate_end;
 
+  if (plr->rgb != NULL) {
+    packet->color_red = plr->rgb->r;
+    packet->color_green = plr->rgb->g;
+    packet->color_blue = plr->rgb->b;
+  } else {
+    /* In pregame, send the color we expect to use, for consistency with
+     * '/list colors' etc. */
+    const struct rgbcolor *preferred = player_preferred_color(plr);
+    if (preferred != NULL) {
+      packet->color_red = preferred->r;
+      packet->color_green = preferred->g;
+      packet->color_blue = preferred->b;
+    } else {
+      fc_assert(game.info.turn < 1);
+      /* Can't tell the client 'no color', so use dummy values (black). */
+      packet->color_red = 0;
+      packet->color_green = 0;
+      packet->color_blue = 0;
+    }
+  }
+
   /* Only send score if we have contact */
   if (info_level >= INFO_MEETING) {
     packet->score = plr->score.game;
@@ -869,8 +1032,8 @@ static void package_player_info(struct player *plr,
     packet->gold = 0;
     pgov = game.government_during_revolution;
   }
-  packet->government = pgov ? government_number(pgov) : -1;
-
+  packet->government = pgov ? government_number(pgov) : government_count();
+   
   /* Send diplomatic status of the player to everyone they are in
    * contact with. */
   if (info_level >= INFO_EMBASSY
@@ -878,7 +1041,7 @@ static void package_player_info(struct player *plr,
           && player_diplstate_get(receiver, plr)->contact_turns_left > 0)) {
     packet->target_government = plr->target_government
                                 ? government_number(plr->target_government)
-                                : -1;
+                                : government_count();
     memset(&packet->real_embassy, 0, sizeof(packet->real_embassy));
     players_iterate(pother) {
       packet->real_embassy[player_index(pother)] =
@@ -899,19 +1062,21 @@ static void package_player_info(struct player *plr,
   }
 
   /* Make absolutely sure - in case you lose your embassy! */
-  if (info_level >= INFO_EMBASSY
+  if (info_level >= INFO_EMBASSY 
       || (receiver
 	  && player_diplstate_get(plr, receiver)->type == DS_TEAM)) {
-    packet->bulbs_last_turn = plr->bulbs_last_turn;
+    packet->bulbs_prod = plr->server.bulbs_last_turn;
+    packet->tech_upkeep = player_tech_upkeep(plr);
   } else {
-    packet->bulbs_last_turn = 0;
+    packet->bulbs_prod = 0;
+    packet->tech_upkeep = 0;
   }
 
   /* Send most civ info about the player only to players who have an
    * embassy. */
   if (highest_team_level >= INFO_EMBASSY) {
     advance_index_iterate(A_FIRST, i) {
-      packet->inventions[i] =
+      packet->inventions[i] = 
         research->inventions[i].state + '0';
     } advance_index_iterate_end;
     packet->tax             = plr->economic.tax;
@@ -920,6 +1085,7 @@ static void package_player_info(struct player *plr,
     packet->bulbs_researched = research->bulbs_researched;
     packet->techs_researched = research->techs_researched;
     packet->researching = research->researching;
+    packet->researching_cost = total_bulbs_required(plr);
     packet->future_tech = research->future_tech;
     packet->revolution_finishes = plr->revolution_finishes;
   } else {
@@ -949,11 +1115,15 @@ static void package_player_info(struct player *plr,
       || (receiver
           && player_diplstate_get(plr, receiver)->type == DS_TEAM)) {
     packet->tech_goal       = research->tech_goal;
+    packet->bulbs_prod = 0;
+    city_list_iterate(plr->cities, pcity) {
+      packet->bulbs_prod += pcity->surplus[O_SCIENCE];
+    } city_list_iterate_end;
   } else {
     packet->tech_goal       = A_UNSET;
   }
 
-  /*
+  /* 
    * This may be an odd time to check these values but we can be sure
    * to have a consistent state here.
    */
@@ -1017,7 +1187,7 @@ static void package_player_diplstate(struct player *plr1,
 }
 
 /**************************************************************************
-  ...
+  Return level of information player should receive about another.
 **************************************************************************/
 static enum plr_info_level player_info_level(struct player *plr,
 					     struct player *receiver)
@@ -1066,12 +1236,12 @@ static void call_first_contact(struct player *pplayer, struct player *aplayer)
   The needs_team options should be set for players who should be assigned
   a team.  They will be put on their own newly-created team.
 ****************************************************************************/
-void server_player_init(struct player *pplayer,
-                        bool initmap, bool needs_team)
+void server_player_init(struct player *pplayer, bool initmap,
+                        bool needs_team)
 {
   player_status_reset(pplayer);
 
-  pplayer->server.capital = FALSE;
+  pplayer->server.got_first_city = FALSE;
   BV_CLR_ALL(pplayer->server.really_gives_vision);
   BV_CLR_ALL(pplayer->server.debug);
 
@@ -1085,26 +1255,241 @@ void server_player_init(struct player *pplayer,
     team_add_player(pplayer, NULL);
   }
 
-  /* This must be done after team information are initialised. */
-  pplayer->economic = player_limit_to_max_rates(pplayer);
+  /* This must be done after team information is initialised
+   * as it might be needed to determine max rate effects. 
+   * Sometimes this server_player_init() gets called twice
+   * with only latter one having needs_team set. We don't
+   * want to call player_limit_to_max_rates() at first time
+   * when team is not yet set. It's callers responsibility
+   * to always have one server_player_init() call with
+   * needs_team TRUE. */
+  if (needs_team) {
+    pplayer->economic = player_limit_to_max_rates(pplayer);
+  }
 
-  ai_data_default(pplayer);
+  adv_data_default(pplayer);
 
   /* We don't push this in calc_civ_score(), or it will be reset
    * every turn. */
   pplayer->score.units_built = 0;
   pplayer->score.units_killed = 0;
   pplayer->score.units_lost = 0;
+
+  /* No delegation. */
+  pplayer->server.delegate_to[0] = '\0';
+  pplayer->server.orig_username[0] = '\0';
+
+  ai_traits_init(pplayer);
 }
 
-/**********************************************************************
+/****************************************************************************
+  If a player's color will be predictable when colors are assigned (or
+  assignment has already happened), return that color. Otherwise (if the
+  player's color is yet to be assigned randomly), return NULL.
+****************************************************************************/
+const struct rgbcolor *player_preferred_color(struct player *pplayer)
+{
+  if (pplayer->rgb) {
+    return pplayer->rgb;
+  } else if (playercolor_count() == 0) {
+    /* If a ruleset isn't loaded, there are no colors to choose from. */
+    return NULL;
+  } else if (game.server.plrcolormode == PLRCOL_NATION_ORDER) {
+    if (pplayer->nation != NO_NATION_SELECTED) {
+      return nation_color(nation_of_player(pplayer)); /* may be NULL */
+    } else {
+      return NULL; /* don't know nation, hence don't know color */
+    }
+  } else {
+    /* Modes indexing into game-defined player colors */
+    int colorid;
+    switch (game.server.plrcolormode) {
+    case PLRCOL_PLR_SET: /* player color (set) */
+    case PLRCOL_PLR_RANDOM: /* player color (random) */
+      /* These depend on other players and will be assigned at game start. */
+      return NULL;
+    default:
+      log_error("Invalid value for 'game.server.plrcolormode' (%d)!",
+                game.server.plrcolormode);
+      /* no break - using 'PLRCOL_PLR_ORDER' as fallback */
+    case PLRCOL_PLR_ORDER: /* player color (ordered) */
+      colorid = player_number(pplayer) % playercolor_count();
+      break;
+    case PLRCOL_TEAM_ORDER: /* team color (ordered) */
+      colorid = team_number(pplayer->team) % playercolor_count();
+      break;
+    }
+    return playercolor_get(colorid);
+  }
+}
+
+/****************************************************************************
+  Permanently assign colors to any players that don't already have them.
+  First assign preferred colors, then assign the rest randomly, trying to
+  avoid clashes.
+****************************************************************************/
+void assign_player_colors(void)
+{
+  struct rgbcolor_list *spare_colors =
+    rgbcolor_list_copy(game.server.plr_colors);
+  int needed = player_count();
+
+  players_iterate(pplayer) {
+    const struct rgbcolor *autocolor;
+    /* Assign the deterministic colors. */
+    if (!pplayer->rgb
+        && (autocolor = player_preferred_color(pplayer))) {
+      player_set_color(pplayer, autocolor);
+    }
+    if (pplayer->rgb) {
+      /* One fewer random color needed. */
+      needed--;
+      /* Try to avoid clashes between explicit and random colors. */
+      rgbcolor_list_iterate(spare_colors, prgbcolor) {
+        if (rgbcolors_are_equal(pplayer->rgb, prgbcolor)) {
+          rgbcolor_list_remove(spare_colors, prgbcolor);
+        }
+      } rgbcolor_list_iterate_end;
+    }
+  } players_iterate_end;
+
+  if (needed == 0) {
+    /* No random colors needed */
+    rgbcolor_list_destroy(spare_colors);
+    return;
+  }
+
+  if (game.server.plrcolormode == PLRCOL_NATION_ORDER) {
+    /* Additionally, try to avoid color clashes with certain nations not
+     * yet in play (barbarians). */
+    allowed_nations_iterate(pnation) {
+      const struct rgbcolor *ncol = nation_color(pnation);
+      if (ncol && nation_barbarian_type(pnation) != NOT_A_BARBARIAN) {
+        /* Don't use this color. */
+        rgbcolor_list_iterate(spare_colors, prgbcolor) {
+          if (rgbcolors_are_equal(ncol, prgbcolor)) {
+            rgbcolor_list_remove(spare_colors, ncol);
+          }
+        } rgbcolor_list_iterate_end;
+      }
+    } allowed_nations_iterate_end;
+  }
+
+  fc_assert(game.server.plrcolormode == PLRCOL_PLR_RANDOM
+            || game.server.plrcolormode == PLRCOL_PLR_SET
+            || game.server.plrcolormode == PLRCOL_NATION_ORDER);
+
+  if (needed > rgbcolor_list_size(spare_colors)) {
+    log_verbose("Not enough unique colors for all players; there will be "
+                "duplicates");
+    /* Fallback: start again from full set of ruleset colors.
+     * No longer attempt to avoid clashes with explicitly assigned colors. */
+    rgbcolor_list_destroy(spare_colors);
+    spare_colors = rgbcolor_list_copy(game.server.plr_colors);
+  }
+  /* We may still not have enough, if there are more players than
+   * ruleset-defined colors. If so, top up with duplicates. */
+  if (needed > rgbcolor_list_size(spare_colors)) {
+    int i, origsize = rgbcolor_list_size(spare_colors);
+    /* Shuffle so that duplicates aren't biased to start of list */
+    rgbcolor_list_shuffle(spare_colors);
+    /* Duplication process avoids one color being hit lots of times */
+    for (i = origsize; i < needed; i++) {
+      rgbcolor_list_append(spare_colors,
+                           rgbcolor_list_get(spare_colors, i - origsize));
+    }
+  }
+  /* Shuffle (including mixing any duplicates up) */
+  rgbcolor_list_shuffle(spare_colors);
+
+  /* Finally, assign shuffled colors to players. */
+  players_iterate(pplayer) {
+    if (!pplayer->rgb) {
+      player_set_color(pplayer, rgbcolor_list_front(spare_colors));
+      rgbcolor_list_pop_front(spare_colors);
+    }
+  } players_iterate_end;
+
+  rgbcolor_list_destroy(spare_colors);
+}
+
+/****************************************************************************
+  Set the player's color. If 'prgbcolor' is not NULL the caller should free
+  the pointer, as player_set_color() copies the data.
+****************************************************************************/
+void server_player_set_color(struct player *pplayer,
+                             const struct rgbcolor *prgbcolor)
+{
+  if (prgbcolor != NULL) {
+    player_set_color(pplayer, prgbcolor);
+  } else {
+    /* Server only: this can be NULL in pregame. */
+    fc_assert_ret(!game_was_started());
+    rgbcolor_destroy(pplayer->rgb);
+    pplayer->rgb = NULL;
+  }
+  /* Update clients */
+  send_player_info_c(pplayer, NULL);
+}
+
+/****************************************************************************
+  Return the player color as featured text string.
+  (In pregame, this uses the color the player will take, if known, even if
+  not assigned yet.)
+****************************************************************************/
+const char *player_color_ftstr(struct player *pplayer)
+{
+  static char buf[64];
+  char hex[16];
+  const struct rgbcolor *prgbcolor;
+
+  fc_assert_ret_val(pplayer != NULL, NULL);
+
+  buf[0] = '\0';
+  prgbcolor = player_preferred_color(pplayer);
+  if (prgbcolor != NULL
+      && rgbcolor_to_hex(prgbcolor, hex, sizeof(hex))) {
+    struct ft_color plrcolor = FT_COLOR("#000000", hex);
+
+    featured_text_apply_tag(hex, buf, sizeof(buf), TTT_COLOR, 0,
+                            FT_OFFSET_UNSET, plrcolor);
+  } else {
+    cat_snprintf(buf, sizeof(buf), _("no color"));
+  }
+
+  return buf;
+}
+
+/********************************************************************** 
+  Gives units that every player should have. Usually called for
+  players created midgame.
+***********************************************************************/
+void give_midgame_initial_units(struct player *pplayer, struct tile *ptile)
+{
+  int sucount = strlen(game.server.start_units);
+  int i;
+
+  for (i = 0; i < sucount; i++) {
+    if (game.server.start_units[i] == 'k') {
+      /* Every player should have king */
+      struct unit_type *utype = crole_to_unit_type('k', pplayer);
+
+      if (utype != NULL) {
+        create_unit(pplayer, ptile, utype, 0, 0, -1);
+      }
+    }
+  }
+}
+
+/********************************************************************** 
   Creates a new, uninitialized, used player slot. You should probably
   call server_player_init() to initialize it, and send_player_info_c()
   later to tell clients about it.
 
   May return NULL if creation was not possible.
 ***********************************************************************/
-struct player *server_create_player(int player_id)
+struct player *server_create_player(int player_id, const char *ai_type,
+                                    struct rgbcolor *prgbcolor)
 {
   struct player_slot *pslot;
   struct player *pplayer;
@@ -1117,21 +1502,30 @@ struct player *server_create_player(int player_id)
     return NULL;
   }
 
-  pplayer->ai = ai_type_by_name(FC_AI_DEFAULT_NAME);
+  pplayer->ai = ai_type_by_name(ai_type);
 
   if (pplayer->ai == NULL) {
     player_destroy(pplayer);
     return NULL;
   }
 
-  ai_data_init(pplayer);
+  adv_data_init(pplayer);
 
+  CALL_FUNC_EACH_AI(player_alloc, pplayer);
+
+  /* TODO: Do we really need this server_player_init() here? All our callers
+   *       will later make another server_player_init() call anyway, with boolean
+   *       parameters set to what they really need. */
   server_player_init(pplayer, FALSE, FALSE);
+
+  if (prgbcolor) {
+    player_set_color(pplayer, prgbcolor);
+  } /* else caller must ensure a color is assigned if game has started */
 
   return pplayer;
 }
 
-/**********************************************************************
+/********************************************************************** 
   This function does _not_ close any connections attached to this
   player. The function cut_connection() is used for that. Be sure
   to send_player_slot_info_c() afterwards to tell clients that the
@@ -1162,10 +1556,10 @@ void server_remove_player(struct player *pplayer)
   /* Don't use conn_list_iterate here because connection_detach() can be
    * recursive and free the next connection pointer. */
   while (conn_list_size(pplayer->connections) > 0) {
-    connection_detach(conn_list_get(pplayer->connections, 0));
+    connection_detach(conn_list_get(pplayer->connections, 0), FALSE);
   }
 
-  script_remove_exported_object(pplayer);
+  script_server_remove_exported_object(pplayer);
   /* Clear data saved in the other player structs. */
   players_iterate(aplayer) {
     BV_CLR(aplayer->real_embassy, player_index(pplayer));
@@ -1173,18 +1567,52 @@ void server_remove_player(struct player *pplayer)
       remove_shared_vision(aplayer, pplayer);
     }
   } players_iterate_end;
+
+  /* Remove citizens of this player from the cities of all other players. */
+  /* FIXME: add a special case if the server quits - no need to run this for
+   *        each player in that case. */
+  if (game.info.citizen_nationality) {
+    cities_iterate(pcity) {
+      if (city_owner(pcity) != pplayer) {
+        citizens nationality = citizens_nation_get(pcity, pplayer->slot);
+        if (nationality != 0) {
+          /* Change nationality of the citizens to the nationality of the
+           * city owner. */
+          citizens_nation_move(pcity, pplayer->slot, city_owner(pcity)->slot,
+                               nationality);
+          city_refresh_queue_add(pcity);
+        }
+      }
+    } cities_iterate_end
+
+    city_refresh_queue_processing();
+  }
+
+  /* AI type lost control of this player */
+  CALL_PLR_AI_FUNC(lost_control, pplayer, pplayer);
+
   /* We have to clear all player data before the ai memory is freed because
    * some function may depend on it. */
   player_clear(pplayer, TRUE);
+
+  if (!map_is_empty()) {
+    remove_player_from_maps(pplayer);
+  }
   player_map_free(pplayer);
 
   /* Destroy advisor and ai data. */
-  ai_data_close(pplayer);
+  CALL_FUNC_EACH_AI(player_free, pplayer);
+
+  ai_traits_close(pplayer);
+  adv_data_close(pplayer);
   player_destroy(pplayer);
 
   send_updated_vote_totals(NULL);
   /* must be called after the player was destroyed */
   send_player_remove_info_c(pslot, NULL);
+
+  /* Recalculate borders. */
+  map_calculate_borders();
 }
 
 /**************************************************************************
@@ -1209,10 +1637,7 @@ struct player_economic player_limit_to_max_rates(struct player *pplayer)
 
   economic = pplayer->economic;
 
-  maxrate = get_player_bonus(pplayer, EFT_MAX_RATES);
-  if (maxrate == 0) {
-    maxrate = 100; /* effects not initialized yet */
-  }
+  maxrate = get_player_maxrate(pplayer);
 
   surplus = 0;
   if (economic.luxury > maxrate) {
@@ -1430,15 +1855,14 @@ static enum diplstate_type
 get_default_diplstate(const struct player *pplayer1,
                       const struct player *pplayer2)
 {
-  players_iterate(pplayer3) {
+  players_iterate_alive(pplayer3) {
     if (pplayer3 != pplayer1
         && pplayer3 != pplayer2
-        && pplayer3->is_alive
         && pplayers_allied(pplayer3, pplayer1)
         && pplayers_allied(pplayer3, pplayer2)) {
       return DS_PEACE;
     }
-  } players_iterate_end;
+  } players_iterate_alive_end;
 
   return DS_WAR;
 }
@@ -1460,8 +1884,8 @@ void make_contact(struct player *pplayer1, struct player *pplayer2,
   ds_plr1plr2 = player_diplstate_get(pplayer1, pplayer2);
   ds_plr2plr1 = player_diplstate_get(pplayer2, pplayer1);
 
-  if (get_player_bonus(pplayer1, EFT_NO_DIPLOMACY) == 0
-      && get_player_bonus(pplayer2, EFT_NO_DIPLOMACY) == 0) {
+  if (get_player_bonus(pplayer1, EFT_NO_DIPLOMACY) <= 0
+      && get_player_bonus(pplayer2, EFT_NO_DIPLOMACY) <= 0) {
     ds_plr1plr2->contact_turns_left = game.server.contactturns;
     ds_plr2plr1->contact_turns_left = game.server.contactturns;
   }
@@ -1488,7 +1912,7 @@ void make_contact(struct player *pplayer1, struct player *pplayer2,
     if (pplayer1->ai_controlled) {
       call_first_contact(pplayer1, pplayer2);
     }
-    if (pplayer2->ai_controlled && !pplayer1->ai_controlled) {
+    if (pplayer2->ai_controlled) {
       call_first_contact(pplayer2, pplayer1);
     }
     return;
@@ -1570,15 +1994,17 @@ struct player *shuffled_player(int i)
   struct player *pplayer;
 
   pplayer = player_by_number(shuffled_order[i]);
-  log_debug("shuffled_player(%d) = %d (%p %s)",
-            i, shuffled_order[i], pplayer, player_name(pplayer));
+  log_debug("shuffled_player(%d) = %d (%s)",
+            i, shuffled_order[i], player_name(pplayer));
   return pplayer;
 }
 
 /****************************************************************************
   This function returns a random-ish nation that is suitable for 'barb_type'
   and is usable (not already in use by an existing player, and if
-  only_available is set, has its 'available' bit set).
+  needs_startpos is set, would not be prohibited from starting on the map
+  by the current scenario -- NB this doesn't check that any start position
+  is actually free).
 
   Unless 'ignore_conflicts' is set, this function tries hard to avoid a
   nation marked as "conflicting with" one already in the game. A
@@ -1597,7 +2023,7 @@ struct player *shuffled_player(int i)
 ****************************************************************************/
 struct nation_type *pick_a_nation(const struct nation_list *choices,
                                   bool ignore_conflicts,
-                                  bool only_available,
+                                  bool needs_startpos,
                                   enum barbarian_type barb_type)
 {
   enum {
@@ -1612,18 +2038,23 @@ struct nation_type *pick_a_nation(const struct nation_list *choices,
    * PREFERRED - we can use this nation and it is on the choices list.
    * UNWANTED - we can use this nation, but we really don't want to. */
   nations_iterate(pnation) {
-    if (pnation->player
-        || (only_available && !pnation->is_available)
+    index = nation_index(pnation);
+
+    if (!nation_is_in_current_set(pnation)
+        || pnation->player
+        || (needs_startpos && game.scenario.startpos_nations
+            && pnation->server.no_startpos)
         || (barb_type != nation_barbarian_type(pnation))
         || (barb_type == NOT_A_BARBARIAN && !is_nation_playable(pnation))) {
-      /* Nation is unplayable or already used: don't consider it. */
-      index = nation_index(pnation);
+      /* Nation is unplayable or already used: don't consider it.
+       * (If nations aren't currently restricted to those with start
+       * positions, we do nothing special here, but generate_players() will
+       * tend to prefer them.) */
       nations_used[index] = UNAVAILABLE;
       match[index] = 0;
       continue;
     }
 
-    index = nation_index(pnation);
     nations_used[index] = AVAILABLE;
 
     /* Determine which nations look good with nations already in the game,
@@ -1711,7 +2142,148 @@ struct nation_type *pick_a_nation(const struct nation_list *choices,
   }
 
   log_error("No nation found!");
+
   return NO_NATION_SELECTED;
+}
+
+/****************************************************************************
+  Return the nationset currently in effect.
+****************************************************************************/
+static struct nation_set *current_nationset(void)
+{
+  return nation_set_by_setting_value(game.server.nationset);
+}
+
+/****************************************************************************
+  Is the nation in the currently selected nationset?
+  If not, it's not allowed to appear in the game.
+****************************************************************************/
+bool nation_is_in_current_set(const struct nation_type *pnation)
+{
+  return nation_is_in_set(pnation, current_nationset());
+}
+
+/****************************************************************************
+  Update the server's cached number of playable nations.
+  Call when the nationset changes.
+****************************************************************************/
+void count_playable_nations(void)
+{
+  server.playable_nations = 0;
+  allowed_nations_iterate(pnation) {
+    if (is_nation_playable(pnation)) {
+      server.playable_nations++;
+    }
+  } allowed_nations_iterate_end;
+}
+
+/****************************************************************************
+  Return whether a nation is "pickable" -- whether players can select it
+  at game start.
+  (is_nation_pickable() is the equivalent function on the client.)
+****************************************************************************/
+bool client_can_pick_nation(const struct nation_type *pnation)
+{
+  fc_assert_ret_val(pnation != NULL, FALSE);
+  return nation_is_in_current_set(pnation)
+         && is_nation_playable(pnation)
+         && (!game.scenario.startpos_nations
+             || !pnation->server.no_startpos);
+}
+
+/****************************************************************************
+  Helper doing the actual work for send_nation_availability() (q.v.).
+****************************************************************************/
+static void send_nation_availability_real(struct conn_list *dest,
+                                          bool nationset_change)
+{
+  struct packet_nation_availability packet;
+
+  packet.ncount = nation_count();
+  packet.nationset_change = nationset_change;
+  nations_iterate(pnation) {
+    packet.is_pickable[nation_index(pnation)] = client_can_pick_nation(pnation);
+  } nations_iterate_end;
+  lsend_packet_nation_availability(dest, &packet);
+}
+
+/****************************************************************************
+  Tell clients which nations can be picked given current server settings.
+****************************************************************************/
+void send_nation_availability(struct conn_list *dest,
+                              bool nationset_change)
+{
+  if (0 < player_info_frozen_level) {
+    return; /* Discard, see comment for player_info_freeze(). */
+  } else {
+    send_nation_availability_real(dest, nationset_change);
+  }
+}
+
+/****************************************************************************
+  Try to select a nation set that fits the current players' nations, or
+  failing that, unset the nations of some of the players.
+  To be called when loading an old savegame that predates nationsets.
+****************************************************************************/
+void fit_nationset_to_players(void)
+{
+  int misfits[nation_set_count()];
+  nation_sets_iterate(pset) {
+    misfits[nation_set_index(pset)] = 0;
+    players_iterate(pplayer) {
+      if (pplayer->nation != NO_NATION_SELECTED
+          && !nation_is_in_set(pplayer->nation, pset)) {
+        misfits[nation_set_index(pset)]++;
+      }
+    } players_iterate_end;
+  } nation_sets_iterate_end;
+
+  if (misfits[nation_set_index(current_nationset())] == 0) {
+    /* Current set is OK. */
+    return;
+  }
+
+  /* Otherwise, pick the least worst set (requires unsetting fewest
+   * players, possibly none). */
+  {
+    /* Quell compiler warning; but least_misfits initializer won't be used */
+    int i, least_misfits = -1;
+    const struct nation_set *best = NULL;
+    fc_assert(nation_set_count() > 0);
+    for (i = 0; i < nation_set_count(); i++) {
+      if (best == NULL || misfits[i] < least_misfits) {
+        best = nation_set_by_number(i);
+        least_misfits = misfits[i];
+        if (least_misfits == 0) {
+          /* Not going to do any better. */
+          break;
+        }
+      }
+    }
+    fc_assert(least_misfits >= 0);
+
+    log_verbose("Current nationset \"%s\" doesn't fit all existing players.",
+                nation_set_rule_name(current_nationset()));
+    log_verbose("Selected nationset \"%s\".", nation_set_rule_name(best));
+    fc_strlcpy(game.server.nationset, nation_set_rule_name(best),
+               sizeof(game.server.nationset));
+    count_playable_nations();
+    /* No need to refresh clients, as we're assumed to be in the middle of
+     * loading a savegame and will send new setting/availability later
+     * along with everything else */
+  }
+
+  /* The set we chose may not fit all the players; as a last resort,
+   * unset nations (caller must then arrange new assignments). */
+  players_iterate(pplayer) {
+    if (pplayer->nation != NO_NATION_SELECTED
+        && !nation_is_in_current_set(pplayer->nation)) {
+      log_verbose("Nation %s of player %s not in nationset \"%s\", unsetting.",
+                  nation_plural_for_player(pplayer), player_name(pplayer),
+                  nation_set_rule_name(current_nationset()));
+      player_set_nation(pplayer, NO_NATION_SELECTED);
+    }
+  } players_iterate_end;
 }
 
 /****************************************************************************
@@ -1734,37 +2306,39 @@ void reset_all_start_commands(void)
 This function creates a new player and copies all of it's science
 research etc.  Players are both thrown into anarchy and gold is
 split between both players.
-                               - Kris Bubendorfer
+                               - Kris Bubendorfer 
 ***********************************************************************/
 static struct player *split_player(struct player *pplayer)
 {
   struct player_research *new_research, *old_research;
   struct player *cplayer;
+  struct nation_type *rebel_nation;
 
   /* make a new player, or not */
-  cplayer = server_create_player(-1);
+  cplayer = server_create_player(-1, default_ai_type_name(), NULL);
   if (!cplayer) {
     return NULL;
   }
-
   server_player_init(cplayer, TRUE, TRUE);
 
   /* Rebel will always be an AI player */
-  player_set_nation(cplayer, pick_a_nation
-      (nation_of_player(pplayer)->server.civilwar_nations,
-       TRUE, FALSE, NOT_A_BARBARIAN));
-  server_player_set_name(cplayer,
-                         pick_random_player_name(nation_of_player(cplayer)));
+  rebel_nation = pick_a_nation(nation_of_player(pplayer)->server.civilwar_nations,
+                               TRUE, FALSE, NOT_A_BARBARIAN);
+  player_nation_defaults(cplayer, rebel_nation, TRUE);
+
+  fc_assert(game_was_started());
+  /* Find a color for the new player. */
+  assign_player_colors();
 
   /* Send information about the used player slot to all connections. */
   send_player_info_c(cplayer, NULL);
 
   sz_strlcpy(cplayer->username, ANON_USER_NAME);
   cplayer->is_connected = FALSE;
-  cplayer->government = nation_of_player(cplayer)->server.init_government;
+  cplayer->government = nation_of_player(cplayer)->init_government;
   fc_assert(cplayer->revolution_finishes < 0);
   /* No capital for the splitted player. */
-  cplayer->server.capital = FALSE;
+  cplayer->server.got_first_city = FALSE;
 
   players_iterate(other_player) {
     struct player_diplstate *ds_co
@@ -1772,7 +2346,7 @@ static struct player *split_player(struct player *pplayer)
     struct player_diplstate *ds_oc
       = player_diplstate_get(other_player, cplayer);
 
-    if (get_player_bonus(other_player, EFT_NO_DIPLOMACY)) {
+    if (get_player_bonus(other_player, EFT_NO_DIPLOMACY) > 0) {
       ds_co->type = DS_WAR;
       ds_oc->type = DS_WAR;
     } else {
@@ -1820,7 +2394,6 @@ static struct player *split_player(struct player *pplayer)
 
   cplayer->ai_controlled = TRUE;
   cplayer->ai_common.maxbuycost = pplayer->ai_common.maxbuycost;
-  cplayer->ai_common.handicaps = pplayer->ai_common.handicaps;
   cplayer->ai_common.warmth = pplayer->ai_common.warmth;
   cplayer->ai_common.frost = pplayer->ai_common.frost;
   set_ai_level_direct(cplayer, game.info.skill_level);
@@ -1828,7 +2401,7 @@ static struct player *split_player(struct player *pplayer)
   advance_index_iterate(A_NONE, i) {
     cplayer->ai_common.tech_want[i] = pplayer->ai_common.tech_want[i];
   } advance_index_iterate_end;
-
+  
   /* change the original player */
   if (government_of_player(pplayer) != game.government_during_revolution) {
     pplayer->target_government = pplayer->government;
@@ -1856,19 +2429,50 @@ static struct player *split_player(struct player *pplayer)
 
   /* Not sure if this is necessary, but might be a good idea
    * to avoid doing some ai calculations with bogus data. */
-  ai_data_phase_init(cplayer, TRUE);
-  assess_danger_player(cplayer);
+  adv_data_phase_init(cplayer, TRUE);
+  CALL_PLR_AI_FUNC(phase_begin, cplayer, cplayer, TRUE);
+  CALL_PLR_AI_FUNC(gained_control, cplayer, cplayer);
   if (pplayer->ai_controlled) {
-    assess_danger_player(pplayer);
+    CALL_PLR_AI_FUNC(split_by_civil_war, pplayer, pplayer);
   }
 
   return cplayer;
 }
 
-/**********************************************************************
+/**************************************************************************
+  Check if civil war is possible for a player.
+  If conquering_city is TRUE, one of the cities currently in the empire
+  will shortly not be and shouldn't be considered.
+  honour_server_option controls whether we honour the 'civilwarsize'
+  server option. (If we don't, we still enforce a minimum empire size, to
+  avoid the risk of creating a new player with no cities.)
+**************************************************************************/
+bool civil_war_possible(struct player *pplayer, bool conquering_city,
+                        bool honour_server_option)
+{
+  int n;
+
+  if (!game.info.civil_war_enabled) {
+    return FALSE;
+  }
+
+  n = city_list_size(pplayer->cities);
+
+  if (n - (conquering_city?1:0) < GAME_MIN_CIVILWARSIZE) {
+    return FALSE;
+  }
+  if (honour_server_option) {
+    return game.server.civilwarsize < GAME_MAX_CIVILWARSIZE
+           && n >= game.server.civilwarsize;
+  } else {
+    return TRUE;
+  }
+}
+
+/********************************************************************** 
 civil_war_triggered:
  * The capture of a capital is not a sure fire way to throw
-and empire into civil war.  Some governments are more susceptible
+and empire into civil war.  Some governments are more susceptible 
 than others, here are the base probabilities:
 Anarchy   	90%
 Despotism 	80%
@@ -1878,8 +2482,8 @@ Communism 	50%
 Republic  	40%
 Democracy 	30%
  * In addition each city in disorder adds 5%, each celebrating city
-subtracts 5% from the probability of a civil war.
- * If you have at least 1 turns notice of the impending loss of
+subtracts 5% from the probability of a civil war.  
+ * If you have at least 1 turns notice of the impending loss of 
 your capital, you can hike luxuries up to the hightest value,
 and by this reduce the chance of a civil war.  In fact by
 hiking the luxuries to 100% under Democracy, it is easy to
@@ -1888,25 +2492,23 @@ civil war.  Likewise, 3 cities in disorder under despotism
 guarantees a civil war.
  * This routine calculates these probabilities and returns true
 if a civil war is triggered.
-                                   - Kris Bubendorfer
+                                   - Kris Bubendorfer 
 ***********************************************************************/
 bool civil_war_triggered(struct player *pplayer)
 {
   /* Get base probabilities */
-
   int dice = fc_rand(100); /* Throw the dice */
   int prob = get_player_bonus(pplayer, EFT_CIVIL_WAR_CHANCE);
 
   /* Now compute the contribution of the cities. */
-
-  city_list_iterate(pplayer->cities, pcity)
+  city_list_iterate(pplayer->cities, pcity) {
     if (city_unhappy(pcity)) {
       prob += 5;
     }
     if (city_celebrating(pcity)) {
       prob -= 5;
     }
-  city_list_iterate_end;
+  } city_list_iterate_end;
 
   log_verbose("Civil war chance for %s: prob %d, dice %d",
               player_name(pplayer), prob, dice);
@@ -1917,63 +2519,102 @@ bool civil_war_triggered(struct player *pplayer)
 /**********************************************************************
 Capturing a nation's capital is a devastating blow.  This function
 creates a new AI player, and randomly splits the original players
-city list into two.  Of course this results in a real mix up of
+city list into two.  Of course this results in a real mix up of 
 teritory - but since when have civil wars ever been tidy, or civil.
 
 Embassies:  All embassies with other players are lost.  Other players
             retain their embassies with pplayer.
  * Units:      Units inside cities are assigned to the new owner
-            of the city.  Units outside are transferred along
+            of the city.  Units outside are transferred along 
             with the ownership of their supporting city.
             If the units are in a unit stack with non rebel units,
             then whichever units are nearest an allied city
-            are teleported to that city.  If the stack is a
-            transport at sea, then all rebel units on the
+            are teleported to that city.  If the stack is a 
+            transport at sea, then all rebel units on the 
             transport are teleported to their nearest allied city.
 
 Cities:     Are split randomly into 2.  This results in a real
-            mix up of teritory - but since when have civil wars
+            mix up of teritory - but since when have civil wars 
             ever been tidy, or for any matter civil?
  *
 One caveat, since the spliting of cities is random, you can
 conceive that this could result in either the original player
 or the rebel getting 0 cities.  To prevent this, the hack below
-ensures that each side gets roughly half, which ones is still
+ensures that each side gets roughly half, which ones is still 
 determined randomly.
                                    - Kris Bubendorfer
 ***********************************************************************/
-void civil_war(struct player *pplayer)
+struct player *civil_war(struct player *pplayer)
 {
   int i, j;
   struct player *cplayer;
+  struct city *capital;
+  struct city_list *defector_candidates;
 
   /* It is possible that this function gets called after pplayer
    * died. Player pointers are safe even after death. */
   if (!pplayer->is_alive) {
-    return;
+    return NULL;
   }
 
-  if (player_count() >= MAX_NUM_PLAYERS) {
+  if (normal_player_count() >= MAX_NUM_PLAYERS) {
     /* No space to make additional player */
     log_normal(_("Could not throw %s into civil war - too many players"),
                nation_plural_for_player(pplayer));
-    return;
+    return NULL;
   }
   if (normal_player_count() >= server.playable_nations) {
     /* No nation for additional player */
     log_normal(_("Could not throw %s into civil war - no available nations"),
                nation_plural_for_player(pplayer));
-    return;
+    return NULL;
   }
 
-  if (player_count() == game.server.max_players) {
+  /* It doesn't make sense to try to split an empire of 1 city.
+   * This should have been enforced by civil_war_possible(). */
+  fc_assert_ret_val(city_list_size(pplayer->cities) > 1, NULL);
+
+  defector_candidates = city_list_new();
+  city_list_iterate(pplayer->cities, pcity) {
+    bool gameloss_present = FALSE;
+
+    /* Capital (probably new capital) won't defect */
+    if (is_capital(pcity)) {
+      continue;
+    }
+
+    /* City hosting victim's GameLoss unit won't defect */
+    unit_list_iterate(city_tile(pcity)->units, punit) {
+      if (unit_owner(punit) == pplayer
+          && unit_has_type_flag(punit, UTYF_GAMELOSS)) {
+        gameloss_present = TRUE;
+        break;
+      }
+    } unit_list_iterate_end;
+    if (gameloss_present) {
+      continue;
+    }
+
+    city_list_append(defector_candidates, pcity);
+  } city_list_iterate_end;
+
+  if (city_list_size(defector_candidates) == 0) {
+    log_verbose(_("Could not throw %s into civil war - no available cities"),
+                nation_plural_for_player(pplayer));
+    city_list_destroy(defector_candidates);
+    return NULL;
+  }
+
+  /* We're definitely going to create a new rebel player. */
+
+  if (normal_player_count() == game.server.max_players) {
     /* 'maxplayers' must be increased to allow for a new player. */
 
     /* This assert should never be called due to the first check above. */
-    fc_assert_ret(game.server.max_players < MAX_NUM_PLAYERS);
+    fc_assert_ret_val(game.server.max_players < MAX_NUM_PLAYERS, NULL);
 
     game.server.max_players++;
-    log_debug("Increase 'maxplayers' to allow the creation of a new player "
+    log_debug("Increased 'maxplayers' to allow the creation of a new player "
               "due to civil war.");
   }
 
@@ -1999,18 +2640,20 @@ void civil_war(struct player *pplayer)
                 player_name(cplayer),
                 nation_plural_for_player(cplayer));
 
-  i = city_list_size(pplayer->cities)/2;   /* number to flip */
-  j = city_list_size(pplayer->cities);	    /* number left to process */
-  city_list_iterate(pplayer->cities, pcity) {
-    if (!is_capital(pcity)) {
-      if (i >= j || (i > 0 && fc_rand(2) == 1)) {
-        /* Transfer city and units supported by this city to the new owner.
-         * We do NOT resolve stack conflicts here, but rather later.
-         * Reason: if we have a transporter from one city which is carrying
-         * a unit from another city, and both cities join the rebellion. We
-         * resolved stack conflicts for each city we would teleport the first
-         * of the units we met since the other would have another owner. */
-        transfer_city(cplayer, pcity, -1, FALSE, FALSE, FALSE);
+  j = city_list_size(defector_candidates);  /* number left to process */
+  /* Number to try to flip; ensure that at least one eligible city is
+   * flipped */
+  i = MAX(j/2, 1);
+  city_list_iterate(defector_candidates, pcity) {
+    fc_assert_action(!is_capital(pcity), continue);
+    if (i >= j || (i > 0 && fc_rand(2) == 1)) {
+      /* Transfer city and units supported by this city to the new owner.
+       * We do NOT resolve stack conflicts here, but rather later.
+       * Reason: if we have a transporter from one city which is carrying
+       * a unit from another city, and both cities join the rebellion. If we
+       * resolved stack conflicts for each city we would teleport the first
+       * of the units we met since the other would have another owner. */
+      if (transfer_city(cplayer, pcity, -1, FALSE, FALSE, FALSE, FALSE)) {
         log_verbose("%s declares allegiance to the %s.", city_name(pcity),
                     nation_rule_name(nation_of_player(cplayer)));
         notify_player(pplayer, pcity->tile, E_CITY_LOST, ftc_server,
@@ -2018,18 +2661,23 @@ void civil_war(struct player *pplayer)
                       _("%s declares allegiance to the %s."),
                       city_link(pcity),
                       nation_plural_for_player(cplayer));
-        i--;
       }
+      i--;
     }
     j--;
   } city_list_iterate_end;
 
+  city_list_destroy(defector_candidates);
+
   resolve_unit_stacks(pplayer, cplayer, FALSE);
 
   i = city_list_size(cplayer->cities);
+  fc_assert(i > 0); /* rebels should have got at least one city */
 
   /* Choose a capital (random). */
-  city_build_free_buildings(city_list_get(cplayer->cities, fc_rand(i)));
+  capital = city_list_get(cplayer->cities, fc_rand(i));
+  city_build_free_buildings(capital);
+  give_midgame_initial_units(cplayer, city_tile(capital));
 
   notify_player(NULL, NULL, E_CIVIL_WAR, ftc_server,
                 /* TRANS: ... Danes ... Poles ... <7> cities. */
@@ -2041,6 +2689,8 @@ void civil_war(struct player *pplayer)
                 nation_plural_for_player(pplayer),
                 nation_plural_for_player(cplayer),
                 i);
+
+  return cplayer;
 }
 
 /**************************************************************************
@@ -2120,4 +2770,195 @@ void player_status_reset(struct player *plr)
 {
   BV_CLR_ALL(plr->server.status);
   player_status_add(plr, PSTATUS_NORMAL);
+}
+
+/**************************************************************************
+  Returns the username that control of the player is delegated to, if any.
+**************************************************************************/
+const char *player_delegation_get(const struct player *pplayer)
+{
+  if (pplayer == NULL || strlen(pplayer->server.delegate_to) == 0) {
+    /* No delegation if there is no player. */
+    return NULL;
+  } else {
+    return pplayer->server.delegate_to;
+  }
+}
+
+/**************************************************************************
+  Define a delegation. NULL for no delegate.
+**************************************************************************/
+void player_delegation_set(struct player *pplayer, const char *username)
+{
+  fc_assert_ret(pplayer != NULL);
+
+  if (username == NULL || strlen(username) == 0) {
+    pplayer->server.delegate_to[0] = '\0';
+  } else {
+    sz_strlcpy(pplayer->server.delegate_to, username);
+  }
+}
+
+/*****************************************************************************
+  Returns TRUE if a delegation is active.
+  This means that either the player is controlled by a delegate, or the
+  player has been temporarily 'put aside' by a delegate.
+*****************************************************************************/
+bool player_delegation_active(const struct player *pplayer)
+{
+  return (pplayer && strlen(pplayer->server.orig_username) != 0);
+}
+
+/*****************************************************************************
+  Send information about delegations to reconnecting users.
+*****************************************************************************/
+void send_delegation_info(const struct connection *pconn)
+{
+  if (game.info.is_new_game) {
+    return;
+  }
+
+  if (!pconn->observer
+      && pconn->playing && player_delegation_get(pconn->playing) != NULL) {
+    notify_conn(pconn->self, NULL, E_CONNECTION, ftc_server,
+                /* TRANS: '/delegate cancel' is a server command and must not
+                 * be translated */
+                _("User '%s' is currently allowed to take control of your "
+                  "player while you are away. Use '/delegate cancel' to "
+                  "revoke this access."),
+                player_delegation_get(pconn->playing));
+  }
+
+  {
+    bool any_delegations = FALSE;
+    players_iterate(aplayer) {
+      if (player_delegation_get(aplayer) != NULL
+          && strcmp(player_delegation_get(aplayer), pconn->username) == 0) {
+        notify_conn(pconn->self, NULL, E_CONNECTION, ftc_server,
+                    _("Control of player '%s' is delegated to you."),
+                    player_name(aplayer));
+        any_delegations = TRUE;
+      }
+    } players_iterate_end;
+    if (any_delegations) {
+      notify_conn(pconn->self, NULL, E_CONNECTION, ftc_server,
+                  /* TRANS: '/delegate take' is a server command and must not
+                   * be translated; but <player> should be translated. */
+                  _("Use '/delegate take <player>' to take control of a "
+                    "delegated player."));
+    }
+  }
+}
+
+/*****************************************************************************
+  For a given user, if there is some player that the user originally
+  controlled but is currently delegated to another user, return that player.
+  See also player_by_user().
+*****************************************************************************/
+struct player *player_by_user_delegated(const char *name)
+{
+  players_iterate(pplayer) {
+    if (player_delegation_get(pplayer)
+        && fc_strcasecmp(name, pplayer->server.orig_username) == 0) {
+      return pplayer;
+    }
+  } players_iterate_end;
+
+  return NULL;
+}
+
+/****************************************************************************
+  Initialise the player colors.
+****************************************************************************/
+void playercolor_init(void)
+{
+  fc_assert_ret(game.server.plr_colors == NULL);
+  game.server.plr_colors = rgbcolor_list_new();
+}
+
+/****************************************************************************
+  Free the memory allocated for the player color.
+****************************************************************************/
+void playercolor_free(void)
+{
+  if (game.server.plr_colors == NULL) {
+    return;
+  }
+
+  if (rgbcolor_list_size(game.server.plr_colors) > 0) {
+    rgbcolor_list_iterate(game.server.plr_colors, prgbcolor) {
+      rgbcolor_list_remove(game.server.plr_colors, prgbcolor);
+      rgbcolor_destroy(prgbcolor);
+    } rgbcolor_list_iterate_end;
+  };
+  rgbcolor_list_destroy(game.server.plr_colors);
+  game.server.plr_colors = NULL;
+}
+
+/****************************************************************************
+  Add a color to the list of all available player colors.
+****************************************************************************/
+void playercolor_add(struct rgbcolor *prgbcolor)
+{
+  fc_assert_ret(game.server.plr_colors != NULL);
+
+  rgbcolor_list_append(game.server.plr_colors, prgbcolor);
+}
+
+/****************************************************************************
+  Get the player color with the index 'id'.
+****************************************************************************/
+struct rgbcolor *playercolor_get(int id)
+{
+  fc_assert_ret_val(game.server.plr_colors != NULL, NULL);
+
+  return rgbcolor_list_get(game.server.plr_colors, id);
+}
+
+/****************************************************************************
+  Number of player colors defined.
+****************************************************************************/
+int playercolor_count(void)
+{
+  fc_assert_ret_val(game.server.plr_colors != NULL, -1);
+
+  return rgbcolor_list_size(game.server.plr_colors);
+}
+
+/****************************************************************************
+  Toggle player to AI mode.
+****************************************************************************/
+void player_set_to_ai_mode(struct player *pplayer, enum ai_level skill_level)
+{
+  pplayer->ai_controlled = TRUE;
+
+  set_ai_level_directer(pplayer, skill_level);
+  cancel_all_meetings(pplayer);
+  CALL_PLR_AI_FUNC(gained_control, pplayer, pplayer);
+
+  if (S_S_RUNNING == server_state()) {
+    /* In case this was last player who has not pressed turn done. */
+    check_for_full_turn_done();
+  }
+
+  fc_assert(pplayer->ai_common.skill_level == skill_level);
+}
+
+/****************************************************************************
+  Toggle player under human control.
+****************************************************************************/
+void player_set_under_human_control(struct player *pplayer)
+{
+  pplayer->ai_controlled = FALSE;
+  if (pplayer->ai_common.skill_level == AI_LEVEL_AWAY) {
+    pplayer->ai_common.skill_level = 0;
+  }
+
+  CALL_PLR_AI_FUNC(lost_control, pplayer, pplayer);
+
+  /* Because the AI "cheats" with government rates but humans shouldn't. */
+  if (!game.info.is_new_game) {
+    check_player_max_rates(pplayer);
+  }
+  cancel_all_meetings(pplayer);
 }

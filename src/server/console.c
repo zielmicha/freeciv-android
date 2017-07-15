@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -24,6 +24,7 @@
 #endif
 
 /* utility */
+#include "fcbacktrace.h"
 #include "fciconv.h"
 #include "fcintl.h"
 #include "log.h"
@@ -60,7 +61,9 @@ static void con_handle_log(enum log_level level, const char *message,
     /* Make sure that message is not left to buffers when server dies */
     conn_list_iterate(game.est_connections, pconn) {
       pconn->send_buffer->do_buffer_sends = 0;
+#ifdef USE_COMPRESSION
       pconn->compression.frozen_level = 0;
+#endif
     } conn_list_iterate_end;
 
     notify_conn(NULL, NULL, E_LOG_FATAL, ftc_warning, "%s", message);
@@ -93,10 +96,10 @@ static void con_update_prompt(void)
   } else {
     rl_forced_update_display();
   }
-#else
+#else  /* HAVE_LIBREADLINE */
   con_dump(C_READY,"> ");
   con_flush();
-#endif
+#endif /* HAVE_LIBREADLINE */
 
   console_prompt_is_showing = TRUE;
 }
@@ -109,6 +112,8 @@ static void con_update_prompt(void)
 static const char *log_prefix(void)
 {
   static char buf[128];
+
+#ifdef LOG_TIMERS
   char timestr[32];
   time_t timestamp;
 
@@ -117,6 +122,10 @@ static const char *log_prefix(void)
            localtime(&timestamp));
 
   fc_snprintf(buf, sizeof(buf), "T%03d - %s", game.info.turn, timestr);
+
+#else  /* LOG_TIMERS */
+  fc_snprintf(buf, sizeof(buf), "T%03d", game.info.turn);
+#endif /* LOG_TIMERS */
 
   return buf;
 }
@@ -135,6 +144,17 @@ void con_log_init(const char *log_filename, enum log_level level,
   log_init(log_filename, level, con_handle_log, NULL,
            fatal_assertions);
 #endif /* DEBUG */
+  backtrace_init();
+}
+
+/************************************************************************
+  Deinitialize logging
+************************************************************************/
+void con_log_close(void)
+{
+  backtrace_deinit();
+
+  log_close();
 }
 
 #ifndef HAVE_LIBREADLINE
@@ -161,7 +181,7 @@ static int con_dump(enum rfc_status rfc_status, const char *message, ...)
   console_prompt_is_showing = FALSE;
   return (int) strlen(buf);
 }
-#endif
+#endif /* HAVE_LIBREADLINE */
 
 /************************************************************************
 Write to console and add line-break, and show prompt if required.
@@ -178,7 +198,7 @@ void con_write(enum rfc_status rfc_status, const char *message, ...)
   va_end(args);
 
   /* remove all format tags */
-  featured_text_to_plain_text(buf1, buf2, sizeof(buf2), NULL);
+  featured_text_to_plain_text(buf1, buf2, sizeof(buf2), NULL, FALSE);
   con_puts(rfc_status, buf2);
 }
 

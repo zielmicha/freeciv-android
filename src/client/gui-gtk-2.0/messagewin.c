@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -308,13 +308,13 @@ static void meswin_dialog_init(struct meswin_dialog *pdialog)
 
   fc_assert_ret(NULL != pdialog);
 
-  if (gui_gtk2_message_chat_location == GUI_GTK2_MSGCHAT_SPLIT) {
+  if (gui_gtk2_message_chat_location == GUI_GTK_MSGCHAT_SPLIT) {
     notebook = right_notebook;
   } else {
     notebook = bottom_notebook;
   }
 
-  gui_dialog_new(&pdialog->shell, GTK_NOTEBOOK(notebook), pdialog);
+  gui_dialog_new(&pdialog->shell, GTK_NOTEBOOK(notebook), pdialog, TRUE);
   gui_dialog_set_title(pdialog->shell, _("Messages"));
   vbox = GTK_BOX(pdialog->shell->vbox);
 

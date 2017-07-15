@@ -20,13 +20,13 @@
  **********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
 #include <stdlib.h>
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
@@ -53,6 +53,7 @@
 #include "gui_id.h"
 #include "gui_main.h"
 #include "gui_tilespec.h"
+#include "helpdlg.h"
 #include "mapctrl.h"
 #include "mapview.h"
 #include "menu.h"
@@ -238,16 +239,16 @@ static int back_callback(struct widget *pWidget)
   }
 
   if (ODM_MAIN == option_dialog->mode) {
-    popdown_optiondlg();
-
     if (client.conn.established) {
       /* Back to game. */
+      popdown_optiondlg(FALSE);
       enable_options_button();
       widget_redraw(pOptions_Button);
       widget_mark_dirty(pOptions_Button);
       flush_dirty();
     } else {
       /* Back to main page. */
+      popdown_optiondlg(TRUE);
       set_client_page(PAGE_MAIN);
     }
     return -1;
@@ -343,7 +344,7 @@ static int work_lists_callback(struct widget *widget)
 static int save_client_options_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
-    options_save();
+    options_save(NULL);
   }
   return -1;
 }
@@ -361,12 +362,24 @@ static int save_game_callback(struct widget *pWidget)
 }
 
 /****************************************************************************
+  Open Help Browser callback
+****************************************************************************/
+static int help_browser_callback(struct widget *pwidget)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    popup_help_browser();
+  }
+
+  return -1;
+}
+
+/****************************************************************************
   Client disconnect from server callback.
 ****************************************************************************/
 static int disconnect_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
-    popdown_optiondlg();
+    popdown_optiondlg(TRUE);
     enable_options_button();
     disconnect_from_server();
   }
@@ -379,7 +392,7 @@ static int disconnect_callback(struct widget *pWidget)
 static int exit_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
-    popdown_optiondlg();
+    popdown_optiondlg(TRUE);
     force_exit_from_event_loop();
   }
   return 0;
@@ -837,6 +850,17 @@ static struct option_dialog *option_dialog_new(void)
   widget_resize(widget, widget->size.w, widget->size.h + adj_size(4));
   add_to_gui_list(ID_OPTIONS_SAVE_GAME_BUTTON, widget);
 
+  /* Create help browser button widget. */
+  widget = create_icon_button_from_chars(NULL, window->dst,
+                                         _("Help Browser"), adj_font(12), 0);
+  widget->action = help_browser_callback;
+  widget->key = SDLK_h;
+  if (client.conn.established) {
+    set_wstate(widget, FC_WS_NORMAL);
+  }
+  widget_resize(widget, widget->size.w, widget->size.h + adj_size(4));
+  add_to_gui_list(ID_OPTIONS_HELP_BROWSER_BUTTON, widget);
+
   /* Create leave game button widget. */
   widget = create_icon_button_from_chars(NULL, window->dst,
                                          _("Leave Game"), adj_font(12), 0);
@@ -970,7 +994,7 @@ static void option_dialog_optset_category(struct option_dialog *pdialog,
   struct widget *window, *widget = NULL, *apply_button;
   const int MAX_SHOWN = 10;
   SDL_Rect area;
-  int scrollbar_width, i;
+  int i;
 
   fc_assert_ret(NULL != pdialog);
   fc_assert_ret(ODM_OPTSET == pdialog->mode);
@@ -1013,15 +1037,13 @@ static void option_dialog_optset_category(struct option_dialog *pdialog,
   pdialog->advanced->pBeginWidgetList = widget;
   pdialog->advanced->pBeginActiveWidgetList = widget;
 
-  scrollbar_width = create_vertical_scrollbar(pdialog->advanced,
-                                              2, MAX_SHOWN, TRUE, TRUE);
+  create_vertical_scrollbar(pdialog->advanced, 2, MAX_SHOWN, TRUE, TRUE);
 
   if (i >= MAX_SHOWN) {
     pdialog->advanced->pActiveWidgetList =
         pdialog->advanced->pEndActiveWidgetList;
   } else {
     hide_scrollbar(pdialog->advanced->pScroll);
-    scrollbar_width = 0;
   }
 
   pdialog->begin_widget_list = pdialog->advanced->pBeginWidgetList;
@@ -1255,7 +1277,7 @@ static void option_dialog_worklist(struct option_dialog *pdialog)
                map_rgba(background->theme->format, bg_color));
   putframe(background->theme,
 		   0, 0, background->theme->w - 1, background->theme->h - 1,
-		   get_game_colorRGB(COLOR_THEME_OPTIONDLG_WORKLISTLIST_FRAME));
+		   get_theme_color(COLOR_THEME_OPTIONDLG_WORKLISTLIST_FRAME));
 
   /* Create the Scrollbar. */
   scrollbar_width = create_vertical_scrollbar(pdialog->advanced,
@@ -1291,10 +1313,7 @@ static void option_dialog_worklist(struct option_dialog *pdialog)
 int optiondlg_callback(struct widget *pButton)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
-    SDL_Rect dest;
-    
     set_wstate(pButton, FC_WS_DISABLED);
-    dest = pButton->size;
     clear_surface(pButton->dst->surface, &pButton->size);
     widget_redraw(pButton);
     widget_flush(pButton);
@@ -1384,9 +1403,9 @@ void popup_optiondlg(void)
 }
 
 /**************************************************************************
-  ...
+  Close option dialog.
 **************************************************************************/
-void popdown_optiondlg(void)
+void popdown_optiondlg(bool leave_game)
 {
   if (NULL == option_dialog) {
     return;
@@ -1394,7 +1413,10 @@ void popdown_optiondlg(void)
 
   option_dialog_destroy(option_dialog);
   option_dialog = NULL;
-  enable_main_widgets();
+
+  if (!leave_game) {
+    enable_main_widgets();
+  }
 
   if (restore_meswin_dialog) {
     meswin_dialog_popup(TRUE);
@@ -1443,6 +1465,10 @@ void option_gui_update(struct option *poption)
       && option_optset(poption) == option_dialog->optset.poptset
       && option_category(poption) == option_dialog->optset.category) {
     option_widget_update(poption);
+  }
+
+  if (!strcmp(option_name(poption), "nationset")) {
+    nationset_changed();
   }
 }
 

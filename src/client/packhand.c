@@ -1,4 +1,4 @@
-/**********************************************************************
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -28,23 +28,28 @@
 
 /* common */
 #include "capstr.h"
+#include "citizens.h"
 #include "events.h"
 #include "game.h"
 #include "government.h"
 #include "idex.h"
 #include "map.h"
+#include "movement.h"
 #include "name_translation.h"
 #include "nation.h"
 #include "packets.h"
 #include "player.h"
 #include "research.h"
+#include "rgbcolor.h"
+#include "road.h"
 #include "spaceship.h"
 #include "specialist.h"
+#include "traderoutes.h"
 #include "unit.h"
 #include "unitlist.h"
 #include "worklist.h"
 
-/* include */
+/* client/include */
 #include "chatline_g.h"
 #include "citydlg_g.h"
 #include "cityrep_g.h"
@@ -86,6 +91,10 @@
 
 #include "packhand.h"
 
+/* Define this macro to get additional debug output about the transport
+ * status of the units. */
+#undef DEBUG_TRANSPORT
+
 static void city_packet_common(struct city *pcity, struct tile *pcenter,
                                struct player *powner,
                                struct tile_list *worked_tiles,
@@ -102,8 +111,17 @@ static struct {
   .placeholder = NULL
 };
 
+static struct {
+  int len;
+  enum event_type event;
+  char *caption;
+  char *headline;
+  char *lines;
+  int parts;
+} page_msg_report = { .parts = 0 };
+
 /****************************************************************************
-  Called below, and by client/civclient.c client_game_free()
+  Called below, and by client/client_main.c client_game_free()
 ****************************************************************************/
 void packhand_free(void)
 {
@@ -145,44 +163,73 @@ static void packhand_init(void)
   Unpackage the unit information into a newly allocated unit structure.
 
   Information for the client must also be processed in
-  handle_unit_packet_common()!
+  handle_unit_packet_common()! Especially notice that unit structure filled
+  here is just temporary one. Values must be copied to real unit in
+  handle_unit_packet_common().
 ****************************************************************************/
 static struct unit *unpackage_unit(const struct packet_unit_info *packet)
 {
-  struct unit *punit = create_unit_virtual(player_by_number(packet->owner),
+  struct unit *punit = unit_virtual_create(player_by_number(packet->owner),
 					   NULL,
 					   utype_by_number(packet->type),
 					   packet->veteran);
 
   /* Owner, veteran, and type fields are already filled in by
-   * create_unit_virtual. */
+   * unit_virtual_create. */
+  punit->nationality = player_by_number(packet->nationality);
   punit->id = packet->id;
-  punit->tile = index_to_tile(packet->tile);
+  unit_tile_set(punit, index_to_tile(packet->tile));
+  punit->facing = packet->facing;
   punit->homecity = packet->homecity;
   output_type_iterate(o) {
     punit->upkeep[o] = packet->upkeep[o];
   } output_type_iterate_end;
-  punit->moves_left = packet->movesleft;
+  if (has_capability("extended_move_rate", client.conn.capability)) {
+    punit->moves_left = packet->movesleft_new;
+  } else {
+    punit->moves_left = packet->movesleft_old;
+  }
   punit->hp = packet->hp;
   punit->activity = packet->activity;
   punit->activity_count = packet->activity_count;
-  punit->activity_target = packet->activity_target;
-  punit->activity_base = packet->activity_base;
+
+  punit->activity_target.type = ATT_SPECIAL;
+  punit->activity_target.obj.spe = packet->activity_tgt_spe;
+  if (packet->activity_tgt_base != BASE_NONE) {
+    punit->activity_target.type = ATT_BASE;
+    punit->activity_target.obj.base = packet->activity_tgt_base;
+  } else if (packet->activity_tgt_road != ROAD_NONE) {
+    punit->activity_target.type = ATT_ROAD;
+    punit->activity_target.obj.road = packet->activity_tgt_road;
+  }
+
   punit->changed_from = packet->changed_from;
   punit->changed_from_count = packet->changed_from_count;
-  punit->changed_from_target = packet->changed_from_target;
-  punit->changed_from_base = packet->changed_from_base;
+
+  punit->changed_from_target.type = ATT_SPECIAL;
+  punit->changed_from_target.obj.spe = packet->changed_from_tgt_spe;
+  if (packet->changed_from_tgt_base != BASE_NONE) {
+    punit->changed_from_target.type = ATT_BASE;
+    punit->changed_from_target.obj.base = packet->changed_from_tgt_base;
+  } else if (packet->changed_from_tgt_road != ROAD_NONE) {
+    punit->changed_from_target.type = ATT_ROAD;
+    punit->changed_from_target.obj.road = packet->changed_from_tgt_road;
+  }
+
   punit->ai_controlled = packet->ai;
   punit->fuel = packet->fuel;
   punit->goto_tile = index_to_tile(packet->goto_tile);
   punit->paradropped = packet->paradropped;
   punit->done_moving = packet->done_moving;
-  punit->occupy = packet->occupy;
+
+  /* Transporter / transporting information. */
+  punit->client.occupied = packet->occupied;
   if (packet->transported) {
-    punit->transported_by = packet->transported_by;
+    punit->client.transported_by = packet->transported_by;
   } else {
-    punit->transported_by = -1;
+    punit->client.transported_by = -1;
   }
+
   punit->battlegroup = packet->battlegroup;
   punit->has_orders = packet->has_orders;
   punit->orders.length = packet->orders_length;
@@ -199,6 +246,7 @@ static struct unit *unpackage_unit(const struct packet_unit_info *packet)
       punit->orders.list[i].dir = packet->orders_dirs[i];
       punit->orders.list[i].activity = packet->orders_activities[i];
       punit->orders.list[i].base = packet->orders_bases[i];
+      punit->orders.list[i].road = packet->orders_roads[i];
     }
   }
 
@@ -213,28 +261,43 @@ static struct unit *unpackage_unit(const struct packet_unit_info *packet)
   everything about (like our enemies' units).
 
   Information for the client must also be processed in
-  handle_unit_packet_common()!
+  handle_unit_packet_common()! Especially notice that unit structure filled
+  here is just temporary one. Values must be copied to real unit in
+  handle_unit_packet_common().
 ****************************************************************************/
 static struct unit *
 unpackage_short_unit(const struct packet_unit_short_info *packet)
 {
-  struct unit *punit = create_unit_virtual(player_by_number(packet->owner),
+  struct unit *punit = unit_virtual_create(player_by_number(packet->owner),
 					   NULL,
 					   utype_by_number(packet->type),
 					   FALSE);
 
-  /* Owner and type fields are already filled in by create_unit_virtual. */
+  /* Owner and type fields are already filled in by unit_virtual_create. */
   punit->id = packet->id;
-  punit->tile = index_to_tile(packet->tile);
+  unit_tile_set(punit, index_to_tile(packet->tile));
+  punit->facing = packet->facing;
+  punit->nationality = NULL;
   punit->veteran = packet->veteran;
   punit->hp = packet->hp;
   punit->activity = packet->activity;
-  punit->activity_base = packet->activity_base;
-  punit->occupy = (packet->occupied ? 1 : 0);
+
+  punit->activity_target.type = ATT_SPECIAL;
+  punit->activity_target.obj.spe = S_LAST;
+  if (packet->activity_tgt_base != BASE_NONE) {
+    punit->activity_target.type = ATT_BASE;
+    punit->activity_target.obj.base = packet->activity_tgt_base;
+  } else if (packet->activity_tgt_road != ROAD_NONE) {
+    punit->activity_target.type = ATT_ROAD;
+    punit->activity_target.obj.road = packet->activity_tgt_road;
+  }
+
+  /* Transporter / transporting information. */
+  punit->client.occupied = packet->occupied;
   if (packet->transported) {
-    punit->transported_by = packet->transported_by;
+    punit->client.transported_by = packet->transported_by;
   } else {
-    punit->transported_by = -1;
+    punit->client.transported_by = -1;
   }
 
   return punit;
@@ -270,9 +333,11 @@ void handle_server_join_reply(bool you_can_join, const char *message,
     }
 
     client_info.gui = get_gui_type();
+    strncpy(client_info.distribution, FREECIV_DISTRIBUTOR,
+            sizeof(client_info.distribution));
     send_packet_client_info(&client.conn, &client_info);
 
-    /* we could always use hack, verify we're local */
+    /* we could always use hack, verify we're local */ 
     send_client_wants_hack(challenge_file);
 
     set_client_state(C_S_PREPARING);
@@ -329,10 +394,14 @@ void handle_city_remove(int city_id)
 void handle_unit_remove(int unit_id)
 {
   struct unit *punit = game_unit_by_number(unit_id);
+  struct unit_list *cargos;
   struct player *powner;
   bool need_economy_report_update;
 
   if (!punit) {
+    log_error("Server wants us to remove unit id %d, "
+              "but we don't know about this unit!",
+              unit_id);
     return;
   }
 
@@ -345,6 +414,20 @@ void handle_unit_remove(int unit_id)
 
   need_economy_report_update = (0 < punit->upkeep[O_GOLD]);
   powner = unit_owner(punit);
+
+  /* Unload cargo if this is a transporter. */
+  cargos = unit_transport_cargo(punit);
+  if (unit_list_size(cargos) > 0) {
+    unit_list_iterate(cargos, pcargo) {
+      unit_transport_unload(pcargo);
+    } unit_list_iterate_end;
+  }
+
+  /* Unload unit if it is transported. */
+  if (unit_transport_get(punit)) {
+    unit_transport_unload(punit);
+  }
+  punit->client.transported_by = -1;
 
   agents_unit_remove(punit);
   editgui_notify_object_changed(OBJTYPE_UNIT, punit->id, TRUE);
@@ -393,14 +476,14 @@ void handle_unit_combat_info(int attacker_unit_id, int defender_unit_id,
   struct unit *punit1 = game_unit_by_number(defender_unit_id);
 
   if (punit0 && punit1) {
-    if (tile_visible_mapcanvas(punit0->tile) &&
-	tile_visible_mapcanvas(punit1->tile)) {
+    if (tile_visible_mapcanvas(unit_tile(punit0)) &&
+	tile_visible_mapcanvas(unit_tile(punit1))) {
       show_combat = TRUE;
     } else if (auto_center_on_combat) {
       if (unit_owner(punit0) == client.conn.playing)
-	center_tile_mapcanvas(punit0->tile);
+	center_tile_mapcanvas(unit_tile(punit0));
       else
-	center_tile_mapcanvas(punit1->tile);
+	center_tile_mapcanvas(unit_tile(punit1));
       show_combat = TRUE;
     }
 
@@ -412,22 +495,22 @@ void handle_unit_combat_info(int attacker_unit_id, int defender_unit_id,
       audio_play_sound(unit_type(punit1)->sound_fight,
 		       unit_type(punit1)->sound_fight_alt);
 
-      if (do_combat_animation) {
+      if (smooth_combat_step_msec > 0) {
 	decrease_unit_hp_smooth(punit0, hp0, punit1, hp1);
       } else {
 	punit0->hp = hp0;
 	punit1->hp = hp1;
 
 	set_units_in_combat(NULL, NULL);
-	refresh_unit_mapcanvas(punit0, punit0->tile, TRUE, FALSE);
-	refresh_unit_mapcanvas(punit1, punit1->tile, TRUE, FALSE);
+	refresh_unit_mapcanvas(punit0, unit_tile(punit0), TRUE, FALSE);
+	refresh_unit_mapcanvas(punit1, unit_tile(punit1), TRUE, FALSE);
       }
     }
     if (make_winner_veteran) {
       struct unit *pwinner = (defender_hp == 0 ? punit0 : punit1);
 
       pwinner->veteran++;
-      refresh_unit_mapcanvas(pwinner, pwinner->tile, TRUE, FALSE);
+      refresh_unit_mapcanvas(pwinner, unit_tile(pwinner), TRUE, FALSE);
     }
   }
 }
@@ -569,11 +652,11 @@ void handle_city_info(const struct packet_city_info *packet)
               || pcity->surplus[O_FOOD] != packet->surplus[O_FOOD]))
       || (draw_city_trade_routes && trade_routes_changed);
   }
-
+  
   sz_strlcpy(pcity->name, packet->name);
-
+  
   /* check data */
-  pcity->size = 0;
+  city_size_set(pcity, 0);
   for (i = 0; i < FEELING_LAST; i++) {
     pcity->feel[CITIZEN_HAPPY][i] = packet->ppl_happy[i];
     pcity->feel[CITIZEN_CONTENT][i] = packet->ppl_content[i];
@@ -581,25 +664,35 @@ void handle_city_info(const struct packet_city_info *packet)
     pcity->feel[CITIZEN_ANGRY][i] = packet->ppl_angry[i];
   }
   for (i = 0; i < CITIZEN_LAST; i++) {
-    pcity->size += pcity->feel[i][FEELING_FINAL];
+    city_size_add(pcity, pcity->feel[i][FEELING_FINAL]);
   }
   specialist_type_iterate(sp) {
-    pcity->size +=
     pcity->specialists[sp] = packet->specialists[sp];
+    city_size_add(pcity, pcity->specialists[sp]);
   } specialist_type_iterate_end;
 
-  if (pcity->size != packet->size) {
+  if (city_size_get(pcity) != packet->size) {
     log_error("handle_city_info() "
               "%d citizens not equal %d city size in \"%s\".",
-              pcity->size, packet->size, city_name(pcity));
-    pcity->size = packet->size;
+              city_size_get(pcity), packet->size, city_name(pcity));
+    city_size_set(pcity, packet->size);
+  }
+
+  /* The nationality of the citizens. */
+  if (game.info.citizen_nationality) {
+    citizens_init(pcity);
+    for (i = 0; i < packet->nationalities_count; i++) {
+      citizens_nation_set(pcity, player_slot_by_number(packet->nation_id[i]),
+                          packet->nation_citizens[i]);
+    }
+    fc_assert(citizens_count(pcity) == city_size_get(pcity));
   }
 
   pcity->city_radius_sq = packet->city_radius_sq;
 
   pcity->city_options = packet->city_options;
 
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+  for (i = 0; i < MAX_TRADE_ROUTES; i++) {
     pcity->trade[i] = packet->trade[i];
     pcity->trade_value[i] = packet->trade_value[i];
   }
@@ -614,14 +707,6 @@ void handle_city_info(const struct packet_city_info *packet)
       || pcity->usage[O_SCIENCE] != packet->usage[O_SCIENCE]) {
     need_science_dialog_update = TRUE;
   }
-  output_type_iterate(o) {
-    pcity->surplus[o] = packet->surplus[o];
-    pcity->waste[o] = packet->waste[o];
-    pcity->unhappy_penalty[o] = packet->unhappy_penalty[o];
-    pcity->prod[o] = packet->prod[o];
-    pcity->citizen_base[o] = packet->citizen_base[o];
-    pcity->usage[o] = packet->usage[o];
-  } output_type_iterate_end;
 
   pcity->food_stock=packet->food_stock;
   if (pcity->shield_stock != packet->shield_stock) {
@@ -634,12 +719,25 @@ void handle_city_info(const struct packet_city_info *packet)
   if (!are_universals_equal(&pcity->production, &product)) {
     production_changed = TRUE;
   }
+  /* Need to consider shield stock/surplus for unit dialog as used build
+   * slots may change, affecting number of "in-progress" units. */
   if ((city_is_new && VUT_UTYPE == product.kind)
       || (production_changed && (VUT_UTYPE == pcity->production.kind
-                                 || VUT_UTYPE == product.kind))) {
+                                 || VUT_UTYPE == product.kind))
+      || pcity->surplus[O_SHIELD] != packet->surplus[O_SHIELD]
+      || shield_stock_changed) {
     need_units_dialog_update = TRUE;
   }
   pcity->production = product;
+
+  output_type_iterate(o) {
+    pcity->surplus[o] = packet->surplus[o];
+    pcity->waste[o] = packet->waste[o];
+    pcity->unhappy_penalty[o] = packet->unhappy_penalty[o];
+    pcity->prod[o] = packet->prod[o];
+    pcity->citizen_base[o] = packet->citizen_base[o];
+    pcity->usage[o] = packet->usage[o];
+  } output_type_iterate_end;
 
 #ifdef DONE_BY_create_city_virtual
   if (city_is_new) {
@@ -649,7 +747,7 @@ void handle_city_info(const struct packet_city_info *packet)
       pcity->built[i].turn = I_NEVER;
     }
   }
-#endif
+#endif /* DONE_BY_create_city_virtual */
 
   worklist_copy(&pcity->worklist, &packet->worklist);
 
@@ -702,6 +800,7 @@ void handle_city_info(const struct packet_city_info *packet)
   }
 
   pcity->client.walls = packet->walls;
+  pcity->client.city_image = packet->city_image;
 
   pcity->client.happy = city_happy(pcity);
   pcity->client.unhappy = city_unhappy(pcity);
@@ -752,7 +851,7 @@ void handle_city_info(const struct packet_city_info *packet)
 
   /* Update the panel text (including civ population). */
   update_info_label();
-
+  
   /* update caravan dialog */
   if ((production_changed || shield_stock_changed)
       && caravan_dialog_is_open(NULL, &caravan_city_id)
@@ -795,7 +894,7 @@ static void city_packet_common(struct city *pcity, struct tile *pcenter,
     }
 
     players_iterate(pp) {
-      unit_list_iterate(pp->units, punit)
+      unit_list_iterate(pp->units, punit) 
 	if(punit->homecity==pcity->id)
 	  unit_list_prepend(pcity->units_supported, punit);
       unit_list_iterate_end;
@@ -812,6 +911,30 @@ static void city_packet_common(struct city *pcity, struct tile *pcenter,
 
   if (city_workers_display==pcity)  {
     city_workers_display=NULL;
+  }
+
+  if (investigate) {
+    /* Commit the collected supported and present units. */
+    if (pcity->client.collecting_info_units_supported != NULL) {
+      /* We got units, let's move the unit lists. */
+      fc_assert(pcity->client.collecting_info_units_present != NULL);
+
+      unit_list_destroy(pcity->client.info_units_present);
+      pcity->client.info_units_present =
+          pcity->client.collecting_info_units_present;
+      pcity->client.collecting_info_units_present = NULL;
+
+      unit_list_destroy(pcity->client.info_units_supported);
+      pcity->client.info_units_supported =
+          pcity->client.collecting_info_units_supported;
+      pcity->client.collecting_info_units_supported = NULL;
+    } else {
+      /* We didn't get any unit, let's clear the unit lists. */
+      fc_assert(pcity->client.collecting_info_units_present == NULL);
+
+      unit_list_clear(pcity->client.info_units_supported);
+      unit_list_clear(pcity->client.info_units_present);
+    }
   }
 
   if (popup
@@ -928,13 +1051,13 @@ void handle_city_short_info(const struct packet_city_short_info *packet)
     }
 
     sz_strlcpy(pcity->name, packet->name);
-
+    
     memset(pcity->feel, 0, sizeof(pcity->feel));
     memset(pcity->specialists, 0, sizeof(pcity->specialists));
   }
 
   pcity->specialists[DEFAULT_SPECIALIST] = packet->size;
-  pcity->size = packet->size;
+  city_size_set(pcity, packet->size);
 
   /* We can't actually see the internals of the city, but the server tells
    * us this much. */
@@ -945,6 +1068,7 @@ void handle_city_short_info(const struct packet_city_short_info *packet)
     }
   }
   pcity->client.walls = packet->walls;
+  pcity->client.city_image = packet->city_image;
 
   pcity->client.happy = packet->happy;
   pcity->client.unhappy = packet->unhappy;
@@ -976,24 +1100,24 @@ void handle_city_short_info(const struct packet_city_short_info *packet)
 }
 
 /**************************************************************************
-...
+  Handle turn and year advancement.
 **************************************************************************/
 void handle_new_year(int year, int turn)
 {
   game.info.year = year;
   /*
-   * The turn was increased in handle_before_new_year()
+   * The turn was increased in handle_end_turn()
    */
   fc_assert(game.info.turn == turn);
   update_info_label();
 
-  update_unit_focus();
+  unit_focus_update();
   auto_center_on_focus_unit();
 
   update_unit_info_label(get_units_in_focus());
   menus_update();
 
-  set_seconds_to_turndone(game.info.timeout);
+  set_seconds_to_turndone(client_current_turn_timeout());
 
 #if 0
   /* This information shouldn't be needed, but if it is this is the only
@@ -1023,17 +1147,9 @@ void handle_new_year(int year, int turn)
 **************************************************************************/
 void handle_end_phase(void)
 {
+  /* Messagewindow will contain events happened since our own phase ended,
+   * so player of the first phase and last phase are in equal situation. */
   meswin_clear();
-  /*
-   * The local idea of the game.info.turn is increased here since the
-   * client will get unit updates (reset of move points for example)
-   * between handle_before_new_year() and handle_new_year(). These
-   * unit updates will look like they did take place in the old turn
-   * which is incorrect. If we get the authoritative information about
-   * the game.info.turn in handle_new_year() we will check it.
-   */
-  game.info.turn++;
-  agents_before_new_turn();
 }
 
 /**************************************************************************
@@ -1060,6 +1176,13 @@ void handle_start_phase(int phase)
 
   game.info.phase = phase;
 
+  /* Possibly replace wait cursor with something else */
+  if (phase == 0) {
+    /* TODO: Have server set as busy also if switching phase
+     * is taking long in a alternating phases mode. */
+    set_server_busy(FALSE);
+  }
+
   if (NULL != client.conn.playing
       && is_player_phase(client.conn.playing, phase)) {
     agents_start_turn();
@@ -1071,7 +1194,7 @@ void handle_start_phase(int phase)
       user_ended_turn();
     }
 
-    set_unit_focus_status(client.conn.playing);
+    unit_focus_set_status(client.conn.playing);
 
     city_list_iterate(client.conn.playing->cities, pcity) {
       pcity->client.colored = FALSE;
@@ -1095,8 +1218,8 @@ void handle_begin_turn(void)
 {
   log_debug("handle_begin_turn()");
 
-  /* Possibly replace wait cursor with something else */
-  set_server_busy(FALSE);
+  /* Server is still considered busy until it handles also the beginning
+   * of the first phase. */
 }
 
 /**************************************************************************
@@ -1109,10 +1232,21 @@ void handle_end_turn(void)
 
   /* Make sure wait cursor is in use */
   set_server_busy(TRUE);
+
+  /*
+   * The local idea of the game.info.turn is increased here since the
+   * client will get unit updates (reset of move points for example)
+   * between handle_end_turn() and handle_new_year(). These
+   * unit updates will look like they did take place in the old turn
+   * which is incorrect. If we get the authoritative information about
+   * the game.info.turn in handle_new_year() we will check it.
+   */
+  game.info.turn++;
+  agents_before_new_turn();
 }
 
 /**************************************************************************
-...
+  Plays sound associated with event
 **************************************************************************/
 void play_sound_for_event(enum event_type type)
 {
@@ -1121,8 +1255,8 @@ void play_sound_for_event(enum event_type type)
   if (sound_tag) {
     audio_play_sound(sound_tag, NULL);
   }
-}
-
+}  
+  
 /**************************************************************************
   Handle a message packet.  This includes all messages - both
   in-game messages and chats from other players.
@@ -1143,16 +1277,73 @@ void handle_connect_msg(const char *message)
 }
 
 /****************************************************************************
-  Packet page_msg handler.
+  Compatibility page_msg header handler.
 ****************************************************************************/
-void handle_page_msg(const char *caption, const char *headline,
-                     const char *lines, enum event_type event)
+void handle_page_msg_old(const char *caption, const char *headline,
+                         const char *lines, enum event_type event)
 {
   if (!client_has_player()
       || !client_player()->ai_controlled
       || event != E_BROADCAST_REPORT) {
     popup_notify_dialog(caption, headline, lines);
     play_sound_for_event(event);
+  }
+}
+
+/****************************************************************************
+  Page_msg header handler.
+****************************************************************************/
+void handle_page_msg_new(const char *caption, const char *headline,
+                         enum event_type event, int len, int parts)
+{
+  if (!client_has_player()
+      || !client_player()->ai_controlled
+      || event != E_BROADCAST_REPORT) {
+    if (page_msg_report.parts > 0) {
+      /* Previous one was never finished */
+      free(page_msg_report.caption);
+      free(page_msg_report.headline);
+      free(page_msg_report.lines);
+    }
+    page_msg_report.len = len;
+    page_msg_report.event = event;
+    page_msg_report.caption = fc_strdup(caption);
+    page_msg_report.headline = fc_strdup(headline);
+    page_msg_report.parts = parts;
+    page_msg_report.lines = fc_malloc(len + 1);
+    page_msg_report.lines[0] = '\0';
+
+    if (parts == 0) {
+      /* Empty report - handle as if last part was just received. */
+      page_msg_report.parts = 1;
+      handle_page_msg_part("");
+    }
+  }
+}
+
+/****************************************************************************
+  Page_msg part handler.
+****************************************************************************/
+void handle_page_msg_part(const char *lines)
+{
+  if (page_msg_report.lines != NULL) {
+    /* We have already decided to show the message at the time we got
+     * the header packet. */
+    fc_strlcat(page_msg_report.lines, lines, page_msg_report.len + 1);
+    page_msg_report.parts--;
+
+    if (page_msg_report.parts == 0) {
+      /* This is the final part */
+      popup_notify_dialog(page_msg_report.caption,
+                          page_msg_report.headline,
+                          page_msg_report.lines);
+      play_sound_for_event(page_msg_report.event);
+
+      free(page_msg_report.caption);
+      free(page_msg_report.headline);
+      free(page_msg_report.lines);
+      page_msg_report.lines = NULL;
+    }
   }
 }
 
@@ -1165,7 +1356,8 @@ void handle_unit_info(const struct packet_unit_info *packet)
 
   punit = unpackage_unit(packet);
   if (handle_unit_packet_common(punit)) {
-    free(punit);
+    punit->client.transported_by = -1;
+    unit_virtual_destroy(punit);
   }
 }
 
@@ -1184,11 +1376,6 @@ void handle_unit_info(const struct packet_unit_info *packet)
   Depending on what caused the change, different actions may be taken.
   Therefore, this function is a bit of a jungle, and it is advisable
   to read thoroughly before changing.
-
-  Exception: When the client puts a unit in focus, it's status is set to
-  idle immediately, before informing the server about the new status. This
-  is because the server can never deny a request for idle, and should not
-  be concerned about which unit the client is focusing on.
 **************************************************************************/
 static bool handle_unit_packet_common(struct unit *packet_unit)
 {
@@ -1212,6 +1399,20 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
   }
 
   if (punit) {
+    /* In some situations, the size of repaint units require can change;
+     * in particular, city-builder units sometimes get a potential-city
+     * outline, but to speed up redraws we don't repaint this whole area
+     * unnecessarily. We need to ensure that when the footprint shrinks,
+     * old bits aren't left behind on the canvas.
+     * If the current (old) status of the unit is such that it gets a large
+     * repaint, as a special case, queue a large repaint immediately, to
+     * schedule the correct amount/location to be redrawn; but rely on the
+     * repaint being deferred until the unit is updated, so that what's
+     * drawn reflects the new status (e.g., no city outline). */
+    if (unit_drawn_with_city_outline(punit, TRUE)) {
+      refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
+    }
+
     ret = TRUE;
     punit->activity_count = packet_unit->activity_count;
     unit_change_battlegroup(punit, packet_unit->battlegroup);
@@ -1225,11 +1426,15 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       }
     }
 
+    if (punit->facing != packet_unit->facing) {
+      punit->facing = packet_unit->facing;
+      repaint_unit = TRUE;
+    }
+
     if (punit->activity != packet_unit->activity
-	|| punit->activity_target != packet_unit->activity_target
-        || punit->activity_base != packet_unit->activity_base
-	|| punit->transported_by != packet_unit->transported_by
-	|| punit->occupy != packet_unit->occupy
+        || cmp_act_tgt(&punit->activity_target, &packet_unit->activity_target)
+        || punit->client.transported_by != packet_unit->client.transported_by
+        || punit->client.occupied != packet_unit->client.occupied
 	|| punit->has_orders != packet_unit->has_orders
 	|| punit->orders.repeat != packet_unit->orders.repeat
 	|| punit->orders.vigilant != packet_unit->orders.vigilant
@@ -1249,7 +1454,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       repaint_unit = TRUE;
 
       /* Wakeup Focus */
-      if (wakeup_focus
+      if (wakeup_focus 
           && NULL != client.conn.playing
           && !client.conn.playing->ai_controlled
           && unit_owner(punit) == client.conn.playing
@@ -1258,23 +1463,33 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
           && !unit_is_in_focus(punit)
           && is_player_phase(client.conn.playing, game.info.phase)) {
         /* many wakeup units per tile are handled */
-        urgent_unit_focus(punit);
+        unit_focus_urgent(punit);
         check_focus = FALSE; /* and keep it */
       }
 
       punit->activity = packet_unit->activity;
       punit->activity_target = packet_unit->activity_target;
-      punit->activity_base = packet_unit->activity_base;
 
-      punit->transported_by = packet_unit->transported_by;
-      if (punit->occupy != packet_unit->occupy
-          && get_focus_unit_on_tile(packet_unit->tile)) {
-        /* Special case: (un)loading a unit in a transporter on the
-         * same tile as the focus unit may (dis)allow the focus unit to be
-         * loaded.  Thus the orders->(un)load menu item needs updating. */
-        need_menus_update = TRUE;
+      if (punit->client.transported_by
+          != packet_unit->client.transported_by) {
+        if (packet_unit->client.transported_by == -1) {
+          /* The unit was unloaded from its transport. The check for a new
+           * transport is done below. */
+          unit_transport_unload(punit);
+        }
+
+        punit->client.transported_by = packet_unit->client.transported_by;
       }
-      punit->occupy = packet_unit->occupy;
+
+      if (punit->client.occupied != packet_unit->client.occupied) {
+        if (get_focus_unit_on_tile(unit_tile(packet_unit))) {
+          /* Special case: (un)loading a unit in a transporter on the same
+           *tile as the focus unit may (dis)allow the focus unit to be
+           * loaded.  Thus the orders->(un)load menu item needs updating. */
+          need_menus_update = TRUE;
+        }
+        punit->client.occupied = packet_unit->client.occupied;
+      }
 
       punit->has_orders = packet_unit->has_orders;
       punit->orders.length = packet_unit->orders.length;
@@ -1308,12 +1523,15 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 	unit_list_remove(pcity->units_supported, punit);
 	refresh_city_dialog(pcity);
       }
-
+      
       punit->homecity = packet_unit->homecity;
       if ((pcity = game_city_by_number(punit->homecity))) {
 	unit_list_prepend(pcity->units_supported, punit);
 	repaint_city = TRUE;
       }
+
+      /* This can change total upkeep figures */
+      need_units_report_update = TRUE;
     }
 
     if (punit->hp != packet_unit->hp) {
@@ -1324,8 +1542,8 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 
     if (punit->utype != unit_type(packet_unit)) {
       /* Unit type has changed (been upgraded) */
-      struct city *pcity = tile_city(punit->tile);
-
+      struct city *pcity = tile_city(unit_tile(punit));
+      
       punit->utype = unit_type(packet_unit);
       repaint_unit = TRUE;
       repaint_city = TRUE;
@@ -1345,11 +1563,11 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       check_focus = TRUE;
     }
 
-    if (!same_pos(punit->tile, packet_unit->tile)) {
+    if (!same_pos(unit_tile(punit), unit_tile(packet_unit))) {
       /*** Change position ***/
-      struct city *pcity = tile_city(punit->tile);
+      struct city *pcity = tile_city(unit_tile(punit));
 
-      old_tile = punit->tile;
+      old_tile = unit_tile(punit);
       moved = TRUE;
 
       /* Show where the unit is going. */
@@ -1375,7 +1593,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 	else
 	  refresh_city_dialog(pcity);
       }
-
+      
       if ((pcity = tile_city(unit_tile(punit)))) {
         if (can_player_see_units_in_city(client.conn.playing, pcity)) {
           /* Unit moved into a city - obviously it's occupied. */
@@ -1395,25 +1613,25 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 
         if (popup_caravan_arrival
             && client_has_player()
+            && client_player() == unit_owner(punit)
             && !client_player()->ai_controlled
             && can_client_issue_orders()
-            && !unit_has_orders(punit)) {
-          if (punit->transported_by == -1
-              && client_player() == unit_owner(punit)
-              && (unit_can_help_build_wonder_here(punit)
-                  || unit_can_est_trade_route_here(punit))) {
-            process_caravan_arrival(punit);
-          }
-          /* Check for transported units. */
-          unit_list_iterate(client_player()->units, pcargo) {
-            if (pcargo->transported_by == punit->id
-                && client_player() == unit_owner(pcargo)
-                && !unit_has_orders(pcargo)
-                && (unit_can_help_build_wonder_here(pcargo)
-                    || unit_can_est_trade_route_here(pcargo))) {
-              process_caravan_arrival(pcargo);
+            && !unit_has_orders(punit)
+            && (unit_can_help_build_wonder_here(punit)
+                || unit_can_est_trade_route_here(punit))) {
+          /* Open caravan dialog only if 'punit' and all its transporters
+           * (recursively) don't have orders. */
+          struct unit *ptrans;
+
+          for (ptrans = unit_transport_get(punit);;
+               ptrans = unit_transport_get(ptrans)) {
+            if (NULL == ptrans) {
+              process_caravan_arrival(punit);
+              break;
+            } else if (unit_has_orders(ptrans)) {
+              break;
             }
-          } unit_list_iterate_end;
+          }
         }
       }
 
@@ -1425,9 +1643,10 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       if ((pcity = game_city_by_number(punit->homecity))) {
 	refresh_city_dialog(pcity);
       }
-      if (repaint_unit && tile_city(punit->tile) && tile_city(punit->tile) != pcity) {
-	/* Refresh the city we're occupying too. */
-	refresh_city_dialog(tile_city(punit->tile));
+      if (repaint_unit && tile_city(unit_tile(punit))
+          && tile_city(unit_tile(punit)) != pcity) {
+        /* Refresh the city we're occupying too. */
+        refresh_city_dialog(tile_city(unit_tile(punit)));
       }
     }
 
@@ -1438,6 +1657,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
       punit->upkeep[o] = packet_unit->upkeep[o];
     } output_type_iterate_end;
 
+    punit->nationality = packet_unit->nationality;
     punit->veteran = packet_unit->veteran;
     punit->moves_left = packet_unit->moves_left;
     punit->fuel = packet_unit->fuel;
@@ -1457,7 +1677,7 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
     idex_register_unit(punit);
 
     unit_list_prepend(unit_owner(punit)->units, punit);
-    unit_list_prepend(punit->tile->units, punit);
+    unit_list_prepend(unit_tile(punit)->units, punit);
 
     unit_register_battlegroup(punit);
 
@@ -1471,10 +1691,25 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
               punit->id, punit->homecity,
               (pcity ? city_name(pcity) : "(unknown)"));
 
-    repaint_unit = (punit->transported_by == -1);
+    repaint_unit = !unit_transported(punit);
     agents_unit_new(punit);
 
-    if ((pcity = tile_city(punit->tile))) {
+    /* Check if we should link cargo units.
+     * (This should only be necessary for allied cargo; for
+     * cargo/transporter of the same nation, server should have sent
+     * transporter info first, per send_unit_info().) */
+    if (client_has_player()
+        && unit_owner(punit) != client_player()
+        && punit->client.occupied) {
+      unit_list_iterate(unit_tile(punit)->units, aunit) {
+        if (aunit->client.transported_by == punit->id) {
+          fc_assert(aunit->transporter == NULL);
+          unit_transport_load(aunit, punit, TRUE);
+        }
+      } unit_list_iterate_end;
+    }
+
+    if ((pcity = tile_city(unit_tile(punit)))) {
       /* The unit is in a city - obviously it's occupied. */
       pcity->client.occupied = TRUE;
     }
@@ -1484,21 +1719,50 @@ static bool handle_unit_packet_common(struct unit *packet_unit)
 
   fc_assert_ret_val(punit != NULL, ret);
 
+  /* Check if we have to load the unit on a transporter. */
+  if (punit->client.transported_by != -1) {
+    struct unit *ptrans
+      = game_unit_by_number(packet_unit->client.transported_by);
+
+    /* Load unit only if transporter is known by the client. For full
+     * unit info the transporter should be known. The server sends
+     * transporters first; see send_unit_info(). */
+    if (ptrans && ptrans != unit_transport_get(punit)) {
+      /* First, we have to unload the unit from its old transporter. */
+      unit_transport_unload(punit);
+      unit_transport_load(punit, ptrans, TRUE);
+#ifdef DEBUG_TRANSPORT
+      log_debug("load %s (ID: %d) onto %s (ID: %d)",
+                unit_name_translation(punit), punit->id,
+                unit_name_translation(ptrans), ptrans->id);
+    } else if (ptrans && ptrans == unit_transport_get(punit)) {
+      log_debug("%s (ID: %d) is loaded onto %s (ID: %d)",
+                unit_name_translation(punit), punit->id,
+                unit_name_translation(ptrans), ptrans->id);
+    } else {
+      log_debug("%s (ID: %d) is not loaded", unit_name_translation(punit),
+                punit->id);
+#endif /* DEBUG_TRANSPORT */
+    }
+  }
+
   if (unit_is_in_focus(punit)
-      || get_focus_unit_on_tile(punit->tile)
+      || get_focus_unit_on_tile(unit_tile(punit))
       || (moved && get_focus_unit_on_tile(old_tile))) {
     update_unit_info_label(get_units_in_focus());
+    /* Update (an possible active) unit select dialog. */
+    unit_select_dialog_update();
   }
 
   if (repaint_unit) {
-    refresh_unit_mapcanvas(punit, punit->tile, TRUE, FALSE);
+    refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
   }
 
   if ((check_focus || get_num_units_in_focus() == 0)
       && NULL != client.conn.playing
       && !client.conn.playing->ai_controlled
       && is_player_phase(client.conn.playing, game.info.phase)) {
-    update_unit_focus();
+    unit_focus_update();
   }
 
   if (need_menus_update) {
@@ -1528,7 +1792,17 @@ void handle_unit_short_info(const struct packet_unit_short_info *packet)
   if (packet->goes_out_of_sight) {
     punit = game_unit_by_number(packet->id);
     if (punit) {
+      /* Unload unit if it is transported. */
+      if (unit_transport_get(punit)) {
+        unit_transport_unload(punit);
+      }
+      punit->client.transported_by = -1;
+
       client_remove_unit(punit);
+    } else {
+      log_error("Server wants us to move unit id %d out of sight, "
+                "but we don't know about this unit!",
+                packet->id);
     }
     return;
   }
@@ -1541,26 +1815,34 @@ void handle_unit_short_info(const struct packet_unit_short_info *packet)
       || packet->packet_use == UNIT_INFO_CITY_PRESENT) {
     static int last_serial_num = 0;
 
-    /* fetch city -- abort if not found */
     pcity = game_city_by_number(packet->info_city_id);
     if (!pcity) {
+      log_error("Investigate city: unknown city id %d!",
+                packet->info_city_id);
       return;
     }
 
-    /* New serial number -- clear (free) everything */
+    /* New serial number: start collecting supported and present units. */
     if (last_serial_num != packet->serial_num) {
       last_serial_num = packet->serial_num;
-      unit_list_clear(pcity->client.info_units_supported);
-      unit_list_clear(pcity->client.info_units_present);
+      /* Ensure we are not already in an investigate cycle. */
+      fc_assert(pcity->client.collecting_info_units_supported == NULL);
+      fc_assert(pcity->client.collecting_info_units_present == NULL);
+      pcity->client.collecting_info_units_supported =
+          unit_list_new_full(unit_virtual_destroy);
+      pcity->client.collecting_info_units_present =
+          unit_list_new_full(unit_virtual_destroy);
     }
 
     /* Okay, append a unit struct to the proper list. */
     punit = unpackage_short_unit(packet);
     if (packet->packet_use == UNIT_INFO_CITY_SUPPORTED) {
-      unit_list_prepend(pcity->client.info_units_supported, punit);
+      fc_assert(pcity->client.collecting_info_units_supported != NULL);
+      unit_list_append(pcity->client.collecting_info_units_supported, punit);
     } else {
       fc_assert(packet->packet_use == UNIT_INFO_CITY_PRESENT);
-      unit_list_prepend(pcity->client.info_units_present, punit);
+      fc_assert(pcity->client.collecting_info_units_present != NULL);
+      unit_list_append(pcity->client.collecting_info_units_present, punit);
     }
 
     /* Done with special case. */
@@ -1573,7 +1855,8 @@ void handle_unit_short_info(const struct packet_unit_short_info *packet)
 
   punit = unpackage_short_unit(packet);
   if (handle_unit_packet_common(punit)) {
-    free(punit);
+    punit->client.transported_by = -1;
+    unit_virtual_destroy(punit);
   }
 }
 
@@ -1591,9 +1874,7 @@ void handle_map_info(int xsize, int ysize, int topology_id)
   map.ysize = ysize;
   map.topology_id = topology_id;
 
-  /* Parameter is FALSE so that sizes are kept unchanged. */
-  map_init_topology(FALSE);
-
+  map_init_topology();
   map_allocate();
   client_player_maps_reset();
   init_client_goto();
@@ -1613,8 +1894,6 @@ void handle_game_info(const struct packet_game_info *pinfo)
 {
   bool boot_help;
   bool update_aifill_button = FALSE;
-  float seconds_to_phasedone;
-
 
   if (game.info.aifill != pinfo->aifill) {
     update_aifill_button = TRUE;
@@ -1623,10 +1902,17 @@ void handle_game_info(const struct packet_game_info *pinfo)
   if (game.info.is_edit_mode != pinfo->is_edit_mode) {
     popdown_all_city_dialogs();
     /* Clears the current goto command. */
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
   }
 
   game.info = *pinfo;
+
+  if (!has_capability("illness_ranges", client.conn.capability)) {
+    /* Fill current values from the old-format values sent by older server. */
+    game.info.illness_base_factor = game.info.illness_base_factor_old;
+    game.info.illness_pollution_factor = game.info.illness_pollution_factor_old;
+    game.info.illness_trade_infection = game.info.illness_trade_infection_old;
+  }
 
   /* check the values! */
 #define VALIDATE(_count, _maximum, _string)                                 \
@@ -1644,30 +1930,23 @@ void handle_game_info(const struct packet_game_info *pinfo)
 
   boot_help = (can_client_change_view()
 	       && game.info.spacerace != pinfo->spacerace);
-  if (has_capability("timeout_extended_range", client.conn.capability)) {
-    /* Centisecond resolution */
-    seconds_to_phasedone = pinfo->seconds_to_phasedone2;
-  } else {
-    /* ~60 hour range */
-    seconds_to_phasedone = pinfo->seconds_to_phasedone;
-  }
-  if (game.info.timeout != 0 && seconds_to_phasedone >= 0) {
+  if (client_current_turn_timeout() != 0 && pinfo->seconds_to_phasedone >= 0) {
     /* If this packet is received in the middle of a turn, this value
      * represents the number of seconds from now to the end of the turn
      * (not from the start of the turn). So we need to restart our
      * timer. */
-    set_seconds_to_turndone(seconds_to_phasedone);
+    set_seconds_to_turndone(pinfo->seconds_to_phasedone);
   }
   if (boot_help) {
     boot_help_texts(client.conn.playing); /* reboot, after setting game.spacerace */
   }
-  update_unit_focus();
+  unit_focus_update();
   menus_update();
   players_dialog_update();
   if (update_aifill_button) {
     update_start_page();
   }
-
+  
   if (can_client_change_view()) {
     update_info_label();
   }
@@ -1676,7 +1955,7 @@ void handle_game_info(const struct packet_game_info *pinfo)
 }
 
 /**************************************************************************
-...
+  Sets player inventions to values specified in inventions array
 **************************************************************************/
 static bool read_player_info_techs(struct player *pplayer,
                                    const char *inventions)
@@ -1763,7 +2042,6 @@ void handle_player_remove(int playerno)
   /* Save player number before player is freed */
   plr_nbr = player_number(pplayer);
 
-  client_player_destroy(pplayer);
   player_destroy(pplayer);
 
   players_dialog_update();
@@ -1798,6 +2076,23 @@ void handle_player_info(const struct packet_player_info *pinfo)
   fc_assert(NULL != pslot);
   new_player = !player_slot_is_used(pslot);
   pplayer = player_new(pslot);
+
+  if (pplayer->rgb == NULL || (pplayer->rgb->r != pinfo->color_red
+                               || pplayer->rgb->g != pinfo->color_green
+                               || pplayer->rgb->b != pinfo->color_blue)) {
+    struct rgbcolor *prgbcolor = rgbcolor_new(pinfo->color_red,
+                                              pinfo->color_green,
+                                              pinfo->color_blue);
+    fc_assert_ret(prgbcolor != NULL);
+
+    player_set_color(pplayer, prgbcolor);
+    tileset_player_init(tileset, pplayer);
+
+    rgbcolor_destroy(prgbcolor);
+
+    /* Queue a map update -- may need to redraw borders, etc. */
+    update_map_canvas_visible();
+  }
 
   if (new_player) {
     /* Initialise client side player data (tile vision). At the moment
@@ -1864,6 +2159,10 @@ void handle_player_info(const struct packet_player_info *pinfo)
     if (pplayer == my_player)  {
       if (my_player->ai_controlled) {
         output_window_append(ftc_client, _("AI mode is now ON."));
+        if (!ai_manual_turn_done && !pplayer->phase_done) {
+          /* End turn immediately */
+          user_ended_turn();
+        }
       } else {
         output_window_append(ftc_client, _("AI mode is now OFF."));
       }
@@ -1880,12 +2179,12 @@ void handle_player_info(const struct packet_player_info *pinfo)
    * only send the player info out at appropriate times - e.g., while the
    * game is running. */
   new_tech = read_player_info_techs(pplayer, pinfo->inventions);
-
+  
   research = player_research_get(pplayer);
 
   poptechup = (research->researching != pinfo->researching
                || research->tech_goal != pinfo->tech_goal);
-  pplayer->bulbs_last_turn = pinfo->bulbs_last_turn;
+  pplayer->client.bulbs_prod = pinfo->bulbs_prod;
   research->bulbs_researched = pinfo->bulbs_researched;
   research->techs_researched = pinfo->techs_researched;
 
@@ -1911,6 +2210,13 @@ void handle_player_info(const struct packet_player_info *pinfo)
   pplayer->ai_common.barbarian_type = pinfo->barbarian_type;
   pplayer->revolution_finishes = pinfo->revolution_finishes;
   pplayer->ai_common.skill_level = pinfo->ai_skill_level;
+  if (has_capability("tech_cost", client.conn.capability)) {
+    research->client.researching_cost = pinfo->researching_cost;
+    pplayer->client.tech_upkeep = pinfo->tech_upkeep;
+  } else {
+    research->client.researching_cost = total_bulbs_required(pplayer);
+    pplayer->client.tech_upkeep = player_tech_upkeep(pplayer);
+  }
 
   /* if the server requests that the client reset, then information about
    * connections to this player are lost. If this is the case, insert the
@@ -1931,32 +2237,32 @@ void handle_player_info(const struct packet_player_info *pinfo)
 
   /* The player information is now fully set. Update the GUI. */
 
-  if (pplayer == my_player && can_client_change_view()) {
-    if (poptechup) {
-      if (client_has_player() && !my_player->ai_controlled) {
+  if (my_player != NULL && can_client_change_view()) {
+    if (research == player_research_get(my_player)) {
+      if (poptechup && !my_player->ai_controlled) {
         science_report_dialog_popup(FALSE);
       }
-    }
-    if (new_tech) {
-      /* If we just learned bridge building and focus is on a settler
-         on a river the road menu item will remain disabled unless we
-         do this. (applys in other cases as well.) */
-      if (get_num_units_in_focus() > 0) {
-        menus_update();
+      science_report_dialog_update();
+      if (new_tech) {
+        /* If we just learned bridge building and focus is on a settler
+           on a river the road menu item will remain disabled unless we
+           do this. (applys in other cases as well.) */
+        if (get_num_units_in_focus() > 0) {
+          menus_update();
+        }
+        /* If we got a new tech the tech tree news an update. */
+        science_report_dialog_redraw();
       }
     }
-    if (turn_done_changed) {
-      update_turn_done_button_state();
+    if (pplayer == my_player) {
+      if (turn_done_changed) {
+        update_turn_done_button_state();
+      }
+      economy_report_dialog_update();
+      units_report_dialog_update();
+      city_report_dialog_update();
+      update_info_label();
     }
-    science_report_dialog_update();
-    if (new_tech) {
-      /* If we got a new tech the tech tree news an update. */
-      science_report_dialog_redraw();
-    }
-    economy_report_dialog_update();
-    units_report_dialog_update();
-    city_report_dialog_update();
-    update_info_label();
   }
 
   upgrade_canvas_clipboard();
@@ -1981,6 +2287,19 @@ void handle_player_info(const struct packet_player_info *pinfo)
   editgui_refresh();
   editgui_notify_object_changed(OBJTYPE_PLAYER, player_number(pplayer),
                                 FALSE);
+}
+
+/****************************************************************************
+  Player gained new tech.
+****************************************************************************/
+void handle_tech_gained(int tech)
+{
+  if (tech != A_FUTURE && !valid_advance_by_number(tech)) {
+    log_error("Received illegal gained tech %d", tech);
+    return;
+  }
+
+//  show_tech_gained_dialog(tech);
 }
 
 /****************************************************************************
@@ -2047,7 +2366,7 @@ void handle_conn_info(const struct packet_conn_info *pinfo)
             pinfo->observer, (int) pinfo->access_level);
   log_debug("conn_info \"%s\" \"%s\" \"%s\"",
             pinfo->username, pinfo->addr, pinfo->capability);
-
+  
   if (!pinfo->used) {
     /* Forget the connection */
     if (!pconn) {
@@ -2181,125 +2500,128 @@ which is left.
 static bool spaceship_autoplace(struct player *pplayer,
 			       struct player_spaceship *ship)
 {
-  int i, num;
-  enum spaceship_place_type type;
+  if (can_client_issue_orders()) {
+    int i, num;
+    enum spaceship_place_type type;
 
-  if (ship->modules > (ship->habitation + ship->life_support
-		       + ship->solar_panels)) {
-    /* "nice" governments prefer to keep success 100%;
-     * others build habitation first (for score?)  (Thanks Massimo.)
-     */
-    type =
-      (ship->habitation==0)   ? SSHIP_PLACE_HABITATION :
-      (ship->life_support==0) ? SSHIP_PLACE_LIFE_SUPPORT :
-      (ship->solar_panels==0) ? SSHIP_PLACE_SOLAR_PANELS :
-      ((ship->habitation < ship->life_support)
-       && (ship->solar_panels*2 >= ship->habitation + ship->life_support + 1))
+    if (ship->modules > (ship->habitation + ship->life_support
+                         + ship->solar_panels)) {
+      /* "nice" governments prefer to keep success 100%;
+       * others build habitation first (for score?)  (Thanks Massimo.)
+       */
+      type =
+        (ship->habitation==0)   ? SSHIP_PLACE_HABITATION :
+        (ship->life_support==0) ? SSHIP_PLACE_LIFE_SUPPORT :
+        (ship->solar_panels==0) ? SSHIP_PLACE_SOLAR_PANELS :
+        ((ship->habitation < ship->life_support)
+         && (ship->solar_panels*2 >= ship->habitation + ship->life_support + 1))
                               ? SSHIP_PLACE_HABITATION :
-      (ship->solar_panels*2 < ship->habitation + ship->life_support)
+        (ship->solar_panels*2 < ship->habitation + ship->life_support)
                               ? SSHIP_PLACE_SOLAR_PANELS :
-      (ship->life_support<ship->habitation)
+        (ship->life_support<ship->habitation)
                               ? SSHIP_PLACE_LIFE_SUPPORT :
-      ((ship->life_support <= ship->habitation)
-       && (ship->solar_panels*2 >= ship->habitation + ship->life_support + 1))
+        ((ship->life_support <= ship->habitation)
+         && (ship->solar_panels*2 >= ship->habitation + ship->life_support + 1))
                               ? SSHIP_PLACE_LIFE_SUPPORT :
                                 SSHIP_PLACE_SOLAR_PANELS;
 
-    if (type == SSHIP_PLACE_HABITATION) {
-      num = ship->habitation + 1;
-    } else if(type == SSHIP_PLACE_LIFE_SUPPORT) {
-      num = ship->life_support + 1;
-    } else {
-      num = ship->solar_panels + 1;
-    }
-    fc_assert(num <= NUM_SS_MODULES / 3);
+      if (type == SSHIP_PLACE_HABITATION) {
+        num = ship->habitation + 1;
+      } else if(type == SSHIP_PLACE_LIFE_SUPPORT) {
+        num = ship->life_support + 1;
+      } else {
+        num = ship->solar_panels + 1;
+      }
+      fc_assert(num <= NUM_SS_MODULES / 3);
 
-    dsend_packet_spaceship_place(&client.conn, type, num);
-    return TRUE;
-  }
-  if (ship->components > ship->fuel + ship->propulsion) {
-    if (ship->fuel <= ship->propulsion) {
-      type = SSHIP_PLACE_FUEL;
-      num = ship->fuel + 1;
-    } else {
-      type = SSHIP_PLACE_PROPULSION;
-      num = ship->propulsion + 1;
-    }
-    dsend_packet_spaceship_place(&client.conn, type, num);
-    return TRUE;
-  }
-  if (ship->structurals > num_spaceship_structurals_placed(ship)) {
-    /* Want to choose which structurals are most important.
-       Else we first want to connect one of each type of module,
-       then all placed components, pairwise, then any remaining
-       modules, or else finally in numerical order.
-    */
-    int req = -1;
-
-    if (!ship->structure[0]) {
-      /* if we don't have the first structural, place that! */
-      type = SSHIP_PLACE_STRUCTURAL;
-      num = 0;
       dsend_packet_spaceship_place(&client.conn, type, num);
       return TRUE;
     }
+    if (ship->components > ship->fuel + ship->propulsion) {
+      if (ship->fuel <= ship->propulsion) {
+        type = SSHIP_PLACE_FUEL;
+        num = ship->fuel + 1;
+      } else {
+        type = SSHIP_PLACE_PROPULSION;
+        num = ship->propulsion + 1;
+      }
+      dsend_packet_spaceship_place(&client.conn, type, num);
+      return TRUE;
+    }
+    if (ship->structurals > num_spaceship_structurals_placed(ship)) {
+      /* Want to choose which structurals are most important.
+         Else we first want to connect one of each type of module,
+         then all placed components, pairwise, then any remaining
+         modules, or else finally in numerical order.
+      */
+      int req = -1;
 
-    if (ship->habitation >= 1
-	&& !ship->structure[modules_info[0].required]) {
-      req = modules_info[0].required;
-    } else if (ship->life_support >= 1
-	       && !ship->structure[modules_info[1].required]) {
-      req = modules_info[1].required;
-    } else if (ship->solar_panels >= 1
-	       && !ship->structure[modules_info[2].required]) {
-      req = modules_info[2].required;
-    } else {
-      int i;
-      for(i=0; i<NUM_SS_COMPONENTS; i++) {
-	if ((i%2==0 && ship->fuel > (i/2))
-	    || (i%2==1 && ship->propulsion > (i/2))) {
-	  if (!ship->structure[components_info[i].required]) {
-	    req = components_info[i].required;
-	    break;
-	  }
-	}
+      if (!BV_ISSET(ship->structure, 0)) {
+        /* if we don't have the first structural, place that! */
+        type = SSHIP_PLACE_STRUCTURAL;
+        num = 0;
+        dsend_packet_spaceship_place(&client.conn, type, num);
+        return TRUE;
       }
-    }
-    if (req == -1) {
-      for(i=0; i<NUM_SS_MODULES; i++) {
-	if ((i%3==0 && ship->habitation > (i/3))
-	    || (i%3==1 && ship->life_support > (i/3))
-	    || (i%3==2 && ship->solar_panels > (i/3))) {
-	  if (!ship->structure[modules_info[i].required]) {
-	    req = modules_info[i].required;
-	    break;
-	  }
-	}
-      }
-    }
-    if (req == -1) {
-      for(i=0; i<NUM_SS_STRUCTURALS; i++) {
-	if (!ship->structure[i]) {
-	  req = i;
-	  break;
-	}
-      }
-    }
-    /* sanity: */
-    fc_assert(req != -1);
-    fc_assert(!ship->structure[req]);
 
-    /* Now we want to find a structural we can build which leads to req.
-       This loop should bottom out, because everything leads back to s0,
-       and we made sure above that we do s0 first.
-     */
-    while(!ship->structure[structurals_info[req].required]) {
-      req = structurals_info[req].required;
+      if (ship->habitation >= 1
+          && !BV_ISSET(ship->structure, modules_info[0].required)) {
+        req = modules_info[0].required;
+      } else if (ship->life_support >= 1
+                 && !BV_ISSET(ship->structure, modules_info[1].required)) {
+        req = modules_info[1].required;
+      } else if (ship->solar_panels >= 1
+                 && !BV_ISSET(ship->structure, modules_info[2].required)) {
+        req = modules_info[2].required;
+      } else {
+        int i;
+
+        for (i = 0; i < NUM_SS_COMPONENTS; i++) {
+          if ((i % 2 == 0 && ship->fuel > (i / 2))
+              || (i % 2 == 1 && ship->propulsion > (i / 2))) {
+            if (!BV_ISSET(ship->structure, components_info[i].required)) {
+              req = components_info[i].required;
+              break;
+            }
+          }
+        }
+      }
+      if (req == -1) {
+        for (i = 0; i < NUM_SS_MODULES; i++) {
+          if ((i % 3 == 0 && ship->habitation > (i / 3))
+              || (i % 3 == 1 && ship->life_support > (i / 3))
+              || (i % 3 == 2 && ship->solar_panels > (i / 3))) {
+            if (!BV_ISSET(ship->structure, modules_info[i].required)) {
+              req = modules_info[i].required;
+              break;
+            }
+          }
+        }
+      }
+      if (req == -1) {
+        for (i = 0; i < NUM_SS_STRUCTURALS; i++) {
+          if (!BV_ISSET(ship->structure, i)) {
+            req = i;
+            break;
+          }
+        }
+      }
+      /* sanity: */
+      fc_assert(req != -1);
+      fc_assert(!BV_ISSET(ship->structure, req));
+
+      /* Now we want to find a structural we can build which leads to req.
+         This loop should bottom out, because everything leads back to s0,
+         and we made sure above that we do s0 first.
+      */
+      while(!BV_ISSET(ship->structure, structurals_info[req].required)) {
+        req = structurals_info[req].required;
+      }
+      type = SSHIP_PLACE_STRUCTURAL;
+      num = req;
+      dsend_packet_spaceship_place(&client.conn, type, num);
+      return TRUE;
     }
-    type = SSHIP_PLACE_STRUCTURAL;
-    num = req;
-    dsend_packet_spaceship_place(&client.conn, type, num);
-    return TRUE;
   }
   return FALSE;
 }
@@ -2309,7 +2631,6 @@ static bool spaceship_autoplace(struct player *pplayer,
 ****************************************************************************/
 void handle_spaceship_info(const struct packet_spaceship_info *p)
 {
-  int i;
   struct player_spaceship *ship;
   struct player *pplayer = player_by_number(p->player_num);
 
@@ -2322,7 +2643,6 @@ void handle_spaceship_info(const struct packet_spaceship_info *p)
   ship->components   = p->components;
   ship->modules      = p->modules;
   ship->fuel         = p->fuel;
-  ship->fuel         = p->fuel;
   ship->propulsion   = p->propulsion;
   ship->habitation   = p->habitation;
   ship->life_support = p->life_support;
@@ -2334,19 +2654,7 @@ void handle_spaceship_info(const struct packet_spaceship_info *p)
   ship->energy_rate  = p->energy_rate;
   ship->success_rate = p->success_rate;
   ship->travel_time  = p->travel_time;
-
-  for(i=0; i<NUM_SS_STRUCTURALS; i++) {
-    if (p->structure[i] == '0') {
-      ship->structure[i] = FALSE;
-    } else if (p->structure[i] == '1') {
-      ship->structure[i] = TRUE;
-    } else {
-      log_error("handle_spaceship_info() "
-                "invalid spaceship structure '%c' (%d).",
-                p->structure[i], p->structure[i]);
-      ship->structure[i] = FALSE;
-    }
-  }
+  ship->structure    = p->structure;
 
   if (pplayer != client_player()) {
     refresh_spaceship_dialog(pplayer);
@@ -2410,6 +2718,10 @@ void handle_tile_info(const struct packet_tile_info *packet)
   } tile_special_type_iterate_end;
   if (!BV_ARE_EQUAL(ptile->bases, packet->bases)) {
     ptile->bases = packet->bases;
+    tile_changed = TRUE;
+  }
+  if (!BV_ARE_EQUAL(ptile->roads, packet->roads)) {
+    ptile->roads = packet->roads;
     tile_changed = TRUE;
   }
 
@@ -2524,7 +2836,7 @@ void handle_tile_info(const struct packet_tile_info *packet)
                 unit_rule_name(punit), TILE_XY(unit_tile(punit)),
                 player_name(unit_owner(punit)));
     } unit_list_iterate_end;
-    fc_assert(0 == unit_list_size(ptile->units));
+    fc_assert_msg(0 == unit_list_size(ptile->units), "Ghost units seen");
     /* Repairing... */
     unit_list_clear(ptile->units);
   }
@@ -2532,8 +2844,19 @@ void handle_tile_info(const struct packet_tile_info *packet)
   ptile->continent = packet->continent;
   map.num_continents = MAX(ptile->continent, map.num_continents);
 
+  if (packet->label[0] == '\0') {
+    if (ptile->label != NULL) {
+      FC_FREE(ptile->label);
+      ptile->label = NULL;
+      tile_changed = TRUE;
+    }
+  } else if (ptile->label == NULL || strcmp(packet->label, ptile->label)) {
+      tile_set_label(ptile, packet->label);
+      tile_changed = TRUE;
+  }
+
   if (known_changed || tile_changed) {
-    /*
+    /* 
      * A tile can only change if it was known before and is still
      * known. In the other cases the tile is new or removed.
      */
@@ -2566,12 +2889,13 @@ void handle_tile_info(const struct packet_tile_info *packet)
 /****************************************************************************
   Received packet containing info about current scenario
 ****************************************************************************/
-void handle_scenario_info_CLIENT(const struct packet_scenario_info *packet)
+void handle_scenario_info(const struct packet_scenario_info *packet)
 {
   game.scenario.is_scenario = packet->is_scenario;
   sz_strlcpy(game.scenario.name, packet->name);
   sz_strlcpy(game.scenario.description, packet->description);
   game.scenario.players = packet->players;
+  game.scenario.startpos_nations = packet->startpos_nations;
 
   editgui_notify_object_changed(OBJTYPE_GAME, 1, FALSE);
 }
@@ -2604,6 +2928,8 @@ void handle_ruleset_control(const struct packet_ruleset_control *packet)
   VALIDATE(num_impr_types,	B_LAST,			"improvements");
   VALIDATE(num_tech_types,	A_LAST_REAL,		"advances");
   VALIDATE(num_base_types,	MAX_BASE_TYPES,		"bases");
+  VALIDATE(num_road_types,      MAX_ROAD_TYPES,         "roads");
+  VALIDATE(num_disaster_types,  MAX_DISASTER_TYPES,     "disasters");
 
   /* game.control.government_count, game.control.nation_count and
    * game.control.styles_count are allocated dynamically, and does
@@ -2619,19 +2945,61 @@ void handle_ruleset_control(const struct packet_ruleset_control *packet)
   nations_alloc(game.control.nation_count);
   city_styles_alloc(game.control.styles_count);
 
-  /* After nation ruleset free/alloc, nation->player pointers are NULL.
-   * We have to initialize player->nation too, to keep state consistent. */
-  players_iterate(pplayer) {
-    pplayer->nation = NULL;
-  } players_iterate_end;
-
   if (packet->prefered_tileset[0] != '\0') {
     /* There is tileset suggestion */
     if (strcmp(packet->prefered_tileset, tileset_get_name(tileset))) {
       /* It's not currently in use */
-      popup_tileset_suggestion_dialog();
+      if (autoaccept_tileset_suggestion) {
+        tilespec_reread(game.control.prefered_tileset, FALSE);
+      } else {
+        popup_tileset_suggestion_dialog();
+      }
     }
   }
+
+  if (packet->prefered_soundset[0] != '\0') {
+    /* There is soundset suggestion */
+    if (strcmp(packet->prefered_soundset, sound_set_name)) {
+      /* It's not currently in use */
+      if (autoaccept_soundset_suggestion) {
+        audio_restart(game.control.prefered_soundset);
+      } else {
+//        popup_soundset_suggestion_dialog();
+      }
+    }
+  }
+
+  tileset_ruleset_reset(tileset);
+}
+
+/****************************************************************************
+  Received packet indicating that all rulesets have now been received.
+****************************************************************************/
+void handle_rulesets_ready(void)
+{
+  /* Setup road hiders caches */
+  road_type_iterate(proad) {
+    proad->hiders = road_type_list_new();
+    road_type_iterate(phider) {
+      if (BV_ISSET(proad->hidden_by, road_index(phider))) {
+        road_type_list_append(proad->hiders, phider);
+      }
+    } road_type_iterate_end;
+  } road_type_iterate_end;
+
+  unit_class_iterate(pclass) {
+    set_unit_class_caches(pclass);
+  } unit_class_iterate_end;
+
+  unit_type_iterate(ptype) {
+    set_unit_type_caches(ptype);
+  } unit_type_iterate_end;
+
+  /* Adjust editor for changed ruleset. */
+  editor_ruleset_changed();
+
+  /* We are not going to crop any more sprites from big sprites, free them. */
+  finish_loading_sprites(tileset);
 }
 
 /****************************************************************************
@@ -2643,12 +3011,21 @@ void handle_ruleset_unit_class(const struct packet_ruleset_unit_class *p)
 
   fc_assert_ret_msg(NULL != c, "Bad unit_class %d.", p->id);
 
-  names_set(&c->name, p->name, p->rule_name);
+  names_set(&c->name, NULL, p->name, p->rule_name);
   c->move_type   = p->move_type;
-  c->min_speed   = p->min_speed;
-  c->hp_loss_pct = p->hp_loss_pct;
-  c->hut_behavior = p->hut_behavior;
-  c->flags       = p->flags;
+  if (has_capability("extended_move_rate", client.conn.capability)) {
+    c->min_speed = p->min_speed_new;
+  } else {
+    c->min_speed = p->min_speed_old;
+  }
+  c->hp_loss_pct        = p->hp_loss_pct;
+  c->hut_behavior       = p->hut_behavior;
+  if (has_capability("nonnatdef", client.conn.capability)) {
+    c->non_native_def_pct = p->non_native_def_pct;
+  } else {
+    c->non_native_def_pct = 100; /* Sensible default */
+  }
+  c->flags              = p->flags;
 }
 
 /****************************************************************************
@@ -2661,7 +3038,7 @@ void handle_ruleset_unit(const struct packet_ruleset_unit *p)
 
   fc_assert_ret_msg(NULL != u, "Bad unit_type %d.", p->id);
 
-  names_set(&u->name, p->name, p->rule_name);
+  names_set(&u->name, NULL, p->name, p->rule_name);
   sz_strlcpy(u->graphic_str, p->graphic_str);
   sz_strlcpy(u->graphic_alt, p->graphic_alt);
   sz_strlcpy(u->sound_move, p->sound_move);
@@ -2674,7 +3051,11 @@ void handle_ruleset_unit(const struct packet_ruleset_unit *p)
   u->pop_cost           = p->pop_cost;
   u->attack_strength    = p->attack_strength;
   u->defense_strength   = p->defense_strength;
-  u->move_rate          = p->move_rate;
+  if (has_capability("extended_move_rate", client.conn.capability)) {
+    u->move_rate        = p->move_rate_new;
+  } else {
+    u->move_rate        = p->move_rate_old;
+  }
   u->require_advance    = advance_by_number(p->tech_requirement);
   u->need_improvement   = improvement_by_number(p->impr_requirement);
   u->need_government    = government_by_number(p->gov_requirement);
@@ -2684,6 +3065,7 @@ void handle_ruleset_unit(const struct packet_ruleset_unit *p)
   u->firepower          = p->firepower;
   u->obsoleted_by       = utype_by_number(p->obsoleted_by);
   u->converted_to       = utype_by_number(p->converted_to);
+  u->convert_time       = p->convert_time;
   u->fuel               = p->fuel;
   u->flags              = p->flags;
   u->roles              = p->roles;
@@ -2698,18 +3080,71 @@ void handle_ruleset_unit(const struct packet_ruleset_unit *p)
   u->city_size          = p->city_size;
   u->cargo              = p->cargo;
   u->targets            = p->targets;
+  u->embarks            = p->embarks;
+  u->disembarks         = p->disembarks;
 
-  u->veteran_levels = 0; /* not used in the client */
+  if (p->veteran_levels == 0) {
+    u->veteran = NULL;
+  } else {
+    const int *move_bonus
+      = has_capability("extended_move_rate", client.conn.capability)
+        ? p->move_bonus_new : p->move_bonus_old;
 
-  for (i = 0; i < MAX_VET_LEVELS; i++) {
-    names_set(&u->veteran[i].name, p->veteran_name[i], NULL);
-    u->veteran[i].power_fact = p->power_fact[i];
-    u->veteran[i].move_bonus = p->move_bonus[i];
+    u->veteran = veteran_system_new(p->veteran_levels);
+
+    for (i = 0; i < p->veteran_levels; i++) {
+      veteran_system_definition(u->veteran, i, p->veteran_name[i],
+                                p->power_fact[i], move_bonus[i], 0, 0);
+    }
   }
 
   PACKET_STRVEC_EXTRACT(u->helptext, p->helptext);
 
   tileset_setup_unit_type(tileset, u);
+}
+
+/****************************************************************************
+  Packet ruleset_unit_bonus handler.
+****************************************************************************/
+void handle_ruleset_unit_bonus(const struct packet_ruleset_unit_bonus *p)
+{
+  struct unit_type *u = utype_by_number(p->unit);
+  struct combat_bonus *bonus;
+
+  fc_assert_ret_msg(NULL != u, "Bad unit_type %d.", p->unit);
+
+  bonus = malloc(sizeof(*bonus));
+
+  bonus->flag  = p->flag;
+  bonus->type  = p->type;
+  bonus->value = p->value;
+
+  combat_bonus_list_append(u->bonuses, bonus);
+}
+
+/****************************************************************************
+  Packet ruleset_unit_flag handler.
+****************************************************************************/
+void handle_ruleset_unit_flag(const struct packet_ruleset_unit_flag *p)
+{
+  const char *flagname;
+  const char *helptxt;
+
+  fc_assert_ret_msg(p->id >= UTYF_USER_FLAG_1 && p->id <= UTYF_LAST_USER_FLAG, "Bad user flag %d.", p->id);
+
+  if (p->name[0] == '\0') {
+    flagname = NULL;
+  } else {
+    flagname = p->name;
+  }
+
+  if (p->helptxt[0] == '\0') {
+    helptxt = NULL;
+  } else {
+    helptxt = p->helptxt;
+  }
+
+  set_user_unit_type_flag_name(p->id, flagname, helptxt);
 }
 
 /****************************************************************************
@@ -2721,7 +3156,7 @@ void handle_ruleset_tech(const struct packet_ruleset_tech *p)
 
   fc_assert_ret_msg(NULL != a, "Bad advance %d.", p->id);
 
-  names_set(&a->name, p->name, p->rule_name);
+  names_set(&a->name, NULL, p->name, p->rule_name);
   sz_strlcpy(a->graphic_str, p->graphic_str);
   sz_strlcpy(a->graphic_alt, p->graphic_alt);
   a->require[AR_ONE] = advance_by_number(p->req[AR_ONE]);
@@ -2736,6 +3171,31 @@ void handle_ruleset_tech(const struct packet_ruleset_tech *p)
 }
 
 /****************************************************************************
+  Packet ruleset_tech_flag handler.
+****************************************************************************/
+void handle_ruleset_tech_flag(const struct packet_ruleset_tech_flag *p)
+{
+  const char *flagname;
+  const char *helptxt;
+
+  fc_assert_ret_msg(p->id >= TECH_USER_1 && p->id <= TECH_USER_LAST, "Bad user flag %d.", p->id);
+
+  if (p->name[0] == '\0') {
+    flagname = NULL;
+  } else {
+    flagname = p->name;
+  }
+
+  if (p->helptxt[0] == '\0') {
+    helptxt = NULL;
+  } else {
+    helptxt = p->helptxt;
+  }
+
+  set_user_tech_flag_name(p->id, flagname, helptxt);
+}
+
+/****************************************************************************
   Packet ruleset_building handler.
 ****************************************************************************/
 void handle_ruleset_building(const struct packet_ruleset_building *p)
@@ -2746,7 +3206,7 @@ void handle_ruleset_building(const struct packet_ruleset_building *p)
   fc_assert_ret_msg(NULL != b, "Bad improvement %d.", p->id);
 
   b->genus = p->genus;
-  names_set(&b->name, p->name, p->rule_name);
+  names_set(&b->name, NULL, p->name, p->rule_name);
   sz_strlcpy(b->graphic_str, p->graphic_str);
   sz_strlcpy(b->graphic_alt, p->graphic_alt);
   for (i = 0; i < p->reqs_count; i++) {
@@ -2782,7 +3242,7 @@ void handle_ruleset_building(const struct packet_ruleset_building *p)
       }
     } improvement_iterate_end;
   }
-#endif
+#endif /* DEBUG */
 
   b->allows_units = FALSE;
   unit_type_iterate(ut) {
@@ -2812,7 +3272,7 @@ void handle_ruleset_government(const struct packet_ruleset_government *p)
   }
   fc_assert(gov->reqs.size == p->reqs_count);
 
-  names_set(&gov->name, p->name, p->rule_name);
+  names_set(&gov->name, NULL, p->name, p->rule_name);
   sz_strlcpy(gov->graphic_str, p->graphic_str);
   sz_strlcpy(gov->graphic_alt, p->graphic_alt);
 
@@ -2846,8 +3306,9 @@ void handle_ruleset_terrain(const struct packet_ruleset_terrain *p)
 
   fc_assert_ret_msg(NULL != pterrain, "Bad terrain %d.", p->id);
 
+  pterrain->tclass = p->tclass;
   pterrain->native_to = p->native_to;
-  names_set(&pterrain->name, p->name, p->rule_name);
+  names_set(&pterrain->name, NULL, p->name, p->rule_name);
   sz_strlcpy(pterrain->graphic_str, p->graphic_str);
   sz_strlcpy(pterrain->graphic_alt, p->graphic_alt);
   pterrain->movement_cost = p->movement_cost;
@@ -2872,8 +3333,12 @@ void handle_ruleset_terrain(const struct packet_ruleset_terrain *p)
   }
   pterrain->resources[p->num_resources] = NULL;
 
+  output_type_iterate(o) {
+    pterrain->road_output_incr_pct[o] = p->road_output_incr_pct[o];
+  } output_type_iterate_end;
+
+  pterrain->base_time = p->base_time;
   pterrain->road_time = p->road_time;
-  pterrain->road_trade_incr = p->road_trade_incr;
   pterrain->irrigation_result = terrain_by_number(p->irrigation_result);
   pterrain->irrigation_food_incr = p->irrigation_food_incr;
   pterrain->irrigation_time = p->irrigation_time;
@@ -2882,15 +3347,42 @@ void handle_ruleset_terrain(const struct packet_ruleset_terrain *p)
   pterrain->mining_time = p->mining_time;
   pterrain->transform_result = terrain_by_number(p->transform_result);
   pterrain->transform_time = p->transform_time;
-  pterrain->rail_time = p->rail_time;
   pterrain->clean_pollution_time = p->clean_pollution_time;
   pterrain->clean_fallout_time = p->clean_fallout_time;
 
   pterrain->flags = p->flags;
 
+  fc_assert_ret(pterrain->rgb == NULL);
+  pterrain->rgb = rgbcolor_new(p->color_red, p->color_green, p->color_blue);
+
   PACKET_STRVEC_EXTRACT(pterrain->helptext, p->helptext);
 
   tileset_setup_tile_type(tileset, pterrain);
+}
+
+/****************************************************************************
+  Packet ruleset_terrain_flag handler.
+****************************************************************************/
+void handle_ruleset_terrain_flag(const struct packet_ruleset_terrain_flag *p)
+{
+  const char *flagname;
+  const char *helptxt;
+
+  fc_assert_ret_msg(p->id >= TER_USER_1 && p->id <= TER_USER_LAST, "Bad user flag %d.", p->id);
+
+  if (p->name[0] == '\0') {
+    flagname = NULL;
+  } else {
+    flagname = p->name;
+  }
+
+  if (p->helptxt[0] == '\0') {
+    helptxt = NULL;
+  } else {
+    helptxt = p->helptxt;
+  }
+
+  set_user_terrain_flag_name(p->id, flagname, helptxt);
 }
 
 /****************************************************************************
@@ -2902,7 +3394,7 @@ void handle_ruleset_resource(const struct packet_ruleset_resource *p)
 
   fc_assert_ret_msg(NULL != presource, "Bad resource %d.", p->id);
 
-  names_set(&presource->name, p->name, p->rule_name);
+  names_set(&presource->name, NULL, p->name, p->rule_name);
   sz_strlcpy(presource->graphic_str, p->graphic_str);
   sz_strlcpy(presource->graphic_alt, p->graphic_alt);
 
@@ -2923,10 +3415,11 @@ void handle_ruleset_base(const struct packet_ruleset_base *p)
 
   fc_assert_ret_msg(NULL != pbase, "Bad base %d.", p->id);
 
-  names_set(&pbase->name, p->name, p->rule_name);
+  names_set(&pbase->name, NULL, p->name, p->rule_name);
   sz_strlcpy(pbase->graphic_str, p->graphic_str);
   sz_strlcpy(pbase->graphic_alt, p->graphic_alt);
   sz_strlcpy(pbase->activity_gfx, p->activity_gfx);
+  sz_strlcpy(pbase->act_gfx_alt, p->act_gfx_alt);
   pbase->buildable = p->buildable;
   pbase->pillageable = p->pillageable;
 
@@ -2953,6 +3446,90 @@ void handle_ruleset_base(const struct packet_ruleset_base *p)
 }
 
 /****************************************************************************
+  Handle a packet about a particular road type.
+****************************************************************************/
+void handle_ruleset_road(const struct packet_ruleset_road *p)
+{
+  struct road_type *proad = road_by_number(p->id);
+  int i;
+
+  fc_assert_ret_msg(NULL != proad, "Bad road %d.", p->id);
+
+  names_set(&proad->name, NULL, p->name, p->rule_name);
+  sz_strlcpy(proad->graphic_str, p->graphic_str);
+  sz_strlcpy(proad->graphic_alt, p->graphic_alt);
+  sz_strlcpy(proad->activity_gfx, p->activity_gfx);
+  sz_strlcpy(proad->act_gfx_alt, p->act_gfx_alt);
+
+  if (has_capability("extended_move_rate", client.conn.capability)) {
+    proad->move_cost = p->move_cost_new;
+  } else {
+    proad->move_cost = p->move_cost_old;
+  }
+  proad->move_mode = p->move_mode;
+  proad->build_time = p->build_time;
+  proad->defense_bonus = p->defense_bonus;
+  proad->buildable = p->buildable;
+  proad->pillageable = p->pillageable;
+
+  output_type_iterate(o) {
+    proad->tile_incr_const[o] = p->tile_incr_const[o];
+    proad->tile_incr[o] = p->tile_incr[o];
+    proad->tile_bonus[o] = p->tile_bonus[o];
+  } output_type_iterate_end;
+
+  for (i = 0; i < p->reqs_count; i++) {
+    requirement_vector_append(&proad->reqs, p->reqs[i]);
+  }
+  fc_assert(proad->reqs.size == p->reqs_count);
+
+  proad->compat = p->compat;
+
+  proad->native_to = p->native_to;
+  proad->hidden_by = p->hidden_by;
+  proad->flags = p->flags;
+
+  PACKET_STRVEC_EXTRACT(proad->helptext, p->helptext);
+
+  tileset_setup_road(tileset, proad);
+}
+
+/****************************************************************************
+  Handle a packet about a particular disaster type.
+****************************************************************************/
+void handle_ruleset_disaster(const struct packet_ruleset_disaster *p)
+{
+  struct disaster_type *pdis = disaster_by_number(p->id);
+  int i;
+
+  fc_assert_ret_msg(NULL != pdis, "Bad disaster %d.", p->id);
+
+  names_set(&pdis->name, NULL, p->name, p->rule_name);
+
+  for (i = 0; i < p->reqs_count; i++) {
+    requirement_vector_append(&pdis->reqs, p->reqs[i]);
+  }
+  fc_assert(pdis->reqs.size == p->reqs_count);
+
+  pdis->frequency = p->frequency;
+
+  pdis->effects = p->effects;
+}
+
+/****************************************************************************
+  Handle a packet about a particular trade route type.
+****************************************************************************/
+void handle_ruleset_trade(const struct packet_ruleset_trade *p)
+{
+  struct trade_route_settings *pset = trade_route_settings_by_type(p->id);
+
+  if (pset != NULL) {
+    pset->trade_pct  = p->trade_pct;
+    pset->cancelling = p->cancelling;
+  }
+}
+
+/****************************************************************************
   Handle the terrain control ruleset packet sent by the server.
 ****************************************************************************/
 void handle_ruleset_terrain_control
@@ -2961,10 +3538,30 @@ void handle_ruleset_terrain_control
   /* Since terrain_control is the same as packet_ruleset_terrain_control
    * we can just copy the data directly. */
   terrain_control = *p;
+  /* terrain_control.move_fragments likely changed */
+  init_move_fragments();
 }
 
 /****************************************************************************
-  Handle the list of groups, sent by the ruleset.
+  Handle the list of nation sets, sent as part of the ruleset.
+****************************************************************************/
+void handle_ruleset_nation_sets
+    (const struct packet_ruleset_nation_sets *packet)
+{
+  int i;
+
+  for (i = 0; i < packet->nsets; i++) {
+    struct nation_set *pset;
+
+    pset = nation_set_new(packet->names[i], packet->rule_names[i],
+                          packet->descriptions[i]);
+    fc_assert(NULL != pset);
+    fc_assert(i == nation_set_index(pset));
+  }
+}
+
+/****************************************************************************
+  Handle the list of nation groups, sent as part of the ruleset.
 ****************************************************************************/
 void handle_ruleset_nation_groups
     (const struct packet_ruleset_nation_groups *packet)
@@ -2981,7 +3578,7 @@ void handle_ruleset_nation_groups
 }
 
 /****************************************************************************
-  Packet ruleset_nation handler.
+  Handle initial ruleset nation info.
 ****************************************************************************/
 void handle_ruleset_nation(const struct packet_ruleset_nation *packet)
 {
@@ -2990,8 +3587,16 @@ void handle_ruleset_nation(const struct packet_ruleset_nation *packet)
 
   fc_assert_ret_msg(NULL != pnation, "Bad nation %d.", packet->id);
 
-  names_set(&pnation->adjective, packet->adjective, packet->rule_name);
-  name_set(&pnation->noun_plural, packet->noun_plural);
+  if (packet->translation_domain[0] != '\0') {
+    size_t len = strlen(packet->translation_domain) + 1;
+    pnation->translation_domain = fc_malloc(len);
+    fc_strlcpy(pnation->translation_domain, packet->translation_domain, len);
+  } else {
+    pnation->translation_domain = NULL;
+  }
+  names_set(&pnation->adjective, pnation->translation_domain,
+            packet->adjective, packet->rule_name);
+  name_set(&pnation->noun_plural, pnation->translation_domain, packet->noun_plural);
   sz_strlcpy(pnation->flag_graphic_str, packet->graphic_str);
   sz_strlcpy(pnation->flag_graphic_alt, packet->graphic_alt);
   pnation->city_style = packet->city_style;
@@ -3000,14 +3605,26 @@ void handle_ruleset_nation(const struct packet_ruleset_nation *packet)
                              packet->leader_is_male[i]);
   }
 
-  pnation->is_available = packet->is_available;
+  /* set later by PACKET_NATION_AVAILABILITY */
+  pnation->client.is_pickable = FALSE; 
   pnation->is_playable = packet->is_playable;
   pnation->barb_type = packet->barbarian_type;
 
   if ('\0' != packet->legend[0]) {
-    pnation->legend = fc_strdup(_(packet->legend));
+    pnation->legend = fc_strdup(nation_legend_translation(pnation, packet->legend));
   } else {
     pnation->legend = fc_strdup("");
+  }
+
+  for (i = 0; i < packet->nsets; i++) {
+    struct nation_set *pset = nation_set_by_number(packet->sets[i]);
+
+    if (NULL != pset) {
+      nation_set_list_append(pnation->sets, pset);
+    } else {
+      log_error("handle_ruleset_nation() \"%s\" have unknown set %d.",
+                nation_rule_name(pnation), packet->sets[i]);
+    }
   }
 
   for (i = 0; i < packet->ngroups; i++) {
@@ -3021,7 +3638,42 @@ void handle_ruleset_nation(const struct packet_ruleset_nation *packet)
     }
   }
 
+  pnation->init_government = government_by_number(packet->init_government_id);
+  for (i = 0; i < MAX_NUM_TECH_LIST; i++) {
+    pnation->init_techs[i] = packet->init_techs[i];
+  }
+  for (i = 0; i < MAX_NUM_UNIT_LIST; i++) {
+    pnation->init_units[i] = utype_by_number(packet->init_units[i]);
+  }
+  for (i = 0; i < MAX_NUM_BUILDING_LIST; i++) {
+    pnation->init_buildings[i] = packet->init_buildings[i];
+  }
+
   tileset_setup_nation_flag(tileset, pnation);
+}
+
+/****************************************************************************
+  Handle nation availability info.
+  This can change during pregame so is separate from ruleset_nation.
+****************************************************************************/
+void handle_nation_availability(int ncount, const bool *is_pickable,
+                                bool nationset_change)
+{
+  int i;
+
+  fc_assert_action(ncount == nation_count(),
+                   ncount = MIN(ncount, nation_count()));
+
+  for (i = 0; i < ncount; i++) {
+    nation_by_number(i)->client.is_pickable = is_pickable[i];
+  }
+
+  if (has_capability("nationset_change", client.conn.capability)) {
+//    races_update_pickable(nationset_change);
+  } else {
+    /* Always do full processing as we don't know if it was nationset change or not */
+//    races_update_pickable(FALSE);
+  }
 }
 
 /**************************************************************************
@@ -3043,7 +3695,7 @@ void handle_ruleset_city(const struct packet_ruleset_city *packet)
   fc_assert(cs->reqs.size == packet->reqs_count);
   cs->replaced_by = packet->replaced_by;
 
-  names_set(&cs->name, packet->name, packet->rule_name);
+  names_set(&cs->name, NULL, packet->name, packet->rule_name);
   sz_strlcpy(cs->graphic, packet->graphic);
   sz_strlcpy(cs->graphic_alt, packet->graphic_alt);
   sz_strlcpy(cs->oceanic_graphic, packet->oceanic_graphic);
@@ -3064,10 +3716,36 @@ void handle_ruleset_game(const struct packet_ruleset_game *packet)
   /* Must set num_specialist_types before iterating over them. */
   DEFAULT_SPECIALIST = packet->default_specialist;
 
-  for (i = 0; i < MAX_VET_LEVELS; i++) {
-    game.work_veteran_chance[i] = packet->work_veteran_chance[i];
-    game.veteran_chance[i] = packet->work_veteran_chance[i];
+  fc_assert_ret(packet->veteran_levels > 0);
+
+  game.veteran = veteran_system_new(packet->veteran_levels);
+  game.veteran->levels = packet->veteran_levels;
+
+  for (i = 0; i < MAX_NUM_TECH_LIST; i++) {
+    game.rgame.global_init_techs[i] = packet->global_init_techs[i];
   }
+  for (i = 0; i < MAX_NUM_BUILDING_LIST; i++) {
+    game.rgame.global_init_buildings[i] = packet->global_init_buildings[i];
+  }
+
+  {
+    const int *move_bonus
+      = has_capability("extended_move_rate", client.conn.capability)
+        ? packet->move_bonus_new : packet->move_bonus_old;
+
+    for (i = 0; i < packet->veteran_levels; i++) {
+      veteran_system_definition(game.veteran, i, packet->veteran_name[i],
+                                packet->power_fact[i], move_bonus[i],
+                                0, 0);
+    }
+  }
+
+  fc_assert(game.plr_bg_color == NULL);
+  game.plr_bg_color = rgbcolor_new(packet->background_red,
+                                   packet->background_green,
+                                   packet->background_blue);
+
+  tileset_background_init(tileset);
 }
 
 /****************************************************************************
@@ -3080,8 +3758,10 @@ void handle_ruleset_specialist(const struct packet_ruleset_specialist *p)
 
   fc_assert_ret_msg(NULL != s, "Bad specialist %d.", p->id);
 
-  names_set(&s->name, p->plural_name, p->rule_name);
-  name_set(&s->abbreviation, p->short_name);
+  names_set(&s->name, NULL, p->plural_name, p->rule_name);
+  name_set(&s->abbreviation, NULL, p->short_name);
+
+  sz_strlcpy(s->graphic_alt, p->graphic_alt);
 
   for (j = 0; j < p->reqs_count; j++) {
     requirement_vector_append(&s->reqs, p->reqs[j]);
@@ -3094,7 +3774,7 @@ void handle_ruleset_specialist(const struct packet_ruleset_specialist *p)
 }
 
 /**************************************************************************
-...
+  Handle reply to our city name request.
 **************************************************************************/
 void handle_city_name_suggestion_info(int unit_id, const char *name)
 {
@@ -3107,7 +3787,7 @@ void handle_city_name_suggestion_info(int unit_id, const char *name)
   if (punit) {
     if (ask_city_name) {
       bool other_asking = FALSE;
-      unit_list_iterate(punit->tile->units, other) {
+      unit_list_iterate(unit_tile(punit)->units, other) {
         if (other->client.asking_city_name) {
           other_asking = TRUE;
         }
@@ -3124,7 +3804,7 @@ void handle_city_name_suggestion_info(int unit_id, const char *name)
 }
 
 /**************************************************************************
-...
+  Handle reply to diplomat action request
 **************************************************************************/
 void handle_unit_diplomat_answer(int diplomat_id, int target_id, int cost,
                                  enum diplomat_actions action_type)
@@ -3141,7 +3821,7 @@ void handle_unit_diplomat_answer(int diplomat_id, int target_id, int cost,
     if (punit) {
       if (NULL != client.conn.playing
           && !client.conn.playing->ai_controlled) {
-        popup_bribe_dialog(punit, cost);
+        popup_bribe_dialog(pdiplomat, punit, cost);
       }
     }
     break;
@@ -3149,7 +3829,7 @@ void handle_unit_diplomat_answer(int diplomat_id, int target_id, int cost,
     if (pcity) {
       if (NULL != client.conn.playing
           && !client.conn.playing->ai_controlled) {
-        popup_incite_dialog(pcity, cost);
+        popup_incite_dialog(pdiplomat, pcity, cost);
       }
     }
     break;
@@ -3166,7 +3846,7 @@ void handle_unit_diplomat_answer(int diplomat_id, int target_id, int cost,
 }
 
 /**************************************************************************
-...
+  Handle list of potenttial buildings to sabotage.
 **************************************************************************/
 void handle_city_sabotage_list(int diplomat_id, int city_id,
                                bv_imprs improvements)
@@ -3185,17 +3865,26 @@ void handle_city_sabotage_list(int diplomat_id, int city_id,
                                               improvement_index(pimprove)));
     } improvement_iterate_end;
 
-    popup_sabotage_dialog(pcity);
+    popup_sabotage_dialog(pdiplomat, pcity);
   }
 }
 
 /****************************************************************************
-  Pass the packet on to be displayed in a gui-specific endgame dialog.
+  Pass the header information about things be displayed in a gui-specific
+  endgame dialog.
 ****************************************************************************/
 void handle_endgame_report(const struct packet_endgame_report *packet)
 {
   set_client_state(C_S_OVER);
-  endgame_report_dialog_popup(packet);
+//  endgame_report_dialog_start(packet);
+}
+
+/****************************************************************************
+  Pass endgame report about single player.
+****************************************************************************/
+void handle_endgame_player(const struct packet_endgame_player *packet)
+{
+//  endgame_report_dialog_player(packet);
 }
 
 /****************************************************************************
@@ -3218,7 +3907,7 @@ void handle_player_attribute_chunk_CLIENT
 }
 
 /**************************************************************************
-...
+  Handle request to start processing packet.
 **************************************************************************/
 void handle_processing_started(void)
 {
@@ -3236,7 +3925,7 @@ void handle_processing_started(void)
 }
 
 /**************************************************************************
-...
+  Handle request to stop processing packet.
 **************************************************************************/
 void handle_processing_finished(void)
 {
@@ -3256,7 +3945,7 @@ void handle_processing_finished(void)
 }
 
 /**************************************************************************
-...
+  Notify interested parties about incoming packet.
 **************************************************************************/
 void notify_about_incoming_packet(struct connection *pc,
                                   int packet_type, int size)
@@ -3266,7 +3955,7 @@ void notify_about_incoming_packet(struct connection *pc,
 }
 
 /**************************************************************************
-...
+  Notify interested parties about outgoing packet.
 **************************************************************************/
 void notify_about_outgoing_packet(struct connection *pc,
                                   int packet_type, int size,
@@ -3301,7 +3990,7 @@ void handle_thaw_client(void)
 }
 
 /**************************************************************************
-...
+  Reply to 'ping' packet with 'pong'
 **************************************************************************/
 void handle_conn_ping(void)
 {
@@ -3309,7 +3998,7 @@ void handle_conn_ping(void)
 }
 
 /**************************************************************************
-...
+  Handle server shutdown.
 **************************************************************************/
 void handle_server_shutdown(void)
 {

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -35,11 +35,6 @@
 
 /* server/advisors */
 #include "advdata.h"
-
-/* ai */
-#include "aicity.h"
-#include "aiunit.h"
-#include "defaultai.h"
 
 #include "srv_log.h"
 
@@ -82,44 +77,6 @@ void real_tech_log(const char *file, const char *function, int line,
 }
 
 /**************************************************************************
-  Log player messages, they will appear like this
-    
-  where ti is timer, co countdown and lo love for target, who is e.
-**************************************************************************/
-void real_diplo_log(const char *file, const char *function, int line,
-                    enum log_level level, bool notify,
-                    const struct player *pplayer,
-                    const struct player *aplayer, const char *msg, ...)
-{
-  char buffer[500];
-  char buffer2[500];
-  va_list ap;
-  const struct ai_dip_intel *adip;
-
-  /* Don't use ai_data_get since it can have side effects. */
-  adip = ai_diplomacy_get(pplayer, aplayer);
-
-  fc_snprintf(buffer, sizeof(buffer), "%s->%s(l%d,c%d,d%d%s): ",
-              player_name(pplayer),
-              player_name(aplayer),
-              pplayer->ai_common.love[player_index(aplayer)],
-              adip->countdown,
-              adip->distance,
-              adip->is_allied_with_enemy ? "?" :
-              (adip->at_war_with_ally ? "!" : ""));
-
-  va_start(ap, msg);
-  fc_vsnprintf(buffer2, sizeof(buffer2), msg, ap);
-  va_end(ap);
-
-  cat_snprintf(buffer, sizeof(buffer), "%s", buffer2);
-  if (notify) {
-    notify_conn(NULL, NULL, E_AI_DEBUG, ftc_log, "%s", buffer);
-  }
-  do_log(file, function, line, FALSE, level, "%s", buffer);
-}
-
-/**************************************************************************
   Log city messages, they will appear like this
     2: Polish Romenna(5,35) [s1 d106 u11 g1] must have Archers ...
 **************************************************************************/
@@ -130,14 +87,15 @@ void real_city_log(const char *file, const char *function, int line,
   char buffer[500];
   char buffer2[500];
   va_list ap;
-  struct ai_city *city_data = def_ai_city_data(pcity);
+  char aibuf[500] = "\0";
 
-  fc_snprintf(buffer, sizeof(buffer), "%s %s(%d,%d) [s%d d%d u%d g%d] ",
+  CALL_PLR_AI_FUNC(log_fragment_city, city_owner(pcity), aibuf, sizeof(aibuf), pcity);
+
+  fc_snprintf(buffer, sizeof(buffer), "%s %s(%d,%d) [s%d] {%s} ",
               nation_rule_name(nation_of_city(pcity)),
               city_name(pcity),
-              TILE_XY(pcity->tile), pcity->size,
-              city_data->danger, city_data->urgency,
-              city_data->grave_danger);
+              TILE_XY(pcity->tile), city_size_get(pcity),
+              aibuf);
 
   va_start(ap, msg);
   fc_vsnprintf(buffer2, sizeof(buffer2), msg, ap);
@@ -164,82 +122,24 @@ void real_unit_log(const char *file, const char *function, int line,
   char buffer2[500];
   va_list ap;
   int gx, gy;
-  struct unit_ai *unit_data = def_ai_unit_data(punit);
+  char aibuf[500] = "\0";
+
+  CALL_PLR_AI_FUNC(log_fragment_unit, unit_owner(punit), aibuf, sizeof(aibuf), punit);
 
   if (punit->goto_tile) {
-    gx = punit->goto_tile->x;
-    gy = punit->goto_tile->y;
+    index_to_map_pos(&gx, &gy, tile_index(punit->goto_tile));
   } else {
     gx = gy = -1;
   }
-  
+
   fc_snprintf(buffer, sizeof(buffer),
-	      "%s %s[%d] %s (%d,%d)->(%d,%d){%d,%d} ",
+	      "%s %s[%d] %s (%d,%d)->(%d,%d){%s} ",
               nation_rule_name(nation_of_unit(punit)),
               unit_rule_name(punit),
               punit->id,
 	      get_activity_text(punit->activity),
-	      TILE_XY(punit->tile),
-	      gx, gy,
-              unit_data->bodyguard, unit_data->ferryboat);
-
-  va_start(ap, msg);
-  fc_vsnprintf(buffer2, sizeof(buffer2), msg, ap);
-  va_end(ap);
-
-  cat_snprintf(buffer, sizeof(buffer), "%s", buffer2);
-  if (notify) {
-    notify_conn(NULL, NULL, E_AI_DEBUG, ftc_log, "%s", buffer);
-  }
-  do_log(file, function, line, FALSE, level, "%s", buffer);
-}
-
-/**************************************************************************
-  Log message for bodyguards. They will appear like this
-    2: Polish Mech. Inf.[485] bodyguard (38,22){Riflemen:574@37,23} was ...
-  note that these messages are likely to wrap if long.
-**************************************************************************/
-void real_bodyguard_log(const char *file, const char *function, int line,
-                        enum log_level level,  bool notify,
-                        const struct unit *punit, const char *msg, ...)
-{
-  char buffer[500];
-  char buffer2[500];
-  va_list ap;
-  const struct unit *pcharge;
-  const struct city *pcity;
-  int id = -1;
-  int charge_x = -1;
-  int charge_y = -1;
-  const char *type = "guard";
-  const char *s = "none";
-  struct unit_ai *unit_data = def_ai_unit_data(punit);
-
-  pcity = game_city_by_number(unit_data->charge);
-  pcharge = game_unit_by_number(unit_data->charge);
-  if (pcharge) {
-    charge_x = pcharge->tile->x;
-    charge_y = pcharge->tile->y;
-    id = pcharge->id;
-    type = "bodyguard";
-    s = unit_rule_name(pcharge);
-  } else if (pcity) {
-    charge_x = pcity->tile->x;
-    charge_y = pcity->tile->y;
-    id = pcity->id;
-    type = "cityguard";
-    s = city_name(pcity);
-  }
-  /* else perhaps the charge died */
-
-  fc_snprintf(buffer, sizeof(buffer),
-              "%s %s[%d] %s (%d,%d){%s:%d@%d,%d} ",
-              nation_rule_name(nation_of_unit(punit)),
-              unit_rule_name(punit),
-              punit->id,
-              type,
-              TILE_XY(punit->tile),
-              s, id, charge_x, charge_y);
+	      TILE_XY(unit_tile(punit)),
+	      gx, gy, aibuf);
 
   va_start(ap, msg);
   fc_vsnprintf(buffer2, sizeof(buffer2), msg, ap);
@@ -256,34 +156,27 @@ void real_bodyguard_log(const char *file, const char *function, int line,
   Measure the time between the calls.  Used to see where in the AI too
   much CPU is being used.
 **************************************************************************/
-void TIMING_LOG(enum ai_timer timer, enum ai_timer_activity activity)
+void timing_log_real(enum ai_timer timer, enum ai_timer_activity activity)
 {
   static int turn = -1;
-  int i;
-
-  if (turn == -1) {
-    for (i = 0; i < AIT_LAST; i++) {
-      aitimer[i][0] = new_timer(TIMER_CPU, TIMER_ACTIVE);
-      aitimer[i][1] = new_timer(TIMER_CPU, TIMER_ACTIVE);
-      recursion[i] = 0;
-    }
-  }
 
   if (game.info.turn != turn) {
+    int i;
+
     turn = game.info.turn;
     for (i = 0; i < AIT_LAST; i++) {
-      clear_timer(aitimer[i][0]);
+      timer_clear(aitimer[i][0]);
     }
     fc_assert(activity == TIMER_START);
   }
 
   if (activity == TIMER_START && recursion[timer] == 0) {
-    start_timer(aitimer[timer][0]);
-    start_timer(aitimer[timer][1]);
+    timer_start(aitimer[timer][0]);
+    timer_start(aitimer[timer][1]);
     recursion[timer]++;
   } else if (activity == TIMER_STOP && recursion[timer] == 1) {
-    stop_timer(aitimer[timer][0]);
-    stop_timer(aitimer[timer][1]);
+    timer_stop(aitimer[timer][0]);
+    timer_stop(aitimer[timer][1]);
     recursion[timer]--;
   }
 }
@@ -291,18 +184,31 @@ void TIMING_LOG(enum ai_timer timer, enum ai_timer_activity activity)
 /**************************************************************************
   Print results
 **************************************************************************/
-void TIMING_RESULTS(void)
+void timing_results_real(void)
 {
   char buf[200];
 
+#ifdef LOG_TIMERS
+
 #define AILOG_OUT(text, which)                                              \
   fc_snprintf(buf, sizeof(buf), "  %s: %g sec turn, %g sec game", text,     \
-              read_timer_seconds(aitimer[which][0]),                        \
-              read_timer_seconds(aitimer[which][1]));                       \
+              timer_read_seconds(aitimer[which][0]),                        \
+              timer_read_seconds(aitimer[which][1]));                       \
   log_test("%s", buf);                                                      \
   notify_conn(NULL, NULL, E_AI_DEBUG, ftc_log, "%s", buf);
 
   log_test("  --- AI timing results ---");
+
+#else  /* LOG_TIMERS */
+
+#define AILOG_OUT(text, which)                                          \
+  fc_snprintf(buf, sizeof(buf), "  %s: %g sec turn, %g sec game", text, \
+              timer_read_seconds(aitimer[which][0]),                    \
+              timer_read_seconds(aitimer[which][1]));                   \
+  notify_conn(NULL, NULL, E_AI_DEBUG, ftc_log, "%s", buf);
+
+#endif /* LOG_TIMERS */
+
   notify_conn(NULL, NULL, E_AI_DEBUG, ftc_log,
               "  --- AI timing results ---");
   AILOG_OUT("Total AI time", AIT_ALL);
@@ -334,4 +240,31 @@ void TIMING_RESULTS(void)
   AILOG_OUT(" - Settler want", AIT_CITY_SETTLERS);
   AILOG_OUT("Citizen arrange", AIT_CITIZEN_ARRANGE);
   AILOG_OUT("Tech", AIT_TECH);
+}
+
+/**************************************************************************
+  Initialize AI timing system
+**************************************************************************/
+void timing_log_init(void)
+{
+  int i;
+
+  for (i = 0; i < AIT_LAST; i++) {
+    aitimer[i][0] = timer_new(TIMER_CPU, TIMER_ACTIVE);
+    aitimer[i][1] = timer_new(TIMER_CPU, TIMER_ACTIVE);
+    recursion[i] = 0;
+  }
+}
+
+/**************************************************************************
+  Free AI timing system resources
+**************************************************************************/
+void timing_log_free(void)
+{
+  int i;
+
+  for (i = 0; i < AIT_LAST; i++) {
+    timer_destroy(aitimer[i][0]);
+    timer_destroy(aitimer[i][1]);
+  }
 }

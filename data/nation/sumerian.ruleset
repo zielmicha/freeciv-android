@@ -1,8 +1,10 @@
 [nation_sumerian]
 
+translation_domain="freeciv"
+
 name=_("Sumerian")
 plural=_("?plural:Sumerians")
-groups="Ancient", "Asian"
+groups="Ancient", "Asian", "Core"
 legend=_("Sumer controlled southern Mesopotamia until the rise of\
  Babylonia. Tablets of Sumerian writing some 5500 years old have been\
  found, pre-dating every other writing in history.")
@@ -23,8 +25,8 @@ leaders = {
 
 ruler_titles = {
  "government", "male_title",    "female_title"
+ "Anarchy",    _("Usurper %s"), _("?female:Usurper %s")
  "Monarchy",   _("%s Lugal"),   _("?female:%s Lugal")
- "Communism",  _("%s Ensi"),    _("?female:%s Ensi")
 }
 
 flag = "sumeria"
@@ -33,7 +35,6 @@ city_style = "Babylonian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations="assyrian", "egyptian", "babylonian"
 

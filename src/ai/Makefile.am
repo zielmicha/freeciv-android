@@ -1,43 +1,40 @@
 ## Process this file with automake to produce Makefile.in
 
-noinst_LTLIBRARIES = libcivai.la
+module_dirs = 
 
-AM_CPPFLAGS = -I$(top_srcdir)/utility -I$(srcdir)/../common -I$(top_srcdir)/server -I$(top_srcdir)/server/advisors -I$(top_srcdir)/common/aicore -I$(top_srcdir)/server/generator
+if AI_MOD_DEFAULT_NEEDED
+module_dirs += default
+endif
 
-libcivai_la_SOURCES = \
-		advdomestic.c	\
-		advdomestic.h	\
-		advmilitary.c	\
-		advmilitary.h	\
-		advdiplomacy.c	\
-		advdiplomacy.h	\
-		advspace.c	\
-		advspace.h	\
-		aiair.c		\
-		aiair.h		\
-		aicity.c	\
-		aicity.h	\
-		aiferry.c	\
-		aiferry.h	\
-		aiguard.c	\
-		aiguard.h	\
-		aihand.c	\
-		aihand.h	\
-		aihunt.c	\
-		aihunt.h	\
-		aiparatrooper.c \
-		aiparatrooper.h \
-		aisettler.c	\
-		aisettler.h	\
-		aitech.c	\
-		aitech.h	\
-		aitools.c	\
-		aitools.h	\
-		aiunit.c	\
-		aiunit.h	\
-		aidiplomat.c	\
-		aidiplomat.h	\
-		defaultai.c	\
-		defaultai.h
+if AI_MOD_STATIC_CLASSIC
+module_dirs += classic
+endif
 
-libcivai_la_LIBADD = -lm
+if AI_MOD_STATIC_THREADED
+module_dirs += threaded
+endif
+
+AM_CPPFLAGS = -I$(top_srcdir)/utility -I$(top_srcdir)/common
+
+if AI_MODULES
+if !AI_MOD_STATIC_CLASSIC
+module_dirs += classic
+endif
+if EXP_AI_MODULES
+if !AI_MOD_STATIC_THREADED
+module_dirs += threaded
+endif
+module_dirs += stub
+else
+# AI module loading supported, but experimental modules not built
+endif
+endif
+
+SUBDIRS = $(module_dirs)
+
+noinst_LTLIBRARIES = libaicommon.la
+
+libaicommon_la_SOURCES = \
+	aitraits.c	\
+	aitraits.h
+

@@ -3,7 +3,7 @@
 ** Written by Waldemar Celes
 ** TeCGraf/PUC-Rio
 ** Apr 2003
-** $Id: $
+** $Id: tolua.h,v 1.12 2011/01/13 13:43:45 fabraham Exp $
 */
 
 /* This code is free software; you can redistribute it and/or modify it. 
@@ -17,14 +17,14 @@
 #define TOLUA_H
 
 #ifndef TOLUA_API
-# ifdef TOLUA_DLL
+# ifdef TOLUA5_DLL
 #  define TOLUA_API __declspec(dllexport)
 # else
 #  define TOLUA_API
 # endif
 #endif
 
-#define TOLUA_VERSION "tolua 5.1.3"
+#define TOLUA_VERSION "tolua 5.2.0"
 
 #ifdef __cplusplus
 extern "C" {

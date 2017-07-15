@@ -83,6 +83,8 @@
  *       int (*compar) (const foo_t *const *, const foo_t *const *));
  *    void foo_list_shuffle(struct foo_list *plist);
  *    void foo_list_reverse(struct foo_list *plist);
+ *    void foo_list_allocate_mutex(struct foo_list *plist);
+ *    void foo_list_release_mutex(struct foo_list *plist);
  *    foo_t *foo_list_link_data(const struct foo_list_link *plink);
  *    struct foo_list_link *
  *        foo_list_link_prev(const struct foo_list_link *plink);
@@ -109,7 +111,7 @@
  * #define foo_list_both_iterate(foolist, plink, pfoo)                      \
  *   TYPED_LIST_BOTH_ITERATE(struct foo_list_link, foo_t,                   \
                              foolist, plink, pfoo)
- * #define foo_list_link_iterate_full_end LIST_BOTH_ITERATE_END
+ * #define foo_list_both_iterate_end LIST_BOTH_ITERATE_END
  *
  * #define foo_list_both_iterate_rev(foolist, pfoo)                         \
  *   TYPED_LIST_BOTH_ITERATE_REV(struct foo_list_link, foo_t,               \
@@ -120,6 +122,10 @@
  * you can have multiple different speclists. For each speclist, this file
  * should be included _once_, inside a .h file which _is_ itself protected
  * against multiple inclusions. */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 #include "genlist.h"
 
@@ -485,6 +491,22 @@ static inline void SPECLIST_FOO(_list_reverse) (SPECLIST_LIST *tthis)
 }
 
 /****************************************************************************
+  Allocate speclist mutex
+****************************************************************************/
+static inline void SPECLIST_FOO(_list_allocate_mutex) (SPECLIST_LIST *tthis)
+{
+  genlist_allocate_mutex((struct genlist *) tthis);
+}
+
+/****************************************************************************
+  Release speclist mutex
+****************************************************************************/
+static inline void SPECLIST_FOO(_list_release_mutex) (SPECLIST_LIST *tthis)
+{
+  genlist_release_mutex((struct genlist *) tthis);
+}
+
+/****************************************************************************
   Return the data of the link.
 ****************************************************************************/
 static inline SPECLIST_TYPE *
@@ -563,6 +585,39 @@ do {                                                                        \
 /* Balance for above: */ 
 #define LIST_ITERATE_END                                                    \
   }                                                                         \
+} while (FALSE);
+
+/* Mutex protected speclist data iterator.
+ * 
+ * Using *_list_remove(NAME_data) is safe in this loop (but it may be
+ * inefficient due to the linear research of the data, see also
+ * *_list_erase()).
+ * Using *_list_clear() will result to use freed data. It must be avoided!
+ *
+ * TYPE_data - The real type of the data in the genlist/speclist.
+ * LIST_tag - Tag of the speclist
+ * ARG_list - The speclist to iterate.
+ * NAME_data - The name of the data iterator (defined inside the macro). */
+#define MUTEXED_LIST_ITERATE(TYPE_data, LIST_tag, ARG_list, NAME_data)      \
+do {                                                                        \
+  const struct genlist_link *NAME_data##_iter;                              \
+  TYPE_data *NAME_data;                                                     \
+  LIST_tag##_list_allocate_mutex(ARG_list);                                 \
+  TYPED_LIST_CHECK(ARG_list);                                               \
+  NAME_data##_iter = genlist_head((const struct genlist *) ARG_list);       \
+  while (NULL != NAME_data##_iter) {                                        \
+    NAME_data = (TYPE_data *) genlist_link_data(NAME_data##_iter);          \
+    NAME_data##_iter = genlist_link_next(NAME_data##_iter);
+
+/* Balance for above: */ 
+#define MUTEXED_ITERATE_END(LIST_tag, ARG_list)                             \
+  }                                                                         \
+    LIST_tag##_list_release_mutex(ARG_list);                                \
+} while (FALSE);
+
+#define MUTEXED_ITERATE_BREAK(LIST_tag, ARG_list)                           \
+do {                                                                        \
+  LIST_tag##_list_release_mutex(ARG_list);                                  \
 } while (FALSE);
 
 /* Same, but iterate backwards:
@@ -688,3 +743,10 @@ do {                                                                        \
 } while (FALSE);
 
 #endif /* FC__SPECLIST_H */
+
+/* This is after #endif FC__SPECLIST_H on purpose.
+   extern "C" portion begins well before latter part of the header
+   is guarded against multiple inclusions. */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

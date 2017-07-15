@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include "log.h"                /* fc_assert */
@@ -116,6 +116,5 @@ void distribute(int number, int groups, int *ratios, int *result)
     number -= result[i];
   }
   fc_assert(number == 0);
-#endif
+#endif /* DEBUG */
 }
-

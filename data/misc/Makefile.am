@@ -13,8 +13,6 @@ pkgdata_DATA =          \
 	citybar.spec	\
 	cityicon.png	\
 	civicon.png	\
-	colors.png	\
-	colors.spec	\
 	colors.tilespec \
 	cursors.png	\
 	cursors.spec	\
@@ -22,6 +20,8 @@ pkgdata_DATA =          \
 	editor.spec	\
 	flags-large.spec	\
 	flags.spec	\
+	governments.png \
+	governments.spec \
 	icons.spec	\
 	intro.png	\
 	mpicon.png	\
@@ -34,6 +34,8 @@ pkgdata_DATA =          \
 	small.spec	\
 	space.png	\
 	space.spec	\
+	specialists.png	\
+	specialists.spec \
 	techs.png	\
 	techs.spec	\
 	treaty.png	\

@@ -18,7 +18,7 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",         "female_title"
- "Monarchy",        _("Duke %s"),         _("Duchess %s")
+ "Despotism",       _("Duke %s"),         _("Duchess %s")
 }
 
 flag="samogitia"
@@ -27,7 +27,6 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with = "lithuanian"

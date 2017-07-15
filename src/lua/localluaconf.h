@@ -14,8 +14,11 @@
 #define FC__LOCALLUACONF_H
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
+
+/* Lua headers want to define VERSION to lua version */
+#undef VERSION
 
 #ifdef HAVE_MKSTEMP
 #define LUA_USE_MKSTEMP
@@ -26,8 +29,15 @@
 #ifdef HAVE_POPEN
 #define LUA_USE_POPEN
 #endif
-#ifdef HAVE__LONGJMP
+#if defined(HAVE__LONGJMP) && defined(HAVE__SETJMP)
 #define LUA_USE_ULONGJMP
+#endif
+#if defined(HAVE_FSEEKO)
+#define LUA_USE_FSEEKO
+#endif
+
+#ifdef HAVE_LIBREADLINE
+#define LUA_USE_READLINE
 #endif
 
 #endif /* FC__LOCALLUACONF_H */

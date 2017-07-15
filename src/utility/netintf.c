@@ -16,7 +16,7 @@
 **********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <errno.h>
@@ -44,14 +44,20 @@
 #include <sys/signal.h>
 #endif
 #ifdef HAVE_WINSOCK
+#ifdef HAVE_WINSOCK2
+#include <winsock2.h>
+#else  /* HAVE_WINSOCK2 */
 #include <winsock.h>
-#endif
+#endif /* HAVE_WINSOCK2 */
+#endif /* HAVE_WINSOCK */
 #ifdef WIN32_NATIVE
 #include <windows.h>	/* GetTempPath */
 #endif
 
+/* utility */
 #include "fcintl.h"
 #include "log.h"
+#include "mem.h"
 #include "support.h"
 
 #include "netintf.h"
@@ -60,13 +66,13 @@
 #define INADDR_NONE 0xffffffff
 #endif
 
-#ifdef IPV6_SUPPORT
+#ifdef HAVE_GETADDRINFO
 #ifdef AI_NUMERICSERV
 #define FC_AI_NUMERICSERV AI_NUMERICSERV
 #else  /* AI_NUMERICSERV */
 #define FC_AI_NUMERICSERV 0
 #endif /* AI_NUMERICSERV */
-#endif /* IPV6_SUPPORT */
+#endif /* HAVE_GETADDRINFO */
 
 #ifdef HAVE_WINSOCK
 /***************************************************************
@@ -108,7 +114,7 @@ int fc_connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen)
   if (result == -1) {
     set_socket_errno();
   }
-#endif
+#endif /* HAVE_WINSOCK */
 
   return result;
 }
@@ -117,19 +123,19 @@ int fc_connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen)
   Wait for a number of sockets to change status
 **************************************************************/
 int fc_select(int n, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
-              struct timeval *timeout)
+              fc_timeval *timeout)
 {
   int result;
-  
+
   result = select(n, readfds, writefds, exceptfds, timeout);
-  
+
 #ifdef HAVE_WINSOCK
   if (result == -1) {
     set_socket_errno();
   }
-#endif
+#endif /* HAVE_WINSOCK */
 
-  return result;       
+  return result;
 }
 
 /***************************************************************
@@ -144,9 +150,9 @@ int fc_readsocket(int sock, void *buf, size_t size)
   if (result == -1) {
     set_socket_errno();
   }
-#else
+#else  /* HAVE_WINSOCK */
   result = read(sock, buf, size);
-#endif
+#endif /* HAVE_WINSOCK */
 
   return result;
 }
@@ -163,10 +169,10 @@ int fc_writesocket(int sock, const void *buf, size_t size)
   if (result == -1) {
     set_socket_errno();
   }
-#else
+#else  /* HAVE_WINSOCK */
 #  ifdef MSG_NOSIGNAL
   result = send(sock, buf, size, MSG_NOSIGNAL);
-#  else
+#  else  /* MSG_NOSIGNAL */
   result = write(sock, buf, size);
 #  endif /* MSG_NOSIGNAL */
 #endif /* HAVE_WINSOCK */
@@ -197,7 +203,7 @@ void fc_init_network(void)
   if (WSAStartup(MAKEWORD(1, 1), &wsa) != 0) {
     log_error("no usable WINSOCK.DLL: %s", fc_strerror(fc_get_errno()));
   }
-#endif
+#endif /* HAVE_WINSOCK */
 
   /* broken pipes are ignored. */
 #ifdef HAVE_SIGPIPE
@@ -222,9 +228,14 @@ void fc_nonblock(int sockfd)
 {
 #ifdef NONBLOCKING_SOCKETS
 #ifdef HAVE_WINSOCK
-  unsigned long b = 1;
+#ifdef __LP64__
+  unsigned b = 1;
+#else  /* __LP64__ */
+  u_long b = 1;
+#endif /* __LP64__ */
+
   ioctlsocket(sockfd, FIONBIO, &b);
-#else
+#else  /* HAVE_WINSOCK */
 #ifdef HAVE_FCNTL
   int f_set;
 
@@ -237,46 +248,54 @@ void fc_nonblock(int sockfd)
   if (fcntl(sockfd, F_SETFL, f_set) == -1) {
     log_error("fcntl F_SETFL failed: %s", fc_strerror(fc_get_errno()));
   }
-#else
+#else  /* HAVE_FCNTL */
 #ifdef HAVE_IOCTL
   long value=1;
 
   if (ioctl(sockfd, FIONBIO, (char*)&value) == -1) {
     log_error("ioctl failed: %s", fc_strerror(fc_get_errno()));
   }
-#endif
-#endif
-#endif
-#else
+#endif /* HAVE_IOCTL */
+#endif /* HAVE_FCNTL */
+#endif /* HAVE_WINSOCK */
+#else  /* NONBLOCKING_SOCKETS */
   log_debug("NONBLOCKING_SOCKETS not available");
-#endif
+#endif /* NONBLOCKING_SOCKETS */
 }
 
 /***************************************************************************
-  Write information about socaddr to debug log.
+  Write information about sockaddr to debug log.
 ***************************************************************************/
-void sockaddr_debug(union fc_sockaddr *addr)
+void sockaddr_debug(union fc_sockaddr *addr, enum log_level lvl)
 {
 #ifdef IPV6_SUPPORT
   char buf[INET6_ADDRSTRLEN] = "Unknown";
 
   if (addr->saddr.sa_family == AF_INET6) { 
     inet_ntop(AF_INET6, &addr->saddr_in6.sin6_addr, buf, INET6_ADDRSTRLEN);
-    log_debug("Host: %s, Port: %d (IPv6)",
-              buf, ntohs(addr->saddr_in6.sin6_port));
-  } else {
+    log_base(lvl, "Host: %s, Port: %d (IPv6)",
+             buf, ntohs(addr->saddr_in6.sin6_port));
+    return;
+  } else if (addr->saddr.sa_family == AF_INET) {
     inet_ntop(AF_INET, &addr->saddr_in4.sin_addr, buf, INET_ADDRSTRLEN);
-    log_debug("Host: %s, Port: %d (IPv4)",
-              buf, ntohs(addr->saddr_in4.sin_port));
+    log_base(lvl, "Host: %s, Port: %d (IPv4)",
+             buf, ntohs(addr->saddr_in4.sin_port));
+    return;
   }
 #else  /* IPv6 support */
-  char *buf;
+  if (addr->saddr.sa_family == AF_INET) {
+    char *buf;
 
-  buf = inet_ntoa(addr->saddr_in4.sin_addr);
+    buf = inet_ntoa(addr->saddr_in4.sin_addr);
 
-  log_debug("Host: %s, Port: %d",
-            buf, ntohs(addr->saddr_in4.sin_port));
+    log_base(lvl, "Host: %s, Port: %d",
+             buf, ntohs(addr->saddr_in4.sin_port));
+
+    return;
+  }
 #endif /* IPv6 support */
+
+  log_error("Unsupported address family in sockaddr_debug()");
 }
 
 /***************************************************************************
@@ -285,14 +304,24 @@ void sockaddr_debug(union fc_sockaddr *addr)
 ***************************************************************************/
 int sockaddr_size(union fc_sockaddr *addr)
 {
+#ifdef WIN32_NATIVE
+  return sizeof(*addr);
+#else
 #ifdef IPV6_SUPPORT
   if (addr->saddr.sa_family == AF_INET6) {
     return sizeof(addr->saddr_in6);
   } else
 #endif /* IPV6_SUPPORT */
-  {
+  if (addr->saddr.sa_family == AF_INET) {
     return sizeof(addr->saddr_in4);
+  } else {
+    fc_assert(FALSE);
+
+    log_error("Unsupported address family in sockaddr_size()");
+
+    return 0;
   }
+#endif /* WIN32_NATIVE */
 }
 
 /***************************************************************************
@@ -303,83 +332,137 @@ bool sockaddr_ipv6(union fc_sockaddr *addr)
 #ifdef IPV6_SUPPORT
   if (addr->saddr.sa_family == AF_INET6) {
     return TRUE;
-  } else
-#endif /* IPv6 support */
-  {
-    return FALSE;
   }
+#endif /* IPv6 support */
+
+  return FALSE;
 }
 
+#ifdef HAVE_GETADDRINFO
 /***************************************************************************
-  Look up the service at hostname:port and fill in *sa.
+  Look up the service at hostname:port using getaddrinfo().
 ***************************************************************************/
-bool net_lookup_service(const char *name, int port, union fc_sockaddr *addr,
-			bool force_ipv4)
+static struct fc_sockaddr_list *net_lookup_getaddrinfo(const char *name,
+						       int port,
+						       enum fc_addr_family family)
 {
-  struct hostent *hp;
-  struct sockaddr_in *sock4;
-#ifdef IPV6_SUPPORT
-  struct sockaddr_in6 *sock6;
-#endif /* IPv6 support */
+  struct addrinfo hints;
+  struct addrinfo *res;
+  int err;
+  char servname[8];
+  int gafam;
+  struct fc_sockaddr_list *addrs =
+      fc_sockaddr_list_new_full((fc_sockaddr_list_free_fn_t) free);
 
-  sock4 = &addr->saddr_in4;
+  switch (family) {
+    case FC_ADDR_IPV4:
+      gafam = AF_INET;
+      break;
+    case FC_ADDR_IPV6:
+      gafam = AF_INET6;
+      break;
+    case FC_ADDR_ANY:
+#ifndef IPV6_SUPPORT
+      gafam = AF_INET;
+#else
+      gafam = AF_UNSPEC;
+#endif
+      break;
+    default:
+      fc_assert(FALSE);
 
-#ifdef IPV6_SUPPORT
-  sock6 = &addr->saddr_in6;
-
-  if (!force_ipv4) {
-    struct addrinfo hints, *res0;
-    int error;
-    char servname[8];
-
-    /* Convert port to string for getaddrinfo() */
-    fc_snprintf(servname, sizeof(servname), "%d", port);
-
-    /* Use getaddrinfo() to lookup IPv6 addresses */
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET6;     /* request only IPv6 */
-    hints.ai_socktype = SOCK_DGRAM; /* any type that uses sin6_port */
-    hints.ai_flags = AI_PASSIVE | FC_AI_NUMERICSERV;
-    error = getaddrinfo(name, servname, &hints, &res0);
-
-    if (error == 0) {
-      /* getaddrinfo() provides a linked list of addresses, but
-       * net_lookup_service() wants only one address.
-       *
-       * We handle this by copying the first address from the list,
-       * then freeing the list. */
-      memcpy(sock6, res0->ai_addr, MIN(sizeof(*sock6), res0->ai_addrlen));
-      freeaddrinfo(res0);
-      return TRUE;
-    } /* else continue to IPv4 */
+      return addrs;
   }
-#endif /* IPv6 support */
 
-  /* IPv4 resolution */
-  addr->saddr.sa_family = AF_INET;
+  /* Convert port to string for getaddrinfo() */
+  fc_snprintf(servname, sizeof(servname), "%d", port);
+
+  /* Use getaddrinfo() to lookup IPv6 addresses */
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = gafam;
+  hints.ai_socktype = SOCK_DGRAM; /* any type that uses sin6_port */
+  hints.ai_flags = AI_PASSIVE | FC_AI_NUMERICSERV;
+  err = getaddrinfo(name, servname, &hints, &res);
+
+  if (err == 0) {
+    struct addrinfo *current = res;
+
+    while (current != NULL) {
+      union fc_sockaddr *caddr;
+
+      fc_assert_action(current->ai_addrlen <= sizeof(*caddr), continue);
+      caddr = fc_malloc(sizeof(*caddr));
+      memcpy(caddr, current->ai_addr, current->ai_addrlen);
+
+      fc_sockaddr_list_append(addrs, caddr);
+
+      current = current->ai_next;
+    }
+    freeaddrinfo(res);
+  }
+
+  return addrs;
+}
+#endif /* HAVE_GETADDRINFO */
+
+/***************************************************************************
+  Look up the service at hostname:port.
+***************************************************************************/
+struct fc_sockaddr_list *net_lookup_service(const char *name, int port,
+					    enum fc_addr_family family)
+{
+  /* IPv6-enabled Freeciv always has HAVE_GETADDRINFO, IPv4-only Freeciv not
+   * necessarily */
+#ifdef HAVE_GETADDRINFO
+  return net_lookup_getaddrinfo(name, port, family);
+#else  /* HAVE_GETADDRINFO */
+
+  struct sockaddr_in *sock4;
+  struct hostent *hp;
+  struct fc_sockaddr_list *addrs = fc_sockaddr_list_new();
+  union fc_sockaddr *result = fc_malloc(sizeof(*result));
+
+  sock4 = &result->saddr_in4;
+
+  fc_assert(family != FC_ADDR_IPV6);
+
+  result->saddr.sa_family = AF_INET;
   sock4->sin_port = htons(port);
 
   if (!name) {
     sock4->sin_addr.s_addr = htonl(INADDR_ANY);
-    return TRUE;
+    fc_sockaddr_list_append(addrs, result);
+
+    return addrs;
   }
 
 #if defined(HAVE_INET_ATON)
   if (inet_aton(name, &sock4->sin_addr) != 0) {
-    return TRUE;
+    fc_sockaddr_list_append(addrs, result);
+
+    return addrs;
   }
 #else  /* HAVE_INET_ATON */
   if ((sock4->sin_addr.s_addr = inet_addr(name)) != INADDR_NONE) {
-    return TRUE;
+    fc_sockaddr_list_append(addrs, result);
+
+    return addrs;
   }
 #endif /* HAVE_INET_ATON */
   hp = gethostbyname(name);
   if (!hp || hp->h_addrtype != AF_INET) {
-    return FALSE;
+    FC_FREE(result);
+
+    return addrs;
   }
 
   memcpy(&sock4->sin_addr, hp->h_addr, hp->h_length);
-  return TRUE;
+  fc_sockaddr_list_append(addrs, result);
+
+  return addrs;
+
+#endif /* !HAVE_GETADDRINFO */
+
 }
 
 /*************************************************************************
@@ -399,7 +482,7 @@ fz_FILE *fc_querysocket(int sock, void *buf, size_t size)
 
   /* we don't use fc_closesocket on sock here since when fp is closed
    * sock will also be closed. fdopen doesn't dup the socket descriptor. */
-#else
+#else  /* HAVE_FDOPEN */
   {
     char tmp[4096];
     int n;
@@ -415,11 +498,11 @@ fz_FILE *fc_querysocket(int sock, void *buf, size_t size)
 
       fp = fc_fopen(filename, "w+b");
     }
-#else
+#else  /* WIN32_NATIVE */
 
     fp = tmpfile();
 
-#endif
+#endif /* WIN32_NATIVE */
 
     if (fp == NULL) {
       return NULL;
@@ -438,146 +521,144 @@ fz_FILE *fc_querysocket(int sock, void *buf, size_t size)
 
     rewind(fp);
   }
-#endif
+#endif /* HAVE_FDOPEN */
 
   return fz_from_stream(fp);
-}
-
-/*************************************************************************
-  Returns a valid httpd server and port, plus the path to the resource
-  at the url location.
-*************************************************************************/
-const char *fc_lookup_httpd(char *server, int *port, const char *url)
-{
-  const char *purl, *str, *ppath, *pport;
-  const char *str2;
-  int chars_between = 0;
-
-  if ((purl = getenv("http_proxy")) && purl[0] != '\0') {
-    if (strncmp(purl, "http://", strlen("http://")) != 0) {
-      return NULL;
-    }
-    str = purl;
-  } else {
-    purl = NULL;
-    if (strncmp(url, "http://", strlen("http://")) != 0) {
-      return NULL;
-    }
-    str = url;
-  }
-
-  str += strlen("http://");
-
-  if (*str == '[') {
-    /* Literal IPv6 address (RFC 2732) */
-    str++;
-    str2 = strchr(str, ']') + 1;
-    if (!str2) {
-      str2 = str + strlen(str);
-    }
-    chars_between = 1;
-  } else {
-    str2 = str;
-  }
-
-  pport = strchr(str2, ':');
-  ppath = strchr(str2, '/');
-
-  /* snarf server. */
-  server[0] = '\0';
-
-  if (pport) {
-    strncat(server, str, MIN(MAX_LEN_ADDR, pport-str-chars_between));
-  } else {
-    if (ppath) {
-      strncat(server, str, MIN(MAX_LEN_ADDR, ppath-str-chars_between));
-    } else {
-      strncat(server, str, MAX_LEN_ADDR);
-    }
-  }
-
-  /* snarf port. */
-  if (NULL == pport || !str_to_int(pport + 1, port)) {
-    *port = 80;
-  }
-
-  /* snarf path. */
-  if (!ppath) {
-    ppath = "/";
-  }
-
-  return (purl ? url : ppath);
-}
-
-/*************************************************************************
-  Returns TRUE if ch is an unreserved ASCII character.
-*************************************************************************/
-static bool is_url_safe(unsigned ch)
-{
-  const char *unreserved = "-_.!~*'|";
-
-  if ((ch>='a' && ch<='z') || (ch>='A' && ch<='Z') || (ch>='0' && ch<='9')) {
-    return TRUE;
-  } else {
-    return (strchr(unreserved, ch) != NULL);
-  }
-}
-
-/***************************************************************
-  URL-encode a string as per RFC 2396.
-  Should work for all ASCII based charsets: including UTF-8.
-***************************************************************/
-const char *fc_url_encode(const char *txt)
-{
-  static char buf[2048];
-  unsigned ch;
-  char *ptr;
-
-  /* in a worst case scenario every character needs "% HEX HEX" encoding. */
-  if (sizeof(buf) <= (3*strlen(txt))) {
-    return "";
-  }
-  
-  for (ptr = buf; *txt != '\0'; txt++) {
-    ch = (unsigned char) *txt;
-
-    if (is_url_safe(ch)) {
-      *ptr++ = *txt;
-    } else if (ch == ' ') {
-      *ptr++ = '+';
-    } else {
-      sprintf(ptr, "%%%2.2X", ch);
-      ptr += 3;
-    }
-  }
-  *ptr++ = '\0';
-
-  return buf;
 }
 
 /************************************************************************** 
   Finds the next (lowest) free port.
 **************************************************************************/ 
-int find_next_free_port(int starting_port)
+int find_next_free_port(int starting_port, int highest_port,
+                        enum fc_addr_family family,
+                        char *net_interface, bool not_avail_ok)
 {
-  int port, s = socket(AF_INET, SOCK_STREAM, 0);
+  int port;
+  int s;
+  int gafamily;
+  bool found = FALSE;
 
-  for (port = starting_port;; port++) {
-    union fc_sockaddr tmp;
-    struct sockaddr_in *sock = &tmp.saddr_in4;
+#ifndef IPV6_SUPPORT
+  fc_assert(family == FC_ADDR_IPV4 || family == FC_ADDR_ANY);
+#endif
 
-    memset(&tmp, 0, sizeof(tmp));
+  switch (family) {
+   case FC_ADDR_IPV4:
+     gafamily = AF_INET;
+     break;
+#ifdef IPV6_SUPPORT
+   case FC_ADDR_IPV6:
+     gafamily = AF_INET6;
+     break;
+#endif /* IPV6_SUPPORT */
+   case FC_ADDR_ANY:
+     gafamily = AF_UNSPEC;
+     break;
+   default:
+     fc_assert(FALSE);
+     log_error("Port from unsupported address family requested!");
 
-    sock->sin_family = AF_INET;
-    sock->sin_port = htons(port);
-    sock->sin_addr.s_addr = htonl(INADDR_ANY);
-
-    if (bind(s, &tmp.saddr, sockaddr_size(&tmp)) == 0) {
-      break;
-    }
+     return -1;
   }
 
-  fc_closesocket(s);
-  
+  for (port = starting_port; !found && highest_port > port; port++) {
+    /* HAVE_GETADDRINFO implies IPv6 support */
+#ifdef HAVE_GETADDRINFO
+    struct addrinfo hints;
+    int err;
+    char servname[8];
+    struct addrinfo *res;
+
+    fc_snprintf(servname, sizeof(servname), "%d", port);
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = gafamily;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE | FC_AI_NUMERICSERV;
+
+    err = getaddrinfo(net_interface, servname, &hints, &res);
+    if (!err) {
+      struct addrinfo *current = res;
+      bool unusable = FALSE;
+
+      while (current != NULL && !unusable) {
+        s = socket(current->ai_family, SOCK_STREAM, 0);
+
+        if (s == -1) {
+          log_error("socket(): %s", fc_strerror(fc_get_errno()));
+        } else {
+          if (bind(s, current->ai_addr, current->ai_addrlen) != 0) {
+            if (!not_avail_ok || fc_get_errno() != EADDRNOTAVAIL) {
+              unusable = TRUE;
+            }
+          }
+        }
+        current = current->ai_next;
+        fc_closesocket(s);
+      }
+
+      freeaddrinfo(res);
+
+      if (!unusable && res != NULL) {
+        found = TRUE;
+      }
+    }
+#else /* HAVE_GETADDRINFO */
+    union fc_sockaddr tmp;
+    struct sockaddr_in *sock4;
+
+    s = socket(gafamily, SOCK_STREAM, 0);
+
+    sock4 = &tmp.saddr_in4;
+    memset(&tmp, 0, sizeof(tmp));
+    sock4->sin_family = AF_INET;
+    sock4->sin_port = htons(port);
+    if (net_interface != NULL) {
+#if defined(HAVE_INET_ATON)
+      if (inet_aton(net_interface, &sock4->sin_addr) == 0) {
+#else /* HAVE_INET_ATON */
+      sock4->sin_addr.s_addr = inet_addr(net_interface);
+      if (sock4->sin_addr.s_addr == INADDR_NONE) {
+#endif /* HAVE_INET_ATON */
+        struct hostent *hp;
+
+        hp = gethostbyname(net_interface);
+        if (hp == NULL) {
+          log_error("No hostent for %s!", net_interface);
+
+          return -1;
+        }
+        if (hp->h_addrtype != AF_INET) {
+          log_error("Requested IPv4 address for %s, got something else! (%d)",
+                    net_interface, hp->h_addrtype);
+
+          return -1;
+        }
+
+        memcpy(&sock4->sin_addr, hp->h_addr, hp->h_length);
+      }
+    } else {
+      sock4->sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
+    if (bind(s, &tmp.saddr, sockaddr_size(&tmp)) == 0) {
+      found = TRUE;
+    }
+
+    fc_closesocket(s);
+#endif /* HAVE_GETADDRINFO */
+  }
+
+  if (!found) {
+    log_error("None of the ports %d - %d is available.",
+              starting_port, highest_port);
+
+    return -1;
+  }
+
+  /* Rollback the last increment from the loop, back to the port
+   * number found to be free. */
+  port--;
+
   return port;
 }

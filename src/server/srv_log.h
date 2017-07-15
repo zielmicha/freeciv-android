@@ -88,24 +88,8 @@ void real_tech_log(const char *file, const char *function, int line,
   enum log_level level = (notify ? LOG_AI_TEST                              \
                           : MIN(loglevel, LOGLEVEL_TECH));                  \
   if (log_do_output_for_level(level)) {                                     \
-    real_tech_log(__FILE__, __FUNCTION__, __LINE__, level, notify,          \
+    real_tech_log(__FILE__, __FUNCTION__, __FC_LINE__, level, notify,       \
                   pplayer, padvance, msg, ## __VA_ARGS__);                  \
-  }                                                                         \
-}
-
-void real_diplo_log(const char *file, const char *function, int line,
-                    enum log_level level, bool notify,
-                    const struct player *pplayer,
-                    const struct player *aplayer, const char *msg, ...)
-                   fc__attribute((__format__ (__printf__, 8, 9)));
-#define DIPLO_LOG(loglevel, pplayer, aplayer, msg, ...)                     \
-{                                                                           \
-  bool notify = BV_ISSET(pplayer->server.debug, PLAYER_DEBUG_DIPLOMACY);    \
-  enum log_level level = (notify ? LOG_AI_TEST                              \
-                          : MIN(loglevel, LOGLEVEL_PLAYER));                \
-  if (log_do_output_for_level(level)) {                                     \
-    real_diplo_log(__FILE__, __FUNCTION__, __LINE__, level, notify,         \
-                   pplayer, aplayer, msg, ## __VA_ARGS__);                  \
   }                                                                         \
 }
 
@@ -119,7 +103,7 @@ void real_city_log(const char *file, const char *function, int line,
   enum log_level level = (notify ? LOG_AI_TEST                              \
                           : MIN(loglevel, LOGLEVEL_CITY));                  \
   if (log_do_output_for_level(level)) {                                     \
-    real_city_log(__FILE__, __FUNCTION__, __LINE__, level, notify,          \
+    real_city_log(__FILE__, __FUNCTION__, __FC_LINE__, level, notify,       \
                   pcity, msg, ## __VA_ARGS__);                              \
   }                                                                         \
 }
@@ -140,27 +124,18 @@ void real_unit_log(const char *file, const char *function, int line,
     level = MIN(loglevel, LOGLEVEL_UNIT);                                   \
   }                                                                         \
   if (log_do_output_for_level(level)) {                                     \
-    real_unit_log(__FILE__, __FUNCTION__, __LINE__, level, notify,          \
+    real_unit_log(__FILE__, __FUNCTION__, __FC_LINE__, level, notify,       \
                   punit, msg, ## __VA_ARGS__);                              \
   }                                                                         \
 }
 
-void real_bodyguard_log(const char *file, const char *function, int line,
-                        enum log_level level,  bool notify,
-                        const struct unit *punit, const char *msg, ...)
-                        fc__attribute((__format__ (__printf__, 7, 8)));
-#define BODYGUARD_LOG(loglevel, punit, msg, ...)                            \
-{                                                                           \
-  bool notify = punit->server.debug;                                        \
-  enum log_level level = (notify ? LOG_AI_TEST                              \
-                          : MIN(loglevel, LOGLEVEL_BODYGUARD));             \
-  if (log_do_output_for_level(level)) {                                     \
-    real_bodyguard_log(__FILE__, __FUNCTION__, __LINE__, level, notify,     \
-                       punit, msg, ## __VA_ARGS__);                         \
-  }                                                                         \
-}
+void timing_log_init(void);
+void timing_log_free(void);
 
-void TIMING_LOG(enum ai_timer timer, enum ai_timer_activity activity);
-void TIMING_RESULTS(void);
+void timing_log_real(enum ai_timer timer, enum ai_timer_activity activity);
+void timing_results_real(void);
+
+#define TIMING_LOG(timer, activity) timing_log_real(timer, activity)
+#define TIMING_RESULTS() timing_results_real()
 
 #endif  /* FC__SRV_LOG_H */

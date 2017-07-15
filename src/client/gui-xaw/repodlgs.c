@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -211,7 +211,7 @@ void create_science_dialog(bool make_modal)
 		  _("Researching %s: %d/%d"),
 		  advance_name_researching(client.conn.playing),
 		  research->bulbs_researched,
-		  total_bulbs_required(client.conn.playing));
+                  research->client.researching_cost);
     }
 
     if (research->tech_goal == A_UNSET) {
@@ -336,7 +336,7 @@ void create_science_dialog(bool make_modal)
 
     flag = 0;
     advance_index_iterate(A_FIRST, i) {
-      if (player_invention_reachable(client.conn.playing, i, FALSE)
+      if (player_invention_reachable(client.conn.playing, i, TRUE)
 	  && TECH_KNOWN != player_invention_state(client.conn.playing, i)
 	  && (11 > num_unknown_techs_for_goal(client.conn.playing, i)
 	      || i == research->tech_goal)) {
@@ -487,7 +487,7 @@ void real_science_report_dialog_update(void)
 		  _("Researching %s: %d/%d"),
 		  advance_name_researching(client.conn.playing),
 		  research->bulbs_researched,
-		  total_bulbs_required(client.conn.playing));
+                  research->client.researching_cost);
     }
 
     xaw_set_label(science_current_label, text);
@@ -552,7 +552,7 @@ void real_science_report_dialog_update(void)
     
     flag=0;
     advance_index_iterate(A_FIRST, i) {
-      if (player_invention_reachable(client.conn.playing, i, FALSE)
+      if (player_invention_reachable(client.conn.playing, i, TRUE)
 	  && TECH_KNOWN != player_invention_state(client.conn.playing, i)
 	  && (11 > num_unknown_techs_for_goal(client.conn.playing, i)
 	      || i == research->tech_goal)) {
@@ -1100,8 +1100,13 @@ void real_units_report_dialog_update(void)
 
     city_list_iterate(client.conn.playing->cities,pcity) {
       if (VUT_UTYPE == pcity->production.kind) {
-	struct unit_type *punittype = pcity->production.value.utype;
-	(unitarray[utype_index(punittype)].building_count)++;
+        struct unit_type *punittype = pcity->production.value.utype;
+        int num_units;
+        /* Account for build slots in city */
+        (void) city_production_build_units(pcity, TRUE, &num_units);
+        /* Unit is in progress even if it won't be done this turn */
+        num_units = MAX(num_units, 1);
+        (unitarray[utype_index(punittype)].building_count) += num_units;
       }
     }
     city_list_iterate_end;
@@ -1160,27 +1165,40 @@ void real_units_report_dialog_update(void)
   }
 }
 
+static char eg_buffer[150 * MAX_NUM_PLAYERS];
+static int eg_player_count = 0;
+static int eg_players_received = 0;
+
 /****************************************************************
   Show a dialog with player statistics at endgame.
   TODO: Display all statistics in packet_endgame_report.
 *****************************************************************/
-void endgame_report_dialog_popup(const struct packet_endgame_report *packet)
+void endgame_report_dialog_start(const struct packet_endgame_report *packet)
 {
-  char buffer[150 * MAX_NUM_PLAYERS];
-  int i;
+  eg_buffer[0] = '\0';
+  eg_player_count = packet->player_num;
+  eg_players_received = 0;
+}
 
-  buffer[0] = '\0';
-  for (i = 0; i < packet->player_num; i++) {
-    const struct player *pplayer = player_by_number(packet->player_id[i]);
+/****************************************************************
+  Received endgame report information about single player
+*****************************************************************/
+void endgame_report_dialog_player(const struct packet_endgame_player *packet)
+{
+  const struct player *pplayer = player_by_number(packet->player_id);
 
-    cat_snprintf(buffer, sizeof(buffer),
-                 PL_("%2d: The %s ruler %s scored %d point\n",
-                     "%2d: The %s ruler %s scored %d points\n",
-                     packet->score[i]),
-                 i + 1, nation_adjective_for_player(pplayer),
-                 player_name(pplayer), packet->score[i]);
+  eg_players_received++;
+
+  cat_snprintf(eg_buffer, sizeof(eg_buffer),
+               PL_("%2d: The %s ruler %s scored %d point\n",
+                   "%2d: The %s ruler %s scored %d points\n",
+                   packet->score),
+               eg_players_received, nation_adjective_for_player(pplayer),
+               player_name(pplayer), packet->score);
+
+  if (eg_players_received == eg_player_count) {
+    popup_notify_dialog(_("Final Report:"),
+                        _("The Greatest Civilizations in the world."),
+                        eg_buffer);
   }
-  popup_notify_dialog(_("Final Report:"),
-                      _("The Greatest Civilizations in the world."),
-                      buffer);
 }

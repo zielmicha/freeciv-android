@@ -21,6 +21,8 @@ void do_conquer_cost(struct player *pplayer, Tech_type_id tech);
 void do_dipl_cost(struct player *pplayer, Tech_type_id tech);
 
 void do_tech_parasite_effect(struct player *pplayer);
+void script_tech_learned(struct player *plr, struct advance *tech,
+                         const char *reason);
 void found_new_tech(struct player *plr, Tech_type_id tech_found,
                     bool was_discovery, bool saving_bulbs);
 bool update_bulbs(struct player *plr, int bulbs, bool check_tech);
@@ -39,5 +41,8 @@ Tech_type_id give_random_initial_tech(struct player *pplayer);
 
 bool tech_transfer(struct player *plr_recv, struct player *plr_donor,
                    Tech_type_id tech);
+
+Tech_type_id pick_random_tech(struct player* plr);
+Tech_type_id pick_cheapest_tech(struct player* plr);
 
 #endif  /* FC__TECHTOOLS_H */

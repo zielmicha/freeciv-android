@@ -33,12 +33,17 @@
       void foo_vector_copy(struct foo_vector *to, 
                 const struct foo_vector *from);
       void foo_vector_free(struct foo_vector *tthis);
+      void foo_vector_append(struct foo_vector *tthis, foo_t pfoo);
 
    Note this is not protected against multiple inclusions; this is
    so that you can have multiple different specvectors.  For each
    specvector, this file should be included _once_, inside a .h file
    which _is_ itself protected against multiple inclusions.
 */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 #include <string.h>		/* for memcpy */
 
@@ -128,10 +133,10 @@ static inline void SPECVEC_FOO(_vector_append) (SPECVEC_VECTOR *tthis,
 
 
 #define TYPED_VECTOR_ITERATE(atype, vector, var) {      \
-  int myiter;					        \
+  unsigned int myiter##var;                             \
   atype *var;                                           \
-  for (myiter = 0; myiter < (vector)->size; myiter++) { \
-    var = &(vector)->p[myiter];			        \
+  for (myiter##var = 0; myiter##var < (vector)->size; myiter##var++) { \
+    var = &(vector)->p[myiter##var];			        \
  
 /* Balance for above: */
 #define VECTOR_ITERATE_END  }}
@@ -143,3 +148,7 @@ static inline void SPECVEC_FOO(_vector_append) (SPECVEC_VECTOR *tthis,
 #undef SPECVEC_PASTE
 #undef SPECVEC_VECTOR
 #undef SPECVEC_FOO
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

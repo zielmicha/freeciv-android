@@ -34,13 +34,23 @@
  * - SPECENUM_ZERO: can be defined only if SPECENUM_BITWISE was also defined.
  * It defines a 0 value.  Note that if you don't declare this value, 0 passed
  * to the 'foo_is_valid()' function will return 0.
- * - SPECENUM_COUNT: The number of elements in the enum for use in static
- * structs. It can not be used in combination with SPECENUM_BITWISE.
- * SPECENUM_is_valid() will return the invalid element for it.
+ * - SPECENUM_COUNT: a name for the maximum enumeration number plus 1. For
+ * enums where every element from 0 to the maximum is defined, this is the
+ * number of elements in the enum. This value is suitable to size an array
+ * indexed by the enum. It can not be used in combination with
+ * SPECENUM_BITWISE. SPECENUM_is_valid() will return the invalid element
+ * for it.
  *
  * SPECENUM_VALUE%dNAME, SPECENUM_ZERONAME, SPECENUM_COUNTNAME: Can be used
- * to bind the name of the particular enumerator.  If not defined, the
- * default name for 'FOO_FIRST' is '"FOO_FIRST"'.
+ * to bind a string to the particular enumerator to be returned by
+ * SPECENUM_name(), etc. If not defined, the default name for 'FOO_FIRST'
+ * is '"FOO_FIRST"'. A name can be qualified. The qualification will only
+ * be used for its translation. The returned name will be unqualified. To
+ * mark a name as translatable use N_().
+ *
+ * SPECENUM_NAMEOVERRIDE: call callback function foo_name_cb(enum foo),
+ * defined by specnum user, to get name of the enum value. If the function
+ * returns NULL, compiled in names are used.
  *
  * Assuming SPECENUM_NAME were 'foo', including this file would provide
  * the definition for the enumeration type 'enum foo', and prototypes for
@@ -56,6 +66,7 @@
  *   enum foo foo_next(enum foo);
  *
  *   const char *foo_name(enum foo);
+ *   const char *foo_translated_name(enum foo);
  *   enum foo foo_by_name(const char *name,
  *                        int (*strcmp_func)(const char *, const char *));
  *
@@ -101,6 +112,12 @@
  *   fghdf is not a valid name
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/* Utility */
+#include "fcintl.h"     /* translation */
 #include "log.h"        /* fc_assert. */
 #include "support.h"    /* bool type. */
 
@@ -117,7 +134,7 @@
 #define SPECENUM_FOO(suffix) SPECENUM_PASTE(SPECENUM_NAME, suffix)
 
 #ifndef SPECENUM_INVALID
-#define SPECENUM_INVALID (-1)
+#define SPECENUM_INVALID ((enum SPECENUM_NAME) -1)
 #endif
 
 #ifdef SPECENUM_BITWISE
@@ -2101,9 +2118,9 @@ static inline enum SPECENUM_NAME SPECENUM_FOO(_next)(enum SPECENUM_NAME e)
 {
   do {
 #ifdef SPECENUM_BITWISE
-    e <<= 1;
+    e = (enum SPECENUM_NAME)(e << 1);
 #else
-    e++;
+    e = (enum SPECENUM_NAME)(e + 1);
 #endif
 
     if (e > SPECENUM_FOO(_max)()) {
@@ -2115,16 +2132,28 @@ static inline enum SPECENUM_NAME SPECENUM_FOO(_next)(enum SPECENUM_NAME e)
   return e;
 }
 
+#ifdef SPECENUM_NAMEOVERRIDE
+char *SPECENUM_FOO(_name_cb)(enum SPECENUM_NAME value);
+#endif /* SPECENUM_NAMEOVERRIDE */
+
 /**************************************************************************
   Returns the name of the enumerator.
 **************************************************************************/
 static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 {
+#ifdef SPECENUM_NAMEOVERRIDE
+  char *name = SPECENUM_FOO(_name_cb)(enumerator);
+
+  if (name != NULL) {
+    return skip_intl_qualifier_prefix(name);
+  }
+#endif /* SPECENUM_NAMEOVERRIDE */
+
   switch (enumerator) {
 #ifdef SPECENUM_ZERO
   case SPECENUM_ZERO:
 #ifdef SPECENUM_ZERONAME
-    return SPECENUM_ZERONAME;
+    return skip_intl_qualifier_prefix(SPECENUM_ZERONAME);
 #else
     return SPECENUM_STRING(SPECENUM_ZERO);
 #endif
@@ -2133,7 +2162,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE0
   case SPECENUM_VALUE0:
 #ifdef SPECENUM_VALUE0NAME
-    return SPECENUM_VALUE0NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE0NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE0);
 #endif
@@ -2142,7 +2171,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE1
   case SPECENUM_VALUE1:
 #ifdef SPECENUM_VALUE1NAME
-    return SPECENUM_VALUE1NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE1NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE1);
 #endif
@@ -2151,7 +2180,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE2
   case SPECENUM_VALUE2:
 #ifdef SPECENUM_VALUE2NAME
-    return SPECENUM_VALUE2NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE2NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE2);
 #endif
@@ -2160,7 +2189,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE3
   case SPECENUM_VALUE3:
 #ifdef SPECENUM_VALUE3NAME
-    return SPECENUM_VALUE3NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE3NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE3);
 #endif
@@ -2169,7 +2198,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE4
   case SPECENUM_VALUE4:
 #ifdef SPECENUM_VALUE4NAME
-    return SPECENUM_VALUE4NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE4NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE4);
 #endif
@@ -2178,7 +2207,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE5
   case SPECENUM_VALUE5:
 #ifdef SPECENUM_VALUE5NAME
-    return SPECENUM_VALUE5NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE5NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE5);
 #endif
@@ -2187,7 +2216,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE6
   case SPECENUM_VALUE6:
 #ifdef SPECENUM_VALUE6NAME
-    return SPECENUM_VALUE6NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE6NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE6);
 #endif
@@ -2196,7 +2225,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE7
   case SPECENUM_VALUE7:
 #ifdef SPECENUM_VALUE7NAME
-    return SPECENUM_VALUE7NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE7NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE7);
 #endif
@@ -2205,7 +2234,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE8
   case SPECENUM_VALUE8:
 #ifdef SPECENUM_VALUE8NAME
-    return SPECENUM_VALUE8NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE8NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE8);
 #endif
@@ -2214,7 +2243,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE9
   case SPECENUM_VALUE9:
 #ifdef SPECENUM_VALUE9NAME
-    return SPECENUM_VALUE9NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE9NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE9);
 #endif
@@ -2223,7 +2252,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE10
   case SPECENUM_VALUE10:
 #ifdef SPECENUM_VALUE10NAME
-    return SPECENUM_VALUE10NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE10NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE10);
 #endif
@@ -2232,7 +2261,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE11
   case SPECENUM_VALUE11:
 #ifdef SPECENUM_VALUE11NAME
-    return SPECENUM_VALUE11NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE11NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE11);
 #endif
@@ -2241,7 +2270,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE12
   case SPECENUM_VALUE12:
 #ifdef SPECENUM_VALUE12NAME
-    return SPECENUM_VALUE12NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE12NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE12);
 #endif
@@ -2250,7 +2279,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE13
   case SPECENUM_VALUE13:
 #ifdef SPECENUM_VALUE13NAME
-    return SPECENUM_VALUE13NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE13NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE13);
 #endif
@@ -2259,7 +2288,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE14
   case SPECENUM_VALUE14:
 #ifdef SPECENUM_VALUE14NAME
-    return SPECENUM_VALUE14NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE14NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE14);
 #endif
@@ -2268,7 +2297,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE15
   case SPECENUM_VALUE15:
 #ifdef SPECENUM_VALUE15NAME
-    return SPECENUM_VALUE15NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE15NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE15);
 #endif
@@ -2277,7 +2306,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE16
   case SPECENUM_VALUE16:
 #ifdef SPECENUM_VALUE16NAME
-    return SPECENUM_VALUE16NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE16NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE16);
 #endif
@@ -2286,7 +2315,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE17
   case SPECENUM_VALUE17:
 #ifdef SPECENUM_VALUE17NAME
-    return SPECENUM_VALUE17NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE17NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE17);
 #endif
@@ -2295,7 +2324,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE18
   case SPECENUM_VALUE18:
 #ifdef SPECENUM_VALUE18NAME
-    return SPECENUM_VALUE18NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE18NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE18);
 #endif
@@ -2304,7 +2333,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE19
   case SPECENUM_VALUE19:
 #ifdef SPECENUM_VALUE19NAME
-    return SPECENUM_VALUE19NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE19NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE19);
 #endif
@@ -2313,7 +2342,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE20
   case SPECENUM_VALUE20:
 #ifdef SPECENUM_VALUE20NAME
-    return SPECENUM_VALUE20NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE20NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE20);
 #endif
@@ -2322,7 +2351,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE21
   case SPECENUM_VALUE21:
 #ifdef SPECENUM_VALUE21NAME
-    return SPECENUM_VALUE21NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE21NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE21);
 #endif
@@ -2331,7 +2360,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE22
   case SPECENUM_VALUE22:
 #ifdef SPECENUM_VALUE22NAME
-    return SPECENUM_VALUE22NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE22NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE22);
 #endif
@@ -2340,7 +2369,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE23
   case SPECENUM_VALUE23:
 #ifdef SPECENUM_VALUE23NAME
-    return SPECENUM_VALUE23NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE23NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE23);
 #endif
@@ -2349,7 +2378,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE24
   case SPECENUM_VALUE24:
 #ifdef SPECENUM_VALUE24NAME
-    return SPECENUM_VALUE24NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE24NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE24);
 #endif
@@ -2358,7 +2387,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE25
   case SPECENUM_VALUE25:
 #ifdef SPECENUM_VALUE25NAME
-    return SPECENUM_VALUE25NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE25NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE25);
 #endif
@@ -2367,7 +2396,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE26
   case SPECENUM_VALUE26:
 #ifdef SPECENUM_VALUE26NAME
-    return SPECENUM_VALUE26NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE26NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE26);
 #endif
@@ -2376,7 +2405,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE27
   case SPECENUM_VALUE27:
 #ifdef SPECENUM_VALUE27NAME
-    return SPECENUM_VALUE27NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE27NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE27);
 #endif
@@ -2385,7 +2414,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE28
   case SPECENUM_VALUE28:
 #ifdef SPECENUM_VALUE28NAME
-    return SPECENUM_VALUE28NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE28NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE28);
 #endif
@@ -2394,7 +2423,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE29
   case SPECENUM_VALUE29:
 #ifdef SPECENUM_VALUE29NAME
-    return SPECENUM_VALUE29NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE29NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE29);
 #endif
@@ -2403,7 +2432,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE30
   case SPECENUM_VALUE30:
 #ifdef SPECENUM_VALUE30NAME
-    return SPECENUM_VALUE30NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE30NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE30);
 #endif
@@ -2412,7 +2441,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE31
   case SPECENUM_VALUE31:
 #ifdef SPECENUM_VALUE31NAME
-    return SPECENUM_VALUE31NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE31NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE31);
 #endif
@@ -2421,7 +2450,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE32
   case SPECENUM_VALUE32:
 #ifdef SPECENUM_VALUE32NAME
-    return SPECENUM_VALUE32NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE32NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE32);
 #endif
@@ -2430,7 +2459,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE33
   case SPECENUM_VALUE33:
 #ifdef SPECENUM_VALUE33NAME
-    return SPECENUM_VALUE33NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE33NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE33);
 #endif
@@ -2439,7 +2468,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE34
   case SPECENUM_VALUE34:
 #ifdef SPECENUM_VALUE34NAME
-    return SPECENUM_VALUE34NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE34NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE34);
 #endif
@@ -2448,7 +2477,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE35
   case SPECENUM_VALUE35:
 #ifdef SPECENUM_VALUE35NAME
-    return SPECENUM_VALUE35NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE35NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE35);
 #endif
@@ -2457,7 +2486,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE36
   case SPECENUM_VALUE36:
 #ifdef SPECENUM_VALUE36NAME
-    return SPECENUM_VALUE36NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE36NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE36);
 #endif
@@ -2466,7 +2495,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE37
   case SPECENUM_VALUE37:
 #ifdef SPECENUM_VALUE37NAME
-    return SPECENUM_VALUE37NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE37NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE37);
 #endif
@@ -2475,7 +2504,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE38
   case SPECENUM_VALUE38:
 #ifdef SPECENUM_VALUE38NAME
-    return SPECENUM_VALUE38NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE38NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE38);
 #endif
@@ -2484,7 +2513,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE39
   case SPECENUM_VALUE39:
 #ifdef SPECENUM_VALUE39NAME
-    return SPECENUM_VALUE39NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE39NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE39);
 #endif
@@ -2493,7 +2522,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE40
   case SPECENUM_VALUE40:
 #ifdef SPECENUM_VALUE40NAME
-    return SPECENUM_VALUE40NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE40NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE40);
 #endif
@@ -2502,7 +2531,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE41
   case SPECENUM_VALUE41:
 #ifdef SPECENUM_VALUE41NAME
-    return SPECENUM_VALUE41NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE41NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE41);
 #endif
@@ -2511,7 +2540,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE42
   case SPECENUM_VALUE42:
 #ifdef SPECENUM_VALUE42NAME
-    return SPECENUM_VALUE42NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE42NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE42);
 #endif
@@ -2520,7 +2549,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE43
   case SPECENUM_VALUE43:
 #ifdef SPECENUM_VALUE43NAME
-    return SPECENUM_VALUE43NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE43NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE43);
 #endif
@@ -2529,7 +2558,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE44
   case SPECENUM_VALUE44:
 #ifdef SPECENUM_VALUE44NAME
-    return SPECENUM_VALUE44NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE44NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE44);
 #endif
@@ -2538,7 +2567,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE45
   case SPECENUM_VALUE45:
 #ifdef SPECENUM_VALUE45NAME
-    return SPECENUM_VALUE45NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE45NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE45);
 #endif
@@ -2547,7 +2576,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE46
   case SPECENUM_VALUE46:
 #ifdef SPECENUM_VALUE46NAME
-    return SPECENUM_VALUE46NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE46NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE46);
 #endif
@@ -2556,7 +2585,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE47
   case SPECENUM_VALUE47:
 #ifdef SPECENUM_VALUE47NAME
-    return SPECENUM_VALUE47NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE47NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE47);
 #endif
@@ -2565,7 +2594,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE48
   case SPECENUM_VALUE48:
 #ifdef SPECENUM_VALUE48NAME
-    return SPECENUM_VALUE48NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE48NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE48);
 #endif
@@ -2574,7 +2603,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE49
   case SPECENUM_VALUE49:
 #ifdef SPECENUM_VALUE49NAME
-    return SPECENUM_VALUE49NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE49NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE49);
 #endif
@@ -2583,7 +2612,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE50
   case SPECENUM_VALUE50:
 #ifdef SPECENUM_VALUE50NAME
-    return SPECENUM_VALUE50NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE50NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE50);
 #endif
@@ -2592,7 +2621,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE51
   case SPECENUM_VALUE51:
 #ifdef SPECENUM_VALUE51NAME
-    return SPECENUM_VALUE51NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE51NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE51);
 #endif
@@ -2601,7 +2630,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE52
   case SPECENUM_VALUE52:
 #ifdef SPECENUM_VALUE52NAME
-    return SPECENUM_VALUE52NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE52NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE52);
 #endif
@@ -2610,7 +2639,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE53
   case SPECENUM_VALUE53:
 #ifdef SPECENUM_VALUE53NAME
-    return SPECENUM_VALUE53NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE53NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE53);
 #endif
@@ -2619,7 +2648,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE54
   case SPECENUM_VALUE54:
 #ifdef SPECENUM_VALUE54NAME
-    return SPECENUM_VALUE54NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE54NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE54);
 #endif
@@ -2628,7 +2657,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE55
   case SPECENUM_VALUE55:
 #ifdef SPECENUM_VALUE55NAME
-    return SPECENUM_VALUE55NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE55NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE55);
 #endif
@@ -2637,7 +2666,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE56
   case SPECENUM_VALUE56:
 #ifdef SPECENUM_VALUE56NAME
-    return SPECENUM_VALUE56NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE56NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE56);
 #endif
@@ -2646,7 +2675,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE57
   case SPECENUM_VALUE57:
 #ifdef SPECENUM_VALUE57NAME
-    return SPECENUM_VALUE57NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE57NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE57);
 #endif
@@ -2655,7 +2684,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE58
   case SPECENUM_VALUE58:
 #ifdef SPECENUM_VALUE58NAME
-    return SPECENUM_VALUE58NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE58NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE58);
 #endif
@@ -2664,7 +2693,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE59
   case SPECENUM_VALUE59:
 #ifdef SPECENUM_VALUE59NAME
-    return SPECENUM_VALUE59NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE59NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE59);
 #endif
@@ -2673,7 +2702,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE60
   case SPECENUM_VALUE60:
 #ifdef SPECENUM_VALUE60NAME
-    return SPECENUM_VALUE60NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE60NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE60);
 #endif
@@ -2682,7 +2711,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE61
   case SPECENUM_VALUE61:
 #ifdef SPECENUM_VALUE61NAME
-    return SPECENUM_VALUE61NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE61NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE61);
 #endif
@@ -2691,7 +2720,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE62
   case SPECENUM_VALUE62:
 #ifdef SPECENUM_VALUE62NAME
-    return SPECENUM_VALUE62NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE62NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE62);
 #endif
@@ -2700,7 +2729,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE63
   case SPECENUM_VALUE63:
 #ifdef SPECENUM_VALUE63NAME
-    return SPECENUM_VALUE63NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE63NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE63);
 #endif
@@ -2709,7 +2738,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE64
   case SPECENUM_VALUE64:
 #ifdef SPECENUM_VALUE64NAME
-    return SPECENUM_VALUE64NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE64NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE64);
 #endif
@@ -2718,7 +2747,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE65
   case SPECENUM_VALUE65:
 #ifdef SPECENUM_VALUE65NAME
-    return SPECENUM_VALUE65NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE65NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE65);
 #endif
@@ -2727,7 +2756,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE66
   case SPECENUM_VALUE66:
 #ifdef SPECENUM_VALUE66NAME
-    return SPECENUM_VALUE66NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE66NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE66);
 #endif
@@ -2736,7 +2765,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE67
   case SPECENUM_VALUE67:
 #ifdef SPECENUM_VALUE67NAME
-    return SPECENUM_VALUE67NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE67NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE67);
 #endif
@@ -2745,7 +2774,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE68
   case SPECENUM_VALUE68:
 #ifdef SPECENUM_VALUE68NAME
-    return SPECENUM_VALUE68NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE68NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE68);
 #endif
@@ -2754,7 +2783,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE69
   case SPECENUM_VALUE69:
 #ifdef SPECENUM_VALUE69NAME
-    return SPECENUM_VALUE69NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE69NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE69);
 #endif
@@ -2763,7 +2792,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE70
   case SPECENUM_VALUE70:
 #ifdef SPECENUM_VALUE70NAME
-    return SPECENUM_VALUE70NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE70NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE70);
 #endif
@@ -2772,7 +2801,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE71
   case SPECENUM_VALUE71:
 #ifdef SPECENUM_VALUE71NAME
-    return SPECENUM_VALUE71NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE71NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE71);
 #endif
@@ -2781,7 +2810,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE72
   case SPECENUM_VALUE72:
 #ifdef SPECENUM_VALUE72NAME
-    return SPECENUM_VALUE72NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE72NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE72);
 #endif
@@ -2790,7 +2819,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE73
   case SPECENUM_VALUE73:
 #ifdef SPECENUM_VALUE73NAME
-    return SPECENUM_VALUE73NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE73NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE73);
 #endif
@@ -2799,7 +2828,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE74
   case SPECENUM_VALUE74:
 #ifdef SPECENUM_VALUE74NAME
-    return SPECENUM_VALUE74NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE74NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE74);
 #endif
@@ -2808,7 +2837,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE75
   case SPECENUM_VALUE75:
 #ifdef SPECENUM_VALUE75NAME
-    return SPECENUM_VALUE75NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE75NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE75);
 #endif
@@ -2817,7 +2846,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE76
   case SPECENUM_VALUE76:
 #ifdef SPECENUM_VALUE76NAME
-    return SPECENUM_VALUE76NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE76NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE76);
 #endif
@@ -2826,7 +2855,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE77
   case SPECENUM_VALUE77:
 #ifdef SPECENUM_VALUE77NAME
-    return SPECENUM_VALUE77NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE77NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE77);
 #endif
@@ -2835,7 +2864,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE78
   case SPECENUM_VALUE78:
 #ifdef SPECENUM_VALUE78NAME
-    return SPECENUM_VALUE78NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE78NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE78);
 #endif
@@ -2844,7 +2873,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE79
   case SPECENUM_VALUE79:
 #ifdef SPECENUM_VALUE79NAME
-    return SPECENUM_VALUE79NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE79NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE79);
 #endif
@@ -2853,7 +2882,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE80
   case SPECENUM_VALUE80:
 #ifdef SPECENUM_VALUE80NAME
-    return SPECENUM_VALUE80NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE80NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE80);
 #endif
@@ -2862,7 +2891,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE81
   case SPECENUM_VALUE81:
 #ifdef SPECENUM_VALUE81NAME
-    return SPECENUM_VALUE81NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE81NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE81);
 #endif
@@ -2871,7 +2900,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE82
   case SPECENUM_VALUE82:
 #ifdef SPECENUM_VALUE82NAME
-    return SPECENUM_VALUE82NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE82NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE82);
 #endif
@@ -2880,7 +2909,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE83
   case SPECENUM_VALUE83:
 #ifdef SPECENUM_VALUE83NAME
-    return SPECENUM_VALUE83NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE83NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE83);
 #endif
@@ -2889,7 +2918,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE84
   case SPECENUM_VALUE84:
 #ifdef SPECENUM_VALUE84NAME
-    return SPECENUM_VALUE84NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE84NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE84);
 #endif
@@ -2898,7 +2927,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE85
   case SPECENUM_VALUE85:
 #ifdef SPECENUM_VALUE85NAME
-    return SPECENUM_VALUE85NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE85NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE85);
 #endif
@@ -2907,7 +2936,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE86
   case SPECENUM_VALUE86:
 #ifdef SPECENUM_VALUE86NAME
-    return SPECENUM_VALUE86NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE86NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE86);
 #endif
@@ -2916,7 +2945,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE87
   case SPECENUM_VALUE87:
 #ifdef SPECENUM_VALUE87NAME
-    return SPECENUM_VALUE87NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE87NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE87);
 #endif
@@ -2925,7 +2954,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE88
   case SPECENUM_VALUE88:
 #ifdef SPECENUM_VALUE88NAME
-    return SPECENUM_VALUE88NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE88NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE88);
 #endif
@@ -2934,7 +2963,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE89
   case SPECENUM_VALUE89:
 #ifdef SPECENUM_VALUE89NAME
-    return SPECENUM_VALUE89NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE89NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE89);
 #endif
@@ -2943,7 +2972,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE90
   case SPECENUM_VALUE90:
 #ifdef SPECENUM_VALUE90NAME
-    return SPECENUM_VALUE90NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE90NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE90);
 #endif
@@ -2952,7 +2981,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE91
   case SPECENUM_VALUE91:
 #ifdef SPECENUM_VALUE91NAME
-    return SPECENUM_VALUE91NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE91NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE91);
 #endif
@@ -2961,7 +2990,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE92
   case SPECENUM_VALUE92:
 #ifdef SPECENUM_VALUE92NAME
-    return SPECENUM_VALUE92NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE92NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE92);
 #endif
@@ -2970,7 +2999,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE93
   case SPECENUM_VALUE93:
 #ifdef SPECENUM_VALUE93NAME
-    return SPECENUM_VALUE93NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE93NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE93);
 #endif
@@ -2979,7 +3008,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE94
   case SPECENUM_VALUE94:
 #ifdef SPECENUM_VALUE94NAME
-    return SPECENUM_VALUE94NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE94NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE94);
 #endif
@@ -2988,7 +3017,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE95
   case SPECENUM_VALUE95:
 #ifdef SPECENUM_VALUE95NAME
-    return SPECENUM_VALUE95NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE95NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE95);
 #endif
@@ -2997,7 +3026,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE96
   case SPECENUM_VALUE96:
 #ifdef SPECENUM_VALUE96NAME
-    return SPECENUM_VALUE96NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE96NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE96);
 #endif
@@ -3006,7 +3035,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE97
   case SPECENUM_VALUE97:
 #ifdef SPECENUM_VALUE97NAME
-    return SPECENUM_VALUE97NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE97NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE97);
 #endif
@@ -3015,7 +3044,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE98
   case SPECENUM_VALUE98:
 #ifdef SPECENUM_VALUE98NAME
-    return SPECENUM_VALUE98NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE98NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE98);
 #endif
@@ -3024,7 +3053,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE99
   case SPECENUM_VALUE99:
 #ifdef SPECENUM_VALUE99NAME
-    return SPECENUM_VALUE99NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE99NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE99);
 #endif
@@ -3033,7 +3062,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE100
   case SPECENUM_VALUE100:
 #ifdef SPECENUM_VALUE100NAME
-    return SPECENUM_VALUE100NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE100NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE100);
 #endif
@@ -3042,7 +3071,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE101
   case SPECENUM_VALUE101:
 #ifdef SPECENUM_VALUE101NAME
-    return SPECENUM_VALUE101NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE101NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE101);
 #endif
@@ -3051,7 +3080,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE102
   case SPECENUM_VALUE102:
 #ifdef SPECENUM_VALUE102NAME
-    return SPECENUM_VALUE102NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE102NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE102);
 #endif
@@ -3060,7 +3089,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE103
   case SPECENUM_VALUE103:
 #ifdef SPECENUM_VALUE103NAME
-    return SPECENUM_VALUE103NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE103NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE103);
 #endif
@@ -3069,7 +3098,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE104
   case SPECENUM_VALUE104:
 #ifdef SPECENUM_VALUE104NAME
-    return SPECENUM_VALUE104NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE104NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE104);
 #endif
@@ -3078,7 +3107,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE105
   case SPECENUM_VALUE105:
 #ifdef SPECENUM_VALUE105NAME
-    return SPECENUM_VALUE105NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE105NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE105);
 #endif
@@ -3087,7 +3116,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE106
   case SPECENUM_VALUE106:
 #ifdef SPECENUM_VALUE106NAME
-    return SPECENUM_VALUE106NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE106NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE106);
 #endif
@@ -3096,7 +3125,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE107
   case SPECENUM_VALUE107:
 #ifdef SPECENUM_VALUE107NAME
-    return SPECENUM_VALUE107NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE107NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE107);
 #endif
@@ -3105,7 +3134,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE108
   case SPECENUM_VALUE108:
 #ifdef SPECENUM_VALUE108NAME
-    return SPECENUM_VALUE108NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE108NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE108);
 #endif
@@ -3114,7 +3143,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE109
   case SPECENUM_VALUE109:
 #ifdef SPECENUM_VALUE109NAME
-    return SPECENUM_VALUE109NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE109NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE109);
 #endif
@@ -3123,7 +3152,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE110
   case SPECENUM_VALUE110:
 #ifdef SPECENUM_VALUE110NAME
-    return SPECENUM_VALUE110NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE110NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE110);
 #endif
@@ -3132,7 +3161,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE111
   case SPECENUM_VALUE111:
 #ifdef SPECENUM_VALUE111NAME
-    return SPECENUM_VALUE111NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE111NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE111);
 #endif
@@ -3141,7 +3170,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE112
   case SPECENUM_VALUE112:
 #ifdef SPECENUM_VALUE112NAME
-    return SPECENUM_VALUE112NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE112NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE112);
 #endif
@@ -3150,7 +3179,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE113
   case SPECENUM_VALUE113:
 #ifdef SPECENUM_VALUE113NAME
-    return SPECENUM_VALUE113NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE113NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE113);
 #endif
@@ -3159,7 +3188,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE114
   case SPECENUM_VALUE114:
 #ifdef SPECENUM_VALUE114NAME
-    return SPECENUM_VALUE114NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE114NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE114);
 #endif
@@ -3168,7 +3197,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE115
   case SPECENUM_VALUE115:
 #ifdef SPECENUM_VALUE115NAME
-    return SPECENUM_VALUE115NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE115NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE115);
 #endif
@@ -3177,7 +3206,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE116
   case SPECENUM_VALUE116:
 #ifdef SPECENUM_VALUE116NAME
-    return SPECENUM_VALUE116NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE116NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE116);
 #endif
@@ -3186,7 +3215,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE117
   case SPECENUM_VALUE117:
 #ifdef SPECENUM_VALUE117NAME
-    return SPECENUM_VALUE117NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE117NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE117);
 #endif
@@ -3195,7 +3224,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE118
   case SPECENUM_VALUE118:
 #ifdef SPECENUM_VALUE118NAME
-    return SPECENUM_VALUE118NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE118NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE118);
 #endif
@@ -3204,7 +3233,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE119
   case SPECENUM_VALUE119:
 #ifdef SPECENUM_VALUE119NAME
-    return SPECENUM_VALUE119NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE119NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE119);
 #endif
@@ -3213,7 +3242,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE120
   case SPECENUM_VALUE120:
 #ifdef SPECENUM_VALUE120NAME
-    return SPECENUM_VALUE120NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE120NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE120);
 #endif
@@ -3222,7 +3251,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE121
   case SPECENUM_VALUE121:
 #ifdef SPECENUM_VALUE121NAME
-    return SPECENUM_VALUE121NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE121NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE121);
 #endif
@@ -3231,7 +3260,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE122
   case SPECENUM_VALUE122:
 #ifdef SPECENUM_VALUE122NAME
-    return SPECENUM_VALUE122NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE122NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE122);
 #endif
@@ -3240,7 +3269,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE123
   case SPECENUM_VALUE123:
 #ifdef SPECENUM_VALUE123NAME
-    return SPECENUM_VALUE123NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE123NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE123);
 #endif
@@ -3249,7 +3278,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_VALUE124
   case SPECENUM_VALUE124:
 #ifdef SPECENUM_VALUE124NAME
-    return SPECENUM_VALUE124NAME;
+    return skip_intl_qualifier_prefix(SPECENUM_VALUE124NAME);
 #else
     return SPECENUM_STRING(SPECENUM_VALUE124);
 #endif
@@ -3258,7 +3287,7 @@ static inline const char *SPECENUM_FOO(_name)(enum SPECENUM_NAME enumerator)
 #ifdef SPECENUM_COUNT
   case SPECENUM_COUNT:
 #ifdef SPECENUM_COUNTNAME
-    return SPECENUM_COUNTNAME;
+    return skip_intl_qualifier_prefix(SPECENUM_COUNTNAME);
 #else
     return SPECENUM_STRING(SPECENUM_COUNT);
 #endif
@@ -3288,6 +3317,1168 @@ static inline enum SPECENUM_NAME SPECENUM_FOO(_by_name)
   return SPECENUM_FOO(_invalid)();
 }
 
+/**************************************************************************
+  Returns the translated name of the enumerator.
+**************************************************************************/
+static inline const char *
+SPECENUM_FOO(_translated_name)(enum SPECENUM_NAME enumerator)
+{
+#ifdef SPECENUM_NAMEOVERRIDE
+  char *name = SPECENUM_FOO(_name_cb)(enumerator);
+
+  if (name != NULL) {
+    return Q_(name);
+  }
+#endif /* SPECENUM_NAMEOVERRIDE */
+
+  switch (enumerator) {
+#ifdef SPECENUM_ZERO
+  case SPECENUM_ZERO:
+#ifdef SPECENUM_ZERONAME
+    return Q_(SPECENUM_ZERONAME);
+#else
+    return SPECENUM_STRING(SPECENUM_ZERO);
+#endif
+#endif /* SPECENUM_ZERO */
+
+#ifdef SPECENUM_VALUE0
+  case SPECENUM_VALUE0:
+#ifdef SPECENUM_VALUE0NAME
+    return Q_(SPECENUM_VALUE0NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE0);
+#endif
+#endif /* SPECENUM_VALUE0 */
+
+#ifdef SPECENUM_VALUE1
+  case SPECENUM_VALUE1:
+#ifdef SPECENUM_VALUE1NAME
+    return Q_(SPECENUM_VALUE1NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE1);
+#endif
+#endif /* SPECENUM_VALUE1 */
+
+#ifdef SPECENUM_VALUE2
+  case SPECENUM_VALUE2:
+#ifdef SPECENUM_VALUE2NAME
+    return Q_(SPECENUM_VALUE2NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE2);
+#endif
+#endif /* SPECENUM_VALUE2 */
+
+#ifdef SPECENUM_VALUE3
+  case SPECENUM_VALUE3:
+#ifdef SPECENUM_VALUE3NAME
+    return Q_(SPECENUM_VALUE3NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE3);
+#endif
+#endif /* SPECENUM_VALUE3 */
+
+#ifdef SPECENUM_VALUE4
+  case SPECENUM_VALUE4:
+#ifdef SPECENUM_VALUE4NAME
+    return Q_(SPECENUM_VALUE4NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE4);
+#endif
+#endif /* SPECENUM_VALUE4 */
+
+#ifdef SPECENUM_VALUE5
+  case SPECENUM_VALUE5:
+#ifdef SPECENUM_VALUE5NAME
+    return Q_(SPECENUM_VALUE5NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE5);
+#endif
+#endif /* SPECENUM_VALUE5 */
+
+#ifdef SPECENUM_VALUE6
+  case SPECENUM_VALUE6:
+#ifdef SPECENUM_VALUE6NAME
+    return Q_(SPECENUM_VALUE6NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE6);
+#endif
+#endif /* SPECENUM_VALUE6 */
+
+#ifdef SPECENUM_VALUE7
+  case SPECENUM_VALUE7:
+#ifdef SPECENUM_VALUE7NAME
+    return Q_(SPECENUM_VALUE7NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE7);
+#endif
+#endif /* SPECENUM_VALUE7 */
+
+#ifdef SPECENUM_VALUE8
+  case SPECENUM_VALUE8:
+#ifdef SPECENUM_VALUE8NAME
+    return Q_(SPECENUM_VALUE8NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE8);
+#endif
+#endif /* SPECENUM_VALUE8 */
+
+#ifdef SPECENUM_VALUE9
+  case SPECENUM_VALUE9:
+#ifdef SPECENUM_VALUE9NAME
+    return Q_(SPECENUM_VALUE9NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE9);
+#endif
+#endif /* SPECENUM_VALUE9 */
+
+#ifdef SPECENUM_VALUE10
+  case SPECENUM_VALUE10:
+#ifdef SPECENUM_VALUE10NAME
+    return Q_(SPECENUM_VALUE10NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE10);
+#endif
+#endif /* SPECENUM_VALUE10 */
+
+#ifdef SPECENUM_VALUE11
+  case SPECENUM_VALUE11:
+#ifdef SPECENUM_VALUE11NAME
+    return Q_(SPECENUM_VALUE11NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE11);
+#endif
+#endif /* SPECENUM_VALUE11 */
+
+#ifdef SPECENUM_VALUE12
+  case SPECENUM_VALUE12:
+#ifdef SPECENUM_VALUE12NAME
+    return Q_(SPECENUM_VALUE12NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE12);
+#endif
+#endif /* SPECENUM_VALUE12 */
+
+#ifdef SPECENUM_VALUE13
+  case SPECENUM_VALUE13:
+#ifdef SPECENUM_VALUE13NAME
+    return Q_(SPECENUM_VALUE13NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE13);
+#endif
+#endif /* SPECENUM_VALUE13 */
+
+#ifdef SPECENUM_VALUE14
+  case SPECENUM_VALUE14:
+#ifdef SPECENUM_VALUE14NAME
+    return Q_(SPECENUM_VALUE14NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE14);
+#endif
+#endif /* SPECENUM_VALUE14 */
+
+#ifdef SPECENUM_VALUE15
+  case SPECENUM_VALUE15:
+#ifdef SPECENUM_VALUE15NAME
+    return Q_(SPECENUM_VALUE15NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE15);
+#endif
+#endif /* SPECENUM_VALUE15 */
+
+#ifdef SPECENUM_VALUE16
+  case SPECENUM_VALUE16:
+#ifdef SPECENUM_VALUE16NAME
+    return Q_(SPECENUM_VALUE16NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE16);
+#endif
+#endif /* SPECENUM_VALUE16 */
+
+#ifdef SPECENUM_VALUE17
+  case SPECENUM_VALUE17:
+#ifdef SPECENUM_VALUE17NAME
+    return Q_(SPECENUM_VALUE17NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE17);
+#endif
+#endif /* SPECENUM_VALUE17 */
+
+#ifdef SPECENUM_VALUE18
+  case SPECENUM_VALUE18:
+#ifdef SPECENUM_VALUE18NAME
+    return Q_(SPECENUM_VALUE18NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE18);
+#endif
+#endif /* SPECENUM_VALUE18 */
+
+#ifdef SPECENUM_VALUE19
+  case SPECENUM_VALUE19:
+#ifdef SPECENUM_VALUE19NAME
+    return Q_(SPECENUM_VALUE19NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE19);
+#endif
+#endif /* SPECENUM_VALUE19 */
+
+#ifdef SPECENUM_VALUE20
+  case SPECENUM_VALUE20:
+#ifdef SPECENUM_VALUE20NAME
+    return Q_(SPECENUM_VALUE20NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE20);
+#endif
+#endif /* SPECENUM_VALUE20 */
+
+#ifdef SPECENUM_VALUE21
+  case SPECENUM_VALUE21:
+#ifdef SPECENUM_VALUE21NAME
+    return Q_(SPECENUM_VALUE21NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE21);
+#endif
+#endif /* SPECENUM_VALUE21 */
+
+#ifdef SPECENUM_VALUE22
+  case SPECENUM_VALUE22:
+#ifdef SPECENUM_VALUE22NAME
+    return Q_(SPECENUM_VALUE22NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE22);
+#endif
+#endif /* SPECENUM_VALUE22 */
+
+#ifdef SPECENUM_VALUE23
+  case SPECENUM_VALUE23:
+#ifdef SPECENUM_VALUE23NAME
+    return Q_(SPECENUM_VALUE23NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE23);
+#endif
+#endif /* SPECENUM_VALUE23 */
+
+#ifdef SPECENUM_VALUE24
+  case SPECENUM_VALUE24:
+#ifdef SPECENUM_VALUE24NAME
+    return Q_(SPECENUM_VALUE24NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE24);
+#endif
+#endif /* SPECENUM_VALUE24 */
+
+#ifdef SPECENUM_VALUE25
+  case SPECENUM_VALUE25:
+#ifdef SPECENUM_VALUE25NAME
+    return Q_(SPECENUM_VALUE25NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE25);
+#endif
+#endif /* SPECENUM_VALUE25 */
+
+#ifdef SPECENUM_VALUE26
+  case SPECENUM_VALUE26:
+#ifdef SPECENUM_VALUE26NAME
+    return Q_(SPECENUM_VALUE26NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE26);
+#endif
+#endif /* SPECENUM_VALUE26 */
+
+#ifdef SPECENUM_VALUE27
+  case SPECENUM_VALUE27:
+#ifdef SPECENUM_VALUE27NAME
+    return Q_(SPECENUM_VALUE27NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE27);
+#endif
+#endif /* SPECENUM_VALUE27 */
+
+#ifdef SPECENUM_VALUE28
+  case SPECENUM_VALUE28:
+#ifdef SPECENUM_VALUE28NAME
+    return Q_(SPECENUM_VALUE28NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE28);
+#endif
+#endif /* SPECENUM_VALUE28 */
+
+#ifdef SPECENUM_VALUE29
+  case SPECENUM_VALUE29:
+#ifdef SPECENUM_VALUE29NAME
+    return Q_(SPECENUM_VALUE29NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE29);
+#endif
+#endif /* SPECENUM_VALUE29 */
+
+#ifdef SPECENUM_VALUE30
+  case SPECENUM_VALUE30:
+#ifdef SPECENUM_VALUE30NAME
+    return Q_(SPECENUM_VALUE30NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE30);
+#endif
+#endif /* SPECENUM_VALUE30 */
+
+#ifdef SPECENUM_VALUE31
+  case SPECENUM_VALUE31:
+#ifdef SPECENUM_VALUE31NAME
+    return Q_(SPECENUM_VALUE31NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE31);
+#endif
+#endif /* SPECENUM_VALUE31 */
+
+#ifdef SPECENUM_VALUE32
+  case SPECENUM_VALUE32:
+#ifdef SPECENUM_VALUE32NAME
+    return Q_(SPECENUM_VALUE32NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE32);
+#endif
+#endif /* SPECENUM_VALUE32 */
+
+#ifdef SPECENUM_VALUE33
+  case SPECENUM_VALUE33:
+#ifdef SPECENUM_VALUE33NAME
+    return Q_(SPECENUM_VALUE33NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE33);
+#endif
+#endif /* SPECENUM_VALUE33 */
+
+#ifdef SPECENUM_VALUE34
+  case SPECENUM_VALUE34:
+#ifdef SPECENUM_VALUE34NAME
+    return Q_(SPECENUM_VALUE34NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE34);
+#endif
+#endif /* SPECENUM_VALUE34 */
+
+#ifdef SPECENUM_VALUE35
+  case SPECENUM_VALUE35:
+#ifdef SPECENUM_VALUE35NAME
+    return Q_(SPECENUM_VALUE35NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE35);
+#endif
+#endif /* SPECENUM_VALUE35 */
+
+#ifdef SPECENUM_VALUE36
+  case SPECENUM_VALUE36:
+#ifdef SPECENUM_VALUE36NAME
+    return Q_(SPECENUM_VALUE36NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE36);
+#endif
+#endif /* SPECENUM_VALUE36 */
+
+#ifdef SPECENUM_VALUE37
+  case SPECENUM_VALUE37:
+#ifdef SPECENUM_VALUE37NAME
+    return Q_(SPECENUM_VALUE37NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE37);
+#endif
+#endif /* SPECENUM_VALUE37 */
+
+#ifdef SPECENUM_VALUE38
+  case SPECENUM_VALUE38:
+#ifdef SPECENUM_VALUE38NAME
+    return Q_(SPECENUM_VALUE38NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE38);
+#endif
+#endif /* SPECENUM_VALUE38 */
+
+#ifdef SPECENUM_VALUE39
+  case SPECENUM_VALUE39:
+#ifdef SPECENUM_VALUE39NAME
+    return Q_(SPECENUM_VALUE39NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE39);
+#endif
+#endif /* SPECENUM_VALUE39 */
+
+#ifdef SPECENUM_VALUE40
+  case SPECENUM_VALUE40:
+#ifdef SPECENUM_VALUE40NAME
+    return Q_(SPECENUM_VALUE40NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE40);
+#endif
+#endif /* SPECENUM_VALUE40 */
+
+#ifdef SPECENUM_VALUE41
+  case SPECENUM_VALUE41:
+#ifdef SPECENUM_VALUE41NAME
+    return Q_(SPECENUM_VALUE41NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE41);
+#endif
+#endif /* SPECENUM_VALUE41 */
+
+#ifdef SPECENUM_VALUE42
+  case SPECENUM_VALUE42:
+#ifdef SPECENUM_VALUE42NAME
+    return Q_(SPECENUM_VALUE42NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE42);
+#endif
+#endif /* SPECENUM_VALUE42 */
+
+#ifdef SPECENUM_VALUE43
+  case SPECENUM_VALUE43:
+#ifdef SPECENUM_VALUE43NAME
+    return Q_(SPECENUM_VALUE43NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE43);
+#endif
+#endif /* SPECENUM_VALUE43 */
+
+#ifdef SPECENUM_VALUE44
+  case SPECENUM_VALUE44:
+#ifdef SPECENUM_VALUE44NAME
+    return Q_(SPECENUM_VALUE44NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE44);
+#endif
+#endif /* SPECENUM_VALUE44 */
+
+#ifdef SPECENUM_VALUE45
+  case SPECENUM_VALUE45:
+#ifdef SPECENUM_VALUE45NAME
+    return Q_(SPECENUM_VALUE45NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE45);
+#endif
+#endif /* SPECENUM_VALUE45 */
+
+#ifdef SPECENUM_VALUE46
+  case SPECENUM_VALUE46:
+#ifdef SPECENUM_VALUE46NAME
+    return Q_(SPECENUM_VALUE46NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE46);
+#endif
+#endif /* SPECENUM_VALUE46 */
+
+#ifdef SPECENUM_VALUE47
+  case SPECENUM_VALUE47:
+#ifdef SPECENUM_VALUE47NAME
+    return Q_(SPECENUM_VALUE47NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE47);
+#endif
+#endif /* SPECENUM_VALUE47 */
+
+#ifdef SPECENUM_VALUE48
+  case SPECENUM_VALUE48:
+#ifdef SPECENUM_VALUE48NAME
+    return Q_(SPECENUM_VALUE48NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE48);
+#endif
+#endif /* SPECENUM_VALUE48 */
+
+#ifdef SPECENUM_VALUE49
+  case SPECENUM_VALUE49:
+#ifdef SPECENUM_VALUE49NAME
+    return Q_(SPECENUM_VALUE49NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE49);
+#endif
+#endif /* SPECENUM_VALUE49 */
+
+#ifdef SPECENUM_VALUE50
+  case SPECENUM_VALUE50:
+#ifdef SPECENUM_VALUE50NAME
+    return Q_(SPECENUM_VALUE50NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE50);
+#endif
+#endif /* SPECENUM_VALUE50 */
+
+#ifdef SPECENUM_VALUE51
+  case SPECENUM_VALUE51:
+#ifdef SPECENUM_VALUE51NAME
+    return Q_(SPECENUM_VALUE51NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE51);
+#endif
+#endif /* SPECENUM_VALUE51 */
+
+#ifdef SPECENUM_VALUE52
+  case SPECENUM_VALUE52:
+#ifdef SPECENUM_VALUE52NAME
+    return Q_(SPECENUM_VALUE52NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE52);
+#endif
+#endif /* SPECENUM_VALUE52 */
+
+#ifdef SPECENUM_VALUE53
+  case SPECENUM_VALUE53:
+#ifdef SPECENUM_VALUE53NAME
+    return Q_(SPECENUM_VALUE53NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE53);
+#endif
+#endif /* SPECENUM_VALUE53 */
+
+#ifdef SPECENUM_VALUE54
+  case SPECENUM_VALUE54:
+#ifdef SPECENUM_VALUE54NAME
+    return Q_(SPECENUM_VALUE54NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE54);
+#endif
+#endif /* SPECENUM_VALUE54 */
+
+#ifdef SPECENUM_VALUE55
+  case SPECENUM_VALUE55:
+#ifdef SPECENUM_VALUE55NAME
+    return Q_(SPECENUM_VALUE55NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE55);
+#endif
+#endif /* SPECENUM_VALUE55 */
+
+#ifdef SPECENUM_VALUE56
+  case SPECENUM_VALUE56:
+#ifdef SPECENUM_VALUE56NAME
+    return Q_(SPECENUM_VALUE56NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE56);
+#endif
+#endif /* SPECENUM_VALUE56 */
+
+#ifdef SPECENUM_VALUE57
+  case SPECENUM_VALUE57:
+#ifdef SPECENUM_VALUE57NAME
+    return Q_(SPECENUM_VALUE57NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE57);
+#endif
+#endif /* SPECENUM_VALUE57 */
+
+#ifdef SPECENUM_VALUE58
+  case SPECENUM_VALUE58:
+#ifdef SPECENUM_VALUE58NAME
+    return Q_(SPECENUM_VALUE58NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE58);
+#endif
+#endif /* SPECENUM_VALUE58 */
+
+#ifdef SPECENUM_VALUE59
+  case SPECENUM_VALUE59:
+#ifdef SPECENUM_VALUE59NAME
+    return Q_(SPECENUM_VALUE59NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE59);
+#endif
+#endif /* SPECENUM_VALUE59 */
+
+#ifdef SPECENUM_VALUE60
+  case SPECENUM_VALUE60:
+#ifdef SPECENUM_VALUE60NAME
+    return Q_(SPECENUM_VALUE60NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE60);
+#endif
+#endif /* SPECENUM_VALUE60 */
+
+#ifdef SPECENUM_VALUE61
+  case SPECENUM_VALUE61:
+#ifdef SPECENUM_VALUE61NAME
+    return Q_(SPECENUM_VALUE61NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE61);
+#endif
+#endif /* SPECENUM_VALUE61 */
+
+#ifdef SPECENUM_VALUE62
+  case SPECENUM_VALUE62:
+#ifdef SPECENUM_VALUE62NAME
+    return Q_(SPECENUM_VALUE62NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE62);
+#endif
+#endif /* SPECENUM_VALUE62 */
+
+#ifdef SPECENUM_VALUE63
+  case SPECENUM_VALUE63:
+#ifdef SPECENUM_VALUE63NAME
+    return Q_(SPECENUM_VALUE63NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE63);
+#endif
+#endif /* SPECENUM_VALUE63 */
+
+#ifdef SPECENUM_VALUE64
+  case SPECENUM_VALUE64:
+#ifdef SPECENUM_VALUE64NAME
+    return Q_(SPECENUM_VALUE64NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE64);
+#endif
+#endif /* SPECENUM_VALUE64 */
+
+#ifdef SPECENUM_VALUE65
+  case SPECENUM_VALUE65:
+#ifdef SPECENUM_VALUE65NAME
+    return Q_(SPECENUM_VALUE65NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE65);
+#endif
+#endif /* SPECENUM_VALUE65 */
+
+#ifdef SPECENUM_VALUE66
+  case SPECENUM_VALUE66:
+#ifdef SPECENUM_VALUE66NAME
+    return Q_(SPECENUM_VALUE66NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE66);
+#endif
+#endif /* SPECENUM_VALUE66 */
+
+#ifdef SPECENUM_VALUE67
+  case SPECENUM_VALUE67:
+#ifdef SPECENUM_VALUE67NAME
+    return Q_(SPECENUM_VALUE67NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE67);
+#endif
+#endif /* SPECENUM_VALUE67 */
+
+#ifdef SPECENUM_VALUE68
+  case SPECENUM_VALUE68:
+#ifdef SPECENUM_VALUE68NAME
+    return Q_(SPECENUM_VALUE68NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE68);
+#endif
+#endif /* SPECENUM_VALUE68 */
+
+#ifdef SPECENUM_VALUE69
+  case SPECENUM_VALUE69:
+#ifdef SPECENUM_VALUE69NAME
+    return Q_(SPECENUM_VALUE69NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE69);
+#endif
+#endif /* SPECENUM_VALUE69 */
+
+#ifdef SPECENUM_VALUE70
+  case SPECENUM_VALUE70:
+#ifdef SPECENUM_VALUE70NAME
+    return Q_(SPECENUM_VALUE70NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE70);
+#endif
+#endif /* SPECENUM_VALUE70 */
+
+#ifdef SPECENUM_VALUE71
+  case SPECENUM_VALUE71:
+#ifdef SPECENUM_VALUE71NAME
+    return Q_(SPECENUM_VALUE71NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE71);
+#endif
+#endif /* SPECENUM_VALUE71 */
+
+#ifdef SPECENUM_VALUE72
+  case SPECENUM_VALUE72:
+#ifdef SPECENUM_VALUE72NAME
+    return Q_(SPECENUM_VALUE72NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE72);
+#endif
+#endif /* SPECENUM_VALUE72 */
+
+#ifdef SPECENUM_VALUE73
+  case SPECENUM_VALUE73:
+#ifdef SPECENUM_VALUE73NAME
+    return Q_(SPECENUM_VALUE73NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE73);
+#endif
+#endif /* SPECENUM_VALUE73 */
+
+#ifdef SPECENUM_VALUE74
+  case SPECENUM_VALUE74:
+#ifdef SPECENUM_VALUE74NAME
+    return Q_(SPECENUM_VALUE74NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE74);
+#endif
+#endif /* SPECENUM_VALUE74 */
+
+#ifdef SPECENUM_VALUE75
+  case SPECENUM_VALUE75:
+#ifdef SPECENUM_VALUE75NAME
+    return Q_(SPECENUM_VALUE75NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE75);
+#endif
+#endif /* SPECENUM_VALUE75 */
+
+#ifdef SPECENUM_VALUE76
+  case SPECENUM_VALUE76:
+#ifdef SPECENUM_VALUE76NAME
+    return Q_(SPECENUM_VALUE76NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE76);
+#endif
+#endif /* SPECENUM_VALUE76 */
+
+#ifdef SPECENUM_VALUE77
+  case SPECENUM_VALUE77:
+#ifdef SPECENUM_VALUE77NAME
+    return Q_(SPECENUM_VALUE77NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE77);
+#endif
+#endif /* SPECENUM_VALUE77 */
+
+#ifdef SPECENUM_VALUE78
+  case SPECENUM_VALUE78:
+#ifdef SPECENUM_VALUE78NAME
+    return Q_(SPECENUM_VALUE78NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE78);
+#endif
+#endif /* SPECENUM_VALUE78 */
+
+#ifdef SPECENUM_VALUE79
+  case SPECENUM_VALUE79:
+#ifdef SPECENUM_VALUE79NAME
+    return Q_(SPECENUM_VALUE79NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE79);
+#endif
+#endif /* SPECENUM_VALUE79 */
+
+#ifdef SPECENUM_VALUE80
+  case SPECENUM_VALUE80:
+#ifdef SPECENUM_VALUE80NAME
+    return Q_(SPECENUM_VALUE80NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE80);
+#endif
+#endif /* SPECENUM_VALUE80 */
+
+#ifdef SPECENUM_VALUE81
+  case SPECENUM_VALUE81:
+#ifdef SPECENUM_VALUE81NAME
+    return Q_(SPECENUM_VALUE81NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE81);
+#endif
+#endif /* SPECENUM_VALUE81 */
+
+#ifdef SPECENUM_VALUE82
+  case SPECENUM_VALUE82:
+#ifdef SPECENUM_VALUE82NAME
+    return Q_(SPECENUM_VALUE82NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE82);
+#endif
+#endif /* SPECENUM_VALUE82 */
+
+#ifdef SPECENUM_VALUE83
+  case SPECENUM_VALUE83:
+#ifdef SPECENUM_VALUE83NAME
+    return Q_(SPECENUM_VALUE83NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE83);
+#endif
+#endif /* SPECENUM_VALUE83 */
+
+#ifdef SPECENUM_VALUE84
+  case SPECENUM_VALUE84:
+#ifdef SPECENUM_VALUE84NAME
+    return Q_(SPECENUM_VALUE84NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE84);
+#endif
+#endif /* SPECENUM_VALUE84 */
+
+#ifdef SPECENUM_VALUE85
+  case SPECENUM_VALUE85:
+#ifdef SPECENUM_VALUE85NAME
+    return Q_(SPECENUM_VALUE85NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE85);
+#endif
+#endif /* SPECENUM_VALUE85 */
+
+#ifdef SPECENUM_VALUE86
+  case SPECENUM_VALUE86:
+#ifdef SPECENUM_VALUE86NAME
+    return Q_(SPECENUM_VALUE86NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE86);
+#endif
+#endif /* SPECENUM_VALUE86 */
+
+#ifdef SPECENUM_VALUE87
+  case SPECENUM_VALUE87:
+#ifdef SPECENUM_VALUE87NAME
+    return Q_(SPECENUM_VALUE87NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE87);
+#endif
+#endif /* SPECENUM_VALUE87 */
+
+#ifdef SPECENUM_VALUE88
+  case SPECENUM_VALUE88:
+#ifdef SPECENUM_VALUE88NAME
+    return Q_(SPECENUM_VALUE88NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE88);
+#endif
+#endif /* SPECENUM_VALUE88 */
+
+#ifdef SPECENUM_VALUE89
+  case SPECENUM_VALUE89:
+#ifdef SPECENUM_VALUE89NAME
+    return Q_(SPECENUM_VALUE89NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE89);
+#endif
+#endif /* SPECENUM_VALUE89 */
+
+#ifdef SPECENUM_VALUE90
+  case SPECENUM_VALUE90:
+#ifdef SPECENUM_VALUE90NAME
+    return Q_(SPECENUM_VALUE90NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE90);
+#endif
+#endif /* SPECENUM_VALUE90 */
+
+#ifdef SPECENUM_VALUE91
+  case SPECENUM_VALUE91:
+#ifdef SPECENUM_VALUE91NAME
+    return Q_(SPECENUM_VALUE91NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE91);
+#endif
+#endif /* SPECENUM_VALUE91 */
+
+#ifdef SPECENUM_VALUE92
+  case SPECENUM_VALUE92:
+#ifdef SPECENUM_VALUE92NAME
+    return Q_(SPECENUM_VALUE92NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE92);
+#endif
+#endif /* SPECENUM_VALUE92 */
+
+#ifdef SPECENUM_VALUE93
+  case SPECENUM_VALUE93:
+#ifdef SPECENUM_VALUE93NAME
+    return Q_(SPECENUM_VALUE93NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE93);
+#endif
+#endif /* SPECENUM_VALUE93 */
+
+#ifdef SPECENUM_VALUE94
+  case SPECENUM_VALUE94:
+#ifdef SPECENUM_VALUE94NAME
+    return Q_(SPECENUM_VALUE94NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE94);
+#endif
+#endif /* SPECENUM_VALUE94 */
+
+#ifdef SPECENUM_VALUE95
+  case SPECENUM_VALUE95:
+#ifdef SPECENUM_VALUE95NAME
+    return Q_(SPECENUM_VALUE95NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE95);
+#endif
+#endif /* SPECENUM_VALUE95 */
+
+#ifdef SPECENUM_VALUE96
+  case SPECENUM_VALUE96:
+#ifdef SPECENUM_VALUE96NAME
+    return Q_(SPECENUM_VALUE96NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE96);
+#endif
+#endif /* SPECENUM_VALUE96 */
+
+#ifdef SPECENUM_VALUE97
+  case SPECENUM_VALUE97:
+#ifdef SPECENUM_VALUE97NAME
+    return Q_(SPECENUM_VALUE97NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE97);
+#endif
+#endif /* SPECENUM_VALUE97 */
+
+#ifdef SPECENUM_VALUE98
+  case SPECENUM_VALUE98:
+#ifdef SPECENUM_VALUE98NAME
+    return Q_(SPECENUM_VALUE98NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE98);
+#endif
+#endif /* SPECENUM_VALUE98 */
+
+#ifdef SPECENUM_VALUE99
+  case SPECENUM_VALUE99:
+#ifdef SPECENUM_VALUE99NAME
+    return Q_(SPECENUM_VALUE99NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE99);
+#endif
+#endif /* SPECENUM_VALUE99 */
+
+#ifdef SPECENUM_VALUE100
+  case SPECENUM_VALUE100:
+#ifdef SPECENUM_VALUE100NAME
+    return Q_(SPECENUM_VALUE100NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE100);
+#endif
+#endif /* SPECENUM_VALUE100 */
+
+#ifdef SPECENUM_VALUE101
+  case SPECENUM_VALUE101:
+#ifdef SPECENUM_VALUE101NAME
+    return Q_(SPECENUM_VALUE101NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE101);
+#endif
+#endif /* SPECENUM_VALUE101 */
+
+#ifdef SPECENUM_VALUE102
+  case SPECENUM_VALUE102:
+#ifdef SPECENUM_VALUE102NAME
+    return Q_(SPECENUM_VALUE102NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE102);
+#endif
+#endif /* SPECENUM_VALUE102 */
+
+#ifdef SPECENUM_VALUE103
+  case SPECENUM_VALUE103:
+#ifdef SPECENUM_VALUE103NAME
+    return Q_(SPECENUM_VALUE103NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE103);
+#endif
+#endif /* SPECENUM_VALUE103 */
+
+#ifdef SPECENUM_VALUE104
+  case SPECENUM_VALUE104:
+#ifdef SPECENUM_VALUE104NAME
+    return Q_(SPECENUM_VALUE104NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE104);
+#endif
+#endif /* SPECENUM_VALUE104 */
+
+#ifdef SPECENUM_VALUE105
+  case SPECENUM_VALUE105:
+#ifdef SPECENUM_VALUE105NAME
+    return Q_(SPECENUM_VALUE105NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE105);
+#endif
+#endif /* SPECENUM_VALUE105 */
+
+#ifdef SPECENUM_VALUE106
+  case SPECENUM_VALUE106:
+#ifdef SPECENUM_VALUE106NAME
+    return Q_(SPECENUM_VALUE106NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE106);
+#endif
+#endif /* SPECENUM_VALUE106 */
+
+#ifdef SPECENUM_VALUE107
+  case SPECENUM_VALUE107:
+#ifdef SPECENUM_VALUE107NAME
+    return Q_(SPECENUM_VALUE107NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE107);
+#endif
+#endif /* SPECENUM_VALUE107 */
+
+#ifdef SPECENUM_VALUE108
+  case SPECENUM_VALUE108:
+#ifdef SPECENUM_VALUE108NAME
+    return Q_(SPECENUM_VALUE108NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE108);
+#endif
+#endif /* SPECENUM_VALUE108 */
+
+#ifdef SPECENUM_VALUE109
+  case SPECENUM_VALUE109:
+#ifdef SPECENUM_VALUE109NAME
+    return Q_(SPECENUM_VALUE109NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE109);
+#endif
+#endif /* SPECENUM_VALUE109 */
+
+#ifdef SPECENUM_VALUE110
+  case SPECENUM_VALUE110:
+#ifdef SPECENUM_VALUE110NAME
+    return Q_(SPECENUM_VALUE110NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE110);
+#endif
+#endif /* SPECENUM_VALUE110 */
+
+#ifdef SPECENUM_VALUE111
+  case SPECENUM_VALUE111:
+#ifdef SPECENUM_VALUE111NAME
+    return Q_(SPECENUM_VALUE111NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE111);
+#endif
+#endif /* SPECENUM_VALUE111 */
+
+#ifdef SPECENUM_VALUE112
+  case SPECENUM_VALUE112:
+#ifdef SPECENUM_VALUE112NAME
+    return Q_(SPECENUM_VALUE112NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE112);
+#endif
+#endif /* SPECENUM_VALUE112 */
+
+#ifdef SPECENUM_VALUE113
+  case SPECENUM_VALUE113:
+#ifdef SPECENUM_VALUE113NAME
+    return Q_(SPECENUM_VALUE113NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE113);
+#endif
+#endif /* SPECENUM_VALUE113 */
+
+#ifdef SPECENUM_VALUE114
+  case SPECENUM_VALUE114:
+#ifdef SPECENUM_VALUE114NAME
+    return Q_(SPECENUM_VALUE114NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE114);
+#endif
+#endif /* SPECENUM_VALUE114 */
+
+#ifdef SPECENUM_VALUE115
+  case SPECENUM_VALUE115:
+#ifdef SPECENUM_VALUE115NAME
+    return Q_(SPECENUM_VALUE115NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE115);
+#endif
+#endif /* SPECENUM_VALUE115 */
+
+#ifdef SPECENUM_VALUE116
+  case SPECENUM_VALUE116:
+#ifdef SPECENUM_VALUE116NAME
+    return Q_(SPECENUM_VALUE116NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE116);
+#endif
+#endif /* SPECENUM_VALUE116 */
+
+#ifdef SPECENUM_VALUE117
+  case SPECENUM_VALUE117:
+#ifdef SPECENUM_VALUE117NAME
+    return Q_(SPECENUM_VALUE117NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE117);
+#endif
+#endif /* SPECENUM_VALUE117 */
+
+#ifdef SPECENUM_VALUE118
+  case SPECENUM_VALUE118:
+#ifdef SPECENUM_VALUE118NAME
+    return Q_(SPECENUM_VALUE118NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE118);
+#endif
+#endif /* SPECENUM_VALUE118 */
+
+#ifdef SPECENUM_VALUE119
+  case SPECENUM_VALUE119:
+#ifdef SPECENUM_VALUE119NAME
+    return Q_(SPECENUM_VALUE119NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE119);
+#endif
+#endif /* SPECENUM_VALUE119 */
+
+#ifdef SPECENUM_VALUE120
+  case SPECENUM_VALUE120:
+#ifdef SPECENUM_VALUE120NAME
+    return Q_(SPECENUM_VALUE120NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE120);
+#endif
+#endif /* SPECENUM_VALUE120 */
+
+#ifdef SPECENUM_VALUE121
+  case SPECENUM_VALUE121:
+#ifdef SPECENUM_VALUE121NAME
+    return Q_(SPECENUM_VALUE121NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE121);
+#endif
+#endif /* SPECENUM_VALUE121 */
+
+#ifdef SPECENUM_VALUE122
+  case SPECENUM_VALUE122:
+#ifdef SPECENUM_VALUE122NAME
+    return Q_(SPECENUM_VALUE122NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE122);
+#endif
+#endif /* SPECENUM_VALUE122 */
+
+#ifdef SPECENUM_VALUE123
+  case SPECENUM_VALUE123:
+#ifdef SPECENUM_VALUE123NAME
+    return Q_(SPECENUM_VALUE123NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE123);
+#endif
+#endif /* SPECENUM_VALUE123 */
+
+#ifdef SPECENUM_VALUE124
+  case SPECENUM_VALUE124:
+#ifdef SPECENUM_VALUE124NAME
+    return Q_(SPECENUM_VALUE124NAME);
+#else
+    return SPECENUM_STRING(SPECENUM_VALUE124);
+#endif
+#endif /* SPECENUM_VALUE124 */
+
+#ifdef SPECENUM_COUNT
+  case SPECENUM_COUNT:
+#ifdef SPECENUM_COUNTNAME
+    return Q_(SPECENUM_COUNTNAME);
+#else
+    return SPECENUM_STRING(SPECENUM_COUNT);
+#endif
+#endif /* SPECENUM_COUNT */
+  }
+
+  return NULL;
+}
+
 #undef SPECENUM_NAME
 #undef SPECENUM_PASTE_
 #undef SPECENUM_PASTE
@@ -3300,6 +4491,7 @@ static inline enum SPECENUM_NAME SPECENUM_FOO(_by_name)
 #undef SPECENUM_ZERO
 #undef SPECENUM_MIN_VALUE
 #undef SPECENUM_MAX_VALUE
+#undef SPECENUM_NAMEOVERRIDE
 #undef SPECENUM_COUNT
 #undef SPECENUM_VALUE0
 #undef SPECENUM_VALUE1
@@ -3552,3 +4744,7 @@ static inline enum SPECENUM_NAME SPECENUM_FOO(_by_name)
 #undef SPECENUM_VALUE122NAME
 #undef SPECENUM_VALUE123NAME
 #undef SPECENUM_VALUE124NAME
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

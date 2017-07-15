@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -59,22 +59,32 @@ static void package_event_full(struct packet_chat_msg *packet,
                                const struct ft_color color,
                                const char *format, va_list vargs)
 {
+  char buf[MAX_LEN_MSG];
+  char *str;
+
   fc_assert_ret(NULL != packet);
 
   packet->tile = (NULL != ptile ? tile_index(ptile) : -1);
   packet->event = event;
   packet->conn_id = pconn ? pconn->id : -1;
 
-  if (ft_color_requested(color)) {
-    /* A color is requested. */
-    char buf[MAX_LEN_MSG];
+  fc_vsnprintf(buf, sizeof(buf), format, vargs);
+  if (is_capitalization_enabled()) {
+    str = capitalized_string(buf);
+  } else {
+    str = buf;
+  }
 
-    fc_vsnprintf(buf, sizeof(buf), format, vargs);
-    featured_text_apply_tag(buf, packet->message, sizeof(packet->message),
+  if (ft_color_requested(color)) {
+    featured_text_apply_tag(str, packet->message, sizeof(packet->message),
                             TTT_COLOR, 0, FT_OFFSET_UNSET, color);
   } else {
     /* Simple case */
-    fc_vsnprintf(packet->message, sizeof(packet->message), format, vargs);
+    strncpy(packet->message, str, sizeof(packet->message));
+  }
+
+  if (is_capitalization_enabled()) {
+    free_capitalized(str);
   }
 }
 
@@ -416,15 +426,11 @@ static struct event_cache_data_list *event_cache = NULL;
 static bool event_cache_status = FALSE;
 
 /**************************************************************************
-  Destroy an event_cache_data.  Removes it from the cache.
+  Callback for freeing event cache data
 **************************************************************************/
-static void event_cache_data_destroy(struct event_cache_data *pdata)
+static void event_cache_data_free(struct event_cache_data *data)
 {
-  fc_assert_ret(NULL != event_cache);
-  fc_assert_ret(NULL != pdata);
-
-  event_cache_data_list_remove(event_cache, pdata);
-  free(pdata);
+  free(data);
 }
 
 /**************************************************************************
@@ -479,7 +485,7 @@ event_cache_data_new(const struct packet_chat_msg *packet, int turn,
                ? game.server.event_cache.max_size
                : GAME_MAX_EVENT_CACHE_MAX_SIZE;
   while (event_cache_data_list_size(event_cache) > max_events) {
-    event_cache_data_destroy(event_cache_data_list_get(event_cache, 0));
+    event_cache_data_list_pop_front(event_cache);
   }
 
   return pdata;
@@ -493,7 +499,7 @@ void event_cache_init(void)
   if (event_cache != NULL) {
     event_cache_free();
   }
-  event_cache = event_cache_data_list_new();
+  event_cache = event_cache_data_list_new_full(event_cache_data_free);
   event_cache_status = TRUE;
 }
 
@@ -503,9 +509,6 @@ void event_cache_init(void)
 void event_cache_free(void)
 {
   if (event_cache != NULL) {
-    event_cache_iterate(pdata) {
-      event_cache_data_destroy(pdata);
-    } event_cache_iterate_end;
     event_cache_data_list_destroy(event_cache);
     event_cache = NULL;
   }
@@ -517,9 +520,7 @@ void event_cache_free(void)
 **************************************************************************/
 void event_cache_clear(void)
 {
-  event_cache_iterate(pdata) {
-    event_cache_data_destroy(pdata);
-  } event_cache_iterate_end;
+  event_cache_data_list_clear(event_cache);
 }
 
 /**************************************************************************
@@ -527,11 +528,16 @@ void event_cache_clear(void)
 **************************************************************************/
 void event_cache_remove_old(void)
 {
-  event_cache_iterate(pdata) {
-    if (pdata->turn + game.server.event_cache.turns <= game.info.turn) {
-      event_cache_data_destroy(pdata);
-    }
-  } event_cache_iterate_end;
+  struct event_cache_data *current;
+
+  /* This assumes that entries are in order, the ones to be removed first. */
+  current = event_cache_data_list_get(event_cache, 0);
+
+  while (current != NULL
+         && current->turn + game.server.event_cache.turns <= game.info.turn) {
+    event_cache_data_list_pop_front(event_cache);
+    current = event_cache_data_list_get(event_cache, 0);
+  }
 }
 
 /**************************************************************************
@@ -811,25 +817,28 @@ void event_cache_load(struct section_file *file, const char *section)
 ***************************************************************/
 void event_cache_save(struct section_file *file, const char *section)
 {
-  struct tile *ptile;
   int event_count = 0;
-  char target[MAX_NUM_PLAYER_SLOTS + 1];
-  char *p;
 
   /* stop event logging; this way events from log_*() will not be added
    * to the event list while saving the event list */
   event_cache_status = FALSE;
 
   event_cache_iterate(pdata) {
-    ptile = index_to_tile(pdata->packet.tile);
+    struct tile *ptile = index_to_tile(pdata->packet.tile);
+    char target[MAX_NUM_PLAYER_SLOTS + 1];
+    char *p;
+    int tile_x = -1, tile_y = -1;
+
+    if (ptile != NULL) {
+      index_to_map_pos(&tile_x, &tile_y, tile_index(ptile));
+    }
+
     secfile_insert_int(file, pdata->turn, "%s.events%d.turn",
                        section, event_count);
     secfile_insert_int(file, pdata->timestamp, "%s.events%d.timestamp",
                        section, event_count);
-    secfile_insert_int(file, NULL != ptile ? ptile->x : -1,
-                       "%s.events%d.x", section, event_count);
-    secfile_insert_int(file, NULL != ptile ? ptile->y : -1,
-                       "%s.events%d.y", section, event_count);
+    secfile_insert_int(file, tile_x, "%s.events%d.x", section, event_count);
+    secfile_insert_int(file, tile_y, "%s.events%d.y", section, event_count);
     secfile_insert_str(file, server_states_name(pdata->server_state),
                        "%s.events%d.server_state", section, event_count);
     secfile_insert_str(file, event_type_name(pdata->packet.event),

@@ -1,7 +1,7 @@
 [spec]
 
 ; Format and options of this spec file:
-options = "+Freeciv-2.3-spec"
+options = "+Freeciv-2.5-spec"
 
 [info]
 
@@ -104,4 +104,9 @@ tiles = { "row", "column", "tag"
   8,  5, "b.sun_tzus_war_academy"
   8,  6, "b.united_nations"
   8,  7, "b.womens_suffrage"
+
+  9,  0, "b.statue_of_zeus"
+  9,  1, "b.temple_of_artemis"
+  9,  2, "b.mausoleum"
+  9,  3, "b.internet"
 }

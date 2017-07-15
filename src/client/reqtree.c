@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -29,14 +29,12 @@
 
 /* client */
 #include "client_main.h"
+#include "options.h"
 #include "tilespec.h"
+#include "reqtree.h"
 
 #include "colors_g.h"
 #include "sprite_g.h"
-
-#include "reqtree.h"
-#include "tilespec.h"
-#include "options.h"
 
 /*
  * Hierarchical directed draph drawing for Freeciv's technology tree
@@ -184,7 +182,8 @@ static void node_rectangle_minimum_size(struct tree_node *node,
         if (advance_number(unit->require_advance) != node->tech) {
           continue;
         }
-        sprite = get_unittype_sprite(tileset, unit);
+        sprite = get_unittype_sprite(tileset, unit, direction8_invalid(),
+                                     TRUE);
         get_sprite_dimensions(sprite, &swidth, &sheight);
         max_icon_height = MAX(max_icon_height, sheight);
         icons_width_sum += swidth + 2;
@@ -400,7 +399,7 @@ static struct reqtree *create_dummy_reqtree(struct player *pplayer,
       nodes[tech] = NULL;
       continue;
     }
-    if (pplayer && !player_invention_reachable(pplayer, tech, !reachable)) {
+    if (pplayer && reachable && !player_invention_reachable(pplayer, tech, TRUE)) {
       /* Reqtree requested for particular player and this tech is
        * unreachable to him/her. */
       nodes[tech] = NULL;
@@ -881,14 +880,24 @@ static enum color_std node_color(struct tree_node *node)
       return COLOR_REQTREE_KNOWN;
     }
 
-    if (!player_invention_reachable(client.conn.playing, node->tech, FALSE)) {
+    if (!player_invention_reachable(client.conn.playing, node->tech, TRUE)) {
       return COLOR_REQTREE_UNREACHABLE;
+    }
+
+    if (!player_invention_reachable(client.conn.playing, node->tech, FALSE)) {
+      if (is_tech_a_req_for_goal(client.conn.playing, node->tech,
+                                 research->tech_goal)
+          || node->tech == research->tech_goal) {
+        return COLOR_REQTREE_GOAL_NOT_GETTABLE;
+      } else {
+        return COLOR_REQTREE_NOT_GETTABLE;
+      }
     }
 
     if (research->researching == node->tech) {
       return COLOR_REQTREE_RESEARCHING;
     }
-    
+
     if (TECH_KNOWN == player_invention_state(client.conn.playing, node->tech)) {
       return COLOR_REQTREE_KNOWN;
     }
@@ -1060,7 +1069,7 @@ void draw_reqtree(struct reqtree *tree, struct canvas *pcanvas,
 	 * node_rectangle_minimum_size(). If you change something here,
 	 * change also node_rectangle_minimum_size().
 	 */
-			     
+
 	get_text_size(&text_w, &text_h, FONT_REQTREE_TEXT, text);
 
 	canvas_put_text(pcanvas,
@@ -1076,7 +1085,8 @@ void draw_reqtree(struct reqtree *tree, struct canvas *pcanvas,
             if (advance_number(unit->require_advance) != node->tech) {
 	      continue;
 	    }
- 	    sprite = get_unittype_sprite(tileset, unit);
+            sprite = get_unittype_sprite(tileset, unit,
+                                         direction8_invalid(), TRUE);
  	    get_sprite_dimensions(sprite, &swidth, &sheight);
  	    canvas_put_sprite_full(pcanvas,
  	                           icon_startx,

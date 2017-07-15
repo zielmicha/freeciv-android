@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <gtk/gtk.h>
@@ -32,7 +32,7 @@
 #include "text.h"
 #include "tilespec.h"
 
-/* gui-gtk-2.0 */
+/* client/gui-gtk-2.0 */
 #include "graphics.h"
 #include "gui_main.h"
 #include "gui_stuff.h"
@@ -45,9 +45,9 @@
 #define	PIXCOMM_WIDTH	(HAPPINESS_PIX_WIDTH * tileset_small_sprite_width(tileset))
 #define	PIXCOMM_HEIGHT	(tileset_small_sprite_height(tileset))
 
-#define NUM_HAPPINESS_MODIFIERS 5
+#define NUM_HAPPINESS_MODIFIERS 6
 
-enum { CITIES, LUXURIES, BUILDINGS, UNITS, WONDERS };
+enum { CITIES, LUXURIES, BUILDINGS, NATIONALITY, UNITS, WONDERS };
 
 struct happiness_dialog {
   struct city *pcity;
@@ -78,7 +78,7 @@ static gboolean show_happiness_button_release(GtkWidget *w,
                                               gpointer data);
 
 /****************************************************************
-...
+  Create happiness dialog
 *****************************************************************/
 void happiness_dialog_init()
 {
@@ -86,7 +86,7 @@ void happiness_dialog_init()
 }
 
 /****************************************************************
-...
+  Remove happiness dialog
 *****************************************************************/
 void happiness_dialog_done()
 {
@@ -94,7 +94,7 @@ void happiness_dialog_done()
 }
 
 /****************************************************************
-...
+  Return happiness dialog for a city
 *****************************************************************/
 static struct happiness_dialog *get_happiness_dialog(struct city *pcity)
 {
@@ -130,6 +130,9 @@ static gboolean show_happiness_popup(GtkWidget *w,
       break;
     case BUILDINGS:
       sz_strlcpy(buf, text_happiness_buildings(pdialog->pcity));
+      break;
+    case NATIONALITY:
+      sz_strlcpy(buf, text_happiness_nationality(pdialog->pcity));
       break;
     case UNITS:
       sz_strlcpy(buf, text_happiness_units(pdialog->pcity));
@@ -192,6 +195,7 @@ static struct happiness_dialog *create_happiness_dialog(struct city *pcity)
     N_("Cities:"),
     N_("Luxuries:"),
     N_("Buildings:"),
+    N_("Nationality:"),
     N_("Units:"),
     N_("Wonders:"),
   };
@@ -264,7 +268,7 @@ static struct happiness_dialog *create_happiness_dialog(struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Refresh citizens pixcomm
 **************************************************************************/
 static void refresh_pixcomm(GtkPixcomm *dst, struct city *pcity,
 			    enum citizen_feeling index)
@@ -286,7 +290,7 @@ static void refresh_pixcomm(GtkPixcomm *dst, struct city *pcity,
 }
 
 /**************************************************************************
-...
+  Refresh whole happiness dialog
 **************************************************************************/
 void refresh_happiness_dialog(struct city *pcity)
 {
@@ -299,7 +303,7 @@ void refresh_happiness_dialog(struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Close happiness dialog of given city
 **************************************************************************/
 void close_happiness_dialog(struct city *pcity)
 {
@@ -318,7 +322,7 @@ void close_happiness_dialog(struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Create happiness dialog and get its widget
 **************************************************************************/
 GtkWidget *get_top_happiness_display(struct city *pcity)
 {

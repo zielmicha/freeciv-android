@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -131,6 +131,8 @@ static inline size_t base_fc_utf8_strlcpy_rep(char *dest, const char *src,
 {
   const char *end;
   size_t src_len, len;
+
+  fc_assert_ret_val(NULL != src, 0);
 
   src_len = strlen(src);
   while (TRUE) {
@@ -582,7 +584,7 @@ int fc_utf8_vsnprintf_trunc(char *str, size_t n, const char *format,
     return ret;
   } else {
     /* Truncate at last valid UTF-8 character. */
-    end = '\0';
+    *end = '\0';
     return (-1 == ret ? -1 : end - str);
   }
 }

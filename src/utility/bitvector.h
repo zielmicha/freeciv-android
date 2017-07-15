@@ -13,6 +13,10 @@
 #ifndef FC__BITVECTOR_H
 #define FC__BITVECTOR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include <stdlib.h> /* size_t */
 #include <string.h> /* memset */
 
@@ -49,13 +53,17 @@ bool dbv_are_equal(const struct dbv *pdbv1, const struct dbv *pdbv2);
 
 void dbv_debug(struct dbv *pdbv);
 
+/* Maximal size of a dynamic bitvector.
+   Use a large value to be on the safe side (4Mbits = 512kbytes). */
+#define MAX_DBV_LENGTH (4 * 1024 * 1024)
+
 /* Static bitvectors. */
 #define _BV_BYTES(bits)        ((((bits) - 1) / 8) + 1)
 #define _BV_BYTE_INDEX(bits)   ((bits) / 8)
 #define _BV_BITMASK(bit)       (1u << ((bit) & 0x7))
 #ifdef DEBUG
 #  define _BV_ASSERT(bv, bit)  fc_assert((bit) >= 0                         \
-                                         && (bit) < sizeof((bv).vec) * 8)
+                                         && (bit) < (signed int) sizeof((bv).vec) * 8)
 #else
 #  define _BV_ASSERT(bv, bit)  (void)0
 #endif
@@ -97,5 +105,9 @@ bool bv_are_equal(const unsigned char *vec1, const unsigned char *vec2,
 /* Used to make a BV typedef. Such types are usually called "bv_foo". */
 #define BV_DEFINE(name, bits)                                               \
   typedef struct { unsigned char vec[_BV_BYTES(bits)]; } name
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__BITVECTOR_H */

@@ -114,6 +114,35 @@ struct sprite *load_gfxfile(const char *filename){
 	return retstru;
 
 }
+// struct sprite *create_sprite(int width, int height, struct color *pcolor)
+struct sprite *create_sprite(int width, int height, struct color *pcolor){
+	PyObject* ret = PY_CALL("siiO", "create_sprite", width, height, py_mapper_color(pcolor));
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from create_sprite (expected 'O')\n");
+	Py_INCREF(retval);
+	Py_DECREF(ret);
+
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;
+}
+// int color_brightness_score(struct color *pcolor)
+int color_brightness_score(struct color *pcolor){
+	PyObject* ret = PY_CALL("sO", "color_brightness_score", py_mapper_color(pcolor));
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from color_brightness_score (expected 'O')\n");
+	Py_INCREF(retval);
+	Py_DECREF(ret);
+
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;
+}
+
+void real_luaconsole_append(const char *astring,
+                            const struct text_tag_list *tags)
+{
+  /* PORTME */
+}
+
 // struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y)
 struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y){
 	PyObject* ret = PY_CALL("sOiiiiOii", "crop_sprite", py_get_pyobject(source), x, y, width, height, py_get_pyobject(mask), mask_offset_x, mask_offset_y);

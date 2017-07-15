@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -36,6 +36,7 @@
 /* common */
 #include "dataio.h"
 #include "game.h"
+#include "mapimg.h"
 #include "version.h"
 
 /* client */
@@ -79,8 +80,14 @@ static GtkTreeSelection *meta_selection, *lan_selection;
  * be catch throught a switch() statement. */
 static enum client_pages current_page = -1;
 
-static guint meta_scan_timer, lan_scan_timer;
-static struct server_scan *meta_scan, *lan_scan;
+struct server_scan_timer_data
+{
+  struct server_scan *scan;
+  guint timer;
+};
+
+static struct server_scan_timer_data meta_scan = { NULL, 0 };
+static struct server_scan_timer_data lan_scan = { NULL, 0 };
 
 static GtkWidget *statusbar, *statusbar_frame;
 static GQueue *statusbar_queue;
@@ -88,7 +95,7 @@ static guint statusbar_timer = 0;
 
 static GtkWidget *ruleset_combo;
 
-static bool save_scenario = FALSE;
+static bool holding_srv_list_mutex = FALSE;
 
 static void connection_state_reset(void);
 
@@ -107,8 +114,8 @@ static void start_new_game_callback(GtkWidget *w, gpointer data)
 **************************************************************************/
 static void start_scenario_callback(GtkWidget *w, gpointer data)
 {
-  set_client_page(PAGE_SCENARIO);
-  client_start_server();
+  output_window_append(ftc_client, _("Compiling scenario list."));
+  client_start_server_and_set_page(PAGE_SCENARIO);
 }
 
 /**************************************************************************
@@ -116,8 +123,7 @@ static void start_scenario_callback(GtkWidget *w, gpointer data)
 **************************************************************************/
 static void load_saved_game_callback(GtkWidget *w, gpointer data)
 {
-  set_client_page(PAGE_LOAD);
-  client_start_server();
+  client_start_server_and_set_page(PAGE_LOAD);
 }
 
 /****************************************************************************
@@ -151,16 +157,36 @@ static gboolean intro_expose(GtkWidget *w, GdkEventExpose *ev)
 {
   static PangoLayout *layout;
   static int width, height;
+  static bool left = FALSE;
 
   if (!layout) {
     char msgbuf[128];
+    const char *rev_ver = fc_svn_revision();
 
     layout = pango_layout_new(gdk_pango_context_get());
     pango_layout_set_font_description(layout,
          pango_font_description_from_string("Sans Bold 10"));
 
-    fc_snprintf(msgbuf, sizeof(msgbuf), "%s%s",
-                word_version(), VERSION_STRING);
+    if (rev_ver == NULL) {
+      rev_ver = fc_git_revision();
+
+      if (rev_ver == NULL) {
+        /* TRANS: "version 2.6.0, gui-gtk-2.0 client" */
+        fc_snprintf(msgbuf, sizeof(msgbuf), _("%s%s, %s client"),
+                    word_version(), VERSION_STRING, client_string);
+      } else {
+        /* TRANS: "version 2.6.0
+         *         commit: [modified] <git commit id>
+         *         gui-gtk-2.0 client" */
+        fc_snprintf(msgbuf, sizeof(msgbuf), _("%s%s\ncommit: %s\n%s client"),
+                    word_version(), VERSION_STRING, rev_ver, client_string);
+        left = TRUE;
+      }
+    } else {
+      /* TRANS: "version 2.6.0 (r25000), gui-gtk-2.0 client" */
+      fc_snprintf(msgbuf, sizeof(msgbuf), _("%s%s (%s), %s client"),
+                  word_version(), VERSION_STRING, rev_ver, client_string);
+    }
     pango_layout_set_text(layout, msgbuf, -1);
 
     pango_layout_get_pixel_size(layout, &width, &height);
@@ -169,7 +195,7 @@ static gboolean intro_expose(GtkWidget *w, GdkEventExpose *ev)
   gtk_draw_shadowed_string(w->window,
       w->style->black_gc,
       w->style->white_gc,
-      w->allocation.x + w->allocation.width - width - 4,
+      w->allocation.x + (left ? 4 : w->allocation.width - width - 4),
       w->allocation.y + w->allocation.height - height - 4,
       layout);
   return TRUE;
@@ -261,21 +287,331 @@ GtkWidget *create_main_page(void)
   gtk_size_group_add_widget(size, button);
   gtk_table_attach_defaults(GTK_TABLE(table), button, 1, 2, 1, 2);
   g_signal_connect(button, "clicked", ggz_login, NULL);
-#endif
+#endif /* GGZ_GTK */
 
   button = gtk_button_new_from_stock(GTK_STOCK_QUIT);
   gtk_size_group_add_widget(size, button);
   gtk_table_attach_defaults(GTK_TABLE(table), button, 1, 2, 2, 3);
   g_signal_connect(button, "clicked",
-                   G_CALLBACK(gtk_main_quit), NULL);
+                   G_CALLBACK(quit_gtk_main), NULL);
 
   return widget;
 }
 
+/****************************************************************************
+                            GENERIC SAVE DIALOG
+****************************************************************************/
+typedef void (*save_dialog_action_fn_t) (const char *filename);
+typedef struct fileinfo_list * (*save_dialog_files_fn_t) (void);
+
+struct save_dialog {
+  GtkDialog *shell;
+  GtkTreeView *tree_view;
+  GtkEntry *entry;
+  save_dialog_action_fn_t action;
+  save_dialog_files_fn_t files;
+};
+
+enum save_dialog_columns {
+  SD_COL_PRETTY_NAME = 0,
+  SD_COL_FULL_PATH,
+
+  SD_COL_NUM
+};
+
+enum save_dialog_response {
+  SD_RES_BROWSE,
+  SD_RES_DELETE,
+  SD_RES_SAVE
+};
+
+/****************************************************************************
+  Create a new file list store.
+****************************************************************************/
+static inline GtkListStore *save_dialog_store_new(void)
+{
+  return gtk_list_store_new(SD_COL_NUM,
+                            G_TYPE_STRING,      /* SD_COL_PRETTY_NAME */
+                            G_TYPE_STRING);     /* SD_COL_FULL_PATH */
+}
+
+/****************************************************************************
+  Fill a file list store with 'files'.
+****************************************************************************/
+static void save_dialog_store_update(GtkListStore *store,
+                                     const struct fileinfo_list *files)
+{
+  GtkTreeIter iter;
+
+  gtk_list_store_clear(store);
+  fileinfo_list_iterate(files, pfile) {
+    gtk_list_store_append(store, &iter);
+    gtk_list_store_set(store, &iter,
+                       SD_COL_PRETTY_NAME, pfile->name,
+                       SD_COL_FULL_PATH, pfile->fullname,
+                       -1);
+  } fileinfo_list_iterate_end;
+}
+
+/****************************************************************************
+  Update a save dialog.
+****************************************************************************/
+static void save_dialog_update(struct save_dialog *pdialog)
+{
+  struct fileinfo_list *files;
+
+  fc_assert_ret(NULL != pdialog);
+
+  /* Update the store. */
+  files = pdialog->files();
+  save_dialog_store_update(GTK_LIST_STORE
+                           (gtk_tree_view_get_model(pdialog->tree_view)),
+                           files);
+  fileinfo_list_destroy(files);
+}
 
 /**************************************************************************
-                                 NETWORK PAGE
+  Callback for save_dialog_file_chooser_new().
 **************************************************************************/
+static void save_dialog_file_chooser_callback(GtkWidget *widget,
+                                              gint response, gpointer data)
+{
+  if (response == GTK_RESPONSE_OK) {
+    save_dialog_action_fn_t action = data;
+    gchar *filename = g_filename_to_utf8(gtk_file_chooser_get_filename
+                                         (GTK_FILE_CHOOSER(widget)),
+                                         -1, NULL, NULL, NULL);
+
+    if (NULL != filename) {
+      action(filename);
+      g_free(filename);
+    }
+  }
+  gtk_widget_destroy(widget);
+}
+
+/****************************************************************************
+  Create a file chooser for both the load and save commands.
+****************************************************************************/
+static void save_dialog_file_chooser_popup(const char *title,
+                                           GtkFileChooserAction action,
+                                           save_dialog_action_fn_t cb)
+{
+  GtkWidget *filechoose;
+
+  /* Create the chooser */
+  filechoose = gtk_file_chooser_dialog_new(title, GTK_WINDOW(toplevel), action,
+      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+      action == GTK_FILE_CHOOSER_ACTION_SAVE ? GTK_STOCK_SAVE : GTK_STOCK_OPEN,
+      GTK_RESPONSE_OK, NULL);
+  setup_dialog(filechoose, toplevel);
+  gtk_window_set_position(GTK_WINDOW(filechoose), GTK_WIN_POS_MOUSE);
+
+  g_signal_connect(filechoose, "response",
+                   G_CALLBACK(save_dialog_file_chooser_callback), cb);
+
+  /* Display that dialog */
+  gtk_window_present(GTK_WINDOW(filechoose));
+}
+
+/****************************************************************************
+  Handle save dialog response.
+****************************************************************************/
+static void save_dialog_response_callback(GtkWidget *w, gint response,
+                                          gpointer data)
+{
+  struct save_dialog *pdialog = data;
+
+  switch (response) {
+  case SD_RES_BROWSE:
+    save_dialog_file_chooser_popup(_("Select Location to Save"),
+                                   GTK_FILE_CHOOSER_ACTION_SAVE,
+                                   pdialog->action);
+    break;
+  case SD_RES_DELETE:
+    {
+      GtkTreeSelection *selection;
+      GtkTreeModel *model;
+      GtkTreeIter iter;
+      const gchar *full_path;
+
+      selection = gtk_tree_view_get_selection(pdialog->tree_view);
+      if (!gtk_tree_selection_get_selected(selection, &model, &iter)) {
+        return;
+      }
+
+      gtk_tree_model_get(model, &iter, SD_COL_FULL_PATH, &full_path, -1);
+      fc_remove(full_path);
+      save_dialog_update(pdialog);
+    }
+    return;
+  case SD_RES_SAVE:
+    {
+      const char *text = gtk_entry_get_text(pdialog->entry);
+      gchar *filename = g_filename_from_utf8(text, -1, NULL, NULL, NULL);
+
+      if (NULL == filename) {
+        return;
+      }
+      pdialog->action(filename);
+      g_free(filename);
+    }
+    break;
+  default:
+    break;
+  }
+  gtk_widget_destroy(GTK_WIDGET(pdialog->shell));
+}
+
+/****************************************************************************
+  Handle save list double click.
+****************************************************************************/
+static void save_dialog_row_callback(GtkTreeView *tree_view,
+                                     GtkTreePath *path,
+                                     GtkTreeViewColumn *column,
+                                     gpointer data)
+{
+  save_dialog_response_callback(NULL, SD_RES_SAVE, data);
+}
+
+/**************************************************************************
+  Handle save filename entry activation.
+**************************************************************************/
+static void save_dialog_entry_callback(GtkEntry *entry, gpointer data)
+{
+  save_dialog_response_callback(NULL, SD_RES_SAVE, data);
+}
+
+/**************************************************************************
+  Handle the save list selection changes.
+**************************************************************************/
+static void save_dialog_list_callback(GtkTreeSelection *selection,
+                                      gpointer data)
+{
+  struct save_dialog *pdialog = data;
+  GtkTreeModel *model;
+  GtkTreeIter iter;
+  const gchar *filename;
+
+  if (!gtk_tree_selection_get_selected(selection, &model, &iter)) {
+    gtk_dialog_set_response_sensitive(pdialog->shell, SD_RES_DELETE, FALSE);
+    return;
+  }
+
+  gtk_dialog_set_response_sensitive(pdialog->shell, SD_RES_DELETE, TRUE);
+  gtk_tree_model_get(model, &iter, SD_COL_PRETTY_NAME, &filename, -1);
+  gtk_entry_set_text(pdialog->entry, filename);
+}
+
+/****************************************************************************
+  Create a new save dialog.
+****************************************************************************/
+static GtkWidget *save_dialog_new(const char *title, const char *savelabel,
+                                  const char *savefilelabel,
+                                  save_dialog_action_fn_t action,
+                                  save_dialog_files_fn_t files)
+{
+  GtkWidget *shell, *sbox, *sw, *label, *view, *entry;
+  GtkBox *vbox;
+  GtkListStore *store;
+  GtkCellRenderer *rend;
+  GtkTreeSelection *selection;
+  struct save_dialog *pdialog;
+
+  fc_assert_ret_val(NULL != action, NULL);
+  fc_assert_ret_val(NULL != files, NULL);
+
+  /* Save dialog structure. */
+  pdialog = fc_malloc(sizeof(*pdialog));
+  pdialog->action = action;
+  pdialog->files = files;
+
+  /* Shell. */
+  shell = gtk_dialog_new_with_buttons(title, NULL, 0,
+                                      _("_Browse..."), SD_RES_BROWSE,
+                                      GTK_STOCK_DELETE, SD_RES_DELETE,
+                                      GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                      GTK_STOCK_SAVE, SD_RES_SAVE,
+                                      NULL);
+  g_object_set_data_full(G_OBJECT(shell), "save_dialog", pdialog,
+                         (GDestroyNotify) free);
+  gtk_dialog_set_default_response(GTK_DIALOG(shell), GTK_RESPONSE_CANCEL);
+  gtk_dialog_set_response_sensitive(GTK_DIALOG(shell), SD_RES_DELETE, FALSE);
+  setup_dialog(shell, toplevel);
+  g_signal_connect(shell, "response",
+                   G_CALLBACK(save_dialog_response_callback), pdialog);
+  pdialog->shell = GTK_DIALOG(shell);
+  vbox = GTK_BOX(GTK_DIALOG(shell)->vbox);
+
+  /* Tree view. */
+  store = save_dialog_store_new();
+  view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
+  g_object_unref(store);
+  gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(view), FALSE);
+  g_signal_connect(view, "row-activated",
+                   G_CALLBACK(save_dialog_row_callback), pdialog);
+  pdialog->tree_view = GTK_TREE_VIEW(view);
+
+  sbox = gtk_vbox_new(FALSE, 2);
+  gtk_box_pack_start(vbox, sbox, TRUE, TRUE, 0);
+
+  label = g_object_new(GTK_TYPE_LABEL,
+                       "use-underline", TRUE,
+                       "mnemonic-widget", view,
+                       "label", savelabel,
+                       "xalign", 0.0,
+                       "yalign", 0.5,
+                       NULL);
+  gtk_box_pack_start(GTK_BOX(sbox), label, FALSE, FALSE, 0);
+
+  sw = gtk_scrolled_window_new(NULL, NULL);
+  gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(sw),
+                                      GTK_SHADOW_ETCHED_IN);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(sw),
+                                 GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+  gtk_widget_set_size_request(sw, 300, 300);
+  gtk_container_add(GTK_CONTAINER(sw), view);
+  gtk_box_pack_start(GTK_BOX(sbox), sw, TRUE, TRUE, 0);
+
+  selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view));
+  gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+  g_signal_connect(selection, "changed",
+                   G_CALLBACK(save_dialog_list_callback), pdialog);
+
+  rend = gtk_cell_renderer_text_new();
+  gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
+                                              -1, NULL, rend, "text",
+                                              SD_COL_PRETTY_NAME, NULL);
+
+  /* Entry. */
+  entry = gtk_entry_new();
+  g_signal_connect(entry, "activate",
+                   G_CALLBACK(save_dialog_entry_callback), pdialog);
+  pdialog->entry = GTK_ENTRY(entry);
+
+  sbox = gtk_vbox_new(FALSE, 2);
+
+  label = g_object_new(GTK_TYPE_LABEL,
+                       "use-underline", TRUE,
+                       "mnemonic-widget", entry,
+                       "label", savefilelabel,
+                       "xalign", 0.0,
+                       "yalign", 0.5,
+                       NULL);
+  gtk_box_pack_start(GTK_BOX(sbox), label, FALSE, FALSE, 0);
+
+  gtk_box_pack_start(GTK_BOX(sbox), entry, FALSE, FALSE, 0);
+  gtk_box_pack_start(vbox, sbox, FALSE, FALSE, 12);
+
+  save_dialog_update(pdialog);
+  gtk_window_set_focus(GTK_WINDOW(shell), entry);
+  gtk_widget_show_all(GTK_WIDGET(vbox));
+  return shell;
+}
+
+/****************************************************************************
+                                 NETWORK PAGE
+****************************************************************************/
 static GtkWidget *network_login_label, *network_login;
 static GtkWidget *network_host_label, *network_host;
 static GtkWidget *network_port_label, *network_port;
@@ -331,26 +667,15 @@ static void update_server_list(enum server_scan_type sstype,
       strncpy(buf, _("Unknown"), sizeof(buf));
     }
     gtk_list_store_append(store, &it);
-    if (sstype == SERVER_SCAN_GLOBAL) {
-      gtk_list_store_set(store, &it,
-                         0, pserver->host,
-                         1, pserver->port,
-                         2, pserver->version,
-                         3, _(pserver->state),
-                         4, pserver->nplayers,
-                         5, buf,
-                         6, pserver->message,
-                         -1);
-    } else {
-      gtk_list_store_set(store, &it,
-                         0, pserver->host,
-                         1, pserver->port,
-                         2, pserver->version,
-                         3, _(pserver->state),
-                         4, pserver->nplayers,
-                         5, pserver->message,
-                         -1);
-    }
+    gtk_list_store_set(store, &it,
+                       0, pserver->host,
+                       1, pserver->port,
+                       2, pserver->version,
+                       3, _(pserver->state),
+                       4, pserver->nplayers,
+                       5, buf,
+                       6, pserver->message,
+                       -1);
     if (strcmp(host, pserver->host) == 0 && port == pserver->port) {
       gtk_tree_selection_select_iter(sel, &it);
     }
@@ -360,23 +685,23 @@ static void update_server_list(enum server_scan_type sstype,
 /**************************************************************************
   Free the server scans.
 **************************************************************************/
-static void destroy_server_scans(void)
+void destroy_server_scans(void)
 {
-  if (meta_scan) {
-    server_scan_finish(meta_scan);
-    meta_scan = NULL;
+  if (meta_scan.scan) {
+    server_scan_finish(meta_scan.scan);
+    meta_scan.scan = NULL;
   }
-  if (meta_scan_timer != 0) {
-    g_source_remove(meta_scan_timer);
-    meta_scan_timer = 0;
+  if (meta_scan.timer != 0) {
+    g_source_remove(meta_scan.timer);
+    meta_scan.timer = 0;
   }
-  if (lan_scan) {
-    server_scan_finish(lan_scan);
-    lan_scan = NULL;
+  if (lan_scan.scan) {
+    server_scan_finish(lan_scan.scan);
+    lan_scan.scan = NULL;
   }
-  if (lan_scan_timer != 0) {
-    g_source_remove(lan_scan_timer);
-    lan_scan_timer = 0;
+  if (lan_scan.timer != 0) {
+    g_source_remove(lan_scan.timer);
+    lan_scan.timer = 0;
   }
 }
 
@@ -385,8 +710,8 @@ static void destroy_server_scans(void)
 **************************************************************************/
 static gboolean check_server_scan(gpointer data)
 {
-  struct server_scan *scan = data;
-  const struct server_list *servers;
+  struct server_scan_timer_data *scan_data = data;
+  struct server_scan *scan = scan_data->scan;
   enum server_scan_status stat;
 
   if (!scan) {
@@ -396,12 +721,19 @@ static gboolean check_server_scan(gpointer data)
   stat = server_scan_poll(scan);
   if (stat >= SCAN_STATUS_PARTIAL) {
     enum server_scan_type type;
+    struct srv_list *srvrs;
+
     type = server_scan_get_type(scan);
-    servers = server_scan_get_list(scan);
-    update_server_list(type, servers);
+    srvrs = server_scan_get_list(scan);
+    fc_allocate_mutex(&srvrs->mutex);
+    holding_srv_list_mutex = TRUE;
+    update_server_list(type, srvrs->servers);
+    holding_srv_list_mutex = FALSE;
+    fc_release_mutex(&srvrs->mutex);
   }
 
   if (stat == SCAN_STATUS_ERROR || stat == SCAN_STATUS_DONE) {
+    scan_data->timer = 0;
     return FALSE;
   }
   return TRUE;
@@ -416,18 +748,8 @@ static void server_scan_error(struct server_scan *scan,
   output_window_append(ftc_client, message);
   log_error("%s", message);
 
-  switch (server_scan_get_type(scan)) {
-  case SERVER_SCAN_LOCAL:
-    server_scan_finish(lan_scan);
-    lan_scan = NULL;
-    break;
-  case SERVER_SCAN_GLOBAL:
-    server_scan_finish(meta_scan);
-    meta_scan = NULL;
-    break;
-  case SERVER_SCAN_LAST:
-    break;
-  }
+  /* Main thread will finalize the scan later (or even concurrently) - 
+   * do not do anything here to cause double free or raze condition. */
 }
 
 /**************************************************************************
@@ -437,11 +759,11 @@ static void update_network_lists(void)
 {
   destroy_server_scans();
 
-  meta_scan = server_scan_begin(SERVER_SCAN_GLOBAL, server_scan_error);
-  meta_scan_timer = g_timeout_add(200, check_server_scan, meta_scan);
+  meta_scan.scan = server_scan_begin(SERVER_SCAN_GLOBAL, server_scan_error);
+  meta_scan.timer = g_timeout_add(200, check_server_scan, &meta_scan);
 
-  lan_scan = server_scan_begin(SERVER_SCAN_LOCAL, server_scan_error);
-  lan_scan_timer = g_timeout_add(500, check_server_scan, lan_scan);
+  lan_scan.scan = server_scan_begin(SERVER_SCAN_LOCAL, server_scan_error);
+  lan_scan.timer = g_timeout_add(500, check_server_scan, &lan_scan);
 }
 
 /**************************************************************************
@@ -742,13 +1064,21 @@ static void network_list_callback(GtkTreeSelection *select, gpointer data)
 
   if (select == meta_selection) {
     GtkTreePath *path;
-    const struct server_list *servers;
+    struct srv_list *srvrs;
 
-    servers = server_scan_get_list(meta_scan);
+    srvrs = server_scan_get_list(meta_scan.scan);
     path = gtk_tree_model_get_path(model, &it);
-    if (servers && path) {
+    if (!holding_srv_list_mutex) {
+      /* We are not yet inside mutex protected block */
+      fc_allocate_mutex(&srvrs->mutex);
+    }
+    if (srvrs->servers && path) {
       gint pos = gtk_tree_path_get_indices(path)[0];
-      pserver = server_list_get(servers, pos);
+      pserver = server_list_get(srvrs->servers, pos);
+    }
+    if (!holding_srv_list_mutex) {
+      /* We are not yet inside mutex protected block */
+      fc_release_mutex(&srvrs->mutex);
     }
     gtk_tree_path_free(path);
   }
@@ -794,11 +1124,12 @@ GtkWidget *create_network_page(void)
   gtk_container_add(GTK_CONTAINER(box), notebook);
 
   /* LAN pane. */
-  lan_store = gtk_list_store_new(6, G_TYPE_STRING, /* host */
+  lan_store = gtk_list_store_new(7, G_TYPE_STRING, /* host */
                                  G_TYPE_INT,       /* port */
                                  G_TYPE_STRING,    /* version */
                                  G_TYPE_STRING,    /* state */
                                  G_TYPE_INT,       /* nplayers */
+                                 G_TYPE_STRING,    /* humans */
                                  G_TYPE_STRING);   /* message */
 
   view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(lan_store));
@@ -810,8 +1141,8 @@ GtkWidget *create_network_page(void)
   gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
   g_signal_connect(view, "focus",
       		   G_CALLBACK(gtk_true), NULL);
-  g_signal_connect(view, "row_activated",
-		   G_CALLBACK(network_activate_callback), NULL);
+  g_signal_connect(view, "row-activated",
+                   G_CALLBACK(network_activate_callback), NULL);
   g_signal_connect(selection, "changed",
                    G_CALLBACK(network_list_callback), NULL);
 
@@ -819,8 +1150,9 @@ GtkWidget *create_network_page(void)
   add_treeview_column(view, _("Port"), G_TYPE_INT, 1);
   add_treeview_column(view, _("Version"), G_TYPE_STRING, 2);
   add_treeview_column(view, _("Status"), G_TYPE_STRING, 3);
-  add_treeview_column(view, _("Players"), G_TYPE_INT, 4);
-  add_treeview_column(view, _("Comment"), G_TYPE_STRING, 5);
+  add_treeview_column(view, Q_("?count:Players"), G_TYPE_INT, 4);
+  add_treeview_column(view, _("Humans"), G_TYPE_STRING, 5);
+  add_treeview_column(view, _("Comment"), G_TYPE_STRING, 6);
 
   label = gtk_label_new_with_mnemonic(_("Local _Area Network"));
 
@@ -852,8 +1184,8 @@ GtkWidget *create_network_page(void)
   gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
   g_signal_connect(view, "focus",
       		   G_CALLBACK(gtk_true), NULL);
-  g_signal_connect(view, "row_activated",
-		   G_CALLBACK(network_activate_callback), NULL);
+  g_signal_connect(view, "row-activated",
+                   G_CALLBACK(network_activate_callback), NULL);
   g_signal_connect(selection, "changed",
                    G_CALLBACK(network_list_callback), NULL);
 
@@ -861,7 +1193,7 @@ GtkWidget *create_network_page(void)
   add_treeview_column(view, _("Port"), G_TYPE_INT, 1);
   add_treeview_column(view, _("Version"), G_TYPE_STRING, 2);
   add_treeview_column(view, _("Status"), G_TYPE_STRING, 3);
-  add_treeview_column(view, _("Players"), G_TYPE_INT, 4);
+  add_treeview_column(view, Q_("?count:Players"), G_TYPE_INT, 4);
   add_treeview_column(view, _("Humans"), G_TYPE_STRING, 5);
   add_treeview_column(view, _("Comment"), G_TYPE_STRING, 6);
 
@@ -1037,7 +1369,7 @@ static GtkWidget *start_options_table;
 static GtkWidget *observe_button, *ready_button, *nation_button;
 static GtkTreeStore *connection_list_store;
 static GtkTreeView *connection_list_view;
-static GtkWidget *start_aifill_spin;
+static GtkWidget *start_aifill_spin = NULL;
 
 
 /* NB: Must match creation arugments in connection_list_store_new(). */
@@ -1166,11 +1498,17 @@ static void game_options_callback(GtkWidget *w, gpointer data)
 **************************************************************************/
 static void ai_skill_callback(GtkWidget *w, gpointer data)
 {
+  enum ai_level level;
+  enum ai_level *levels = (enum ai_level *)data;
   const char *name;
-  enum ai_level level = GPOINTER_TO_UINT(data);
+  int i;
 
-  if (level == AI_LEVEL_LAST) {
+  i = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
+
+  if (i == -1) {
     level = AI_LEVEL_DEFAULT;
+  } else {
+    level = levels[i];
   }
 
   name = ai_level_cmd(level);
@@ -1223,14 +1561,35 @@ static void ruleset_enter(GtkWidget *w, gpointer data)
 }
 
 /**************************************************************************
-  AI fill setting callback.
+  User changed AI fill setting.
 **************************************************************************/
 static bool send_new_aifill_to_server = TRUE;
-static void ai_fill_callback(GtkWidget *w, gpointer data)
+static void ai_fill_changed_by_user(GtkWidget *w, gpointer data)
 {
   if (send_new_aifill_to_server) {
-    send_chat_printf("/set aifill %d",
-                     gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w)));
+    option_int_set(optset_option_by_name(server_optset, "aifill"),
+                   gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w)));
+  }
+}
+
+/**************************************************************************
+  Server changed AI fill setting.
+**************************************************************************/
+void ai_fill_changed_by_server(int aifill)
+{
+  if (start_aifill_spin) {
+    bool old = send_new_aifill_to_server;
+    /* Suppress callback from this change to avoid a loop. */
+    send_new_aifill_to_server = FALSE;
+    /* HACK: this GUI control doesn't have quite the same semantics as the
+     * server 'aifill' option, in that it claims to represent the minimum
+     * number of players _including humans_. The GUI control has a minimum
+     * value of 1, so aifill==0 will not be represented correctly.
+     * But there's generally exactly one human player because the control
+     * only shows up for a locally spawned server, so we more or less
+     * get away with this. */
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(start_aifill_spin), aifill);
+    send_new_aifill_to_server = old;
   }
 }
 
@@ -1239,12 +1598,6 @@ static void ai_fill_callback(GtkWidget *w, gpointer data)
 **************************************************************************/
 void update_start_page(void)
 {
-  bool old = send_new_aifill_to_server;
-
-  send_new_aifill_to_server = FALSE;
-  gtk_spin_button_set_value(GTK_SPIN_BUTTON(start_aifill_spin),
-                            game.info.aifill);
-  send_new_aifill_to_server = old;
   conn_list_dialog_update();
 }
 
@@ -1338,7 +1691,7 @@ static void conn_menu_connection_command(GObject *object, gpointer data)
 static void show_conn_popup(struct player *pplayer, struct connection *pconn)
 {
   GtkWidget *popup;
-  char buf[1024] = "";
+  char buf[4096] = "";
 
   if (pconn) {
     cat_snprintf(buf, sizeof(buf), _("Connection name: %s"),
@@ -1385,14 +1738,15 @@ static GtkWidget *create_conn_menu(struct player *pplayer,
 {
   GtkWidget *menu;
   GtkWidget *item;
-  char buf[128];
+  gchar *buf;
 
   menu = gtk_menu_new();
   object_put(G_OBJECT(menu), pplayer, pconn);
 
-  fc_snprintf(buf, sizeof(buf), _("%s info"),
-              pconn ? pconn->username : player_name(pplayer));
+  buf = g_strdup_printf(_("%s info"),
+                        pconn ? pconn->username : player_name(pplayer));
   item = gtk_menu_item_new_with_label(buf);
+  g_free(buf);
   gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
   g_signal_connect_swapped(item, "activate",
                            G_CALLBACK(conn_menu_info_chosen), menu);
@@ -1466,9 +1820,10 @@ static GtkWidget *create_conn_menu(struct player *pplayer,
     /* No item for hack access; that would be a serious security hole. */
     for (level = cmdlevel_min(); level < client.conn.access_level; level++) {
       /* TRANS: Give access level to a connection. */
-      fc_snprintf(buf, sizeof(buf), _("Give %s access"),
-                  cmdlevel_name(level));
+      buf = g_strdup_printf(_("Give %s access"),
+                            cmdlevel_name(level));
       item = gtk_menu_item_new_with_label(buf);
+      g_free(buf);
       gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
       g_object_set_data_full(G_OBJECT(item), "command",
                              g_strdup_printf("cmdlevel %s",
@@ -1520,9 +1875,10 @@ static GtkWidget *create_conn_menu(struct player *pplayer,
       }
 
       /* TRANS: e.g., "Put on Team 5" */
-      fc_snprintf(buf, sizeof(buf), _("Put on %s"),
-                  team_slot_name_translation(tslot));
+      buf = g_strdup_printf(_("Put on %s"),
+                            team_slot_name_translation(tslot));
       item = gtk_menu_item_new_with_label(buf);
+      g_free(buf);
       gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
       object_put(G_OBJECT(item), pplayer, NULL);
       g_signal_connect(item, "activate", G_CALLBACK(conn_menu_team_chosen),
@@ -1718,6 +2074,8 @@ static void ready_button_callback(GtkWidget *w, gpointer data)
     dsend_packet_player_ready(&client.conn,
                               player_number(client_player()),
                               !client_player()->is_ready);
+  } else {
+    dsend_packet_player_ready(&client.conn, 0, TRUE);
   }
 }
 
@@ -1796,7 +2154,19 @@ static void update_start_page_buttons(void)
     }
   } else {
     text = _("_Start");
-    sensitive = FALSE;
+    if (can_client_access_hack()) {
+      sensitive = TRUE;
+      players_iterate(plr) {
+        if (!plr->ai_controlled) {
+          /* There's human controlled player(s) in game, so it's their
+           * job to start the game. */
+          sensitive = FALSE;
+          break;
+        }
+      } players_iterate_end;
+    } else {
+      sensitive = FALSE;
+    }
   }
   gtk_stockbutton_set_label(ready_button, text);
   gtk_widget_set_sensitive(ready_button, sensitive);
@@ -2197,11 +2567,16 @@ static void add_tree_col(GtkWidget *treeview, GType gtype,
 GtkWidget *create_start_page(void)
 {
   GtkWidget *box, *sbox, *table, *align, *vbox;
-  GtkWidget *view, *sw, *text, *toolkit_view, *button, *spin, *option;
-  GtkWidget *label, *menu, *item;
+  GtkWidget *view, *sw, *text, *toolkit_view, *button, *spin, *ai_lvl_combobox;
+  GtkWidget *label;
   GtkWidget *rs_entry;
   GtkTreeSelection *selection;
   enum ai_level level;
+  /* There's less than AI_LEVEL_LAST entries as not all levels have
+     entries (that's the whole point of this array: index != value),
+     but this is set safely to the max */
+  static enum ai_level levels[AI_LEVEL_LAST];
+  int i = 0;
 
   box = gtk_vbox_new(FALSE, 8);
   gtk_container_set_border_width(GTK_CONTAINER(box), 4);
@@ -2227,41 +2602,47 @@ GtkWidget *create_start_page(void)
   gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 0);
   gtk_spin_button_set_update_policy(GTK_SPIN_BUTTON(spin), 
                                     GTK_UPDATE_IF_VALID);
+  if (server_optset != NULL) {
+    struct option *paifill = optset_option_by_name(server_optset, "aifill");
+    if (paifill) {
+      gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin),
+                                option_int_get(paifill));
+    } /* else it'll be updated later */
+  }
   g_signal_connect_after(spin, "value_changed",
-                         G_CALLBACK(ai_fill_callback), NULL);
+                         G_CALLBACK(ai_fill_changed_by_user), NULL);
 
   gtk_table_attach_defaults(GTK_TABLE(table), spin, 1, 2, 0, 1);
 
   label = g_object_new(GTK_TYPE_LABEL,
 		       "use-underline", TRUE,
 		       "mnemonic-widget", spin,
-                       "label", _("Number of _Players (including AI):"),
+                       /* TRANS: Keep individual lines short */
+                       "label", _("Number of _Players\n(including AI):"),
                        "xalign", 0.0,
                        "yalign", 0.5,
                        NULL);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 0, 1);
 
-  option = gtk_option_menu_new();
+  ai_lvl_combobox = gtk_combo_box_new_text();
 
-  menu = gtk_menu_new();
   for (level = 0; level < AI_LEVEL_LAST; level++) {
     if (is_settable_ai_level(level)) {
       const char *level_name = ai_level_name(level);
 
-      item = gtk_menu_item_new_with_label(level_name);
-      g_signal_connect(item, "activate",
-                       G_CALLBACK(ai_skill_callback), GUINT_TO_POINTER(level));
-
-      gtk_widget_show(item);
-      gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+      gtk_combo_box_insert_text(GTK_COMBO_BOX(ai_lvl_combobox), i, level_name);
+      levels[i] = level;
+      i++;
     }
   }
-  gtk_option_menu_set_menu(GTK_OPTION_MENU(option), menu);
-  gtk_table_attach_defaults(GTK_TABLE(table), option, 1, 2, 1, 2);
+  g_signal_connect(ai_lvl_combobox, "changed",
+                   G_CALLBACK(ai_skill_callback), levels);
+
+  gtk_table_attach_defaults(GTK_TABLE(table), ai_lvl_combobox, 1, 2, 1, 2);
 
   label = g_object_new(GTK_TYPE_LABEL,
 		       "use-underline", TRUE,
-		       "mnemonic-widget", option,
+		       "mnemonic-widget", ai_lvl_combobox,
                        "label", _("AI Skill _Level:"),
                        "xalign", 0.0,
                        "yalign", 0.5,
@@ -2288,7 +2669,7 @@ GtkWidget *create_start_page(void)
   label = g_object_new(GTK_TYPE_LABEL,
 		       "use-underline", TRUE,
 		       "mnemonic-widget", GTK_COMBO_BOX(ruleset_combo),
-                       "label", _("Ruleset _Version:"),
+                       "label", _("Ruleset:"),
                        "xalign", 0.0,
                        "yalign", 0.5,
                        NULL);
@@ -2417,22 +2798,28 @@ void handle_game_load(bool load_successful, const char *filename)
 }
 
 /**************************************************************************
+  Load a savegame/scenario.
+**************************************************************************/
+static void load_filename(const char *filename)
+{
+  send_chat_printf("/load %s", filename);
+}
+
+/**************************************************************************
   loads the currently selected game.
 **************************************************************************/
 static void load_callback(void)
 {
   GtkTreeIter it;
-  char *filename;
+  const gchar *filename;
 
   if (!gtk_tree_selection_get_selected(load_selection, NULL, &it)) {
     return;
   }
 
-  gtk_tree_model_get(GTK_TREE_MODEL(load_store), &it, 1, &filename, -1);
-
-  if (is_server_running()) {
-    send_chat_printf("/load %s", filename);
-  }
+  gtk_tree_model_get(GTK_TREE_MODEL(load_store), &it,
+                     SD_COL_FULL_PATH, &filename, -1);
+  load_filename(filename);
 }
 
 /**************************************************************************
@@ -2440,29 +2827,9 @@ static void load_callback(void)
 **************************************************************************/
 static void load_browse_callback(GtkWidget *w, gpointer data)
 {
-  create_file_selection(_("Choose Saved Game to Load"), FALSE);
-}
-
-/**************************************************************************
-  update the saved games list store.
-**************************************************************************/
-static void update_saves_store(GtkListStore *store,
-                               const struct strvec *dirs)
-{
-  struct fileinfo_list *files;
-
-  gtk_list_store_clear(store);
-
-  /* search for user saved games. */
-  files = fileinfolist_infix(dirs, ".sav", FALSE);
-  fileinfo_list_iterate(files, pfile) {
-    GtkTreeIter it;
-
-    gtk_list_store_append(store, &it);
-    gtk_list_store_set(store, &it,
-                       0, pfile->name, 1, pfile->fullname, -1);
-  } fileinfo_list_iterate_end;
-  fileinfo_list_destroy(files);
+  save_dialog_file_chooser_popup(_("Choose Saved Game to Load"),
+                                 GTK_FILE_CHOOSER_ACTION_OPEN,
+                                 load_filename);
 }
 
 /**************************************************************************
@@ -2470,7 +2837,12 @@ static void update_saves_store(GtkListStore *store,
 **************************************************************************/
 static void update_load_page(void)
 {
-  update_saves_store(load_store, get_save_dirs());
+  /* Search for user saved games. */
+  struct fileinfo_list *files = fileinfolist_infix(get_save_dirs(),
+                                                   ".sav", FALSE);
+
+  save_dialog_store_update(load_store, files);
+  fileinfo_list_destroy(files);
 }
 
 /**************************************************************************
@@ -2489,7 +2861,7 @@ GtkWidget *create_load_page(void)
   align = gtk_alignment_new(0.5, 0.5, 0.0, 1.0);
   gtk_box_pack_start(GTK_BOX(box), align, TRUE, TRUE, 0);
 
-  load_store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+  load_store = save_dialog_store_new();
   view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(load_store));
   g_object_unref(load_store);
 
@@ -2502,7 +2874,7 @@ GtkWidget *create_load_page(void)
 
   gtk_tree_selection_set_mode(load_selection, GTK_SELECTION_SINGLE);
 
-  g_signal_connect(view, "row_activated",
+  g_signal_connect(view, "row-activated",
                    G_CALLBACK(load_callback), NULL);
   
   sbox = gtk_vbox_new(FALSE, 2);
@@ -2590,10 +2962,7 @@ static void scenario_callback(void)
   }
 
   gtk_tree_model_get(GTK_TREE_MODEL(scenario_store), &it, 1, &filename, -1);
-
-  if (is_server_running()) {
-    send_chat_printf("/load %s", filename);
-  }
+  load_filename(filename);
 }
 
 /**************************************************************************
@@ -2601,7 +2970,9 @@ static void scenario_callback(void)
 **************************************************************************/
 static void scenario_browse_callback(GtkWidget *w, gpointer data)
 {
-  create_file_selection(_("Choose a Scenario"), FALSE);
+  save_dialog_file_chooser_popup(_("Choose a Scenario"),
+                                 GTK_FILE_CHOOSER_ACTION_OPEN,
+                                 load_filename);
 }
 
 /**************************************************************************
@@ -2616,13 +2987,14 @@ static void update_scenario_page(void)
   /* search for scenario files. */
   files = fileinfolist_infix(get_scenario_dirs(), ".sav", TRUE);
   fileinfo_list_iterate(files, pfile) {
-    GtkTreeIter it;
     struct section_file *sf;
 
-    gtk_list_store_append(scenario_store, &it);
-
-    if ((sf = secfile_load_section(pfile->fullname, "scenario", TRUE))) {
+    if ((sf = secfile_load_section(pfile->fullname, "scenario", TRUE))
+        && secfile_lookup_bool_default(sf, TRUE, "scenario.is_scenario")) {
       const char *sname, *sdescription;
+      GtkTreeIter it;
+
+      gtk_list_store_append(scenario_store, &it);
 
       sname = secfile_lookup_str_default(sf, NULL, "scenario.name");
       sdescription = secfile_lookup_str_default(sf, NULL,
@@ -2634,13 +3006,6 @@ static void update_scenario_page(void)
                              ? Q_(sdescription) : ""),
                          -1);
       secfile_destroy(sf);
-    } else {
-      log_error("Error loading '%s':\n%s", pfile->fullname, secfile_error());
-      gtk_list_store_set(scenario_store, &it,
-			 0, pfile->name,
-			 1, pfile->fullname,
-			 2, "",
-			-1);
     }
   } fileinfo_list_iterate_end;
 
@@ -2677,9 +3042,9 @@ GtkWidget *create_scenario_page(void)
 
   gtk_tree_selection_set_mode(scenario_selection, GTK_SELECTION_SINGLE);
 
-  g_signal_connect(view, "row_activated",
+  g_signal_connect(view, "row-activated",
                    G_CALLBACK(scenario_callback), NULL);
-  
+
   sbox = gtk_vbox_new(FALSE, 2);
   gtk_box_pack_start(GTK_BOX(vbox), sbox, TRUE, TRUE, 0);
 
@@ -2791,9 +3156,6 @@ void real_set_client_page(enum client_pages new_page)
   case PAGE_SCENARIO:
   case PAGE_LOAD:
     break;
-  case PAGE_NETWORK:
-    destroy_server_scans();
-    break;
   case PAGE_GAME:
     enable_menus(FALSE);
     gtk_window_unmaximize(GTK_WINDOW(toplevel));
@@ -2884,229 +3246,114 @@ void real_set_client_page(enum client_pages new_page)
   }
 }
 
-/**************************************************************************
-                                SAVE GAME DIALOG
-**************************************************************************/
-static GtkWidget *save_dialog_shell, *save_entry;
-static GtkListStore *save_store;
-static GtkTreeSelection *save_selection;
+/****************************************************************************
+                            SAVE GAME DIALOGs
+****************************************************************************/
 
-enum {
-  SAVE_BROWSE,
-  SAVE_DELETE,
-  SAVE_SAVE
-};
-
-/**************************************************************************
-  update save dialog.
-**************************************************************************/
-static void update_save_dialog(void)
+/****************************************************************************
+  Save game 'save_dialog_files_fn_t' implementation.
+****************************************************************************/
+static struct fileinfo_list *save_dialog_savegame_list(void)
 {
-  update_saves_store(save_store, save_scenario
-                     ? get_scenario_dirs() : get_save_dirs());
+  return fileinfolist_infix(get_save_dirs(), ".sav", FALSE);
 }
 
-/**************************************************************************
-  handle save dialog response.
-**************************************************************************/
-static void save_response_callback(GtkWidget *w, gint arg)
+/****************************************************************************
+  Save game dialog.
+****************************************************************************/
+void save_game_dialog_popup(void)
 {
-  switch (arg) {
-  case SAVE_BROWSE:
-    create_file_selection(_("Select Location to Save"), TRUE);
-    break;
-  case SAVE_DELETE:
-    {
-      char *filename;
-      GtkTreeIter it;
+  static GtkWidget *shell = NULL;
 
-      if (!gtk_tree_selection_get_selected(save_selection, NULL, &it)) {
-	return;
-      }
-
-      gtk_tree_model_get(GTK_TREE_MODEL(save_store), &it, 1, &filename, -1);
-      fc_remove(filename);
-      update_save_dialog();
-    }
-    return;
-  case SAVE_SAVE:
-    {
-      const char *text;
-      char *filename;
-
-      text = gtk_entry_get_text(GTK_ENTRY(save_entry));
-      filename = g_filename_from_utf8(text, -1, NULL, NULL, NULL);
-      if (!filename) {
-        break;
-      }
-      if (save_scenario) {
-        dsend_packet_save_scenario(&client.conn, filename);
-      } else {
-        send_save_game(filename);
-      }
-      g_free(filename);
-    }
-    break;
-  default:
-    break;
-  }
-  gtk_widget_destroy(save_dialog_shell);
-}
-
-/**************************************************************************
-  handle save list double click.
-**************************************************************************/
-static void save_row_callback(void)
-{
-  save_response_callback(NULL, SAVE_SAVE);
-}
-
-/**************************************************************************
-  handle save filename entry activation.
-**************************************************************************/
-static void save_entry_callback(GtkEntry *w, gpointer data)
-{
-  save_response_callback(NULL, SAVE_SAVE);
-}
-
-/**************************************************************************
-  handle save list selection change.
-**************************************************************************/
-static void save_list_callback(GtkTreeSelection *select, gpointer data)
-{
-  GtkTreeModel *model;
-  GtkTreeIter it;
-  char *name;
-
-  if (!gtk_tree_selection_get_selected(select, &model, &it)) {
-    gtk_dialog_set_response_sensitive(GTK_DIALOG(save_dialog_shell),
-	SAVE_DELETE, FALSE);
+  if (NULL != shell) {
     return;
   }
 
-  gtk_dialog_set_response_sensitive(GTK_DIALOG(save_dialog_shell),
-      SAVE_DELETE, TRUE);
-
-  gtk_tree_model_get(model, &it, 0, &name, -1);
-  gtk_entry_set_text(GTK_ENTRY(save_entry), name);
+  shell = save_dialog_new(_("Save Game"), _("Saved _Games:"),
+                          _("Save _Filename:"), send_save_game,
+                          save_dialog_savegame_list);
+  g_signal_connect(shell, "destroy", G_CALLBACK(gtk_widget_destroyed),
+                   &shell);
+  gtk_window_present(GTK_WINDOW(shell));
 }
 
-/**************************************************************************
-  create save dialog.
-**************************************************************************/
-static void create_save_dialog(bool scenario)
+/****************************************************************************
+  Save scenario 'save_dialog_action_fn_t' implementation.
+****************************************************************************/
+static void save_dialog_save_scenario(const char *filename)
 {
-  GtkWidget *shell;
-
-  GtkWidget *sbox, *sw;
-
-  GtkWidget *label, *view, *entry;
-  GtkCellRenderer *rend;
-  GtkTreeSelection *selection;
-
-  save_scenario = scenario;
-
-  shell = gtk_dialog_new_with_buttons(scenario ? _("Save Scenario") : _("Save Game"),
-      NULL,
-      0,
-      _("_Browse..."),
-      SAVE_BROWSE,
-      GTK_STOCK_DELETE,
-      SAVE_DELETE,
-      GTK_STOCK_CANCEL,
-      GTK_RESPONSE_CANCEL,
-      GTK_STOCK_SAVE,
-      SAVE_SAVE,
-      NULL);
-  gtk_dialog_set_default_response(GTK_DIALOG(shell), GTK_RESPONSE_CANCEL);
-  save_dialog_shell = shell;
-  setup_dialog(shell, toplevel);
-
-  save_store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-  view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(save_store));
-  g_object_unref(save_store);
-
-  rend = gtk_cell_renderer_text_new();
-  gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
-      -1, NULL, rend, "text", 0, NULL);
-
-  selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view));
-  save_selection = selection;
-  gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(view), FALSE);
-
-  gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-
-  g_signal_connect(view, "row_activated",
-                   G_CALLBACK(save_row_callback), NULL);
-  g_signal_connect(selection, "changed",
-                   G_CALLBACK(save_list_callback), NULL);
-
-  sbox = gtk_vbox_new(FALSE, 2);
-  gtk_box_pack_start(GTK_BOX(GTK_DIALOG(shell)->vbox), sbox, TRUE, TRUE, 0);
-
-  label = g_object_new(GTK_TYPE_LABEL,
-    "use-underline", TRUE,
-    "mnemonic-widget", view,
-    "label", _("Saved _Games:"),
-    "xalign", 0.0,
-    "yalign", 0.5,
-    NULL);
-  gtk_box_pack_start(GTK_BOX(sbox), label, FALSE, FALSE, 0);
-
-  sw = gtk_scrolled_window_new(NULL, NULL);
-  gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(sw),
-				      GTK_SHADOW_ETCHED_IN);
-  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(sw), GTK_POLICY_AUTOMATIC,
-  				 GTK_POLICY_AUTOMATIC);
-  gtk_widget_set_size_request(sw, 300, 300);
-  gtk_container_add(GTK_CONTAINER(sw), view);
-  gtk_box_pack_start(GTK_BOX(sbox), sw, TRUE, TRUE, 0);
-
-
-  sbox = gtk_vbox_new(FALSE, 2);
-  gtk_box_pack_start(GTK_BOX(GTK_DIALOG(shell)->vbox), sbox, FALSE, FALSE, 12);
-
-  entry = gtk_entry_new();
-  save_entry = entry;
-  g_signal_connect(entry, "activate",
-      G_CALLBACK(save_entry_callback), NULL);
-
-  label = g_object_new(GTK_TYPE_LABEL,
-    "use-underline", TRUE,
-    "mnemonic-widget", entry,
-    "label", _("Save _Filename:"),
-    "xalign", 0.0,
-    "yalign", 0.5,
-    NULL);
-  gtk_box_pack_start(GTK_BOX(sbox), label, FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX(sbox), entry, FALSE, FALSE, 0);
-
-
-  g_signal_connect(shell, "response",
-      G_CALLBACK(save_response_callback), NULL);
-  g_signal_connect(shell, "destroy",
-      G_CALLBACK(gtk_widget_destroyed), &save_dialog_shell);
-
-  gtk_dialog_set_response_sensitive(GTK_DIALOG(save_dialog_shell),
-      SAVE_DELETE, FALSE);
-
-  gtk_window_set_focus(GTK_WINDOW(shell), entry);
-
-  gtk_widget_show_all(GTK_DIALOG(shell)->vbox);
+  dsend_packet_save_scenario(&client.conn, filename);
 }
 
-/**************************************************************************
-  popup save dialog.
-**************************************************************************/
-void popup_save_dialog(bool scenario)
+/****************************************************************************
+  Save scenario 'save_dialog_files_fn_t' implementation.
+****************************************************************************/
+static struct fileinfo_list *save_dialog_scenario_list(void)
 {
-  if (!save_dialog_shell) {
-    create_save_dialog(scenario);
+  return fileinfolist_infix(get_scenario_dirs(), ".sav", FALSE);
+}
+
+/****************************************************************************
+  Save scenario dialog.
+****************************************************************************/
+void save_scenario_dialog_popup(void)
+{
+  static GtkWidget *shell = NULL;
+
+  if (NULL != shell) {
+    return;
   }
-  update_save_dialog();
- 
-  gtk_window_present(GTK_WINDOW(save_dialog_shell));
+
+  shell = save_dialog_new(_("Save Scenario"), _("Saved Sce_narios:"),
+                          _("Save Sc_enario:"), save_dialog_save_scenario,
+                          save_dialog_scenario_list);
+  g_signal_connect(shell, "destroy", G_CALLBACK(gtk_widget_destroyed),
+                   &shell);
+  gtk_window_present(GTK_WINDOW(shell));
 }
+
+/****************************************************************************
+  Save mapimg 'save_dialog_files_fn_t' implementation. If possible, only the
+  current directory is used. As fallback, the files in the save directories
+  are listed.
+****************************************************************************/
+static struct fileinfo_list *save_dialog_mapimg_list(void)
+{
+  return fileinfolist_infix(get_save_dirs(), ".map", FALSE);
+}
+
+/****************************************************************************
+  Save scenario dialog.
+****************************************************************************/
+void save_mapimg_dialog_popup(void)
+{
+  static GtkWidget *shell = NULL;
+
+  if (NULL != shell) {
+    return;
+  }
+
+  shell = save_dialog_new(_("Save Map Image"), _("Saved Map _Images:"),
+                          _("Save _Map Images:"), mapimg_client_save,
+                          save_dialog_mapimg_list);
+  g_signal_connect(shell, "destroy", G_CALLBACK(gtk_widget_destroyed),
+                   &shell);
+  gtk_window_present(GTK_WINDOW(shell));
+}
+
+/****************************************************************************
+  Save map image. On error popup a message window for the user.
+****************************************************************************/
+void mapimg_client_save(const char *filename)
+{
+  if (!mapimg_client_createmap(filename)) {
+    char msg[512];
+
+    fc_snprintf(msg, sizeof(msg), "(%s)", mapimg_error());
+    popup_notify_dialog("Error", "Error Creating the Map Image!", msg);
+  }
+}
+
 
 /****************************************************************************
   Set the list of available rulesets.  The default ruleset should be

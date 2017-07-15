@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2003 - The Freeciv Project 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -81,9 +81,9 @@ int minimal_surplus[O_LAST], factors[O_LAST + 1];
 struct city *current_city;
 char *initial_preset_list[] = {
 	N_("For information on\n"
-	"the citizen governor and governor presets,\n"
-	"including sample presets,\n"
-	"see README.cma."),
+           "the citizen governor and governor presets,\n"
+           "including sample presets,\n"
+           "see README.governor."),
 	NULL};
 
 

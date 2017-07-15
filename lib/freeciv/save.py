@@ -311,7 +311,7 @@ def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
 
 def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     assert quit_on_disconnect
-    args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
+    args = ('-p', str(port), '-s', get_save_dir(), ) + args
 
     piddir = get_save_dir()
     print 'server args', args

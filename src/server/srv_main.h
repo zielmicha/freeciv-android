@@ -1,4 +1,4 @@
-/**********************************************************************
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 /* common */
 #include "fc_types.h"
+#include "game.h"
 
 struct conn_list;
 
@@ -26,12 +27,15 @@ struct server_arguments {
   /* metaserver information */
   bool metaserver_no_send;
   char metaserver_addr[256];
-  char metaserver_name[256];
+  bool metaconnection_persistent;
+  char identity_name[256];
   unsigned short int metaserver_port;
   /* address this server is to listen on (NULL => INADDR_ANY) */
   char *bind_addr;
   /* this server's listen port */
   int port;
+  /* address to bind when connecting to the metaserver (NULL => bind_addr) */
+  char *bind_meta_addr;
   /* the log level */
   enum log_level loglevel;
   /* filenames */
@@ -42,17 +46,16 @@ struct server_arguments {
   char *saves_pathname;
   char *scenarios_pathname;
   char serverid[256];
-  /* save a ppm of the map? */
-  bool save_ppm;
   /* quit if there no players after a given time interval */
   int quitidle;
   /* exit the server on game ending */
   bool exit_on_end;
   /* authentication options */
+  bool fcdb_enabled;            /* defaults to FALSE */
+  char *fcdb_conf;              /* freeciv database configuration file */
   bool auth_enabled;            /* defaults to FALSE */
-  char *auth_conf;              /* auth configuration file */
-  bool auth_allow_guests;       /* defaults to TRUE */
-  bool auth_allow_newusers;     /* defaults to TRUE */
+  bool auth_allow_guests;       /* defaults to FALSE */
+  bool auth_allow_newusers;     /* defaults to FALSE */
   enum announce_type announce;
   int fatal_assertions;         /* default to -1 (disabled). */
 };
@@ -86,7 +89,7 @@ void init_game_seed(void);
 void srv_init(void);
 void srv_main(void);
 void server_quit(void);
-void save_game_auto(const char *save_reason, const char *reason_filename);
+void save_game_auto(const char *save_reason, enum autosave_type type);
 
 enum server_states server_state(void);
 void set_server_state(enum server_states newstate);
@@ -100,6 +103,8 @@ void start_game(void);
 void save_game(const char *orig_filename, const char *save_reason,
                bool scenario);
 const char *pick_random_player_name(const struct nation_type *pnation);
+void player_nation_defaults(struct player *pplayer, struct nation_type *pnation,
+                            bool set_name);
 void send_all_info(struct conn_list *dest);
 
 void identity_number_release(int id);
@@ -107,11 +112,14 @@ void identity_number_reserve(int id);
 int identity_number(void);
 void server_game_init(void);
 void server_game_free(void);
-void aifill(int amount);
+const char *aifill(int amount);
 
 extern struct server_arguments srvarg;
 
 extern bool force_end_of_sniff;
 
-void init_available_nations(void);
+void update_nations_with_startpos(void);
+
+int current_turn_timeout(void);
+
 #endif /* FC__SRV_MAIN_H */

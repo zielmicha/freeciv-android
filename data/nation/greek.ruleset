@@ -1,8 +1,10 @@
 [nation_greek]
 
+translation_domain="freeciv"
+
 name=_("Greek")
 plural=_("?plural:Greeks")
-groups="Ancient", "European"
+groups="Ancient", "European", "Core"
 legend=_("The ancient Greeks, between Mycenae and the Roman conquest.")
 
 leaders = {
@@ -13,12 +15,14 @@ leaders = {
  "Solon",               "Male"
  "Alkibiades",          "Male"
  "Megas Alexandros",    "Male" ; Alexander the Great
+ "Gorgo",               "Female"
 }
 
 ruler_titles = {
  "government",      "male_title",           "female_title"
+ "Anarchy",         _("Usurper %s"),        _("?female:Usurper %s")
  "Despotism",       _("Despot %s"),         _("?female:Despot %s")
- "Democracy",       _("Prime Minister %s"), _("?female:Prime Minister %s")
+ "Fundamentalism",  _("Elder %s"),          _("?female:Elder %s")
 }
 
 flag="greece_ancient"
@@ -27,9 +31,8 @@ city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations="macedon", "persian", "Byzantine"
+civilwar_nations="macedon", "epirote", "Byzantine", "Cretan", "Pontic", "italian greek"
 
 cities =
 ; Original city list with native Greek orthography

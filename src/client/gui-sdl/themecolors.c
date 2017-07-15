@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -20,9 +20,32 @@
 
 /* client/gui-sdl */
 #include "colors.h"
-#include "themespec.h"
 
 #include "themecolors.h"
+#include "themes_common.h"
+
+
+struct theme {
+  char name[512];
+  int priority;
+
+  char *font_filename;
+  int default_font_size;
+
+  struct specfile_list *specfiles;
+  struct small_sprite_list *small_sprites;
+
+  /*
+   * This hash table maps themespec tags to struct small_sprites.
+   */
+  struct small_sprite_hash *sprite_hash;
+
+/*  struct named_sprites sprites;*/
+
+  struct theme_background_system *background_system;  
+  struct theme_color_system *color_system;  
+};
+
 
 /* An RGBAcolor contains the R,G,B,A bitvalues for a color.  The color itself
  * holds the color structure for this color but may be NULL (it's allocated
@@ -33,7 +56,7 @@ struct rgbacolor {
 };
 
 struct theme_color_system {
-  struct rgbacolor colors[(THEME_COLOR_LAST - COLOR_LAST)];
+  struct rgbacolor colors[COLOR_THEME_LAST];
 };
 
 static char *color_names[] = {
@@ -139,6 +162,7 @@ static char *color_names[] = {
   "unitsrep_frame",
   "unitsrep_text",
   "unitupgrade_text",
+  "unitdisband_text",
   "userpasswddlg_frame",  
   "userpasswddlg_text",
   "wardlg_text",
@@ -150,9 +174,8 @@ struct theme_color_system *theme_color_system_read(struct section_file *file)
   int i;
   struct theme_color_system *colors = fc_malloc(sizeof(*colors));
 
-  fc_assert_ret_val(ARRAY_SIZE(color_names)
-                    == (THEME_COLOR_LAST - COLOR_LAST), NULL);
-  for (i = 0; i < (THEME_COLOR_LAST - COLOR_LAST); i++) {
+  fc_assert_ret_val(ARRAY_SIZE(color_names) == COLOR_THEME_LAST, NULL);
+  for (i = 0; i < COLOR_THEME_LAST; i++) {
     colors->colors[i].r
       = secfile_lookup_int_default(file, 0, "colors.%s0.r", color_names[i]);
     colors->colors[i].g
@@ -174,30 +197,33 @@ void theme_color_system_free(struct theme_color_system *colors)
 {
   int i;
 
-  for (i = 0; i < (THEME_COLOR_LAST - COLOR_LAST); i++) {
+  for (i = 0; i < COLOR_THEME_LAST; i++) {
     if (colors->colors[i].color) {
       color_free(colors->colors[i].color);
     }
   }
-  
+
   free(colors);
 }
 
 /****************************************************************************
   Return the RGBA color, allocating it if necessary.
 ****************************************************************************/
-static struct color *ensure_color(struct rgbacolor *rgba)
+static struct color *ensure_color_rgba(struct rgbacolor *rgba)
 {
   if (!rgba->color) {
     rgba->color = color_alloc_rgba(rgba->r, rgba->g, rgba->b, rgba->a);
   }
   return rgba->color;
 }
-
+struct theme_color_system *theme_get_color_system(const struct theme *t)
+{
+  return t->color_system;
+}
 /****************************************************************************
   Return a pointer to the given "theme" color.
 ****************************************************************************/
 struct color *theme_get_color(const struct theme *t, enum theme_color color)
 {
-  return ensure_color(&theme_get_color_system(t)->colors[color]);
+  return ensure_color_rgba(&theme_get_color_system(t)->colors[color]);
 }

@@ -1,8 +1,10 @@
 [nation_polish]
 
+translation_domain="freeciv"
+
 name=_("Polish")
 plural=_("?plural:Poles")
-groups="Medieval", "Early Modern", "Modern", "European"
+groups="Medieval", "Early Modern", "Modern", "European", "Core"
 legend=_("The Polish state was formed about a millennium ago, and reached\
  its Golden Age near the end of the 16th century.")
 
@@ -32,7 +34,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",            "female_title"
  "Despotism",       _("Prince %s"),          _("Princess %s")
- "Fundamentalism",  _("Bishop %s"),          _("?female:Bishop %s")
+ "Fundamentalism",  _("Bishop %s"),          _("Mother Superior %s")
  "Communism",       _("First Secretary %s"), _("?female:First Secretary %s")
 }
 
@@ -42,15 +44,14 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with =
  "Silesian",
  "Mazovian",
  "Greater Polish",
- "Slavic"
-; "Gothic",
+ "Slavic",
+ "Gothic"
 ; "Polanian"
 
 civilwar_nations =
@@ -62,11 +63,13 @@ civilwar_nations =
  "Lendian",
  "Lipka Tatar",
  "Belarusian",
- "Ukrainian"
-; "Kashubian",
-; "Rusyn",
-; "Polanian",
-; "Old Prussian"
+ "Ukrainian",
+ "Kashubian",
+ "Old Prussian",
+ "Cuyavian",
+ "Central Lithuanian",
+ "Rusyn"
+; "Polanian"
 
 cities =
 ; Te bedą pierwsze, bo tak pasuje

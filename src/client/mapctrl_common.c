@@ -1,5 +1,5 @@
-/********************************************************************** 
- Freeciv - Copyright (C) 2002 - The Freeciv Poject
+/**********************************************************************
+ Freeciv - Copyright (C) 2002 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2, or (at your option)
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdlib.h>		/* qsort */
@@ -121,7 +121,7 @@ static void define_tiles_within_rectangle(bool append)
   const int inc_y = (rec_h > 0 ? half_H : -half_H);
   int x, y, x2, y2, xx, yy;
   struct unit_list *units = unit_list_new();
-
+  const struct city *pcity;
   bool found_any_cities = FALSE;
 
   if (!append) {
@@ -156,8 +156,8 @@ static void define_tiles_within_rectangle(bool append)
 
       /*  Tile passed all tests; process it.
        */
-      if (NULL != tile_city(ptile)
-          && tile_owner(ptile) == client.conn.playing) {
+      pcity = tile_city(ptile);
+      if (pcity != NULL && city_owner(pcity) == client_player()) {
         mapdeco_set_highlight(ptile, TRUE);
         found_any_cities = tiles_hilited_cities = TRUE;
       }
@@ -173,11 +173,11 @@ static void define_tiles_within_rectangle(bool append)
       && unit_list_size(units) > 0) {
     if (!append) {
       struct unit *punit = unit_list_get(units, 0);
-      set_unit_focus(punit);
+      unit_focus_set(punit);
       unit_list_remove(units, punit);
     }
     unit_list_iterate(units, punit) {
-      add_unit_focus(punit);
+      unit_focus_add(punit);
     } unit_list_iterate_end;
   }
   unit_list_destroy(units);
@@ -292,7 +292,7 @@ void cancel_selection_rectangle(void)
 }
 
 /**************************************************************************
-...
+  Is city highlighted
 **************************************************************************/
 bool is_city_hilited(struct city *pcity)
 {
@@ -441,7 +441,7 @@ void clipboard_paste_production(struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Send request to build production in clipboard to server.
 **************************************************************************/
 static void clipboard_send_production_packet(struct city *pcity)
 {
@@ -475,7 +475,7 @@ void upgrade_canvas_clipboard(void)
 }
 
 /**************************************************************************
-...
+  Goto button has been released. Finish goto.
 **************************************************************************/
 void release_goto_button(int canvas_x, int canvas_y)
 {
@@ -483,7 +483,7 @@ void release_goto_button(int canvas_x, int canvas_y)
 
   if (keyboardless_goto_active && hover_state == HOVER_GOTO && ptile) {
     do_unit_goto(ptile);
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
     update_unit_info_label(get_units_in_focus());
   }
   keyboardless_goto_active = FALSE;
@@ -512,9 +512,20 @@ void maybe_activate_keyboardless_goto(int canvas_x, int canvas_y)
 **************************************************************************/
 bool get_turn_done_button_state(void)
 {
+  return can_end_turn()
+    && (!client.conn.playing->ai_controlled || ai_manual_turn_done);
+}
+
+/**************************************************************************
+  Return TRUE iff client can end turn.
+**************************************************************************/
+bool can_end_turn(void)
+{
   return (can_client_issue_orders()
-          && !client.conn.playing->ai_controlled
+          && client.conn.playing->is_alive
           && !client.conn.playing->phase_done
+          && !is_server_busy()
+          && is_player_phase(client.conn.playing, game.info.phase)
           && !agents_busy());
 }
 
@@ -612,7 +623,7 @@ void recenter_button_pressed(int canvas_x, int canvas_y)
 }
 
 /**************************************************************************
- Update the turn done button state.
+  Update the turn done button state.
 **************************************************************************/
 void update_turn_done_button_state(void)
 {
@@ -620,11 +631,8 @@ void update_turn_done_button_state(void)
 
   set_turn_done_button_state(turn_done_state);
 
-  if (turn_done_state) {
-    if (waiting_for_end_turn
-        || (NULL != client.conn.playing
-            && client.conn.playing->ai_controlled
-            && !ai_manual_turn_done)) {
+  if (can_end_turn()) {
+    if (waiting_for_end_turn) {
       send_turn_done();
     } else {
       update_turn_done_button(TRUE);
@@ -643,10 +651,12 @@ void update_line(int canvas_x, int canvas_y)
   case HOVER_GOTO:
   case HOVER_PATROL:
   case HOVER_CONNECT:
+  case HOVER_NUKE:
     ptile = canvas_pos_to_tile(canvas_x, canvas_y);
 
     is_valid_goto_draw_line(ptile);
-  default:
+  case HOVER_NONE:
+  case HOVER_PARADROP:
     break;
   };
 }
@@ -663,11 +673,13 @@ void overview_update_line(int overview_x, int overview_y)
   case HOVER_GOTO:
   case HOVER_PATROL:
   case HOVER_CONNECT:
+  case HOVER_NUKE:
     overview_to_map_pos(&x, &y, overview_x, overview_y);
     ptile = map_pos_to_tile(x, y);
 
     is_valid_goto_draw_line(ptile);
-  default:
+  case HOVER_NONE:
+  case HOVER_PARADROP:
     break;
   };
 }
@@ -684,19 +696,19 @@ static int unit_list_compare(const void *a, const void *b)
   const struct unit *punit1 = *(struct unit **)a;
   const struct unit *punit2 = *(struct unit **)b;
 
-  if (punit1->transported_by == punit2->transported_by) {
+  if (unit_transport_get(punit1) == unit_transport_get(punit2)) {
     /* For units with the same transporter or no transporter: sort by id. */
     /* Perhaps we should sort by name instead? */
     return punit1->id - punit2->id;
-  } else if (punit1->transported_by == punit2->id) {
+  } else if (unit_transport_get(punit1) == punit2) {
     return 1;
-  } else if (punit2->transported_by == punit1->id) {
+  } else if (unit_transport_get(punit2) == punit1) {
     return -1;
   } else {
     /* If the transporters aren't the same, put in order by the
      * transporters. */
-    const struct unit *ptrans1 = game_unit_by_number(punit1->transported_by);
-    const struct unit *ptrans2 = game_unit_by_number(punit2->transported_by);
+    const struct unit *ptrans1 = unit_transport_get(punit1);
+    const struct unit *ptrans2 = unit_transport_get(punit2);
 
     if (!ptrans1) {
       ptrans1 = punit1;
@@ -725,4 +737,3 @@ void fill_tile_unit_list(const struct tile *ptile, struct unit **unit_list)
   /* Then sort it. */
   qsort(unit_list, i, sizeof(*unit_list), unit_list_compare);
 }
-

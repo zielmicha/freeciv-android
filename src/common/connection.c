@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <errno.h>
@@ -30,8 +30,12 @@
 #include <unistd.h>
 #endif
 #ifdef HAVE_WINSOCK
+#ifdef HAVE_WINSOCK2
+#include <winsock2.h>
+#else  /* HAVE_WINSOCK2 */
 #include <winsock.h>
-#endif
+#endif /* HAVE_WINSOCK2 */
+#endif /* HAVE_WINSOCK */
 
 /* utility */
 #include "fcintl.h"
@@ -39,7 +43,7 @@
 #include "log.h"
 #include "mem.h"
 #include "netintf.h"
-#include "support.h"            /* mystr(n)casecmp */
+#include "support.h"            /* fc_str(n)casecmp */
 
 /* common */
 #include "game.h"               /* game.all_connections */
@@ -100,7 +104,8 @@ void connection_close(struct connection *pconn, const char *reason)
 
 
 /**************************************************************************
-...
+  Make sure that there is at least extra_space bytes free space in buffer,
+  allocating more memory if needed.
 **************************************************************************/
 static bool buffer_ensure_free_extra_space(struct socket_packet_buffer *buf,
 					   int extra_space)
@@ -171,7 +176,7 @@ static int write_socket_data(struct connection *pc,
 
   for (start=0; buf->ndata-start>limit;) {
     fd_set writefs, exceptfs;
-    struct timeval tv;
+    fc_timeval tv;
 
     FC_FD_ZERO(&writefs);
     FC_FD_ZERO(&exceptfs);
@@ -215,8 +220,8 @@ static int write_socket_data(struct connection *pc,
   if (start > 0) {
     buf->ndata -= start;
     memmove(buf->data, buf->data+start, buf->ndata);
-    pc->last_write = renew_timer_start(pc->last_write,
-				       TIMER_USER, TIMER_ACTIVE);
+    pc->last_write = timer_renew(pc->last_write, TIMER_USER, TIMER_ACTIVE);
+    timer_start(pc->last_write);
   }
   return 0;
 }
@@ -486,7 +491,9 @@ const char *conn_description(const struct connection *pconn)
 ****************************************************************************/
 bool can_conn_edit(const struct connection *pconn)
 {
-  return can_conn_enable_editing(pconn) && game.info.is_edit_mode;
+  return (can_conn_enable_editing(pconn)
+          && game.info.is_edit_mode
+          && (NULL != pconn->playing || pconn->observer));
 }
 
 /****************************************************************************
@@ -515,7 +522,7 @@ int get_next_request_id(int old_request_id)
 }
 
 /**************************************************************************
- ...
+  Free compression queue for given connection.
 **************************************************************************/
 void free_compression_queue(struct connection *pc)
 {
@@ -525,7 +532,7 @@ void free_compression_queue(struct connection *pc)
 }
 
 /**************************************************************************
- ...
+  Allocate and initialize packet hashs for given connection.
 **************************************************************************/
 static void init_packet_hashs(struct connection *pc)
 {
@@ -543,7 +550,7 @@ static void init_packet_hashs(struct connection *pc)
 }
 
 /**************************************************************************
- ...
+  Free packet hash resources from given connection.
 **************************************************************************/
 static void free_packet_hashes(struct connection *pc)
 {
@@ -576,12 +583,14 @@ static void free_packet_hashes(struct connection *pc)
 }
 
 /**************************************************************************
- ...
+  Initialize common part of connection structure. This is used by
+  both server and client.
 **************************************************************************/
 void connection_common_init(struct connection *pconn)
 {
   pconn->established = FALSE;
   pconn->used = TRUE;
+  packet_header_init(&pconn->packet_header);
   pconn->closing_reason = NULL;
   pconn->last_write = NULL;
   pconn->buffer = new_socket_packet_buffer();
@@ -597,7 +606,7 @@ void connection_common_init(struct connection *pconn)
 }
 
 /**************************************************************************
- ...
+   Connection closing part common to server and client.
 **************************************************************************/
 void connection_common_close(struct connection *pconn)
 {
@@ -618,7 +627,7 @@ void connection_common_close(struct connection *pconn)
     pconn->send_buffer = NULL;
 
     if (pconn->last_write) {
-      free_timer(pconn->last_write);
+      timer_destroy(pconn->last_write);
       pconn->last_write = NULL;
     }
 
@@ -885,4 +894,13 @@ struct conn_pattern *conn_pattern_from_string(const char *pattern,
   }
 
   return  conn_pattern_new(type, p);
+}
+
+/**************************************************************************
+  Returns TRUE if the connection is valid, i.e. not NULL, not closed, not
+  closing, etc.
+**************************************************************************/
+bool conn_is_valid(const struct connection *pconn)
+{
+  return (pconn && pconn->used && !pconn->server.is_closing);
 }

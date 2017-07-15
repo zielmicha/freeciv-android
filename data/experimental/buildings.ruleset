@@ -14,7 +14,7 @@
 
 [datafile]
 description="Experimental buildings data for Freeciv"
-options="+Freeciv-2.3-ruleset"
+options="+Freeciv-2.5-ruleset"
 
 ; /* <-- avoid gettext warnings
 ;
@@ -44,6 +44,18 @@ options="+Freeciv-2.3-ruleset"
 ; upkeep	= monetary upkeep value
 ; sabotage	= percent chance of diplomat sabotage being successful
 ; flags         = special flag strings
+;
+; ** Building flags **
+; "VisibleByOthers"  = Anyone who can see your city knows whether it has
+;                      this improvement. (Great and small wonders are
+;                      always visible.)
+; "SaveSmallWonder"  = If you lose the city with this building in, and the
+;                      "savepalace" server setting is enabled, another will
+;                      be built for free in a random city.
+;                      Should only be used with genus "SmallWonder".
+; "Gold"             = Not a real building; production turned into gold
+;                      indefinitely (capitalization/coinage).
+;                      Genus should be "Special".
 ;
 ; */ <-- avoid gettext warnings
 
@@ -305,10 +317,12 @@ sound		= "b_courthouse"
 sound_alt	= "b_generic"
 ; /* xgettext:no-c-format */
 helptext	= _("\
-Reduces the corruption in a city by 50%.  Under a Democracy, a\
- Courthouse also makes 1 unhappy citizen content (unless that citizen is\
- unhappy about military activity). \
- Also makes the revolt cost of the city 4 times bigger.\
+Reduces the corruption in a city by 50%, and makes the revolt cost\
+ of the city 4 times bigger. (These effects are redundant in your\
+ capital city.)\
+"), _("\
+Under a Democracy, a Courthouse also makes 1 unhappy citizen content\
+ (unless that citizen is unhappy about military activity).\
 ")
 
 [building_factory]
@@ -405,7 +419,7 @@ reqs	=
     { "type", "name", "range"
       "Tech", "Electronics", "Player"
       "Building", "Factory", "City"
-      "Special", "River", "Adjacent"
+      "Road", "River", "Adjacent"
     }
 graphic	= "b.hydro_plant"
 graphic_alt	= "-"
@@ -620,16 +634,26 @@ sabotage	= 0
 sound		= "b_palace"
 sound_alt	= "b_generic"
 helptext	= _("\
-Makes a city the capital and the center of your government. \
+Makes a city the capital and the center of your government.\
  Corruption in other cities is related to how far away from the\
  capital they are, except when the government is Democracy or\
- Communism.  The cost of inciting a revolt in a city also depends\
- upon the city's distance from the capital (under all forms of\
- government).\
+ Communism. On top of this, corruption in your capital itself is\
+ half of what it would otherwise be (as if it had a Courthouse).\
+"), _("\
+The cost to enemy Diplomats and Spies of inciting a revolt in a\
+ city also depends upon the city's distance from the capital\
+ (under all forms of government). Your capital city itself cannot\
+ be incited to revolt, and enjoys a bonus when enemy agents try\
+ to evade your own agents stationed in the city, or sabotage your\
+ buildings.\
 "), _("\
 Take good care of your capital, as its loss may result in your\
  empire plunging into civil war. Losing your current palace also\
  results in losing whatever spaceship you might have.\
+"), _("\
+If the capital is in a dangerous location, or a more central capital\
+ would give a better corruption distribution, you can move your palace\
+ by rebuilding it in another city.\
 "),
 ; /* xgettext:no-c-format */
 _("\
@@ -799,10 +823,10 @@ sound		= "b_sdi_defense"
 sound_alt	= "b_generic"
 helptext	= _("\
 Protects a city and its environs (up to 2 tiles away) from attacks\
- by Nuclear units. A Nuclear unit attacking a city with SDI Defense,\
- or attacking a unit (or deliberately exploded) within range, is shot\
- down and simply has no effect. Also, doubles defense for units in\
- the city against non-nuclear missiles.\
+ by enemy Nuclear units. A Nuclear unit not owned by you or an ally\
+ which attacks a city with SDI Defense, or attacks a unit (or is\
+ deliberately exploded) within range, is shot down and simply has no effect.\
+ Also, doubles defense for units in the city against non-nuclear missiles.\
 ")
 ; NOTE:
 ; Civ2 does not document the "Unit_Defend"/"Missile" aspect; does it apply or not?
@@ -1285,7 +1309,7 @@ genus		= "GreatWonder"
 reqs	=
     { "type", "name", "range"
       "Tech", "Electronics", "Player"
-      "Special", "River", "Adjacent"
+      "Road", "River", "Adjacent"
     }
 graphic	= "b.hoover_dam"
 graphic_alt	= "-"
@@ -1604,9 +1628,10 @@ sabotage	= 0
 sound		= "w_sun_tzus_war_academy"
 sound_alt	= "w_generic"
 helptext	= _("\
-All your new military land units start at the first veteran level. The\
- chance of a land unit getting the next veteran level after a battle\
- increases by half.\
+All your new military land units start with an additional veteran level\
+ (this is cumulative with any Barracks building in a city; with both, units\
+ are created as Hardened). The chance of a land unit getting the next\
+ veteran level after a battle increases by half.\
 ")
 
 [building_united_nations]

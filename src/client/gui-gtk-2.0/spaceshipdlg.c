@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -81,7 +81,7 @@ static void spaceship_dialog_update_image(struct spaceship_dialog *pdialog);
 static void spaceship_dialog_update_info(struct spaceship_dialog *pdialog);
 
 /****************************************************************
-...
+  Initialize spaceship dialogs
 *****************************************************************/
 void spaceship_dialog_init()
 {
@@ -89,7 +89,7 @@ void spaceship_dialog_init()
 }
 
 /****************************************************************
-...
+  Free resources allocated for spaceship dialogs
 *****************************************************************/
 void spaceship_dialog_done()
 {
@@ -97,7 +97,7 @@ void spaceship_dialog_done()
 }
 
 /****************************************************************
-...
+  Get spaceship dialog about certain player
 *****************************************************************/
 struct spaceship_dialog *get_spaceship_dialog(struct player *pplayer)
 {
@@ -111,7 +111,7 @@ struct spaceship_dialog *get_spaceship_dialog(struct player *pplayer)
 }
 
 /****************************************************************
-...
+  Refresh spaceship dialog of certain player
 *****************************************************************/
 void refresh_spaceship_dialog(struct player *pplayer)
 {
@@ -165,7 +165,7 @@ void popdown_spaceship_dialog(struct player *pplayer)
 
 
 /****************************************************************
-...
+  Spaceship dialog canvas got exposed
 *****************************************************************/
 static gboolean spaceship_image_canvas_expose(GtkWidget *widget,
 					      GdkEventExpose *ev,
@@ -179,7 +179,7 @@ static gboolean spaceship_image_canvas_expose(GtkWidget *widget,
 }
 
 /****************************************************************
-...
+  Spaceship dialog being destroyed
 *****************************************************************/
 static void spaceship_destroy_callback(GtkWidget *w, gpointer data)
 {
@@ -191,7 +191,7 @@ static void spaceship_destroy_callback(GtkWidget *w, gpointer data)
 }
 
 /****************************************************************
-...
+  User has responded to spaceship dialog
 *****************************************************************/
 static void spaceship_response(struct gui_dialog *dlg, int response,
                                gpointer data)
@@ -210,7 +210,7 @@ static void spaceship_response(struct gui_dialog *dlg, int response,
 }
   
 /****************************************************************
-...
+  Create new spaceship dialog
 *****************************************************************/
 struct spaceship_dialog *create_spaceship_dialog(struct player *pplayer)
 {
@@ -221,7 +221,7 @@ struct spaceship_dialog *create_spaceship_dialog(struct player *pplayer)
   pdialog=fc_malloc(sizeof(struct spaceship_dialog));
   pdialog->pplayer=pplayer;
 
-  gui_dialog_new(&pdialog->shell, GTK_NOTEBOOK(top_notebook), NULL);
+  gui_dialog_new(&pdialog->shell, GTK_NOTEBOOK(top_notebook), NULL, TRUE);
   gui_dialog_set_title(pdialog->shell, player_name(pplayer));
 
   gui_dialog_add_button(pdialog->shell,
@@ -271,7 +271,7 @@ struct spaceship_dialog *create_spaceship_dialog(struct player *pplayer)
 }
 
 /****************************************************************
-...
+  Update spaceship dialog info label text
 *****************************************************************/
 void spaceship_dialog_update_info(struct spaceship_dialog *pdialog)
 {
@@ -280,9 +280,8 @@ void spaceship_dialog_update_info(struct spaceship_dialog *pdialog)
 }
 
 /****************************************************************
-...
-Should also check connectedness, and show non-connected
-parts differently.
+  Should also check connectedness, and show non-connected
+  parts differently.
 *****************************************************************/
 void spaceship_dialog_update_image(struct spaceship_dialog *pdialog)
 {
@@ -291,4 +290,3 @@ void spaceship_dialog_update_image(struct spaceship_dialog *pdialog)
 
   put_spaceship(&store, 0, 0, pdialog->pplayer);
 }
-

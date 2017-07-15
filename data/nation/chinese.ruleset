@@ -1,11 +1,13 @@
 [nation_chinese]
 
+translation_domain="freeciv"
+
 name=_("Chinese")
 plural=_("?plural:Chinese")
-groups="Modern", "Asian"
+groups="Modern", "Asian", "Core"
 legend=_("China is the oldest major civilization that is still in\
  existence today, with written records dating back over 3,500 years.\
- After first being unified by the Qin dynasty in 221 BC, China alternated\
+ After first being unified by the Qin dynasty in 221 BCE, China alternated\
  between periods of unity and disunity, and was occasionally conquered by\
  external ethnicities. Today, the People's Republic of China, established\
  by the Communists in 1949, occupies the mainland, while the former\
@@ -25,7 +27,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",      "female_title"
  "Monarchy",        _("Emperor %s"),   _("Empress Dowager %s")
- "Communism",       _("Chairman %s"),  _("Chairperson %s")
+ "Communism",       _("Chairman %s"),  _("Chairwoman %s")
 }
 
 flag="china"
@@ -34,15 +36,12 @@ city_style = "Asian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations=
 ; Technically Taiwan (ROC) is the site of government-in-exile of China proper
  "taiwanese",
 ; Nations part of modern PRC
- "manchu", "uyghur", "miao",
-; Vietnam split from Chinese rule in the first millennium AD
- "vietnamese"
+ "manchu", "miao", "tibetan", "uyghur", "zhuang", "cantonese"
 
 cities =
  "Beijing",

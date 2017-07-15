@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -35,10 +35,11 @@
     }                                                                       \
   }
 
-/* This routine returns true if the capability in cap appears
- * in the capability list in capstr.  The capabilities in capstr
- * are allowed to start with a "+", but the capability in cap must not.
- */
+/***************************************************************************
+  This routine returns true if the capability in cap appears
+  in the capability list in capstr.  The capabilities in capstr
+  are allowed to start with a "+", but the capability in cap must not.
+***************************************************************************/
 static bool my_has_capability(const char *cap, const char *capstr,
 			     const size_t cap_len)
 {
@@ -63,16 +64,18 @@ static bool my_has_capability(const char *cap, const char *capstr,
   }
 }
 
-/* Wrapper for my_has_capability() for NUL terminated strings.
- */
+/***************************************************************************
+  Wrapper for my_has_capability() for NUL terminated strings.
+***************************************************************************/
 bool has_capability(const char *cap, const char *capstr)
 {
   return my_has_capability(cap, capstr, strlen(cap));
 }
 
-/* This routine returns true if all the mandatory capabilities in
- * us appear in them.
- */
+/***************************************************************************
+  This routine returns true if all the mandatory capabilities in
+  us appear in them.
+***************************************************************************/
 bool has_capabilities(const char *us, const char *them)
 {
   const char *next;

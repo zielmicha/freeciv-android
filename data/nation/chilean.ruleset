@@ -4,10 +4,11 @@ name=_("Chilean")
 plural=_("?plural:Chileans")
 groups="Modern", "American"
 legend=_("Chile is located on the south-western coast of South America.\
- At the expense of Bolivia, Peru and the indigenous Mapuche people, Chile\
- more than doubled its territory in the 19th century. Always having been\
- more stable and prosperous than its neighbors, Chile currently is the\
- most developed country of Latin America.")
+ Chile declared its independence from Spain in 1810. At the expense of\
+ Bolivia, Peru and the indigenous Mapuche people, Chile more than doubled\
+ its territory in the 19th century. Often having been more stable and\
+ prosperous than its neighbors, Chile currently is the most developed\
+ country of Latin America.")
 
 leaders = {
  "name",                        "sex"
@@ -27,8 +28,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",            "female_title"
  "Despotism",       _("Captain General %s"), _("?female:Captain General %s")
- "Fundamentalism",  _("Archbishop %s"),      _("?female:Mother Superior %s")
- "Republic",        _("Supreme Director %s"),_("Supreme Director %s")
+ "Fundamentalism",  _("Archbishop %s"),      _("Mother Superior %s")
 }
 
 flag="chile"
@@ -38,9 +38,8 @@ city_style = "European"
 init_techs=""
 init_buildings=""
 
-init_government="Despotism"
 init_units=""
-civilwar_nations = "argentine", "mapuche"
+civilwar_nations = "mapuche", "rapa nui"
 
 cities =
  "Santiago",

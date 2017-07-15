@@ -50,7 +50,6 @@ extern GtkWidget *      bulb_label;
 extern GtkWidget *      sun_label;
 extern GtkWidget *      flake_label;
 extern GtkWidget *      government_label;
-extern GtkTooltips *	main_tips;
 extern GtkWidget *	econ_ebox;
 extern GtkWidget *	bulb_ebox;
 extern GtkWidget *	sun_ebox;
@@ -85,6 +84,9 @@ gboolean map_canvas_focus(void);
 
 void reset_unit_table(void);
 void popup_quit_dialog(void);
+void quit_gtk_main(void);
 void refresh_chat_buttons(void);
+
+bool is_gui_up(void);
 
 #endif  /* FC__GUI_MAIN_H */

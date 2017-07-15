@@ -1,8 +1,10 @@
 [nation_mayan]
 
+translation_domain="freeciv"
+
 name=_("Mayan")
 plural=_("?plural:Mayas")
-groups="Ancient", "Medieval", "Early Modern", "American"
+groups="Ancient", "Medieval", "Early Modern", "American", "Core"
 legend=_("The Mayans were a Mesoamerican civilization. They are\
  famous for building great pyramids and palaces in the jungle.")
 
@@ -22,8 +24,8 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",      "female_title"
- ; /* TRANS: Ajaw = Lord */
- "Monarchy",        _("Ajaw %s"),         _("?female:Ajaw %s")
+ "Despotism",       _("Lord %s"),      _("Lady %s")
+ "Fundamentalism",  _("Elder %s"),     _("?female:Elder %s")
 }
 
 flag = "maya"
@@ -32,9 +34,8 @@ city_style = "Tropical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations = "guatemalan", "yucatecan"
+civilwar_nations = "guatemalan", "yucatecan", "chiapanec"
 
 ; Oldest names take precedence. Later/alternative names in comment.
 cities =
@@ -45,7 +46,7 @@ cities =
  "Popo",			;Toniná
  "Ox Witz Ja'",			;Caracol
  "Ja'",				;Dos Pilas
- "Chi'che'e'n Itsa",		;Chichén Itzá
+ "Chi'che'en Itsa",		;Chichén Itzá
  "Oxwitik",			;Copán
  "Óox Máal",			;Uxmal
  "Q'umarkaj",			;Gumarcaj, Utatlán

@@ -17,13 +17,17 @@ leaders = {
  "Ferdinand Marcos",    "Male"
 }
 
+ruler_titles = {
+ "government",      "male_title",           "female_title"
+ "Fundamentalism",  _("Cardinal %s"),       _("Mother Superior %s")
+ "Republic",        _("Governor %s"),       _("?female:Governor %s")
+}
 flag="philippines"
 flag_alt = "-"
 city_style = "Tropical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations="japanese", "malaysian"
 

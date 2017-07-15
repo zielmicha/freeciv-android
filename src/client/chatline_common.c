@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -21,6 +21,7 @@
 /* utility */
 #include "astring.h"
 #include "fcintl.h"
+#include "fcthread.h"
 #include "fc_utf8.h"
 #include "log.h"
 
@@ -37,6 +38,7 @@
 
 #include "chatline_common.h"
 
+static fc_mutex ow_mutex;
 
 /****************************************************************************
   Send the message as a chat to the server.
@@ -64,6 +66,38 @@ int send_chat_printf(const char *format, ...)
 }
 
 /**************************************************************************
+  Allocate output window mutex
+**************************************************************************/
+void fc_allocate_ow_mutex(void)
+{
+  fc_allocate_mutex(&ow_mutex);
+}
+
+/**************************************************************************
+  Release output window mutex
+**************************************************************************/
+void fc_release_ow_mutex(void)
+{
+  fc_release_mutex(&ow_mutex);
+}
+
+/**************************************************************************
+  Initialize output window mutex
+**************************************************************************/
+void fc_init_ow_mutex(void)
+{
+  fc_init_mutex(&ow_mutex);
+}
+
+/**************************************************************************
+  Destroy output window mutex
+**************************************************************************/
+void fc_destroy_ow_mutex(void)
+{
+  fc_destroy_mutex(&ow_mutex);
+}
+
+/**************************************************************************
   Add a line of text to the output ("chatline") window, like puts() would
   do it in the console.
 **************************************************************************/
@@ -75,7 +109,7 @@ void output_window_append(const struct ft_color color,
 
   /* Separate the text and the tags. */
   featured_text_to_plain_text(featured_text, plain_text,
-                              sizeof(plain_text), &tags);
+                              sizeof(plain_text), &tags, FALSE);
 
   if (ft_color_requested(color)) {
     /* A color is requested. */
@@ -92,7 +126,9 @@ void output_window_append(const struct ft_color color,
     }
   }
 
+  fc_allocate_ow_mutex();
   real_output_window_append(plain_text, tags, -1);
+  fc_release_ow_mutex();
   text_tag_list_destroy(tags);
 }
 
@@ -130,19 +166,26 @@ void output_window_printf(const struct ft_color color,
 void output_window_event(const char *plain_text,
                          const struct text_tag_list *tags, int conn_id)
 {
+  fc_allocate_ow_mutex();
   real_output_window_append(plain_text, tags, conn_id);
+  fc_release_ow_mutex();
 }
 
 /****************************************************************************
   Standard welcome message.
 ****************************************************************************/
-void chat_welcome_message(void)
+void chat_welcome_message(bool gui_has_copying_mitem)
 {
   output_window_append(ftc_any, _("Freeciv is free software and you are "
                                   "welcome to distribute copies of it "
                                   "under certain conditions;"));
-  output_window_append(ftc_any, _("See the \"Copying\" item on the "
-                                  "Help menu."));
+  if (gui_has_copying_mitem) {
+    output_window_append(ftc_any, _("See the \"Copying\" item on the "
+                                    "Help menu."));
+  } else {
+    output_window_append(ftc_any, _("See COPYING file distributed with "
+                                    "this program."));
+  }
   output_window_append(ftc_any, _("Now ... Go give 'em hell!"));
 }
 

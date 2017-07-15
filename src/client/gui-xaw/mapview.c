@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -214,7 +214,7 @@ void update_unit_info_label(struct unit_list *punitlist)
               get_unit_info_label_text2(punitlist, 0));
   xaw_set_label(unit_info_label, buffer);
 
-  if (unit_list_size(punitlist) > 0) {
+  if (punitlist && unit_list_size(punitlist) > 0) {
     switch (hover_state) {
     case HOVER_NONE:
       XUndefineCursor(display, XtWindow(map_canvas));
@@ -687,9 +687,11 @@ static void draw_shadowed_string(struct canvas *pcanvas,
 
   y -= XExtentsOfFontSet(fontset)->max_logical_extent.y;
 
-  XSetForeground(display, font_gc, shadow->color.pixel);
-  XmbDrawString(display, pcanvas->pixmap, fontset, font_gc,
-      x + 1, y + 1, string, len);
+  if (foreground->color.pixel != shadow->color.pixel) {
+    XSetForeground(display, font_gc, shadow->color.pixel);
+    XmbDrawString(display, pcanvas->pixmap, fontset, font_gc,
+                  x + 1, y + 1, string, len);
+  }
 
   XSetForeground(display, font_gc, foreground->color.pixel);
   XmbDrawString(display, pcanvas->pixmap, fontset, font_gc,

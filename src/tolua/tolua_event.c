@@ -3,7 +3,7 @@
 ** Written by Waldemar Celes
 ** TeCGraf/PUC-Rio
 ** Apr 2003
-** $Id: $
+** $Id: tolua_event.c,v 1.7 2011/01/13 13:43:46 fabraham Exp $
 */
 
 /* This code is free software; you can redistribute it and/or modify it. 
@@ -12,16 +12,17 @@
 ** enhancements, or modifications. 
 */
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "tolua.h"
+
 #include "tolua_event.h"
 
-/* Store at ubox
+/* Store at peer
 	* It stores, creating the corresponding table if needed,
-	* the pair key/value in the corresponding ubox table
+	* the pair key/value in the corresponding peer table
 */
 static void storeatpeer (lua_State* L, int index)
 {
@@ -122,22 +123,22 @@ static int module_newindex_event (lua_State* L)
 
 /* Class index function
 	* If the object is a userdata (ie, an object), it searches the field in 
-	* the alternative table stored in the corresponding "ubox" table.
+	* the alternative table stored in the corresponding "peer" table.
 */
 static int class_index_event (lua_State* L)
 {
- int t = lua_type(L,1);
+  int t = lua_type(L,1);
 	if (t == LUA_TUSERDATA)
 	{
 		/* Access alternative table */
 		lua_pushstring(L,"tolua_peer");
-		lua_rawget(L,LUA_REGISTRYINDEX);        /* stack: obj key ubox */
+		lua_rawget(L,LUA_REGISTRYINDEX);        /* stack: obj key peer */
 		lua_pushvalue(L,1);
-		lua_rawget(L,-2);                       /* stack: obj key ubox ubox[u] */
+		lua_rawget(L,-2);                       /* stack: obj key peer peer[u] */
 		if (lua_istable(L,-1))
 		{
 			lua_pushvalue(L,2);  /* key */
-			lua_rawget(L,-2);                      /* stack: obj key ubox ubox[u] value */
+			lua_rawget(L,-2);                      /* stack: obj key peer peer[u] value */
 			if (!lua_isnil(L,-1))
 				return 1;
 		}
@@ -184,7 +185,7 @@ static int class_index_event (lua_State* L)
 					}
 					else if (lua_istable(L,-1))
 					{
-						/* deal with array: create table to be returned and cache it in ubox */
+						/* deal with array: create table to be returned and cache it in peer */
 						void* u = *((void**)lua_touserdata(L,1));
 						lua_newtable(L);                /* stack: obj key mt value table */
 						lua_pushstring(L,".self");
@@ -216,7 +217,7 @@ static int class_index_event (lua_State* L)
 
 /* Newindex function
 	* It first searches for a C/C++ varaible to be set.
-	* Then, it either stores it in the alternative ubox table (in the case it is
+	* Then, it either stores it in the alternative peer table (in the case it is
 	* an object) or in the own table (that represents the class or module).
 */
 static int class_newindex_event (lua_State* L)
@@ -347,30 +348,33 @@ static int class_eq_event (lua_State* L)
 
 static int class_gc_event (lua_State* L)
 {
-  int top = lua_gettop(L);
-	 void* u = *((void**)lua_touserdata(L,1));
-  lua_pushstring(L,"tolua_gc");
-  lua_rawget(L,LUA_REGISTRYINDEX);   /* gc */
-  lua_pushlightuserdata(L,u);        /* gc u */
-  lua_rawget(L,-2);                  /* gc func */
-  if (!lua_isnil(L, -1))
+  if (lua_type(L,1) == LUA_TUSERDATA)
   {
-    /* remove entry from table */
-    lua_pushlightuserdata(L,u);
-    lua_pushnil(L);
-    lua_rawset(L,-4);
-    if (lua_isfunction(L,-1)) {
-      /* call collect function */
-      lua_pushvalue(L,1);            /* tolua_gc tolua_gc.u(func) u */
-      lua_call(L,1,0);               /* tolua_gc */
+    int top = lua_gettop(L);
+    void* u = *((void**)lua_touserdata(L,1));
+    lua_pushstring(L,"tolua_gc");
+    lua_rawget(L,LUA_REGISTRYINDEX);   /* gc */
+    lua_pushlightuserdata(L,u);        /* gc u */
+    lua_rawget(L,-2);                  /* gc func */
+    if (!lua_isnil(L, -1))
+    {
+      /* remove entry from table */
+      lua_pushlightuserdata(L,u);
+      lua_pushnil(L);
+      lua_rawset(L,-4);
+      if (lua_isfunction(L,-1)) {
+        /* call collect function */
+        lua_pushvalue(L,1);            /* tolua_gc tolua_gc.u(func) u */
+        lua_call(L,1,0);               /* tolua_gc */
+      }
+      else if (lua_isuserdata(L,-1) && *((void**)lua_touserdata(L,-1))==NULL) {
+        /* free object */
+        free(u);
+        tolua_release(L,u);                /* unmap from tolua tables */
+      }
     }
-    else if (lua_isuserdata(L,-1) && *((void**)lua_touserdata(L,-1))==NULL) {
-      /* free object */
-      free(u);
-      tolua_release(L,u);                /* unmap from tolua tables */
-    }
+    lua_settop(L,top);
   }
-	lua_settop(L,top);
 	return 0;
 }
 

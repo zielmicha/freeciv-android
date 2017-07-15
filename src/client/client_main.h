@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -10,8 +10,12 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 ***********************************************************************/
-#ifndef FC__CIVCLIENT_H
-#define FC__CIVCLIENT_H
+#ifndef FC__CLIENT_MAIN_H
+#define FC__CLIENT_MAIN_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 #include "fc_types.h"
 
@@ -64,6 +68,7 @@ void client_remove_all_cli_conn(void);
 
 extern char *logfile;
 extern char *scriptfile;
+extern char *savefile;
 extern char sound_plugin_name[512];
 extern char sound_set_name[512];
 extern char server_host[512];
@@ -72,6 +77,7 @@ extern char password[MAX_LEN_PASSWORD];
 extern char metaserver[512];
 extern int  server_port;
 extern bool auto_connect;
+extern bool auto_spawn;
 extern bool waiting_for_end_turn;
 extern bool in_ggz;
 
@@ -103,8 +109,17 @@ bool can_intel_with_player(const struct player *pplayer);
 
 void client_exit(void);
 
+int client_current_turn_timeout(void);
+
+bool is_client_quitting(void);
+void start_quitting(void);
+
 /* Set in GUI code. */
 extern const char * const gui_character_encoding;
 extern const bool gui_use_transliteration;
 
-#endif  /* FC__CIVCLIENT_H */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif  /* FC__CLIENT_MAIN_H */

@@ -13,9 +13,10 @@
 #ifndef FC__CONSOLE_H
 #define FC__CONSOLE_H
 
+/* utility */
 #include "support.h"            /* bool type and fc__attribute */
 
-#define MAX_LEN_CONSOLE_LINE 512	/* closing \0 included */
+#define MAX_LEN_CONSOLE_LINE 1024  /* closing '\0' included */
 
 /* 
  * A note on "rfc-style":
@@ -53,6 +54,7 @@ enum rfc_status {
 /* initialize logging via console */
 void con_log_init(const char *log_filename, enum log_level level,
                   int fatal_assertions);
+void con_log_close(void);
 
 /* write to console and add line-break, and show prompt if required. */
 void con_write(enum rfc_status rfc_status, const char *message, ...)

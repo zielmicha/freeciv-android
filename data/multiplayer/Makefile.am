@@ -4,14 +4,13 @@
 pkgdatadir = $(datadir)/$(PACKAGE)/multiplayer
 
 pkgdata_DATA =          \
-	ai_effects.ruleset \
 	buildings.ruleset \
 	cities.ruleset	\
-	default.lua	\
 	effects.ruleset	\
 	script.lua	\
 	game.ruleset	\
 	governments.ruleset \
+	nations.ruleset	\
 	techs.ruleset	\
 	terrain.ruleset	\
 	units.ruleset

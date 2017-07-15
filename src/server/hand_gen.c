@@ -9,7 +9,7 @@
 
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* common */
@@ -208,11 +208,6 @@ bool server_handle_packet(enum packet_type type, const void *packet,
       ((const struct packet_unit_upgrade *)packet)->unit_id);
     return TRUE;
 
-  case PACKET_UNIT_CONVERT:
-    handle_unit_convert(pplayer,
-      ((const struct packet_unit_convert *)packet)->unit_id);
-    return TRUE;
-
   case PACKET_UNIT_NUKE:
     handle_unit_nuke(pplayer,
       ((const struct packet_unit_nuke *)packet)->unit_id);
@@ -255,8 +250,21 @@ bool server_handle_packet(enum packet_type type, const void *packet,
     handle_unit_change_activity(pplayer,
       ((const struct packet_unit_change_activity *)packet)->unit_id,
       ((const struct packet_unit_change_activity *)packet)->activity,
-      ((const struct packet_unit_change_activity *)packet)->activity_target,
-      ((const struct packet_unit_change_activity *)packet)->activity_base);
+      ((const struct packet_unit_change_activity *)packet)->activity_target);
+    return TRUE;
+
+  case PACKET_UNIT_CHANGE_ACTIVITY_BASE:
+    handle_unit_change_activity_base(pplayer,
+      ((const struct packet_unit_change_activity_base *)packet)->unit_id,
+      ((const struct packet_unit_change_activity_base *)packet)->activity,
+      ((const struct packet_unit_change_activity_base *)packet)->activity_base);
+    return TRUE;
+
+  case PACKET_UNIT_CHANGE_ACTIVITY_ROAD:
+    handle_unit_change_activity_road(pplayer,
+      ((const struct packet_unit_change_activity_road *)packet)->unit_id,
+      ((const struct packet_unit_change_activity_road *)packet)->activity,
+      ((const struct packet_unit_change_activity_road *)packet)->activity_road);
     return TRUE;
 
   case PACKET_DIPLOMACY_INIT_MEETING_REQ:
@@ -307,7 +315,8 @@ bool server_handle_packet(enum packet_type type, const void *packet,
 
   case PACKET_CLIENT_INFO:
     handle_client_info(pconn,
-      ((const struct packet_client_info *)packet)->gui);
+      ((const struct packet_client_info *)packet)->gui,
+      ((const struct packet_client_info *)packet)->distribution);
     return TRUE;
 
   case PACKET_SPACESHIP_LAUNCH:
@@ -322,10 +331,6 @@ bool server_handle_packet(enum packet_type type, const void *packet,
 
   case PACKET_SINGLE_WANT_HACK_REQ:
     handle_single_want_hack_req(pconn, packet);
-    return TRUE;
-
-  case PACKET_SCENARIO_INFO:
-    handle_scenario_info(pconn, packet);
     return TRUE;
 
   case PACKET_SAVE_SCENARIO:
@@ -385,6 +390,14 @@ bool server_handle_packet(enum packet_type type, const void *packet,
       ((const struct packet_edit_tile_base *)packet)->base_type_id,
       ((const struct packet_edit_tile_base *)packet)->remove,
       ((const struct packet_edit_tile_base *)packet)->size);
+    return TRUE;
+
+  case PACKET_EDIT_TILE_ROAD:
+    handle_edit_tile_road(pconn,
+      ((const struct packet_edit_tile_road *)packet)->tile,
+      ((const struct packet_edit_tile_road *)packet)->road_type_id,
+      ((const struct packet_edit_tile_road *)packet)->remove,
+      ((const struct packet_edit_tile_road *)packet)->size);
     return TRUE;
 
   case PACKET_EDIT_STARTPOS:

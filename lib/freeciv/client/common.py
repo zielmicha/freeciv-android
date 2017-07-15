@@ -34,6 +34,16 @@ def load_gfxfile(fn):
         return graphics.load_image(fn)
 
 @freeciv.register
+def create_sprite(width, height, color):
+    surf = graphics.create_surface(width, height)
+    surf.fill(color)
+    return surf
+
+@freeciv.register
+def color_brightness_score(color):
+    return (color.color.r*299 + color.color.g*587 + color.color.b*114) / 1000;
+
+@freeciv.register
 def get_sprite_dimensions(image):
     return image.get_size()
 

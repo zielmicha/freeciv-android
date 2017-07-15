@@ -1,5 +1,5 @@
-/**********************************************************************
- Freeciv - Copyright (C) 2002 - The Freeciv Poject
+/***********************************************************************
+ Freeciv - Copyright (C) 2002 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2, or (at your option)
@@ -13,6 +13,10 @@
 
 #ifndef FC__MAPCTRL_COMMON_H
 #define FC__MAPCTRL_COMMON_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /* utility */
 #include "support.h"            /* bool type */
@@ -53,6 +57,7 @@ void release_goto_button(int canvas_x, int canvas_y);
 void maybe_activate_keyboardless_goto(int canvas_x, int canvas_y);
 
 bool get_turn_done_button_state(void);
+bool can_end_turn(void);
 void scroll_mapview(enum direction8 gui_dir);
 void action_button_pressed(int canvas_x, int canvas_y,
                 enum quickselect_type qtype);
@@ -66,5 +71,9 @@ void overview_update_line(int overview_x, int overview_y);
 void fill_tile_unit_list(const struct tile *ptile, struct unit **unit_list);
 
 extern struct city *city_workers_display;
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__MAPCTRL_COMMON_H */

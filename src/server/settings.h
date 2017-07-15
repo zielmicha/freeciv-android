@@ -56,7 +56,7 @@ struct sset_val_name {
 /* Levels allow options to be subdivided and thus easier to navigate */
 #define SPECENUM_NAME sset_level
 #define SPECENUM_VALUE0     SSET_NONE
-#define SPECENUM_VALUE0NAME N_("None")
+#define SPECENUM_VALUE0NAME N_("?ssetlevel:None")
 #define SPECENUM_VALUE1     SSET_ALL
 #define SPECENUM_VALUE1NAME N_("All")
 #define SPECENUM_VALUE2     SSET_VITAL
@@ -91,9 +91,10 @@ int setting_number(const struct setting *pset);
 
 const char *setting_name(const struct setting *pset);
 const char *setting_short_help(const struct setting *pset);
-const char *setting_extra_help(const struct setting *pset);
+const char *setting_extra_help(const struct setting *pset, bool constant);
 enum sset_type setting_type(const struct setting *pset);
 enum sset_level setting_level(const struct setting *pset);
+enum sset_category setting_category(const struct setting *pset);
 
 bool setting_is_changeable(const struct setting *pset,
                            struct connection *caller, char *reject_msg,
@@ -158,15 +159,27 @@ bool setting_changed(const struct setting *pset);
 bool setting_locked(const struct setting *pset);
 void setting_lock_set(struct setting *pset, bool lock);
 
-/* iterate over all settings */
-#define settings_iterate(_pset)                                             \
-{                                                                           \
-  struct setting *_pset;                                                    \
-  int _pset_id;                                                             \
-  for (_pset_id = 0; (_pset = setting_by_number(_pset_id)); _pset_id++) {
+/* get 'struct setting_list' and related functions: */
+#define SPECLIST_TAG setting
+#define SPECLIST_TYPE struct setting
+#include "speclist.h"
 
-#define settings_iterate_end                                               \
-  }                                                                        \
+#define setting_list_iterate(_setting_list, _setting)                        \
+  TYPED_LIST_ITERATE(struct setting, _setting_list, _setting)
+#define setting_list_iterate_end                                             \
+  LIST_ITERATE_END
+
+/* Iterate over all settings; this additionally checks if the list is
+ * created and valid. */
+#define settings_iterate(_level, _pset)                                      \
+{                                                                            \
+  struct setting_list *_setting_list = settings_list_get(_level);            \
+  if (_setting_list != NULL) {                                               \
+    setting_list_iterate(_setting_list, _pset) {
+
+#define settings_iterate_end                                                 \
+    } setting_list_iterate_end;                                              \
+  }                                                                          \
 }
 
 void settings_game_start(void);
@@ -174,13 +187,16 @@ void settings_game_save(struct section_file *file, const char *section);
 void settings_game_load(struct section_file *file, const char *section);
 bool settings_game_reset(void);
 
-void settings_init(void);
+void settings_init(bool act);
 void settings_reset(void);
 void settings_turn(void);
 void settings_free(void);
 int settings_number(void);
 
-bool settings_ruleset(struct section_file *file, const char *section);
+void settings_list_update(void);
+struct setting_list *settings_list_get(enum sset_level level);
+
+bool settings_ruleset(struct section_file *file, const char *section, bool act);
 
 void send_server_setting(struct conn_list *dest, const struct setting *pset);
 void send_server_settings(struct conn_list *dest);

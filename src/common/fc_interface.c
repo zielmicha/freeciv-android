@@ -12,7 +12,7 @@
 ****************************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -57,6 +57,20 @@ void fc_interface_init(void)
 
   /* Test the existence of each required function here! */
   fc_assert_exit(fc_funcs->player_tile_vision_get);
+  fc_assert_exit(fc_funcs->gui_color_free);
 
   fc_funcs_defined = TRUE;
+
+  setup_real_activities_array();
+}
+
+/**************************************************************************
+  Free misc resources allocated for libfreeciv.
+**************************************************************************/
+void free_libfreeciv(void)
+{
+  free_data_dir_names();
+  free_multicast_group();
+  free_user_home_dir();
+  free_fileinfo_data();
 }

@@ -13,6 +13,10 @@
 #ifndef FC__TERRAIN_H
 #define FC__TERRAIN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "bitvector.h"
 #include "shared.h"
@@ -24,7 +28,9 @@
 
 struct base_type;
 struct strvec;          /* Actually defined in "utility/string_vector.h". */
+struct rgbcolor;
 
+/* Used in the network protocol. */
 enum special_river_move {
   RMV_NORMAL = 0,
   RMV_FAST_STRICT = 1,
@@ -32,28 +38,10 @@ enum special_river_move {
   RMV_FAST_ALWAYS = 3,
 };
 
-enum tile_special_type {
-  S_ROAD,
-  S_IRRIGATION,
-  S_RAILROAD,
-  S_MINE,
-  S_POLLUTION,
-  S_HUT,
-  S_OLD_FORTRESS,
-  S_RIVER,
-  S_FARMLAND,
-  S_OLD_AIRBASE,
-  S_FALLOUT,
-
-  /* internal values not saved */
-  S_LAST,
-  S_RESOURCE_VALID = S_LAST,
-};
-
 /* S_LAST-terminated */
 extern enum tile_special_type infrastructure_specials[];
 
-BV_DEFINE(bv_special, S_LAST);
+BV_DEFINE(bv_special, S_LAST); /* Used in the network protocol. */
 
 /* NB: This does not include S_FORTRESS and S_AIRBASE.
  * You must use base_type_iterate and related accessors
@@ -62,9 +50,6 @@ BV_DEFINE(bv_special, S_LAST);
 {                                                                          \
   enum tile_special_type special = 0;                                      \
   for (; special < S_LAST; special++) {                                    \
-    if (special == S_OLD_FORTRESS || special == S_OLD_AIRBASE) {           \
-      continue;                                                            \
-    }
     
 #define tile_special_type_iterate_end                                      \
   }                                                                        \
@@ -93,9 +78,11 @@ struct resource {
 /* The first terrain value. */
 #define T_FIRST 0
 
-/* A hard limit on the number of terrains; useful for static arrays. */
+/* A hard limit on the number of terrains; useful for static arrays.
+ * Used in the network protocol. */
 #define MAX_NUM_TERRAINS (96)
-/* Reflect reality; but theoretically could be larger than terrains! */
+/* Reflect reality; but theoretically could be larger than terrains!
+ * Used in the network protocol. */
 #define MAX_NUM_RESOURCES (MAX_NUM_TERRAINS/2)
 
 #define SPECENUM_NAME terrain_class
@@ -125,33 +112,46 @@ struct resource {
 #define SPECENUM_NAME terrain_flag_id
 /* No barbarians summoned on this terrain. */
 #define SPECENUM_VALUE0 TER_NO_BARBS
-#define SPECENUM_VALUE0NAME "NoBarbs"
+/* TRANS: this and following strings are 'terrain flags', which may rarely
+ * be presented to the player in ruleset help text */
+#define SPECENUM_VALUE0NAME N_("NoBarbs")
 /* This terrain cannot be polluted. */
 #define SPECENUM_VALUE1 TER_NO_POLLUTION
-#define SPECENUM_VALUE1NAME "NoPollution"
+#define SPECENUM_VALUE1NAME N_("NoPollution")
 /* No cities on this terrain. */
 #define SPECENUM_VALUE2 TER_NO_CITIES
-#define SPECENUM_VALUE2NAME "NoCities"
+#define SPECENUM_VALUE2NAME N_("NoCities")
 /* Players will start on this terrain type. */
 #define SPECENUM_VALUE3 TER_STARTER
-#define SPECENUM_VALUE3NAME "Starter"
-/* Terrains with this type can have S_RIVER on them. */
+#define SPECENUM_VALUE3NAME N_("Starter")
+/* Terrains with this type can have road with "River" flag on them. */
 #define SPECENUM_VALUE4 TER_CAN_HAVE_RIVER
-#define SPECENUM_VALUE4NAME "CanHaveRiver"
+#define SPECENUM_VALUE4NAME N_("CanHaveRiver")
 /*this tile is not safe as coast, (all ocean / ice) */
 #define SPECENUM_VALUE5 TER_UNSAFE_COAST
-#define SPECENUM_VALUE5NAME "UnsafeCoast"
-/* This is an water terrain. */
-#define SPECENUM_VALUE6 TER_OCEANIC
-#define SPECENUM_VALUE6NAME "Oceanic"
+#define SPECENUM_VALUE5NAME N_("UnsafeCoast")
 /* Fresh water terrain */
-#define SPECENUM_VALUE7 TER_FRESHWATER
-#define SPECENUM_VALUE7NAME "FreshWater"
+#define SPECENUM_VALUE6 TER_FRESHWATER
+#define SPECENUM_VALUE6NAME N_("FreshWater")
+/* Map generator does not place this terrain */
+#define SPECENUM_VALUE7 TER_NOT_GENERATED
+#define SPECENUM_VALUE7NAME N_("NotGenerated")
+#define SPECENUM_VALUE8 TER_USER_1
+#define SPECENUM_VALUE9 TER_USER_2
+#define SPECENUM_VALUE10 TER_USER_3
+#define SPECENUM_VALUE11 TER_USER_4
+#define SPECENUM_VALUE12 TER_USER_5
+#define SPECENUM_VALUE13 TER_USER_6
+#define SPECENUM_VALUE14 TER_USER_7
+#define SPECENUM_VALUE15 TER_USER_LAST
+#define SPECENUM_NAMEOVERRIDE
 #include "specenum_gen.h"
 
 #define TER_MAX 64 /* Changing this breaks network compatability. */
 
-BV_DEFINE(bv_terrain_flags, TER_MAX);
+#define MAX_NUM_USER_TER_FLAGS (TER_USER_LAST - TER_USER_1 + 1)
+
+BV_DEFINE(bv_terrain_flags, TER_MAX); /* Used in the network protocol. */
 
 #define SPECENUM_NAME mapgen_terrain_property
 #define SPECENUM_VALUE0 MG_MOUNTAINOUS
@@ -191,14 +191,17 @@ struct terrain {
 
 #define TERRAIN_UNKNOWN_IDENTIFIER 'u'
 
-  int movement_cost;
+  enum terrain_class tclass;
+
+  int movement_cost; /* whole MP, not scaled by SINGLE_MOVE */
   int defense_bonus; /* % defense bonus - defaults to zero */
 
   int output[O_LAST];
 
   struct resource **resources; /* NULL-terminated */
 
-  int road_trade_incr;
+  int road_output_incr_pct[O_LAST];
+  int base_time;
   int road_time;
 
   struct terrain *irrigation_result;
@@ -211,7 +214,6 @@ struct terrain {
 
   struct terrain *transform_result;
   int transform_time;
-  int rail_time;
   int clean_pollution_time;
   int clean_fallout_time;
 
@@ -237,6 +239,8 @@ struct terrain {
 
   bv_terrain_flags flags;
 
+  struct rgbcolor *rgb;
+
   struct strvec *helptext;
 };
 
@@ -261,26 +265,31 @@ const char *terrain_name_translation(const struct terrain *pterrain);
 
 int terrains_by_flag(enum terrain_flag_id flag, struct terrain **buffer, int bufsize);
 
+bool is_terrain_flag_card_near(const struct tile *ptile,
+			       enum terrain_flag_id flag);
 bool is_terrain_flag_near_tile(const struct tile *ptile,
 			       enum terrain_flag_id flag);
 int count_terrain_flag_near_tile(const struct tile *ptile,
 				 bool cardinal_only, bool percentage,
 				 enum terrain_flag_id flag);
+void user_terrain_flags_init(void);
+void user_terrain_flags_free(void);
+void set_user_terrain_flag_name(enum terrain_flag_id id, const char *name, const char *helptxt);
+const char *terrain_flag_helptxt(enum terrain_flag_id id);
 
 /* Terrain-specific functions. */
-#define is_ocean(pterrain) ((pterrain) != T_UNKNOWN			\
-			    && terrain_has_flag((pterrain), TER_OCEANIC))
+#define is_ocean(pterrain) ((pterrain) != T_UNKNOWN \
+                            && terrain_type_terrain_class(pterrain) == TC_OCEAN)
 #define is_ocean_tile(ptile) \
   is_ocean(tile_terrain(ptile))
-#define is_ocean_near_tile(ptile) \
-  is_terrain_flag_near_tile(ptile, TER_OCEANIC)
-#define count_ocean_near_tile(ptile, cardinal_only, percentage)		\
-  count_terrain_flag_near_tile(ptile, cardinal_only, percentage, TER_OCEANIC)
 
 bool terrain_has_resource(const struct terrain *pterrain,
 			  const struct resource *presource);
 
 /* Functions to operate on a general terrain type. */
+bool is_terrain_card_near(const struct tile *ptile,
+			  const struct terrain *pterrain,
+                          bool check_self);
 bool is_terrain_near_tile(const struct tile *ptile,
 			  const struct terrain *pterrain,
                           bool check_self);
@@ -290,6 +299,13 @@ int count_terrain_near_tile(const struct tile *ptile,
 int count_terrain_property_near_tile(const struct tile *ptile,
 				     bool cardinal_only, bool percentage,
 				     enum mapgen_terrain_property prop);
+
+bool is_resource_card_near(const struct tile *ptile,
+                           const struct resource *pres,
+                           bool check_self);
+bool is_resource_near_tile(const struct tile *ptile,
+                           const struct resource *pres,
+                           bool check_self);
 
 /* General resource accessor functions. */
 Resource_type_id resource_count(void);
@@ -321,12 +337,23 @@ bool is_native_tile_to_special(enum tile_special_type special,
                                const struct tile *ptile);
 
 /* Special helper functions */
-const char *get_infrastructure_text(bv_special pset, bv_bases bases);
+const char *get_infrastructure_text(bv_special pset, bv_bases bases, bv_roads roads);
 enum tile_special_type get_infrastructure_prereq(enum tile_special_type spe);
-int get_preferred_pillage(bv_special pset,
-                          bv_bases bases);
+bool get_preferred_pillage(struct act_tgt *tgt,
+                           bv_special pset,
+                           bv_bases bases,
+                           bv_roads roads);
+
+int terrain_base_time(const struct terrain *pterrain,
+                      Base_type_id base);
+
+int terrain_road_time(const struct terrain *pterrain,
+                      Road_type_id road);
 
 /* Functions to operate on a terrain special. */
+bool is_special_card_near(const struct tile *ptile,
+                          enum tile_special_type spe,
+                          bool check_self);
 bool is_special_near_tile(const struct tile *ptile,
 			  enum tile_special_type spe,
                           bool check_self);
@@ -337,9 +364,12 @@ int count_special_near_tile(const struct tile *ptile,
 /* Functions to operate on a terrain class. */
 const char *terrain_class_name_translation(enum terrain_class tclass);
 
-bool terrain_belongs_to_class(const struct terrain *pterrain,
-                              enum terrain_class tclass);
+enum terrain_class terrain_type_terrain_class(const struct terrain *pterrain);
+bool is_terrain_class_card_near(const struct tile *ptile, enum terrain_class tclass);
 bool is_terrain_class_near_tile(const struct tile *ptile, enum terrain_class tclass);
+int count_terrain_class_near_tile(const struct tile *ptile,
+                                  bool cardinal_only, bool percentage,
+                                  enum terrain_class tclass);
 
 /* Functions to deal with possible terrain alterations. */
 const char *terrain_alteration_name_translation(enum terrain_alteration talter);
@@ -378,5 +408,9 @@ const struct terrain *terrain_array_last(void);
     }									\
   }									\
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__TERRAIN_H */

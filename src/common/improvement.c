@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -242,7 +242,8 @@ int impr_sell_gold(const struct impr_type *pimprove)
 }
 
 /**************************************************************************
-...
+  Returns whether improvement is some kind of wonder. Both great wonders
+  and small wonders count.
 **************************************************************************/
 bool is_wonder(const struct impr_type *pimprove)
 {
@@ -301,7 +302,16 @@ bool is_improvement_visible(const struct impr_type *pimprove)
 }
 
 /**************************************************************************
- Returns 1 if the improvement is obsolete, now also works for wonders
+  Return TRUE if the improvement can ever go obsolete.
+  Can be used for buildings or wonders.
+**************************************************************************/
+bool can_improvement_go_obsolete(const struct impr_type *pimprove)
+{
+  return pimprove->obsolete_by != NULL;
+}
+
+/**************************************************************************
+  Returns TRUE if the improvement or wonder is obsolete
 **************************************************************************/
 bool improvement_obsolete(const struct player *pplayer,
 			  const struct impr_type *pimprove)
@@ -416,7 +426,7 @@ bool can_player_build_improvement_direct(const struct player *p,
     }
   }
   if (space_part &&
-      (!get_player_bonus(p, EFT_ENABLE_SPACE) > 0
+      (get_player_bonus(p, EFT_ENABLE_SPACE) <= 0
        || p->spaceship.state >= SSHIP_LAUNCHED)) {
     return FALSE;
   }
@@ -459,6 +469,10 @@ bool can_player_build_improvement_later(const struct player *p,
     return FALSE;
   }
   if (improvement_obsolete(p, pimprove)) {
+    return FALSE;
+  }
+  if (is_great_wonder(pimprove) && !great_wonder_is_available(pimprove)) {
+    /* Can't build wonder if already built */
     return FALSE;
   }
 
@@ -545,7 +559,7 @@ void wonder_destroyed(const struct city *pcity,
 
   pplayer = city_owner(pcity);
   fc_assert_ret(pplayer->wonders[index] == pcity->id);
-  pplayer->wonders[index] = WONDER_NOT_BUILT;
+  pplayer->wonders[index] = WONDER_LOST;
 
   if (is_great_wonder(pimprove)) {
     fc_assert_ret(game.info.great_wonder_owners[index]
@@ -555,20 +569,36 @@ void wonder_destroyed(const struct city *pcity,
 }
 
 /**************************************************************************
-  Returns whether the player has built this wonder (small or great).
+  Returns whether the player has lost this wonder after having owned it
+  (small or great).
+**************************************************************************/
+bool wonder_is_lost(const struct player *pplayer,
+                    const struct impr_type *pimprove)
+{
+  fc_assert_ret_val(NULL != pplayer, FALSE);
+  fc_assert_ret_val(is_wonder(pimprove), FALSE);
+
+  return pplayer->wonders[improvement_index(pimprove)] == WONDER_LOST;
+}
+
+/**************************************************************************
+  Returns whether the player is currently in possession of this wonder
+  (small or great).
 **************************************************************************/
 bool wonder_is_built(const struct player *pplayer,
                      const struct impr_type *pimprove)
 {
-  fc_assert_ret_val(NULL != pplayer, NULL);
-  fc_assert_ret_val(is_wonder(pimprove), NULL);
+  fc_assert_ret_val(NULL != pplayer, FALSE);
+  fc_assert_ret_val(is_wonder(pimprove), FALSE);
 
   return WONDER_BUILT(pplayer->wonders[improvement_index(pimprove)]);
 }
 
 /**************************************************************************
   Get the world city with this wonder (small or great).  This doesn't
-  always success on the client side.
+  always succeed on the client side, and even when it does, it may
+  return an "invisible" city whose members are unexpectedly NULL;
+  take care.
 **************************************************************************/
 struct city *city_from_wonder(const struct player *pplayer,
                               const struct impr_type *pimprove)
@@ -735,3 +765,29 @@ bool can_city_sell_building(const struct city *pcity,
   return (city_has_building(pcity, pimprove) && is_improvement(pimprove));
 }
 
+/****************************************************************************
+  Return TRUE iff the player can sell the given improvement from city.
+  If pimprove is NULL, returns iff city could sell some building type (this
+  does not check if such building is in this city)
+****************************************************************************/
+enum test_result test_player_sell_building_now(struct player *pplayer,
+                                               struct city *pcity,
+                                               struct impr_type *pimprove)
+{
+  /* Check if player can sell anything from this city */
+  if (pcity->owner != pplayer) {
+    return TR_OTHER_FAILURE;
+  }
+
+  if (pcity->did_sell) {
+    return TR_ALREADY_SOLD;
+  }
+
+  /* Check if particular building can be solt */
+  if (pimprove != NULL 
+      && !can_city_sell_building(pcity, pimprove)) {
+    return TR_OTHER_FAILURE;
+  }
+
+  return TR_SUCCESS;
+}

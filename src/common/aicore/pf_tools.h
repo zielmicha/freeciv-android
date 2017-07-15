@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2003 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -13,8 +13,13 @@
 #ifndef FC__PF_TOOLS_H
 #define FC__PF_TOOLS_H
 
-#include "path_finding.h"
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
+
+/* common/aicore */
+#include "path_finding.h"
 
 /* 
  * Use to create 'amphibious' paths. An amphibious path starts on a sea tile,
@@ -38,15 +43,10 @@ struct pft_amphibious
 };
 
 
-struct pf_path *pft_concat(struct pf_path *dest_path,
-			   const struct pf_path *src_path);
-bool pft_advance_path(struct pf_path *path,
-		      struct tile *ptile);
-
 void pft_fill_unit_parameter(struct pf_parameter *parameter,
-			     const struct unit *punit);
+                             const struct unit *punit);
 void pft_fill_unit_overlap_param(struct pf_parameter *parameter,
-				 const struct unit *punit);
+                                 const struct unit *punit);
 void pft_fill_unit_attack_param(struct pf_parameter *parameter,
                                 const struct unit *punit);
 
@@ -73,4 +73,8 @@ enum tile_behavior no_intermediate_fights(const struct tile *ptile,
                                           enum known_type known,
                                           const struct pf_parameter *param);
 
-#endif				/* FC__PF_TOOLS_H */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* FC__PF_TOOLS_H */

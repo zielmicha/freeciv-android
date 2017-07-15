@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -134,7 +134,7 @@ static bool my_results_are_equal(const struct cm_result *result1,
   Returns TRUE if the city is valid for CMA. Fills parameter if TRUE
   is returned. Parameter can be NULL.
 *****************************************************************************/
-static bool check_city(int city_id, struct cm_parameter *parameter)
+static struct city *check_city(int city_id, struct cm_parameter *parameter)
 {
   struct city *pcity = game_city_by_number(city_id);
   struct cm_parameter dummy;
@@ -145,15 +145,15 @@ static bool check_city(int city_id, struct cm_parameter *parameter)
 
   if (!pcity
       || !cma_get_parameter(ATTR_CITY_CMA_PARAMETER, city_id, parameter)) {
-    return FALSE;
+    return NULL;
   }
 
   if (city_owner(pcity) != client.conn.playing) {
     cma_release_city(pcity);
-    return FALSE;
+    return NULL;
   }
 
-  return TRUE;
+  return pcity;
 }  
 
 /****************************************************************************
@@ -178,21 +178,21 @@ static bool apply_result_on_server(struct city *pcity,
     return TRUE;
   }
 
-  stats.apply_result_applied++;
-
-  log_apply_result("apply_result_on_server(city %d=\"%s\")",
-                   pcity->id, city_name(pcity));
-
-  connection_do_buffer(&client.conn);
-
   /* Do checks */
-  if (pcity->size != cm_result_citizens(result)) {
+  if (city_size_get(pcity) != cm_result_citizens(result)) {
     log_error("apply_result_on_server(city %d=\"%s\") bad result!",
               pcity->id, city_name(pcity));
     cm_print_city(pcity);
     cm_print_result(result);
     return FALSE;
   }
+
+  stats.apply_result_applied++;
+
+  log_apply_result("apply_result_on_server(city %d=\"%s\")",
+                   pcity->id, city_name(pcity));
+
+  connection_do_buffer(&client.conn);
 
   /* Remove all surplus workers */
   city_tile_iterate_skip_free_worked(city_radius_sq, pcenter, ptile, index,
@@ -284,9 +284,8 @@ static bool apply_result_on_server(struct city *pcity,
     int city_id = pcity->id;
 
     wait_for_requests("CMA", first_request_id, last_request_id);
-    if (!check_city(city_id, NULL)) {
-      log_error("apply_result_on_server(city %d=\"%s\") !check_city()!",
-                pcity->id, city_name(pcity));
+    if (pcity != check_city(city_id, NULL)) {
+      log_verbose("apply_result_on_server(city %d) !check_city()!", city_id);
       return FALSE;
     }
   }
@@ -335,11 +334,11 @@ static void report_stats(void)
            per_mill / 10, per_mill % 10, stats.apply_result_ignored,
            (1000 - per_mill) / 10, (1000 - per_mill) % 10,
            stats.apply_result_applied, total);
-#endif
+#endif /* SHOW_TIME_STATS */
 }
 
 /****************************************************************************
-...
+  Remove governor setting from city.
 *****************************************************************************/
 static void release_city(int city_id)
 {
@@ -374,12 +373,10 @@ static void handle_city(struct city *pcity)
 
     log_handle_city2("  try %d", i);
 
-    if (!check_city(city_id, &parameter)) {
+    if (pcity != check_city(city_id, &parameter)) {
       handled = TRUE;	
       break;
     }
-
-    pcity = game_city_by_number(city_id);
 
     cm_query_result(pcity, &parameter, result);
     if (!result->found_a_valid) {
@@ -395,7 +392,7 @@ static void handle_city(struct city *pcity)
     } else {
       if (!apply_result_on_server(pcity, result)) {
         log_handle_city2("  doesn't cleanly apply");
-        if (check_city(city_id, NULL) && i == 0) {
+        if (pcity == check_city(city_id, NULL) && i == 0) {
           create_event(city_tile(pcity), E_CITY_CMA_RELEASE, ftc_client,
                        _("The citizen governor has gotten confused dealing "
                          "with %s.  You may want to have a look."),
@@ -412,10 +409,8 @@ static void handle_city(struct city *pcity)
 
   cm_result_destroy(result);
 
-  pcity = game_city_by_number(city_id);
-
   if (!handled) {
-    fc_assert_ret(pcity != NULL);
+    fc_assert_ret(pcity == check_city(city_id, NULL));
     log_handle_city2("  not handled");
 
     create_event(city_tile(pcity), E_CITY_CMA_RELEASE, ftc_client,
@@ -465,7 +460,7 @@ static void new_turn(void)
 
 /*************************** public interface *******************************/
 /****************************************************************************
-...
+  Initialize city governor code
 *****************************************************************************/
 void cma_init(void)
 {
@@ -480,10 +475,10 @@ void cma_init(void)
   /* reset cache counters */
   memset(&stats, 0, sizeof(stats));
 
-  /* We used to just use new_timer here, but apparently cma_init can be
+  /* We used to just use timer_new here, but apparently cma_init can be
    * called multiple times per client invocation so that lead to memory
    * leaks. */
-  stats.wall_timer = renew_timer(timer, TIMER_USER, TIMER_ACTIVE);
+  stats.wall_timer = timer_renew(timer, TIMER_USER, TIMER_ACTIVE);
 
   memset(&self, 0, sizeof(self));
   strcpy(self.name, "CMA");
@@ -496,7 +491,7 @@ void cma_init(void)
 }
 
 /****************************************************************************
-...
+  Apply result on server if it's valid
 *****************************************************************************/
 bool cma_apply_result(struct city *pcity, const struct cm_result *result)
 {
@@ -508,7 +503,7 @@ bool cma_apply_result(struct city *pcity, const struct cm_result *result)
 }
 
 /****************************************************************************
-...
+  Put city under governor control
 *****************************************************************************/
 void cma_put_city_under_agent(struct city *pcity,
 			      const struct cm_parameter *const parameter)
@@ -526,7 +521,7 @@ void cma_put_city_under_agent(struct city *pcity,
 }
 
 /****************************************************************************
-...
+  Release city from governor control.
 *****************************************************************************/
 void cma_release_city(struct city *pcity)
 {
@@ -536,7 +531,7 @@ void cma_release_city(struct city *pcity)
 }
 
 /****************************************************************************
-...
+  Check whether city is under governor control, and fill parameter if it is.
 *****************************************************************************/
 bool cma_is_city_under_agent(const struct city *pcity,
 			     struct cm_parameter *parameter)
@@ -599,7 +594,7 @@ bool cma_get_parameter(enum attr_city attr, int city_id,
 }
 
 /**************************************************************************
- ...
+  Set attribute block for city from parameter.
 **************************************************************************/
 void cma_set_parameter(enum attr_city attr, int city_id,
 		       const struct cm_parameter *parameter)

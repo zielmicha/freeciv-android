@@ -1,10 +1,12 @@
 [nation_persian]
 
+translation_domain="freeciv"
+
 name=_("Persian")
 plural=_("?plural:Persians")
-groups="Ancient", "Medieval", "Early Modern", "Asian"
-legend=_("The first Persian (Achaemenid) Empire lasted from 550 BC to 330\
- BC; the second (Sassanid) from 226 AD to 642 AD.")
+groups="Ancient", "Medieval", "Early Modern", "Asian", "Core"
+legend=_("The first Persian (Achaemenid) Empire lasted from 550 BCE to 330\
+ BCE; the second (Sassanid) from 226 CE to 642 CE.")
 
 leaders = {
  "name",                "sex"
@@ -14,10 +16,12 @@ leaders = {
  "Ardashir I",          "Male"
  "Khosrau I",           "Male"
  "Shapur I",            "Male"
+ "Purandokht",          "Female"
 }
 
 ruler_titles = {
  "government",      "male_title",         "female_title"
+ "Despotism",       _("Satrap %s"),       _("?female:Satrap %s")
  "Monarchy",        _("%s Shah"),         _("%s Shahbanu")
  "Fundamentalism",  _("Ayatollah %s"),    _("?female:Ayatollah %s")
 }
@@ -28,7 +32,6 @@ city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations="Khwarezmian", "Elamite"

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -179,7 +179,7 @@ void sell_all_improvements(struct impr_type *pimprove, bool redundant_only,
 
   if (count > 0) {
     /* FIXME: plurality of count is ignored! */
-    /* TRANS: "Sold 3 Harbour for 90 gold." (Pluralisation is in gold --
+    /* TRANS: "Sold 3 Harbor for 90 gold." (Pluralisation is in gold --
      * second %d -- not in buildings.) */
     fc_snprintf(message, message_sz, PL_("Sold %d %s for %d gold.",
                                          "Sold %d %s for %d gold.", gold),
@@ -208,7 +208,7 @@ void disband_all_units(struct unit_type *punittype, bool in_cities_only,
     return;
   }
 
-  if (utype_has_flag(punittype, F_UNDISBANDABLE)) {
+  if (utype_has_flag(punittype, UTYF_UNDISBANDABLE)) {
     fc_snprintf(message, message_sz, _("%s cannot be disbanded."),
                 utype_name_translation(punittype));
     return;
@@ -218,7 +218,7 @@ void disband_all_units(struct unit_type *punittype, bool in_cities_only,
     /* Only supported units are disbanded.  Units with no homecity have no
      * cost and are not disbanded. */
     unit_list_iterate(pcity->units_supported, punit) {
-      struct city *incity = tile_city(punit->tile);
+      struct city *incity = tile_city(unit_tile(punit));
 
       if (unit_type(punit) == punittype
 	  && (!in_cities_only

@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "log.h"
@@ -83,7 +83,7 @@ static int redraw_window(struct widget *pWindow)
     putline(pWindow->dst->surface,
             dst.x, dst.y - 1,
             dst.x + dst.w - 1, dst.y - 1,
-            get_game_colorRGB(COLOR_THEME_WINDOW_TITLEBAR_SEPARATOR));
+            get_theme_color(COLOR_THEME_WINDOW_TITLEBAR_SEPARATOR));
   }
   
   /* draw frame */
@@ -246,6 +246,8 @@ int resize_window(struct widget *pWindow,
 		  SDL_Surface * pBcgd,
 		  SDL_Color * pColor, Uint16 new_w, Uint16 new_h)
 {
+  SDL_Color color;
+
   /* window */
   if ((new_w != pWindow->size.w) || (new_h != pWindow->size.h)) {
     pWindow->size.w = new_w;
@@ -279,7 +281,8 @@ int resize_window(struct widget *pWindow,
     pWindow->theme = create_surf_alpha(new_w, new_h, SDL_SWSURFACE);
     
     if (!pColor) {
-      SDL_Color color = *get_game_colorRGB(COLOR_THEME_BACKGROUND);
+      color = *get_theme_color(COLOR_THEME_BACKGROUND);
+
       pColor = &color;
     }
   

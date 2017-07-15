@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* gui-sdl */
 #include "colors.h"
@@ -246,7 +246,7 @@ static void widget_core_unselect(struct widget *pwidget)
 /**************************************************************************
   ...
 **************************************************************************/
-struct widget *widget_new()
+struct widget *widget_new(void)
 {
   struct widget *pWidget = fc_calloc(1, sizeof(struct widget));
 

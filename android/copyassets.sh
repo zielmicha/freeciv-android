@@ -41,9 +41,11 @@ mkdir -p $B
 done
 
 (cd ../data; find -type f) | while read line; do
-    if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
+# FIXME I've duplicated all the data files to quick fix a startup bug.
+# => TODO: uncomment the if-elif conditions below and fix startup on android
+#    if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
         cp ../data/$line $B/$line || exit 1
-    elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
+#    elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
         cp ../data/$line project/assets/data/$line || exit 1
-    fi
+#    fi
 done

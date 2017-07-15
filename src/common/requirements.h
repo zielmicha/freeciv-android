@@ -14,26 +14,36 @@
 #ifndef FC__REQUIREMENTS_H
 #define FC__REQUIREMENTS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/* common */
 #include "fc_types.h"
 
-#include "tech.h"
-#include "terrain.h"
-#include "unittype.h"
-
-/* Range of requirements. */
+/* Range of requirements.
+ * Used in the network protocol.
+ * Order is important -- wider ranges should come later -- some code
+ * assumes a total order, or tests for e.g. >= REQ_RANGE_PLAYER.
+ * Ranges of similar types should be supersets: the set of Adjacent tiles
+ * contains the set of CAdjacent tiles, and both contain the center
+ * Local tile (a requirement on the local tile is also within Adjacent
+ * range). */
 #define SPECENUM_NAME req_range
 #define SPECENUM_VALUE0 REQ_RANGE_LOCAL
 #define SPECENUM_VALUE0NAME "Local"
-#define SPECENUM_VALUE1 REQ_RANGE_ADJACENT
-#define SPECENUM_VALUE1NAME "Adjacent"
-#define SPECENUM_VALUE2 REQ_RANGE_CITY
-#define SPECENUM_VALUE2NAME "City"
-#define SPECENUM_VALUE3 REQ_RANGE_CONTINENT
-#define SPECENUM_VALUE3NAME "Continent"
-#define SPECENUM_VALUE4 REQ_RANGE_PLAYER
-#define SPECENUM_VALUE4NAME "Player"
-#define SPECENUM_VALUE5 REQ_RANGE_WORLD
-#define SPECENUM_VALUE5NAME "World"
+#define SPECENUM_VALUE1 REQ_RANGE_CADJACENT
+#define SPECENUM_VALUE1NAME "CAdjacent"
+#define SPECENUM_VALUE2 REQ_RANGE_ADJACENT
+#define SPECENUM_VALUE2NAME "Adjacent"
+#define SPECENUM_VALUE3 REQ_RANGE_CITY
+#define SPECENUM_VALUE3NAME "City"
+#define SPECENUM_VALUE4 REQ_RANGE_CONTINENT
+#define SPECENUM_VALUE4NAME "Continent"
+#define SPECENUM_VALUE5 REQ_RANGE_PLAYER
+#define SPECENUM_VALUE5NAME "Player"
+#define SPECENUM_VALUE6 REQ_RANGE_WORLD
+#define SPECENUM_VALUE6NAME "World"
 #define SPECENUM_COUNT REQ_RANGE_COUNT /* keep this last */
 #include "specenum_gen.h"
 
@@ -41,7 +51,8 @@
  * may not be active on a target.  If it is active then something happens.
  * For instance units and buildings have requirements to be built, techs
  * have requirements to be researched, and effects have requirements to be
- * active. */
+ * active.
+ * Used in the network protocol. */
 struct requirement {
   struct universal source;		/* requirement source */
   enum req_range range;			/* requirement range */
@@ -76,6 +87,9 @@ struct requirement req_from_values(int type, int range,
 
 bool are_requirements_equal(const struct requirement *req1,
 			    const struct requirement *req2);
+
+bool are_requirements_opposites(const struct requirement *req1,
+                                const struct requirement *req2);
 
 bool is_req_active(const struct player *target_player,
 		   const struct city *target_city,
@@ -117,5 +131,9 @@ const char *universal_name_translation(const struct universal *psource,
 const char *universal_type_rule_name(const struct universal *psource);
 
 int universal_build_shield_cost(const struct universal *target);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__REQUIREMENTS_H */

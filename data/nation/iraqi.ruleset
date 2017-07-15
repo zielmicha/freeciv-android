@@ -17,8 +17,9 @@ leaders = {
 }
 
 ruler_titles = {
- "government",  "male_title",      "female_title"
- "Communism",   _("Dictator %s"),  _("Dictatress %s")
+ "government",      "male_title",           "female_title"
+ "Communism",       _("Chairman %s"),       _("Chairwoman %s")
+ "Fundamentalism",  _("Caliph %s"),         _("Calipha %s")
 }
 
 flag = "iraq"
@@ -27,39 +28,38 @@ city_style = "Babylonian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with="Sumerian", "Babylonian"
-civilwar_nations="Assyrian", "Kurdish"
+civilwar_nations="Assyrian", "Kurdish", "Kuwaiti"
 
 cities =
  "Baghdad",
- "Basra",
+ "Al-Basra",
  "Mosul",
- "Najaf",
+ "An-Najaf",
  "Kirkuk",
  "Tikrit",
  "Umm Qasr",
  "Nassiriya",
- "Ar Rutbah",
+ "Ar-Rutba",
  "Karbala",
- "As Sulaymaniyah",
+ "As-Sulaymaniya",
  "Samarra",
- "Kut",
- "Ar Ramadi",
+ "Al-Kut",
+ "Ar-Ramadi",
  "Arbil",
  "Kazimain",
- "Sadr City",
+ "Madinat as-Sadr",
  "Baiji",
  "Baquba",
  "Dahuk",
- "Al Diwaniyah",
- "Fallujah",
+ "Al-Diwaniya",
+ "Falluja",
  "Halabja",
- "Al Hillah",
+ "Al-Hillah",
  "Iskandariya",
- "Muqdadiyah",
+ "Muqdadiya",
  "Osiraq",
- "Samawah",
+ "Samawa",
  "Tadji"

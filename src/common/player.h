@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -13,10 +13,15 @@
 #ifndef FC__PLAYER_H
 #define FC__PLAYER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "bitvector.h"
 
 /* common */
+#include "ai.h" /* FC_AI_LAST */
 #include "city.h"
 #include "connection.h"
 #include "fc_types.h"
@@ -24,6 +29,7 @@
 #include "shared.h"
 #include "spaceship.h"
 #include "tech.h"
+#include "traits.h"
 #include "unitlist.h"
 #include "vision.h"
 
@@ -33,6 +39,14 @@
 
 #define ANON_PLAYER_NAME "noname"
 #define ANON_USER_NAME "Unassigned"
+
+enum plrcolor_mode {
+  PLRCOL_PLR_ORDER,
+  PLRCOL_PLR_RANDOM,
+  PLRCOL_PLR_SET,
+  PLRCOL_TEAM_ORDER,
+  PLRCOL_NATION_ORDER
+};
 
 struct player_slot;
 
@@ -119,6 +133,8 @@ struct player_ai {
   enum barbarian_type barbarian_type;
 
   int love[MAX_NUM_PLAYER_SLOTS];
+
+  struct ai_trait *traits;
 };
 
 /* Diplomatic states (how one player views another).
@@ -150,6 +166,8 @@ struct player_diplstate {
   int turns_left; /* until pact (e.g., cease-fire) ends */
   int has_reason_to_cancel; /* 0: no, 1: this turn, 2: this or next turn */
   int contact_turns_left; /* until contact ends */
+
+  int auto_cancel_turn; /* used to avoid asymmetric turns_left */
 };
 
 /***************************************************************************
@@ -199,12 +217,11 @@ struct player {
   struct player_score score;
   struct player_economic economic;
 
-  int bulbs_last_turn;    /* # bulbs researched last turn only */
   struct player_spaceship spaceship;
 
   bool ai_controlled; /* 0: not automated; 1: automated */
   struct player_ai ai_common;
-  struct ai_type *ai;
+  const struct ai_type *ai;
 
   bool was_created;                    /* if the player was /created */
   bool is_connected;
@@ -212,18 +229,23 @@ struct player {
   struct conn_list *connections;       /* will replace conn */
   bv_player gives_shared_vision;       /* bitvector those that give you
                                         * shared vision */
-  int wonders[B_LAST];              /* contains city id's or WONDER_NOT_BUILT */
+  int wonders[B_LAST];              /* contains city id's, WONDER_NOT_BUILT,
+                                     * or WONDER_LOST */
   struct attribute_block_s attribute_block;
   struct attribute_block_s attribute_block_buffer;
 
   struct dbv tile_known;
+
+  struct rgbcolor *rgb;
 
   union {
     struct {
       /* Only used in the server (./ai/ and ./server/). */
       bv_pstatus status;
 
-      bool capital; /* used to give player init_buildings in first city. */
+      bool got_first_city; /* used to give player init_buildings in first
+                            * city. Once set, never becomes unset.
+                            * (Previously 'capital'.) */
 
       struct player_tile *private_map;
 
@@ -232,7 +254,22 @@ struct player {
 
       bv_debug debug;
 
-      struct ai_data *aidata;
+      struct adv_data *adv;
+
+      void *ais[FC_AI_LAST];
+
+      /* This user is allowed to take over the player. */
+      char delegate_to[MAX_LEN_NAME];
+      /* This is set when a player is 'involved' in a delegation.
+       * There are two cases:
+       *  - if delegate_to[] is set, it records the original owner, with
+       *    'username' temporarily holding the delegate's name;
+       *  - otherwise, it's set when a delegate's original player is 'put
+       *    aside' while the delegate user controls a delegated player.
+       *    (In this case orig_username == username.) */
+      char orig_username[MAX_LEN_NAME];
+
+      int bulbs_last_turn; /* Number of bulbs researched last turn only. */
     } server;
 
     struct {
@@ -241,6 +278,9 @@ struct player {
       /* Corresponds to the result of
          (player:server:private_map[tile_index]:seen_count[vlayer] != 0). */
       struct dbv tile_vision[V_COUNT];
+
+      int tech_upkeep;
+      int bulbs_prod; /* Current number of bulbs production. */
     } client;
   };
 };
@@ -263,7 +303,10 @@ int player_slot_max_used_number(void);
 
 /* General player accessor functions. */
 struct player *player_new(struct player_slot *pslot);
+void player_set_color(struct player *pplayer,
+                      const struct rgbcolor *prgbcolor);
 void player_clear(struct player *pplayer, bool full);
+void player_ruleset_close(struct player *pplayer);
 void player_destroy(struct player *pplayer);
 
 int player_count(void);
@@ -290,7 +333,8 @@ bool can_player_see_unit(const struct player *pplayer,
 			 const struct unit *punit);
 bool can_player_see_unit_at(const struct player *pplayer,
 			    const struct unit *punit,
-			    const struct tile *ptile);
+                            const struct tile *ptile,
+                            bool is_transported);
 
 bool can_player_see_units_in_city(const struct player *pplayer,
 				  const struct city *pcity);
@@ -315,13 +359,15 @@ int num_known_tech_with_flag(const struct player *pplayer,
 			     enum tech_flag_id flag);
 int player_get_expected_income(const struct player *pplayer);
 
-struct city *player_palace(const struct player *pplayer);
+struct city *player_capital(const struct player *pplayer);
 
 bool ai_handicap(const struct player *pplayer, enum handicap_type htype);
 bool ai_fuzzy(const struct player *pplayer, bool normal_decision);
 
 const char *diplstate_text(const enum diplstate_type type);
 const char *love_text(const int love);
+
+enum diplstate_type cancel_pact_result(enum diplstate_type oldstate);
 
 struct player_diplstate *player_diplstate_get(const struct player *plr1,
                                               const struct player *plr2);
@@ -347,7 +393,13 @@ bool players_on_same_team(const struct player *pplayer1,
 int player_in_territory(const struct player *pplayer,
 			const struct player *pplayer2);
 
-bool is_barbarian(const struct player *pplayer);
+/**************************************************************************
+  Return TRUE iff player is any kind of barbarian
+**************************************************************************/
+static inline bool is_barbarian(const struct player *pplayer)
+{
+  return pplayer->ai_common.barbarian_type != NOT_A_BARBARIAN;
+}
 
 bool gives_shared_vision(const struct player *me, const struct player *them);
 
@@ -362,13 +414,21 @@ bool gives_shared_vision(const struct player *me, const struct player *them);
 
 /* iterate over all players, which are used at the moment */
 #define players_iterate(_pplayer)                                           \
-  player_slots_iterate(_pslot) {                                            \
-    if (!player_slot_is_used(_pslot)) {                                     \
-      continue;                                                             \
-    }                                                                       \
-    struct player *_pplayer = player_slot_get_player(_pslot);
+  player_slots_iterate(_pslot##_pplayer) {                                  \
+    struct player *_pplayer = player_slot_get_player(_pslot##_pplayer);     \
+    if (_pplayer != NULL) {
 #define players_iterate_end                                                 \
+    }                                                                       \
   } player_slots_iterate_end;
+
+/* iterate over all players, which are used at the moment and are alive */
+#define players_iterate_alive(_pplayer)                                     \
+  players_iterate(_pplayer) {                                                \
+    if (!_pplayer->is_alive) {                                              \
+      continue;                                                             \
+    }
+#define players_iterate_alive_end                                           \
+  } players_iterate_end;
 
 /* get 'struct player_list' and related functions: */
 #define SPECLIST_TAG player
@@ -392,5 +452,25 @@ const char *ai_level_name(enum ai_level level);
 const char *ai_level_cmd(enum ai_level level);
 bool is_settable_ai_level(enum ai_level level);
 int number_of_ai_levels(void);
+
+void *player_ai_data(const struct player *pplayer, const struct ai_type *ai);
+void player_set_ai_data(struct player *pplayer, const struct ai_type *ai,
+                        void *data);
+
+static inline bool player_is_cpuhog(const struct player *pplayer)
+{
+  /* You have to make code change here to enable cpuhog AI. There is no even
+   * configure option to change this. That's intentional.
+   * Enabling them causes game to proceed differently, and for reproducing
+   * reported bugs we want to know if this has been changed. People are more
+   * likely to report that they have made code changes than remembering some
+   * specific configure option they happened to pass to build this time - or even
+   * knowing what configure options somebody else used when building freeciv for them. */
+  return FALSE;
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__PLAYER_H */

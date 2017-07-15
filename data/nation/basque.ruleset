@@ -29,7 +29,8 @@ leaders = {
 
 ruler_titles = {
  "government",     "male_title",          "female_title"
- "Despotism",      _("?title:Leader %s"), _("?female:Leader %s")
+ "Despotism",      _("Leader %s"),        _("?female:Leader %s")
+ "Republic",       _("Lehendakari %s"),   _("?female:Lehendakari %s")
 }
 
 flag="euskadi"
@@ -38,7 +39,6 @@ city_style="European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations="Spanish", "French"

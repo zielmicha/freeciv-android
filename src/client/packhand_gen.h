@@ -10,6 +10,10 @@
 #ifndef FC__PACKHAND_GEN_H
 #define FC__PACKHAND_GEN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "shared.h"
 
@@ -25,6 +29,8 @@ void handle_authentication_req(enum authentication_type type, const char *messag
 void handle_server_shutdown(void);
 struct packet_endgame_report;
 void handle_endgame_report(const struct packet_endgame_report *packet);
+struct packet_endgame_player;
+void handle_endgame_player(const struct packet_endgame_player *packet);
 struct packet_tile_info;
 void handle_tile_info(const struct packet_tile_info *packet);
 struct packet_game_info;
@@ -44,6 +50,7 @@ void handle_city_sabotage_list(int diplomat_id, int city_id, bv_imprs improvemen
 void handle_player_remove(int playerno);
 struct packet_player_info;
 void handle_player_info(const struct packet_player_info *packet);
+void handle_tech_gained(int tech);
 struct packet_player_attribute_chunk;
 void handle_player_attribute_chunk_CLIENT(const struct packet_player_attribute_chunk *packet);
 void handle_player_attribute_chunk_SERVER(const struct packet_player_attribute_chunk *packet);
@@ -61,7 +68,9 @@ void handle_diplomacy_cancel_meeting(int counterpart, int initiated_from);
 void handle_diplomacy_create_clause(int counterpart, int giver, enum clause_type type, int value);
 void handle_diplomacy_remove_clause(int counterpart, int giver, enum clause_type type, int value);
 void handle_diplomacy_accept_treaty(int counterpart, bool I_accepted, bool other_accepted);
-void handle_page_msg(const char *caption, const char *headline, const char *lines, enum event_type event);
+void handle_page_msg_old(const char *caption, const char *headline, const char *lines, enum event_type event);
+void handle_page_msg_new(const char *caption, const char *headline, enum event_type event, int len, int parts);
+void handle_page_msg_part(const char *lines);
 struct packet_conn_info;
 void handle_conn_info(const struct packet_conn_info *packet);
 void handle_conn_ping_info(int connections, const int *conn_id, const float *ping_time);
@@ -77,6 +86,10 @@ struct packet_spaceship_info;
 void handle_spaceship_info(const struct packet_spaceship_info *packet);
 struct packet_ruleset_unit;
 void handle_ruleset_unit(const struct packet_ruleset_unit *packet);
+struct packet_ruleset_unit_bonus;
+void handle_ruleset_unit_bonus(const struct packet_ruleset_unit_bonus *packet);
+struct packet_ruleset_unit_flag;
+void handle_ruleset_unit_flag(const struct packet_ruleset_unit_flag *packet);
 struct packet_ruleset_game;
 void handle_ruleset_game(const struct packet_ruleset_game *packet);
 struct packet_ruleset_specialist;
@@ -85,24 +98,38 @@ struct packet_ruleset_government_ruler_title;
 void handle_ruleset_government_ruler_title(const struct packet_ruleset_government_ruler_title *packet);
 struct packet_ruleset_tech;
 void handle_ruleset_tech(const struct packet_ruleset_tech *packet);
+struct packet_ruleset_tech_flag;
+void handle_ruleset_tech_flag(const struct packet_ruleset_tech_flag *packet);
 struct packet_ruleset_government;
 void handle_ruleset_government(const struct packet_ruleset_government *packet);
 struct packet_ruleset_terrain_control;
 void handle_ruleset_terrain_control(const struct packet_ruleset_terrain_control *packet);
+void handle_rulesets_ready(void);
+struct packet_ruleset_nation_sets;
+void handle_ruleset_nation_sets(const struct packet_ruleset_nation_sets *packet);
 struct packet_ruleset_nation_groups;
 void handle_ruleset_nation_groups(const struct packet_ruleset_nation_groups *packet);
 struct packet_ruleset_nation;
 void handle_ruleset_nation(const struct packet_ruleset_nation *packet);
+void handle_nation_availability(int ncount, const bool *is_pickable, bool nationset_change);
 struct packet_ruleset_city;
 void handle_ruleset_city(const struct packet_ruleset_city *packet);
 struct packet_ruleset_building;
 void handle_ruleset_building(const struct packet_ruleset_building *packet);
 struct packet_ruleset_terrain;
 void handle_ruleset_terrain(const struct packet_ruleset_terrain *packet);
+struct packet_ruleset_terrain_flag;
+void handle_ruleset_terrain_flag(const struct packet_ruleset_terrain_flag *packet);
 struct packet_ruleset_unit_class;
 void handle_ruleset_unit_class(const struct packet_ruleset_unit_class *packet);
 struct packet_ruleset_base;
 void handle_ruleset_base(const struct packet_ruleset_base *packet);
+struct packet_ruleset_road;
+void handle_ruleset_road(const struct packet_ruleset_road *packet);
+struct packet_ruleset_disaster;
+void handle_ruleset_disaster(const struct packet_ruleset_disaster *packet);
+struct packet_ruleset_trade;
+void handle_ruleset_trade(const struct packet_ruleset_trade *packet);
 struct packet_ruleset_control;
 void handle_ruleset_control(const struct packet_ruleset_control *packet);
 void handle_single_want_hack_reply(bool you_have_hack);
@@ -130,8 +157,7 @@ void handle_ruleset_effect_req(const struct packet_ruleset_effect_req *packet);
 struct packet_ruleset_resource;
 void handle_ruleset_resource(const struct packet_ruleset_resource *packet);
 struct packet_scenario_info;
-void handle_scenario_info_CLIENT(const struct packet_scenario_info *packet);
-void handle_scenario_info_SERVER(const struct packet_scenario_info *packet);
+void handle_scenario_info(const struct packet_scenario_info *packet);
 struct packet_vote_new;
 void handle_vote_new(const struct packet_vote_new *packet);
 void handle_vote_update(int vote_no, int yes, int no, int abstain, int num_voters);
@@ -144,5 +170,9 @@ struct packet_edit_startpos_full;
 void handle_edit_startpos_full_CLIENT(const struct packet_edit_startpos_full *packet);
 void handle_edit_startpos_full_SERVER(const struct packet_edit_startpos_full *packet);
 void handle_edit_object_created(int tag, int id);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__PACKHAND_GEN_H */

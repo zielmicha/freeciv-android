@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -29,6 +29,7 @@
 /* client */
 #include "client_main.h"
 #include "climisc.h"
+#include "options.h"
 #include "text.h"
 
 /* client/include */
@@ -119,6 +120,54 @@ static const char *col_diplstate(const struct player *player)
 }
 
 /******************************************************************
+ Return a numerical value suitable for ordering players by
+ their diplomatic status in the players dialog
+ 
+ A lower value stands for more friendly diplomatic status.
+*******************************************************************/
+static int diplstate_value(const struct player *plr)
+{
+  /* these values are scaled so that adding/subtracting
+     the number of turns left makes sense */
+  static const int diplstate_cmp_lookup[DS_LAST] = {
+    [DS_TEAM] = 1 << 16,
+    [DS_ALLIANCE] = 2 << 16,
+    [DS_PEACE] = 3 << 16,
+    [DS_ARMISTICE] = 4 << 16,
+    [DS_CEASEFIRE] = 5 << 16,
+    [DS_WAR] = 6 << 16,
+    [DS_NO_CONTACT] = 7 << 16
+  };
+  
+  const struct player_diplstate *pds;
+  int ds_value;
+  
+  if (NULL == client.conn.playing || plr == client.conn.playing) {
+    /* current global player is as close as players get
+       -> return value smaller than for DS_TEAM */
+    return 0;
+  }
+  
+  pds = player_diplstate_get(client.conn.playing, plr);
+  ds_value = diplstate_cmp_lookup[pds->type];
+  
+  if (pds->type == DS_ARMISTICE || pds->type == DS_CEASEFIRE) {
+    ds_value += pds->turns_left;
+  }
+  
+  return ds_value;
+}
+
+/******************************************************************
+ Compares diplomatic status of two players in players dialog
+*******************************************************************/
+static int cmp_diplstate(const struct player *player1,
+                         const struct player *player2)
+{
+  return diplstate_value(player1) - diplstate_value(player2);
+}
+
+/******************************************************************
   Return a string displaying the AI's love (or not) for you...
 *******************************************************************/
 static const char *col_love(const struct player *player)
@@ -177,13 +226,39 @@ const char *plrdlg_col_state(const struct player *plr)
     /* TRANS: Dead -- Rest In Peace -- Reqia In Pace */
     return _("R.I.P.");
   } else if (!plr->is_connected) {
-    return "";
-  } else if (!is_player_phase(plr, game.info.phase)) {
-    return _("waiting");
-  } else if (plr->phase_done) {
-    return _("done");
+    struct option *opt;
+    bool consider_tb = FALSE;
+
+    if (plr->ai_controlled) {
+      return "";
+    }
+
+    opt = optset_option_by_name(server_optset, "turnblock");
+    if (opt != NULL) {
+      consider_tb = option_bool_get(opt);
+    }
+
+    if (!consider_tb) {
+      /* TRANS: No connection */
+      return _("noconn");
+    }
+
+    if (!is_player_phase(plr, game.info.phase)) {
+      return _("waiting");
+    } else if (plr->phase_done) {
+      return _("done");
+    } else {
+      /* TRANS: Turnblocking & player not connected */
+      return _("blocking");
+    }
   } else {
-    return _("moving");
+    if (!is_player_phase(plr, game.info.phase)) {
+      return _("waiting");
+    } else if (plr->phase_done) {
+      return _("done");
+    } else {
+      return _("moving");
+    }
   }
 }
 
@@ -236,7 +311,8 @@ struct player_dlg_column player_dlg_columns[] = {
   {TRUE, COL_BOOLEAN, N_("AI"), NULL, col_ai, NULL,  "ai"},
   {TRUE, COL_TEXT, N_("Attitude"), col_love, NULL, cmp_love,  "attitude"},
   {TRUE, COL_TEXT, N_("Embassy"), col_embassy, NULL, NULL,  "embassy"},
-  {TRUE, COL_TEXT, N_("Dipl.State"), col_diplstate, NULL, NULL,  "diplstate"},
+  {TRUE, COL_TEXT, N_("Dipl.State"), col_diplstate, NULL, cmp_diplstate,
+    "diplstate"},
   {TRUE, COL_TEXT, N_("Vision"), col_vision, NULL, NULL,  "vision"},
   {TRUE, COL_TEXT, N_("State"), plrdlg_col_state, NULL, NULL,  "state"},
   {FALSE, COL_TEXT, N_("?Player_dlg:Host"), col_host, NULL, NULL,  "host"},
@@ -247,7 +323,7 @@ struct player_dlg_column player_dlg_columns[] = {
 const int num_player_dlg_columns = ARRAY_SIZE(player_dlg_columns);
 
 /******************************************************************
- ...
+  Return default player dlg sorting column.
 *******************************************************************/
 int player_dlg_default_sort_column(void)
 {

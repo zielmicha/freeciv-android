@@ -12,11 +12,17 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
 #include "mem.h"
+
+/* common */
+#include "rgbcolor.h"
+
+/* gui main header */
+#include "gui_stub.h"
 
 #include "colors.h"
 
@@ -24,7 +30,7 @@
   Allocate a color (adjusting it for our colormap if necessary on paletted
   systems) and return a pointer to it.
 ****************************************************************************/
-struct color *color_alloc(int r, int g, int b)
+struct color *gui_color_alloc(int r, int g, int b)
 {
   struct color *color = fc_malloc(sizeof(*color));
 
@@ -39,8 +45,24 @@ struct color *color_alloc(int r, int g, int b)
 /****************************************************************************
   Free a previously allocated color.  See color_alloc.
 ****************************************************************************/
-void color_free(struct color *color)
+void gui_color_free(struct color *color)
 {
   /* PORTME */
   free(color);
+}
+
+/****************************************************************************
+  Return a number indicating the perceptual brightness of this color
+  relative to others (larger is brighter).
+****************************************************************************/
+int color_brightness_score(struct color *pcolor)
+{
+  /* PORTME */
+  /* Can use GUI-specific colorspace functions here. This is a fallback
+   * using platform-independent code */
+  struct rgbcolor *prgb = rgbcolor_new(pcolor->r, pcolor->g, pcolor->b);
+  int score = rgbcolor_brightness_score(prgb);
+
+  rgbcolor_destroy(prgb);
+  return score;
 }

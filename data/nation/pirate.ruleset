@@ -1,7 +1,10 @@
 [nation_pirate]
 
+translation_domain="freeciv"
+
 name=_("Pirate")
 plural=_("?plural:Pirates")
+groups="Core"
 legend=_("As long as honest men have sailed the seas, pirates have been a\
  scourge of them and of all coastal dwelling peoples.")
 
@@ -22,7 +25,6 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 ; Various pirate havens
@@ -31,7 +33,7 @@ cities =
  "Port Royal", 
  "Tortuga"
 
-is_playable = 0
+is_playable = FALSE
 barbarian_type = "Sea"
 
 ; nothing more needed for barbarians

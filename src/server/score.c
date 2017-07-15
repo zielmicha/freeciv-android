@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -62,6 +62,10 @@ Land Area Debug...
 
 #if LAND_AREA_DEBUG >= 2
 
+/**************************************************************************
+  Return one character representation of the turn number 'when'.
+  If value of 'when' is out of supported range, '?' is returned.
+**************************************************************************/
 static char when_char(int when)
 {
   static char list[] = {
@@ -148,7 +152,7 @@ static void print_landarea_map(struct claim_map *pcmap, int turn)
   WRITE_MAP_DATA("%c", when_char(pcmap->claims[map_pos_to_index(x, y)].when));
 }
 
-#endif
+#endif /* LAND_AREA_DEBUG > 2 */
 
 /****************************************************************************
   Count landarea, settled area, and claims map for all players.
@@ -382,103 +386,6 @@ int total_player_citizens(const struct player *pplayer)
   return count;
 }
 
-static const int *ppm_player_color(int player_number)
-{
-  /* the colors for each player. these were selected to give
-   * the most differentiation between all players. YMMV. */
-  static const int col[][3] = {
-    {255,   0,   0}, {  0, 128,   0}, {255, 255, 255}, {255, 255,   0},
-    {138,  43, 226}, {255, 140,   0}, {  0, 255, 255}, {139,  69,  19},
-    {211, 211, 211}, {255, 215,   0}, {255,  20, 147}, {124, 252,   0},
-    {218, 112, 214}, { 30, 144, 255}, {250, 128, 114}, {154, 205,  50},
-    { 25,  25, 112}, {  0, 255, 127}, {139,   0,   0}, {100, 149, 237},
-    {  0, 128, 128}, {255, 192, 203}, {255, 250, 205}, {119, 136, 153},
-    {255, 127,  80}, {255,   0, 255}, {128, 128,   0}, {245, 222, 179},
-    {184, 134,  11}, {173, 216, 230}, {102, 205, 170}, {255, 165,   0},
-  };
-
-  return col[player_number % ARRAY_SIZE(col)];
-}
-
-/**************************************************************************
- save a ppm file which is a representation of the map of the current turn.
- this can later be turned into a animated gif.
-
- terrain type, units, and cities are saved.
-**************************************************************************/
-void save_ppm(void)
-{
-  char filename[600];
-  char tmpname[600];
-  FILE *fp;
-  int i, j;
-  static const int watercol[3] = {0,0,255}; /* blue */
-  static const int landcol[3] =  {0,0,0};   /* black */
-
-  if (!srvarg.save_ppm) {
-    return;
-  }
-
-  /* put this file in the same place we put savegames */
-  fc_snprintf(filename, sizeof(filename),
-              "%s%+05d.int.ppm", game.server.save_name, game.info.year);
-
-  /* Ensure the saves directory exists. */
-  make_dir(srvarg.saves_pathname);
-
-  sz_strlcpy(tmpname, srvarg.saves_pathname);
-  if (tmpname[0] != '\0') {
-    sz_strlcat(tmpname, "/");
-  }
-  sz_strlcat(tmpname, filename);
-  sz_strlcpy(filename, tmpname);
-
-  fp = fc_fopen(filename, "w");
-
-  if (!fp) {
-    log_error("couldn't open ppm file: %s", filename);
-    return;
-  }
-
-  fprintf(fp, "P3\n# version:2\n# gameid: %s\n", server.game_identifier);
-  fprintf(fp, "# An intermediate map from saved Freeciv game %s%+05d\n",
-          game.server.save_name, game.info.year);
-
-  players_iterate(pplayer) {
-    const int *color = ppm_player_color(player_index(pplayer));
-    fprintf(fp, "# playerno:%d:color:#%02x%02x%02x:name:\"%s\"\n", 
-            player_number(pplayer), color[0], color[1], color[2],
-            player_name(pplayer));
-  } players_iterate_end;
-
-  fprintf(fp, "%d %d\n", map.xsize, map.ysize);
-  fprintf(fp, "255\n");
-
-  for (j = 0; j < map.ysize; j++) {
-    for (i = 0; i < map.xsize; i++) {
-       struct tile *ptile = native_pos_to_tile(i, j);
-       const int *color;
-
-       /* color for cities first, then units, then land */
-       if (tile_city(ptile)) {
-         color = ppm_player_color(player_index(city_owner(tile_city(ptile))));
-       } else if (unit_list_size(ptile->units) > 0) {
-         color = ppm_player_color(player_index(
-                   unit_owner(unit_list_get(ptile->units, 0))
-                 ));
-       } else if (is_ocean_tile(ptile)) {
-         color = watercol;
-       } else {
-         color = landcol;
-       }
-
-       fprintf(fp, "%d %d %d\n", color[0], color[1], color[2]);
-    }
-  }
-
-  fclose(fp);
-}
-
 /**************************************************************************
   At the end of a game, figure the winners and losers of the game and
   output to a suitable place.
@@ -489,29 +396,32 @@ void save_ppm(void)
   surrendered or dead. Exception: the winner of the spacerace and his 
   teammates will win of course.
 
+  In games ended by /endgame, endturn, or any other interruption not caused
+  by satisfaction of victory conditions, for each team is calculated the sum
+  of the scores of any belonging member which is alive and has not
+  surrendered; all the players in the team with the higest sum of scores win.
+  This condition is signaled to the function by the boolean "interrupt".
+
   Barbarians do not count as winners or losers.
 
-  Games ending by endturn results in a draw, we don't rank in that case.
+  If interrupt is true, rank players by team score rather than by alive/dead
+  status.
 **************************************************************************/
-void rank_users(void)
+void rank_users(bool interrupt)
 {
   FILE *fp;
-  int i;
+  int i, t_winner_score = 0;
   enum victory_state { VS_NONE, VS_LOSER, VS_WINNER };
   enum victory_state plr_state[player_slot_count()];
   struct player *spacerace_winner = NULL;
-
-  /* game ending via endturn results in a draw. We don't rank. */
-  if (game.info.turn > game.server.end_turn) {
-    return;
-  }
+  struct team *t_winner = NULL;
 
   /* don't output ranking info if we haven't enabled it via cmdline */
   if (!srvarg.ranklog_filename) {
     return;
   }
 
-  fp = fc_fopen(srvarg.ranklog_filename,"w");
+  fp = fc_fopen(srvarg.ranklog_filename, "w");
 
   /* don't fail silently, at least print an error */
   if (!fp) {
@@ -543,46 +453,80 @@ void rank_users(void)
     } players_iterate_end;
   }
 
-  /* first pass: locate those alive who haven't surrendered, set them to win;
-   * barbarians won't count, and everybody else is a loser for now. */
-  players_iterate(pplayer) {
-    if (is_barbarian(pplayer)) {
-      plr_state[player_index(pplayer)] = VS_NONE;
-    } else if (pplayer->is_alive
-               && !player_status_check(pplayer, PSTATUS_SURRENDER)) {
-      plr_state[player_index(pplayer)] = VS_WINNER;
-    } else {
-      plr_state[player_index(pplayer)] = VS_LOSER;
-    }
-  } players_iterate_end;
+  if (interrupt == FALSE) {
+    /* game ended for a victory condition */
 
-  /* second pass: find the teammates of those winners, they win too. */
-  players_iterate(pplayer) {
-    if (plr_state[player_index(pplayer)] == VS_WINNER) {
-      players_iterate(aplayer) {
-        if (aplayer->team == pplayer->team) {
-          plr_state[player_index(aplayer)] = VS_WINNER;
+    /* first pass: locate those alive who haven't surrendered, set them to
+     * win; barbarians won't count, and everybody else is a loser for now. */
+    players_iterate(pplayer) {
+      if (is_barbarian(pplayer)) {
+	plr_state[player_index(pplayer)] = VS_NONE;
+      } else if (pplayer->is_alive
+		 && !player_status_check(pplayer, PSTATUS_SURRENDER)) {
+	plr_state[player_index(pplayer)] = VS_WINNER;
+      } else {
+	plr_state[player_index(pplayer)] = VS_LOSER;
+      }
+    } players_iterate_end;
+
+    /* second pass: find the teammates of those winners, they win too. */
+    players_iterate(pplayer) {
+      if (plr_state[player_index(pplayer)] == VS_WINNER) {
+	players_iterate(aplayer) {
+	  if (aplayer->team == pplayer->team) {
+	    plr_state[player_index(aplayer)] = VS_WINNER;
+	  }
+	} players_iterate_end;
+      }
+    } players_iterate_end;
+  } else {
+
+    /* game ended via endturn */
+    /* i) determine the winner team */
+    teams_iterate(pteam) {
+      int t_score = 0;
+      const struct player_list *members = team_members(pteam);
+      player_list_iterate(members, pplayer) {
+	if (pplayer->is_alive
+	    && !player_status_check(pplayer, PSTATUS_SURRENDER)) {
+	  t_score += get_civ_score(pplayer);
         }
-      } players_iterate_end;
-    }
-  } players_iterate_end;
+      } player_list_iterate_end;
+      if (t_score > t_winner_score) {
+	t_winner = pteam;
+	t_winner_score = t_score;
+      }
+    } teams_iterate_end;
+  
+    /* ii) set all the members of the team as winners, the others as losers */
+    players_iterate(pplayer) {
+      if (pplayer->team == t_winner) {
+	plr_state[player_index(pplayer)] = VS_WINNER;
+      } else {
+        /* if no winner team is found (each one as same score) all them lose */
+	plr_state[player_index(pplayer)] = VS_LOSER;
+      }
+    } players_iterate_end;
+  }
 
   /* write out ranking information to file */
   fprintf(fp, "turns: %d\n", game.info.turn);
   fprintf(fp, "winners: ");
   players_iterate(pplayer) {
     if (plr_state[player_index(pplayer)] == VS_WINNER) {
-      fprintf(fp, "%s (%s,%s), ", pplayer->ranked_username,
-                                  player_name(pplayer),
-                                  pplayer->username);
+      fprintf(fp, "%s,%s,%s,%i,, ", pplayer->ranked_username,
+                                    player_name(pplayer),
+	                            pplayer->username,
+	                            get_civ_score(pplayer));
     }
   } players_iterate_end;
   fprintf(fp, "\nlosers: ");
   players_iterate(pplayer) {
     if (plr_state[player_index(pplayer)] == VS_LOSER) {
-      fprintf(fp, "%s (%s,%s), ", pplayer->ranked_username,
-                                  player_name(pplayer),
-                                  pplayer->username);
+      fprintf(fp, "%s,%s,%s,%i,, ", pplayer->ranked_username,
+                                    player_name(pplayer),
+	                            pplayer->username,
+	                            get_civ_score(pplayer));
     }
   } players_iterate_end;
   fprintf(fp, "\n");

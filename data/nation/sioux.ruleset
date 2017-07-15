@@ -1,8 +1,10 @@
 [nation_sioux]
 
+translation_domain="freeciv"
+
 name=_("Sioux")
 plural=_("?plural:Sioux")
-groups="Medieval", "American"
+groups="Medieval", "American", "Core"
 legend=_("The Sioux was a North American nation that fought several\
  decisive battles against the United States. It consisted of three distinct\
  groups of tribes: the Lakota, the Dakota and the Nakota.")
@@ -19,6 +21,7 @@ leaders = {
  "Waneta",              "Male" ; literally "The Charger"
  "Napeshneeduta",       "Male" ; literally "Red man who flees not"
  "Tasunkakokipapi",     "Male" ; literally "Young Man Afraid of His Horses"
+ "Black Shawl",         "Female"
 }
 
 ruler_titles = {
@@ -26,6 +29,7 @@ ruler_titles = {
  "Monarchy",        _("Great Chief %s"),     _("?female:Great Chief %s")
  "Republic",        _("Spokesman %s"),       _("Spokeswoman %s")
  "Democracy",       _("Principal Chief %s"), _("?female:Principal Chief %s")
+ "Fundamentalism",  _("Shaman %s"),          _("?female:Shaman %s")
 }
 
 flag="cheyenne"
@@ -34,7 +38,6 @@ city_style = "Celtic"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations = "iroquois", "hopi", "cree"
 

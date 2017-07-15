@@ -12,20 +12,21 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
 #include <string.h>
 
-#include "city.h"
-#include "game.h"
-#ifdef DEBUG
+/* utility */
 #include "log.h"
-#endif
-#include "map.h"
 #include "mem.h"
 #include "support.h"
+
+/* common */
+#include "city.h"
+#include "game.h"
+#include "map.h"
 #include "unit.h"
 #include "unitlist.h"
 #include "unittype.h"
@@ -65,8 +66,8 @@ void citymap_turn_init(struct player *pplayer)
   citymap = fc_realloc(citymap, MAP_INDEX_SIZE * sizeof(*citymap));
   memset(citymap, 0, MAP_INDEX_SIZE * sizeof(*citymap));
 
-  players_iterate(pplayer) {
-    city_list_iterate(pplayer->cities, pcity) {
+  players_iterate(pother) {
+    city_list_iterate(pother->cities, pcity) {
       struct tile *pcenter = city_tile(pcity);
 
       /* reserve at least the default (squared) city radius */
@@ -85,8 +86,8 @@ void citymap_turn_init(struct player *pplayer)
   } players_iterate_end;
 
   unit_list_iterate(pplayer->units, punit) {
-    if (unit_has_type_flag(punit, F_CITIES)
-        && punit->server.adv->role == AIUNIT_BUILD_CITY) {
+    if (unit_has_type_flag(punit, UTYF_CITIES)
+        && punit->server.adv->task == AUT_BUILD_CITY) {
 
       /* use default (squared) city radius */
       city_tile_iterate(CITY_MAP_DEFAULT_RADIUS_SQ, punit->goto_tile,

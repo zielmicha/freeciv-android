@@ -14,17 +14,21 @@ leaders = {
  "Muhammad Ali Jinnah", "Male"
  "Khawaja Nazimuddin",  "Male"
 }
-
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Despotism",       _("Raja %s"),      _("Rani %s")
+ "Fundamentalism",  _("Mullah %s"),    _("?female:Mullah %s")
+ "Monarchy",        _("Maharaja %s"),  _("Maharani %s")
+}
 flag="pakistan"
 flag_alt="-"
 city_style = "Asian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
-civilwar_nations="Iranian", "Pashtun", "Kashmiri"
+civilwar_nations="Bangladeshi", "Pashtun", "Kashmiri"
 
 ; http://de.wikipedia.org/wiki/Liste_der_Städte_in_Pakistan
 cities =

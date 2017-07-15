@@ -1,4 +1,4 @@
-/**********************************************************************
+/********************************************************************** 
  Freeciv - Copyright (C) 2003-2004 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <errno.h>
@@ -32,6 +32,7 @@
 #include <libcharset.h>
 #endif
 
+/* utility */
 #include "fciconv.h"
 #include "fcintl.h"
 #include "log.h"
@@ -40,16 +41,16 @@
 
 static bool is_init = FALSE;
 static char convert_buffer[4096];
+static const char *transliteration_string;
 
 #ifdef HAVE_ICONV
 static const char *local_encoding, *data_encoding, *internal_encoding;
-static const char *transliteration_string;
-#else
+#else  /* HAVE_ICONV */
 /* Hack to confuse the compiler into working. */
 #  define local_encoding get_local_encoding()
 #  define data_encoding get_local_encoding()
 #  define internal_encoding get_local_encoding()
-#endif
+#endif /* HAVE_ICONV */
 
 /***************************************************************************
   Must be called during the initialization phase of server and client to
@@ -60,18 +61,16 @@ static const char *transliteration_string;
 void init_character_encodings(const char *my_internal_encoding,
 			      bool my_use_transliteration)
 {
+  transliteration_string = "";
 #ifdef HAVE_ICONV
   if (my_use_transliteration) {
     transliteration_string = "//TRANSLIT";
-  } else {
-    transliteration_string = "";
   }
 
   /* Set the data encoding - first check $FREECIV_DATA_ENCODING,
    * then fall back to the default. */
   data_encoding = getenv("FREECIV_DATA_ENCODING");
   if (!data_encoding) {
-    /* Currently the rulesets are in latin1 (ISO-8859-1). */
     data_encoding = FC_DEFAULT_DATA_ENCODING;
   }
 
@@ -81,13 +80,13 @@ void init_character_encodings(const char *my_internal_encoding,
   if (!local_encoding) {
 #ifdef HAVE_LIBCHARSET
     local_encoding = locale_charset();
-#else
+#else  /* HAVE_LIBCHARSET */
 #ifdef HAVE_LANGINFO_CODESET
     local_encoding = nl_langinfo(CODESET);
-#else
+#else  /* HAVE_LANGINFO_CODESET */
     local_encoding = "";
-#endif
-#endif
+#endif /* HAVE_LANGINFO_CODESET */
+#endif /* HAVE_LIBCHARSET */
     if (fc_strcasecmp(local_encoding, "ANSI_X3.4-1968") == 0
         || fc_strcasecmp(local_encoding, "ASCII") == 0
         || fc_strcasecmp(local_encoding, "US-ASCII") == 0) {
@@ -123,11 +122,11 @@ void init_character_encodings(const char *my_internal_encoding,
 #ifdef DEBUG
   fprintf(stderr, "Encodings: Data=%s, Local=%s, Internal=%s\n",
           data_encoding, local_encoding, internal_encoding);
-#endif
+#endif /* DEBUG */
 
-#else
+#else  /* HAVE_ICONV */
    /* log_* may not work at this point. */
-#endif
+#endif /* HAVE_ICONV */
 
   is_init = TRUE;
 }
@@ -149,17 +148,17 @@ const char *get_local_encoding(void)
 #ifdef HAVE_ICONV
   fc_assert_ret_val(is_init, NULL);
   return local_encoding;
-#else
+#else  /* HAVE_ICONV */
 #  ifdef HAVE_LIBCHARSET
   return locale_charset();
-#  else
+#  else  /* HAVE_LIBCHARSET */
 #    ifdef HAVE_LANGINFO_CODESET
   return nl_langinfo(CODESET);
-#    else
+#    else  /* HAVE_LANGINFO_CODESET */
   return "";
-#    endif
-#  endif
-#endif
+#    endif /* HAVE_LANGINFO_CODESET */
+#  endif /* HAVE_LIBCHARSET */
+#endif /* HAVE_ICONV */
 }
 
 /***************************************************************************
@@ -194,10 +193,16 @@ char *convert_string(const char *text,
   fc_assert_ret_val(NULL != text, NULL);
 
   if (cd == (iconv_t) (-1)) {
-    /* TRANS: "Could not convert text from <encoding a> to <encoding b>:"
+    /* Do not do potentially recursive call to freeciv logging here,
+     * but use fprintf(stderr) */
+    /* Use the real OS-provided strerror and errno rather than Freeciv's
+     * abstraction, as that wouldn't do the correct thing with third-party
+     * iconv on Windows */
+
+    /* TRANS: "Could not convert text from <encoding a> to <encoding b>:" 
      *        <externally translated error string>."*/
-    log_error(_("Could not convert text from %s to %s: %s"),
-              from, to, fc_strerror(fc_get_errno()));
+    fprintf(stderr, _("Could not convert text from %s to %s: %s.\n"),
+            from, to, strerror(errno));
     /* The best we can do? */
     if (alloc) {
       return fc_strdup(text);
@@ -232,7 +237,9 @@ char *convert_string(const char *text,
     if (res == (size_t) (-1)) {
       if (errno != E2BIG) {
         /* Invalid input. */
-        log_error("Invalid string conversion from %s to %s.", from, to);
+
+        fprintf(stderr, "Invalid string conversion from %s to %s: %s.\n",
+                from, to, strerror(errno));
         iconv_close(cd);
         if (alloc) {
           free(buf);
@@ -254,7 +261,6 @@ char *convert_string(const char *text,
     if (alloc) {
       /* Not enough space; try again. */
       buf[to_len - 1] = 0;
-      log_verbose("   Result was '%s'.", buf);
 
       free(buf);
       to_len *= 2;
@@ -274,7 +280,7 @@ char *convert_string(const char *text,
 }
 
 #ifndef HAVE_ICONV
-char* transliteration_string = "";
+static const char *transliteration_string = "";
 #endif
 
 #define CONV_FUNC_MALLOC(src, dst)                                          \
@@ -368,15 +374,18 @@ void fc_fprintf(FILE *stream, const char *format, ...)
 size_t get_internal_string_length(const char *text)
 {
   int text2[(strlen(text) + 1)]; /* UCS-4 text */
-  int i = 0;
+  int i;
+  int len = 0;
 
   convert_string(text, internal_encoding, "UCS-4",
                  (char *)text2, sizeof(text2));
-  /* Check BOM */
-  fc_assert_ret_val(0x0000FEFF != text2[0]&& 0xFFFE0000!= text2[0], -1);
   for (i = 0; ; i++) {
     if (text2[i] == 0) {
-      return i;
+      return len;
+    }
+    if (text2[i] != 0x0000FEFF && text2[i] != 0xFFFE0000) {
+      /* Not BOM */
+      len++;
     }
   }
 }

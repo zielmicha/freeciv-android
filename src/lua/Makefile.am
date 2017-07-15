@@ -1,18 +1,24 @@
 ## Process this file with automake to produce Makefile.in
 
-noinst_LIBRARIES = liblua.a
+noinst_LTLIBRARIES = liblua.la
 
 AM_CPPFLAGS =
 
-liblua_a_SOURCES = 	\
+liblua_la_LIBADD = -lm
+
+liblua_la_SOURCES = 	\
 	localluaconf.h	\
 	lapi.c		\
 	lapi.h		\
 	lauxlib.c	\
 	lauxlib.h	\
 	lbaselib.c	\
+	lbitlib.c	\
 	lcode.c		\
 	lcode.h		\
+	lcorolib.c	\
+	lctype.c	\
+	lctype.h	\
 	ldblib.c	\
 	ldebug.c	\
 	ldebug.h	\
@@ -49,14 +55,13 @@ liblua_a_SOURCES = 	\
 	ltablib.c	\
 	ltm.c		\
 	ltm.h		\
-	luac.c		\
 	luaconf.h	\
 	lua.h		\
+	lua.hpp		\
 	lualib.h	\
 	lundump.c	\
 	lundump.h	\
 	lvm.c		\
 	lvm.h		\
 	lzio.c		\
-	lzio.h		\
-	print.c
+	lzio.h

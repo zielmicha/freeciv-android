@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -22,13 +22,16 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 
-/* common & utility */
-#include "diptreaty.h"
+/* utility */
+#include "astring.h"
 #include "fcintl.h"
+#include "support.h"
+
+/* common */
+#include "diptreaty.h"
 #include "packets.h"
 #include "nation.h"
 #include "player.h"
-#include "support.h"
 
 /* client */
 #include "chatline.h"
@@ -99,7 +102,7 @@ void popdown_players_dialog(void)
 }
 
 /**************************************************************************
-...
+  Create pixbuf for player
 **************************************************************************/
 static GdkPixbuf *create_player_icon(const struct player *plr)
 {
@@ -127,7 +130,7 @@ static GdkPixbuf *create_player_icon(const struct player *plr)
 }
 
 /**************************************************************************
-...
+  Refresh player menu
 **************************************************************************/
 static void update_players_menu(void)
 {
@@ -148,24 +151,21 @@ static void update_players_menu(void)
     }
 
     if (NULL != client.conn.playing) {
-      switch (player_diplstate_get(client.conn.playing,
-                                   player_by_number(plrno))->type) {
-      case DS_WAR:
-      case DS_NO_CONTACT:
-	gtk_widget_set_sensitive(players_war_command, FALSE);
-	break;
-      default:
-	gtk_widget_set_sensitive(players_war_command,
-				 can_client_issue_orders()
-				 && player_by_number(plrno) != client.conn.playing);
-      }
+      /* We keep button sensitive in case of DIPL_SENATE_BLOCKING, so that player
+       * can request server side to check requirements of those effects with omniscience */
+      gtk_widget_set_sensitive(players_war_command,
+                               can_client_issue_orders()
+                               && pplayer_can_cancel_treaty(client_player(),
+                                                            player_by_number(plrno))
+                               != DIPL_ERROR);
     } else {
       gtk_widget_set_sensitive(players_war_command, FALSE);
     }
 
     gtk_widget_set_sensitive(players_vision_command,
 			     can_client_issue_orders()
-			     && gives_shared_vision(client.conn.playing, plr));
+			     && gives_shared_vision(client.conn.playing, plr)
+                             && !players_on_same_team(client.conn.playing, plr));
 
     gtk_widget_set_sensitive(players_meet_command, can_meet_with_player(plr));
     gtk_widget_set_sensitive(players_int_command, can_intel_with_player(plr));
@@ -177,7 +177,7 @@ static void update_players_menu(void)
 }
 
 /**************************************************************************
-...
+  Something selected from player menu
 **************************************************************************/
 static void selection_callback(GtkTreeSelection *selection, gpointer data)
 {
@@ -185,7 +185,7 @@ static void selection_callback(GtkTreeSelection *selection, gpointer data)
 }
 
 /**************************************************************************
-...
+  Button pressed on player list
 **************************************************************************/
 static gboolean button_press_callback(GtkTreeView *view, GdkEventButton *ev)
 {
@@ -218,7 +218,7 @@ static gboolean button_press_callback(GtkTreeView *view, GdkEventButton *ev)
 }
 
 /**************************************************************************
-...
+  Sorting function for plr dlg.
 **************************************************************************/
 static gint plrdlg_sort_func(GtkTreeModel *model,
 			      GtkTreeIter *a, GtkTreeIter *b, gpointer data)
@@ -230,11 +230,11 @@ static gint plrdlg_sort_func(GtkTreeModel *model,
 
   n = GPOINTER_TO_INT(data);
 
-  gtk_tree_model_get_value(model, a, num_player_dlg_columns + 2, &value);
+  gtk_tree_model_get_value(model, a, PLR_DLG_COL_ID, &value);
   player1 = player_by_number(g_value_get_int(&value));
   g_value_unset(&value);
   
-  gtk_tree_model_get_value(model, b, num_player_dlg_columns + 2, &value);
+  gtk_tree_model_get_value(model, b, PLR_DLG_COL_ID, &value);
   player2 = player_by_number(g_value_get_int(&value));
   g_value_unset(&value);
   
@@ -287,7 +287,7 @@ static GtkListStore *players_dialog_store_new(void)
 }
 
 /**************************************************************************
-...
+  Toggled column visibility
 **************************************************************************/
 static void toggle_view(GtkCheckMenuItem* item, gpointer data)
 {
@@ -364,7 +364,7 @@ static GtkWidget *create_intelligence_menu(void)
 }
 
 /**************************************************************************
-...
+  Create 'show' menu for player dialog
 **************************************************************************/
 static GtkWidget* create_show_menu(void)
 {
@@ -396,7 +396,7 @@ static GtkWidget* create_show_menu(void)
 }
 
 /**************************************************************************
-...
+  Create all of player dialog
 **************************************************************************/
 void create_players_dialog(void)
 {
@@ -405,7 +405,8 @@ void create_players_dialog(void)
   GtkWidget *menubar, *menu, *item, *vbox;
   enum ai_level level;
 
-  gui_dialog_new(&players_dialog_shell, GTK_NOTEBOOK(top_notebook), NULL);
+  gui_dialog_new(&players_dialog_shell, GTK_NOTEBOOK(top_notebook), NULL,
+                 TRUE);
   /* TRANS: Nations report title */
   gui_dialog_set_title(players_dialog_shell, _("Nations"));
 
@@ -460,8 +461,8 @@ void create_players_dialog(void)
 
       col = gtk_tree_view_column_new_with_attributes(pcol->title, renderer,
 	  "text", i,
-	  "style", num_player_dlg_columns,
-	  "weight", num_player_dlg_columns + 1,
+	  "style", PLR_DLG_COL_STYLE,
+	  "weight", PLR_DLG_COL_WEIGHT,
 	  NULL);
       gtk_tree_view_column_set_sort_column_id(col, i);
       break;
@@ -471,15 +472,12 @@ void create_players_dialog(void)
 
       col = gtk_tree_view_column_new_with_attributes(pcol->title, renderer,
 	  "text", i,
-	  "style", num_player_dlg_columns,
-	  "weight", num_player_dlg_columns + 1,
+	  "style", PLR_DLG_COL_STYLE,
+	  "weight", PLR_DLG_COL_WEIGHT,
 	  NULL);
       gtk_tree_view_column_set_sort_column_id(col, i);
-
-      if (pcol->type == COL_RIGHT_TEXT) {
-	g_object_set(renderer, "xalign", 1.0, NULL);
-	gtk_tree_view_column_set_alignment(col, 1.0);
-      }
+      g_object_set(renderer, "xalign", 1.0, NULL);
+      gtk_tree_view_column_set_alignment(col, 1.0);
       break;
     }
     
@@ -746,7 +744,31 @@ void players_meet_callback(GtkMenuItem *item, gpointer data)
 }
 
 /**************************************************************************
-...
+  Confirm pact/treaty cancellation.
+  Frees strings passed in.
+**************************************************************************/
+static void confirm_cancel_pact(enum clause_type clause, int plrno,
+                                char *title, char *question)
+{
+  GtkWidget *shell;
+
+  shell = gtk_message_dialog_new(NULL, 0,
+                                 GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+                                 "%s", question);
+  gtk_window_set_title(GTK_WINDOW(shell), title);
+  setup_dialog(shell, toplevel);
+  gtk_dialog_set_default_response(GTK_DIALOG(shell), GTK_RESPONSE_NO);
+
+  if (gtk_dialog_run(GTK_DIALOG(shell)) == GTK_RESPONSE_YES) {
+    dsend_packet_diplomacy_cancel_pact(&client.conn, plrno, clause);
+  }
+  gtk_widget_destroy(shell);
+  FC_FREE(title);
+  FC_FREE(question);
+}
+
+/**************************************************************************
+  Pact cancellation requested
 **************************************************************************/
 void players_war_callback(GtkMenuItem *item, gpointer data)
 {
@@ -754,18 +776,40 @@ void players_war_callback(GtkMenuItem *item, gpointer data)
   GtkTreeIter it;
 
   if (gtk_tree_selection_get_selected(players_selection, &model, &it)) {
+    struct astring title = ASTRING_INIT, question = ASTRING_INIT;
     gint plrno;
+    struct player *aplayer;
+    enum diplstate_type oldstate, newstate;
 
     gtk_tree_model_get(model, &it, PLR_DLG_COL_ID, &plrno, -1);
+    aplayer = player_by_number(plrno);
+    fc_assert_ret(aplayer != NULL);
+
+    oldstate = player_diplstate_get(client_player(), aplayer)->type;
+    newstate = cancel_pact_result(oldstate);
+
+    /* TRANS: %s is a diplomatic state: "Cancel Cease-fire" */
+    astr_set(&title, _("Cancel %s"), diplstate_text(oldstate));
+
+    if (newstate == DS_WAR) {
+      astr_set(&question, _("Really declare war on the %s?"),
+               nation_plural_for_player(aplayer));
+    } else {
+      /* TRANS: "Cancel Belgian Alliance? ... will be Armistice." */
+      astr_set(&question, _("Cancel %s %s? New diplomatic state will be %s."),
+               nation_adjective_for_player(aplayer),
+               diplstate_text(oldstate),
+               diplstate_text(newstate));
+    }
 
     /* can be any pact clause */
-    dsend_packet_diplomacy_cancel_pact(&client.conn, plrno,
-				       CLAUSE_CEASEFIRE);
+    confirm_cancel_pact(CLAUSE_CEASEFIRE, plrno,
+                        astr_to_str(&title), astr_to_str(&question));
   }
 }
 
 /**************************************************************************
-...
+  Withdrawing shared vision
 **************************************************************************/
 void players_vision_callback(GtkMenuItem *item, gpointer data)
 {
@@ -773,15 +817,26 @@ void players_vision_callback(GtkMenuItem *item, gpointer data)
   GtkTreeIter it;
 
   if (gtk_tree_selection_get_selected(players_selection, &model, &it)) {
+    struct astring question = ASTRING_INIT;
     gint plrno;
+    struct player *aplayer;
 
     gtk_tree_model_get(model, &it, PLR_DLG_COL_ID, &plrno, -1);
-    dsend_packet_diplomacy_cancel_pact(&client.conn, plrno, CLAUSE_VISION);
+    aplayer = player_by_number(plrno);
+    fc_assert_ret(aplayer != NULL);
+
+    /* TRANS: "...from the Belgians?" */
+    astr_set(&question, _("Withdraw shared vision from the %s?"),
+             nation_plural_for_player(aplayer));
+
+    confirm_cancel_pact(CLAUSE_VISION, plrno,
+                        fc_strdup(_("Withdraw Shared Vision")),
+                        astr_to_str(&question));
   }
 }
 
 /**************************************************************************
-...
+  Intelligence report query
 **************************************************************************/
 void players_intel_callback(GtkMenuItem *item, gpointer data)
 {
@@ -800,7 +855,7 @@ void players_intel_callback(GtkMenuItem *item, gpointer data)
 }
 
 /**************************************************************************
-...
+  Spaceship query callback
 **************************************************************************/
 void players_sship_callback(GtkMenuItem *item, gpointer data)
 {
@@ -852,7 +907,7 @@ static void players_ai_skill_callback(GtkMenuItem *item, gpointer data)
 }
 
 /**************************************************************************
-...
+  Refresh players dialog views.
 **************************************************************************/
 static void update_views(void)
 {
@@ -864,4 +919,4 @@ static void update_views(void)
     col = gtk_tree_view_get_column(GTK_TREE_VIEW(players_list), i);
     gtk_tree_view_column_set_visible(col, player_dlg_columns[i].show);
   }
-};
+}

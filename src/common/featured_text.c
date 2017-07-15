@@ -11,7 +11,7 @@
    GNU General Public License for more details.
 ***********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -77,7 +77,7 @@ const struct ft_color ftc_server        = FT_COLOR("#8B0000",   NULL);
 const struct ft_color ftc_client        = FT_COLOR("#EF7F00",   NULL);
 const struct ft_color ftc_editor        = FT_COLOR("#0000FF",   NULL);
 const struct ft_color ftc_command       = FT_COLOR("#006400",   NULL);
-const struct ft_color ftc_changed       = FT_COLOR("#FF0000",   NULL);
+      struct ft_color ftc_changed       = FT_COLOR("#FF0000",   NULL);
 const struct ft_color ftc_server_prompt = FT_COLOR("#FF0000",   "#BEBEBE");
 const struct ft_color ftc_player_lost   = FT_COLOR("#FFFFFF",   "#000000");
 const struct ft_color ftc_game_start    = FT_COLOR("#00FF00",   "#115511");
@@ -85,6 +85,7 @@ const struct ft_color ftc_game_start    = FT_COLOR("#00FF00",   "#115511");
 const struct ft_color ftc_chat_public   = FT_COLOR("#00008B",   NULL);
 const struct ft_color ftc_chat_ally     = FT_COLOR("#551166",   NULL);
 const struct ft_color ftc_chat_private  = FT_COLOR("#A020F0",   NULL);
+const struct ft_color ftc_chat_luaconsole = FT_COLOR("#006400", NULL);
 
 const struct ft_color ftc_vote_public   = FT_COLOR("#FFFFFF",   "#AA0000");
 const struct ft_color ftc_vote_team     = FT_COLOR("#FFFFFF",   "#5555CC");
@@ -93,6 +94,12 @@ const struct ft_color ftc_vote_failed   = FT_COLOR("#8B0000",   "#FFAAAA");
 const struct ft_color ftc_vote_yes      = FT_COLOR("#000000",   "#C8FFD5");
 const struct ft_color ftc_vote_no       = FT_COLOR("#000000",   "#FFD2D2");
 const struct ft_color ftc_vote_abstain  = FT_COLOR("#000000",   "#E8E8E8");
+
+const struct ft_color ftc_luaconsole_input   = FT_COLOR("#2B008B", NULL);
+const struct ft_color ftc_luaconsole_error   = FT_COLOR("#FF0000", NULL);
+const struct ft_color ftc_luaconsole_normal  = FT_COLOR("#006400", NULL);
+const struct ft_color ftc_luaconsole_verbose = FT_COLOR("#B8B8B8", NULL);
+const struct ft_color ftc_luaconsole_debug   = FT_COLOR("#B87676", NULL);
 
 /**************************************************************************
   Return the long name of the text tag type.
@@ -392,7 +399,7 @@ static bool text_tag_initv(struct text_tag *ptag, enum text_tag_type type,
     return TRUE;
   case TTT_COLOR:
     {
-      struct ft_color color = va_arg(args, struct ft_color);
+      const struct ft_color color = va_arg(args, struct ft_color);
 
       if ((NULL == color.foreground || '\0' == color.foreground[0])
           && (NULL == color.background || '\0' == color.background[0])) {
@@ -447,7 +454,7 @@ static bool text_tag_initv(struct text_tag *ptag, enum text_tag_type type,
             return FALSE;
           }
           ptag->link.id = punit->id;
-          sz_strlcpy(ptag->link.name, unit_rule_name(punit));
+          sz_strlcpy(ptag->link.name, unit_name_translation(punit));
         }
         return TRUE;
       };
@@ -525,7 +532,7 @@ static size_t text_tag_start_sequence(const struct text_tag *ptag,
           if (punit) {
             ret += fc_snprintf(buf + ret, len - ret,
                                " id=%d name=\"%s\"",
-                               punit->id, unit_rule_name(punit));
+                               punit->id, unit_name_translation(punit));
           } else {
             ret += fc_snprintf(buf + ret, len - ret,
                                " id=%d", ptag->link.id);
@@ -564,14 +571,15 @@ static size_t text_tag_stop_sequence(const struct text_tag *ptag,
   When the sequence looks like [sequence/] then we insert a string instead.
 **************************************************************************/
 static size_t text_tag_replace_text(const struct text_tag *ptag,
-                                    char *buf, size_t len)
+                                    char *buf, size_t len,
+                                    bool replace_link_text)
 {
   if (ptag->type != TTT_LINK) {
     return 0;
   }
 
-  if (!is_server()) {
-    /* The client check if this should be updated or translated. */
+  if (replace_link_text) {
+    /* The client might check if this should be updated or translated. */
     switch (ptag->link.type) {
     case TLT_CITY:
       {
@@ -844,10 +852,17 @@ static size_t extract_sequence_text(const char *featured_text,
 
 /**************************************************************************
   Separate the text from the text features.  'tags' can be NULL.
+
+  When 'replace_link_text' is set, the text used for the signal sequence
+  links will be overwritten. It is used on client side to have updated
+  links in chatline, to communicate when users don't know share the city
+  names, and avoid users making voluntary confusing names when editing
+  links in chatline.
 **************************************************************************/
 size_t featured_text_to_plain_text(const char *featured_text,
                                    char *plain_text, size_t plain_text_len,
-                                   struct text_tag_list **tags)
+                                   struct text_tag_list **tags,
+                                   bool replace_link_text)
 {
   const char *read = featured_text;
   char *write = plain_text;
@@ -917,7 +932,8 @@ size_t featured_text_to_plain_text(const char *featured_text,
               log_featured_text("Couldn't create a text tag with \"%s\".",
                                 buf);
             } else {
-              len = text_tag_replace_text(&tag, write, write_len);
+              len = text_tag_replace_text(&tag, write, write_len,
+                                          replace_link_text);
               write += len;
               write_len -= len;
               if (tags) {
@@ -1096,12 +1112,10 @@ const char *unit_link(const struct unit *punit)
 {
   static char buf[MAX_LEN_LINK];
 
-  /* We use the rule name of the unit, it will be translated in every
-   * local sides in the function text_tag_replace_text(). */
   fc_snprintf(buf, sizeof(buf), "%c%s tgt=\"%s\" id=%d name=\"%s\" %c%c",
               SEQ_START, text_tag_type_short_name(TTT_LINK),
               text_link_type_name(TLT_UNIT), punit->id,
-              unit_rule_name(punit), SEQ_END, SEQ_STOP);
+              unit_name_translation(punit), SEQ_END, SEQ_STOP);
   return buf;
 }
 
@@ -1123,4 +1137,3 @@ const char *unit_tile_link(const struct unit *punit)
               SEQ_START, SEQ_END, tag_name, SEQ_STOP);
   return buf;
 }
-

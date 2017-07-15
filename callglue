@@ -66,7 +66,7 @@ PyObject* get_unit_properties(struct unit* s)
 const char* get_unit_name(const struct unit* u)
 
 void request_new_unit_activity(struct unit *punit, enum unit_activity act)
-void set_unit_focus(struct unit *punit)
+void unit_focus_set(struct unit *punit)
 
 void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
 int get_citydlg_canvas_width()
@@ -173,7 +173,7 @@ void request_center_focus_unit(void)
 
 struct city *tile_city(const struct tile *ptile)
 bool diplomat_can_do_action(const struct unit *pdiplomat, enum diplomat_actions action, const struct tile *ptile)
-bool unit_has_type_flag(const struct unit *punit, enum unit_flag_id flag)
+bool unit_has_type_flag(const struct unit *punit, enum unit_type_flag_id flag)
 void request_diplomat_action(enum diplomat_actions action, int dipl_id, int target_id, int value)
 
 int py_get_city_id(struct city* city)

@@ -13,6 +13,10 @@
 #ifndef FC__COMBAT_H
 #define FC__COMBAT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include "fc_types.h"
 #include "unittype.h"
 
@@ -24,16 +28,24 @@
  */
 #define POWER_FACTOR	10
 
+enum unit_attack_result {
+  ATT_OK,
+  ATT_NON_ATTACK,
+  ATT_UNREACHABLE,
+  ATT_NONNATIVE_SRC,
+  ATT_NONNATIVE_DST
+};
+
 bool is_unit_reachable_at(const struct unit *defender,
                           const struct unit *attacker,
                           const struct tile *location);
 bool can_player_attack_tile(const struct player *pplayer,
 			    const struct tile *ptile);
-bool can_unit_attack_unit_at_tile(const struct unit *punit,
-				  const struct unit *pdefender,
-				  const struct tile *dest_tile);
-bool can_unit_attack_units_at_tile(const struct unit *punit,
-                                   const struct tile *ptile);
+enum unit_attack_result unit_attack_unit_at_tile_result(const struct unit *punit,
+                                                        const struct unit *pdefender,
+                                                        const struct tile *dest_tile);
+enum unit_attack_result unit_attack_units_at_tile_result(const struct unit *punit,
+                                                         const struct tile *ptile);
 bool can_unit_attack_tile(const struct unit *punit,
 			  const struct tile *ptile);
 
@@ -53,9 +65,10 @@ int get_attack_power(const struct unit *punit);
 int base_get_attack_power(const struct unit_type *punittype,
 			  int veteran, int moves_left);
 int base_get_defense_power(const struct unit *punit);
-int get_defense_power(const struct unit *punit);
 int get_total_defense_power(const struct unit *attacker,
 			    const struct unit *defender);
+int get_fortified_defense_power(const struct unit *attacker,
+                                const struct unit *defender);
 int get_virtual_defense_power(const struct unit_type *attacker,
 			      const struct unit_type *defender,
 			      const struct player *defending_player,
@@ -70,4 +83,13 @@ struct unit *get_attacker(const struct unit *defender,
 			  const struct tile *ptile);
 
 bool is_stack_vulnerable(const struct tile *ptile);
+
+int combat_bonus_against(const struct combat_bonus_list *list,
+                         const struct unit_type *enemy,
+                         enum combat_bonus_type type);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
 #endif /* FC__COMBAT_H */

@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2005 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -11,14 +11,14 @@
    GNU General Public License for more details.
 ***********************************************************************/
 
-/**********************************************************************
+/***********************************************************************
   Functions for handling the themespec files which describe
   the files and contents of themes.
   original author: David Pfitzner <dwp@mso.anu.edu.au>
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -150,7 +150,7 @@ struct theme {
   struct theme_color_system *color_system;  
 };
 
-struct theme *theme;
+struct theme *theme = NULL;
 
 
 /****************************************************************************
@@ -306,14 +306,14 @@ static void theme_free_toplevel(struct theme *t)
 /**************************************************************************
   Clean up.
 **************************************************************************/
-void theme_free(struct theme *t)
+void theme_free(struct theme *ftheme)
 {
-  if (t) {
-    theme_free_sprites(t);
-    theme_free_toplevel(t);
-    specfile_list_destroy(t->specfiles);
-    small_sprite_list_destroy(t->small_sprites);
-    FC_FREE(t);
+  if (ftheme != NULL) {
+    theme_free_sprites(ftheme);
+    theme_free_toplevel(ftheme);
+    specfile_list_destroy(ftheme->specfiles);
+    small_sprite_list_destroy(ftheme->small_sprites);
+    free(ftheme);
   }
 }
 
@@ -449,7 +449,8 @@ static struct sprite *load_gfx_file(const char *gfx_filename)
   /* Try out all supported file extensions to find one that works. */
   while ((gfx_fileext = *gfx_fileexts++)) {
     const char *real_full_name;
-    char full_name[strlen(gfx_filename) + strlen(gfx_fileext) + 2];
+    char full_name[strlen(gfx_filename) + strlen(".")
+                   + strlen(gfx_fileext) + 1];
 
     sprintf(full_name, "%s.%s", gfx_filename, gfx_fileext);
     if ((real_full_name = fileinfoname(get_data_dirs(), full_name))) {
@@ -670,13 +671,13 @@ char *themespec_gfx_filename(const char *gfx_filename)
   const char  *gfx_current_fileext;
   const char **gfx_fileexts = gfx_fileextensions();
 
-  while((gfx_current_fileext = *gfx_fileexts++))
-  {
-    char *full_name =
-       fc_malloc(strlen(gfx_filename) + strlen(gfx_current_fileext) + 2);
+  while ((gfx_current_fileext = *gfx_fileexts++)) {
     const char *real_full_name;
+    char *full_name =
+      fc_malloc(strlen(gfx_filename) + strlen(".")
+                + strlen(gfx_current_fileext) + 1);
 
-    sprintf(full_name,"%s.%s",gfx_filename,gfx_current_fileext);
+    sprintf(full_name, "%s.%s", gfx_filename, gfx_current_fileext);
 
     real_full_name = fileinfoname(get_data_dirs(), full_name);
     FC_FREE(full_name);
@@ -687,6 +688,7 @@ char *themespec_gfx_filename(const char *gfx_filename)
 
   log_fatal("Couldn't find a supported gfx file extension for \"%s\".",
             gfx_filename);
+
   exit(EXIT_FAILURE);
   return NULL;
 }
@@ -938,7 +940,7 @@ static void theme_lookup_sprite_tags(struct theme *t)
   call.  This saves a fair amount of memory, but it will take extra time
   the next time we start loading sprites again.
 **************************************************************************/
-static void finish_loading_sprites(struct theme *t)
+static void theme_finish_loading_sprites(struct theme *t)
 {
   specfile_list_iterate(t->specfiles, sf) {
     if (sf->big_sprite) {
@@ -947,6 +949,7 @@ static void finish_loading_sprites(struct theme *t)
     }
   } specfile_list_iterate_end;
 }
+
 /**********************************************************************
   Load the tiles; requires themespec_read_toplevel() called previously.
   Leads to tile_sprites being allocated and filled with pointers
@@ -956,7 +959,7 @@ static void finish_loading_sprites(struct theme *t)
 void theme_load_sprites(struct theme *t)
 {
   theme_lookup_sprite_tags(t);
-  finish_loading_sprites(t);
+  theme_finish_loading_sprites(t);
 }
 
 /**********************************************************************

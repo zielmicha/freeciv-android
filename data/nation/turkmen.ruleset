@@ -3,7 +3,7 @@
 name=_("Turkmen")
 plural=_("?plural:Turkmens")
 groups="Modern", "Asian"
-legend=_("Turkmen tribes were first united in the 11th century AD under\
+legend=_("Turkmen tribes were first united in the 11th century CE under\
  Togrul Beg, second ruler of the Seljuk Empire. As the Seljuk state broke\
  down under the pressure from encroaching Mongols, the Turkmens started\
  a westward migration. They eventually settled in the lands between\
@@ -23,8 +23,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",            "female_title"
  "Despotism",       _("%s Khan"),            _("%s Khatan")
- "Monarchy",        _("%s Beg"),             _("?female:%s Beg")
- "Republic",        _("Sultan %s"),          _("Sultana %s")
+ "Monarchy",        _("Sultan %s"),          _("Sultana %s")
  "Communism",       _("First Secretary %s"), _("?female:First Secretary %s")
  "Fundamentalism",  _("Turkmenbashi %s"),    _("?female:Turkmenbashi %s")
 }
@@ -35,7 +34,6 @@ city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations="Uzbek", "Kazakh", "Turkish", "Azeri", "Kyrgyz"

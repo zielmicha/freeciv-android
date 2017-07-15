@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdlib.h>
@@ -29,8 +29,10 @@
 
 /* client/gui-gtk-2.0 */
 #include "colors.h"
+#include "dialogs.h"
 #include "gui_main.h"
 #include "gui_stuff.h"
+#include "pages.h"
 
 #include "optiondlg.h"
 
@@ -43,7 +45,6 @@ struct option_dialog {
   GtkWidget **vboxes;                   /* Category boxes. */
   int *box_children;                    /* The number of children for
                                          * each category. */
-  GtkTooltips *tips;                    /* The tips stuff. */
 };
 
 #define SPECLIST_TAG option_dialog
@@ -117,7 +118,7 @@ static void option_dialog_reponse_callback(GtkDialog *dialog,
     break;
   case RESPONSE_SAVE:
     desired_settable_options_update();
-    options_save();
+    options_save(NULL);
     break;
   }
 }
@@ -289,7 +290,7 @@ static void option_color_set_button_color(GtkButton *button,
     pixmap = gdk_pixmap_new(root_window, 16, 16, -1);
     gdk_gc_set_foreground(fill_bg_gc, current_color);
     gdk_draw_rectangle(pixmap, fill_bg_gc, TRUE, 0, 0, 16, 16);
-    child = gtk_pixmap_new(pixmap, NULL);
+    child = gtk_image_new_from_pixmap(pixmap, NULL);
     gtk_container_add(GTK_CONTAINER(button), child);
     gtk_widget_show(child);
     g_object_unref(G_OBJECT(pixmap));
@@ -371,7 +372,6 @@ option_dialog_new(const char *name, const struct option_set *poptset)
   pdialog->vboxes = fc_calloc(CATEGORY_NUM, sizeof(*pdialog->vboxes));
   pdialog->box_children = fc_calloc(CATEGORY_NUM,
                                     sizeof(*pdialog->box_children));
-  pdialog->tips = gtk_tooltips_new();
 
   /* Append to the option dialog list. */
   if (NULL == option_dialogs) {
@@ -425,7 +425,6 @@ static void option_dialog_destroy(struct option_dialog *pdialog)
     gtk_widget_destroy(shell);
   }
 
-  gtk_object_destroy(GTK_OBJECT(pdialog->tips));
   free(pdialog->vboxes);
   free(pdialog->box_children);
   free(pdialog);
@@ -520,7 +519,7 @@ static void option_dialog_option_add(struct option_dialog *pdialog,
   pdialog->box_children[category]++;
 
   ebox = gtk_event_box_new();
-  gtk_tooltips_set_tip(pdialog->tips, ebox, option_help_text(poption), NULL);
+  gtk_widget_set_tooltip_text(ebox, option_help_text(poption));
   gtk_box_pack_start(GTK_BOX(pdialog->vboxes[category]), ebox,
                      FALSE, FALSE, 0);
   g_signal_connect(ebox, "button_press_event",
@@ -622,8 +621,8 @@ static void option_dialog_option_add(struct option_dialog *pdialog,
       /* Foreground color selector button. */
       button = gtk_button_new();
       gtk_box_pack_start(GTK_BOX(w), button, FALSE, TRUE, 0);
-      gtk_tooltips_set_tip(pdialog->tips, GTK_WIDGET(button),
-                           _("Select the text color"), NULL);
+      gtk_widget_set_tooltip_text(GTK_WIDGET(button),
+                                  _("Select the text color"));
       g_object_set_data(G_OBJECT(w), "fg_button", button);
       g_signal_connect(button, "clicked",
                        G_CALLBACK(option_color_select_callback), NULL);
@@ -631,8 +630,8 @@ static void option_dialog_option_add(struct option_dialog *pdialog,
       /* Background color selector button. */
       button = gtk_button_new();
       gtk_box_pack_start(GTK_BOX(w), button, FALSE, TRUE, 0);
-      gtk_tooltips_set_tip(pdialog->tips, GTK_WIDGET(button),
-                           _("Select the background color"), NULL);
+      gtk_widget_set_tooltip_text(GTK_WIDGET(button),
+                                  _("Select the background color"));
       g_object_set_data(G_OBJECT(w), "bg_button", button);
       g_signal_connect(button, "clicked",
                        G_CALLBACK(option_color_select_callback), NULL);
@@ -994,6 +993,21 @@ void option_dialog_popdown(const struct option_set *poptset)
 }
 
 /****************************************************************************
+  Pass on updated option values to controls outside the main option
+  dialogs.
+****************************************************************************/
+static void option_gui_update_extra(struct option *poption)
+{
+  if (option_optset(poption) == server_optset) {
+    if (strcmp(option_name(poption), "aifill") == 0) {
+      ai_fill_changed_by_server(option_int_get(poption));
+    } else if (strcmp(option_name(poption), "nationset") == 0) {
+      nationset_sync_to_server(option_str_get(poption));
+    }
+  }
+}
+
+/****************************************************************************
   Update the GUI for the option.
 ****************************************************************************/
 void option_gui_update(struct option *poption)
@@ -1003,6 +1017,8 @@ void option_gui_update(struct option *poption)
   if (NULL != pdialog) {
     option_dialog_option_refresh(poption);
   }
+
+  option_gui_update_extra(poption);
 }
 
 /****************************************************************************
@@ -1015,6 +1031,8 @@ void option_gui_add(struct option *poption)
   if (NULL != pdialog) {
     option_dialog_option_add(pdialog, poption, TRUE);
   }
+
+  option_gui_update_extra(poption);
 }
 
 /****************************************************************************

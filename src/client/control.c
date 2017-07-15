@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -23,31 +23,41 @@
 #include "timing.h"
 
 /* common */
+#include "combat.h"
 #include "game.h"
 #include "map.h"
 #include "movement.h"
+#include "unitlist.h"
 
-/* client */
-#include "audio.h"
+/* client/include */
 #include "chatline_g.h"
 #include "citydlg_g.h"
-#include "client_main.h"
-#include "climap.h"
-#include "climisc.h"
-#include "combat.h"
 #include "dialogs_g.h"
-#include "editor.h"
-#include "goto.h"
 #include "gui_main_g.h"
 #include "mapctrl_g.h"
 #include "mapview_g.h"
 #include "menu_g.h"
+
+/* client */
+#include "audio.h"
+#include "client_main.h"
+#include "climap.h"
+#include "climisc.h"
+#include "editor.h"
+#include "goto.h"
 #include "options.h"
 #include "overview_common.h"
 #include "tilespec.h"
-#include "unitlist.h"
+#include "update_queue.h"
 
 #include "control.h"
+
+
+struct client_nuke_data {
+  int *units_id;
+  int units_num;
+  int tile_idx;
+};
 
 /* gui-dep code may adjust depending on tile size etc: */
 int num_units_below = MAX_NUM_UNITS_BELOW;
@@ -59,16 +69,20 @@ static struct unit_list *current_focus = NULL;
  * with keypad 5 (or the equivalent). */
 static struct unit_list *previous_focus = NULL;
 
-/* The priority unit(s) for advance_unit_focus(). */
+/* The priority unit(s) for unit_focus_advance(). */
 static struct unit_list *urgent_focus_queue = NULL;
 
 /* These should be set via set_hover_state() */
 enum cursor_hover_state hover_state = HOVER_NONE;
 enum unit_activity connect_activity;
+struct act_tgt connect_tgt;
 enum unit_orders goto_last_order; /* Last order for goto */
 
 static struct tile *hover_tile = NULL;
 static struct unit_list *battlegroups[MAX_NUM_BATTLEGROUPS];
+
+/* Current moving unit. */
+static struct unit *punit_moving = NULL;
 
 /* units involved in current combat */
 static struct unit *punit_attacking = NULL;
@@ -90,7 +104,7 @@ static struct unit *quickselect(struct tile *ptile,
                                 enum quickselect_type qtype);
 
 /**************************************************************************
-  Called only by client_game_init() in client/civclient.c
+  Called only by client_game_init() in client/client_main.c
 **************************************************************************/
 void control_init(void)
 {
@@ -110,7 +124,7 @@ void control_init(void)
 }
 
 /**************************************************************************
-  Called only by client_game_free() in client/civclient.c
+  Called only by client_game_free() in client/client_main.c
 **************************************************************************/
 void control_free(void)
 {
@@ -134,12 +148,12 @@ void control_free(void)
     battlegroups[i] = NULL;
   }
 
-  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
   free_client_goto();
 }
 
 /**************************************************************************
-...
+  Returns list of units currently in focus.
 **************************************************************************/
 struct unit_list *get_units_in_focus(void)
 {
@@ -171,7 +185,7 @@ static void store_previous_focus(void)
 /****************************************************************************
   Store a priority focus unit.
 ****************************************************************************/
-void urgent_unit_focus(struct unit *punit)
+void unit_focus_urgent(struct unit *punit)
 {
   unit_list_append(urgent_focus_queue, punit);
 }
@@ -198,7 +212,7 @@ void control_unit_killed(struct unit *punit)
 
   unit_list_remove(get_units_in_focus(), punit);
   if (get_num_units_in_focus() < 1) {
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
   }
 
   unit_list_remove(previous_focus, punit);
@@ -246,11 +260,12 @@ void unit_register_battlegroup(struct unit *punit)
 /**************************************************************************
   Enter the given hover state.
 
-    activity => The connect activity (ACTIVITY_ROAD, etc.)
+    activity => The connect activity (ACTIVITY_IRRIGATE, etc.)
     order => The last order (ORDER_BUILD_CITY, ORDER_LAST, etc.)
 **************************************************************************/
 void set_hover_state(struct unit_list *punits, enum cursor_hover_state state,
 		     enum unit_activity activity,
+                     struct act_tgt *tgt,
 		     enum unit_orders order)
 {
   fc_assert_ret((punits && unit_list_size(punits) > 0)
@@ -259,6 +274,12 @@ void set_hover_state(struct unit_list *punits, enum cursor_hover_state state,
   fc_assert_ret(state == HOVER_GOTO || order == ORDER_LAST);
   hover_state = state;
   connect_activity = activity;
+  if (tgt) {
+    connect_tgt = *tgt;
+  } else {
+    connect_tgt.type = ATT_SPECIAL;
+    connect_tgt.obj.spe = S_LAST;
+  }
   goto_last_order = order;
   exit_goto_state();
 }
@@ -268,7 +289,7 @@ void set_hover_state(struct unit_list *punits, enum cursor_hover_state state,
 ****************************************************************************/
 bool unit_is_in_focus(const struct unit *punit)
 {
-  return unit_list_search(get_units_in_focus(), punit);
+  return unit_list_search(get_units_in_focus(), punit) != NULL;
 }
 
 /****************************************************************************
@@ -277,7 +298,7 @@ bool unit_is_in_focus(const struct unit *punit)
 struct unit *get_focus_unit_on_tile(const struct tile *ptile)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
-    if (punit->tile == ptile) {
+    if (unit_tile(punit) == ptile) {
       return punit;
     }
   } unit_list_iterate_end;
@@ -301,9 +322,9 @@ static struct tile *find_a_focus_unit_tile_to_center_on(void)
   struct unit *punit;
 
   if (NULL != (punit = get_focus_unit_on_tile(get_center_tile_mapcanvas()))) {
-    return punit->tile;
+    return unit_tile(punit);
   } else if (get_num_units_in_focus() > 0) {
-    return head_of_units_in_focus()->tile;
+    return unit_tile(head_of_units_in_focus());
   } else {
     return NULL;
   }
@@ -323,18 +344,27 @@ void auto_center_on_focus_unit(void)
 }
 
 /**************************************************************************
-  ...
+  Add unit to list of units currently in focus.
 **************************************************************************/
 static void current_focus_append(struct unit *punit)
 {
   unit_list_append(current_focus, punit);
 
   punit->client.focus_status = FOCUS_AVAIL;
-  refresh_unit_mapcanvas(punit, punit->tile, TRUE, FALSE);
+  refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
 
   if (unit_selection_clears_orders) {
     clear_unit_orders(punit);
   }
+}
+
+/**************************************************************************
+  Remove focus from unit.
+**************************************************************************/
+static void current_focus_remove(struct unit *punit)
+{
+  unit_list_remove(current_focus, punit);
+  refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
 }
 
 /**************************************************************************
@@ -365,7 +395,7 @@ void clear_unit_orders(struct unit *punit)
   happens immediately as a result of a client action.  Other times it
   happens because of a server-sent packet that wakes up a unit.
 **************************************************************************/
-void set_unit_focus(struct unit *punit)
+void unit_focus_set(struct unit *punit)
 {
   bool focus_changed = FALSE;
 
@@ -388,7 +418,7 @@ void set_unit_focus(struct unit *punit)
   /* Redraw the old focus unit (to fix blinking or remove the selection
    * circle). */
   unit_list_iterate(current_focus, punit_old) {
-    refresh_unit_mapcanvas(punit_old, punit_old->tile, TRUE, FALSE);
+    refresh_unit_mapcanvas(punit_old, unit_tile(punit_old), TRUE, FALSE);
   } unit_list_iterate_end;
   unit_list_clear(current_focus);
 
@@ -405,7 +435,7 @@ void set_unit_focus(struct unit *punit)
   }
 
   if (focus_changed) {
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
     focus_units_changed();
   }
 }
@@ -413,7 +443,7 @@ void set_unit_focus(struct unit *punit)
 /**************************************************************************
   Adds this unit to the list of units in focus.
 **************************************************************************/
-void add_unit_focus(struct unit *punit)
+void unit_focus_add(struct unit *punit)
 {
   if (NULL != punit
       && NULL != client.conn.playing
@@ -433,7 +463,7 @@ void add_unit_focus(struct unit *punit)
   if (hover_state != HOVER_NONE) {
     /* Can't continue with current goto if set of focus units
      * change. Cancel it. */
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
   }
 
   current_focus_append(punit);
@@ -441,13 +471,47 @@ void add_unit_focus(struct unit *punit)
 }
 
 /**************************************************************************
+  Removes this unit from the list of units in focus.
+**************************************************************************/
+void unit_focus_remove(struct unit *punit)
+{
+  if (NULL != punit
+      && NULL != client.conn.playing
+      && unit_owner(punit) != client.conn.playing) {
+    /* Callers should make sure this never happens. */
+    return;
+  }
+
+  if (NULL == punit || !can_client_change_view()) {
+    return;
+  }
+
+  if (!unit_is_in_focus(punit)) {
+    return;
+  }
+
+  if (hover_state != HOVER_NONE) {
+    /* Can't continue with current goto if set of focus units
+     * change. Cancel it. */
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
+  }
+
+  current_focus_remove(punit);
+  if (get_num_units_in_focus() > 0) {
+    focus_units_changed();
+  } else {
+    unit_focus_advance();
+  }
+}
+
+/**************************************************************************
  The only difference is that here we draw the "cross".
 **************************************************************************/
-void set_unit_focus_and_select(struct unit *punit)
+void unit_focus_set_and_select(struct unit *punit)
 {
-  set_unit_focus(punit);
+  unit_focus_set(punit);
   if (punit) {
-    put_cross_overlay_tile(punit->tile);
+    put_cross_overlay_tile(unit_tile(punit));
   }
 }
 
@@ -464,7 +528,7 @@ static struct unit *find_best_focus_candidate(bool accept_current)
     struct unit *pfirst = head_of_units_in_focus();
 
     if (pfirst) {
-      ptile = pfirst->tile;
+      ptile = unit_tile(pfirst);
     }
   }
 
@@ -475,7 +539,7 @@ static struct unit *find_best_focus_candidate(bool accept_current)
 	  && punit->client.focus_status == FOCUS_AVAIL
 	  && punit->activity == ACTIVITY_IDLE
 	  && !unit_has_orders(punit)
-	  && punit->moves_left > 0
+	  && (punit->moves_left > 0 || unit_type(punit)->move_rate == 0)
 	  && !punit->done_moving
 	  && !punit->ai_controlled) {
 	return punit;
@@ -487,13 +551,13 @@ static struct unit *find_best_focus_candidate(bool accept_current)
 }
 
 /**************************************************************************
- This function may be called from packhand.c, via update_unit_focus(),
+ This function may be called from packhand.c, via unit_focus_update(),
  as a result of packets indicating change in activity for a unit. Also
  called when user press the "Wait" command.
  
  FIXME: Add feature to focus only units of a certain category.
 **************************************************************************/
-void advance_unit_focus(void)
+void unit_focus_advance(void)
 {
   struct unit *candidate = NULL;
   const int num_units_in_old_focus = get_num_units_in_focus();
@@ -501,11 +565,11 @@ void advance_unit_focus(void)
   if (NULL == client.conn.playing
       || !is_player_phase(client.conn.playing, game.info.phase)
       || !can_client_change_view()) {
-    set_unit_focus(NULL);
+    unit_focus_set(NULL);
     return;
   }
 
-  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
 
   unit_list_iterate(get_units_in_focus(), punit) {
     /* 
@@ -520,26 +584,37 @@ void advance_unit_focus(void)
 
   if (unit_list_size(urgent_focus_queue) > 0) {
     /* Try top of the urgent list. */
-    candidate = unit_list_get(urgent_focus_queue, 0);
+    struct tile *focus_tile = (get_num_units_in_focus() > 0
+                               ? unit_tile(head_of_units_in_focus())
+                               : NULL);
 
-    if (get_num_units_in_focus() > 0) {
-      /* Rarely, more than one unit on the same tile will be in the list. */
-      unit_list_iterate(urgent_focus_queue, punit) {
-        if (head_of_units_in_focus()->tile == punit->tile) {
-          /* Use the first one found */
-          candidate = punit;
-          break;
-        }
-      } unit_list_iterate_end;
-    }
-    unit_list_remove(urgent_focus_queue, candidate);
+    unit_list_both_iterate(urgent_focus_queue, plink, punit) {
+      if (ACTIVITY_IDLE != punit->activity
+          || unit_has_orders(punit)) {
+        /* We have assigned new orders to this unit since, remove it. */
+        unit_list_erase(urgent_focus_queue, plink);
+      } else if (NULL == focus_tile
+                 || focus_tile == unit_tile(punit)) {
+        /* Use the first one found */
+        candidate = punit;
+        break;
+      } else if (NULL == candidate) {
+        candidate = punit;
+      }
+    } unit_list_both_iterate_end;
 
-    /* Autocenter on Wakeup, regardless of the local option 
-     * "auto_center_on_unit". */
-    if (!tile_visible_and_not_on_border_mapcanvas(candidate->tile)) {
-      center_tile_mapcanvas(candidate->tile);
+    if (NULL != candidate) {
+      unit_list_remove(urgent_focus_queue, candidate);
+
+      /* Autocenter on Wakeup, regardless of the local option
+       * "auto_center_on_unit". */
+      if (!tile_visible_and_not_on_border_mapcanvas(unit_tile(candidate))) {
+        center_tile_mapcanvas(unit_tile(candidate));
+      }
     }
-  } else {
+  }
+
+  if (NULL == candidate) {
     candidate = find_best_focus_candidate(FALSE);
 
     if (!candidate) {
@@ -558,7 +633,7 @@ void advance_unit_focus(void)
     }
   }
 
-  set_unit_focus(candidate);
+  unit_focus_set(candidate);
 
   /* 
    * Handle auto-turn-done mode: If a unit was in focus (did move),
@@ -580,7 +655,7 @@ void advance_unit_focus(void)
  We let GOTO-ing units stay in focus, so that if they have moves left
  at the end of the goto, then they are still in focus.
 **************************************************************************/
-void update_unit_focus(void)
+void unit_focus_update(void)
 {
   if (NULL == client.conn.playing || !can_client_change_view()) {
     return;
@@ -599,7 +674,7 @@ void update_unit_focus(void)
     }
   } unit_list_iterate_end;
 
-  advance_unit_focus();
+  unit_focus_advance();
 }
 
 /**************************************************************************
@@ -608,7 +683,6 @@ Return a pointer to a visible unit, if there is one.
 struct unit *find_visible_unit(struct tile *ptile)
 {
   struct unit *panyowned = NULL, *panyother = NULL, *ptptother = NULL;
-  struct unit *pfocus;
 
   /* If no units here, return nothing. */
   if (unit_list_size(ptile->units)==0) {
@@ -616,23 +690,25 @@ struct unit *find_visible_unit(struct tile *ptile)
   }
 
   /* If a unit is attacking we should show that on top */
-  if (punit_attacking && same_pos(punit_attacking->tile, ptile)) {
+  if (punit_attacking && same_pos(unit_tile(punit_attacking), ptile)) {
     unit_list_iterate(ptile->units, punit)
       if(punit == punit_attacking) return punit;
     unit_list_iterate_end;
   }
 
   /* If a unit is defending we should show that on top */
-  if (punit_defending && same_pos(punit_defending->tile, ptile)) {
+  if (punit_defending && same_pos(unit_tile(punit_defending), ptile)) {
     unit_list_iterate(ptile->units, punit)
       if(punit == punit_defending) return punit;
     unit_list_iterate_end;
   }
 
   /* If the unit in focus is at this tile, show that on top */
-  if ((pfocus = get_focus_unit_on_tile(ptile))) {
-    return pfocus;
-  }
+  unit_list_iterate(get_units_in_focus(), punit) {
+    if (punit != punit_moving && unit_tile(punit) == ptile) {
+      return punit;
+    }
+  } unit_list_iterate_end;
 
   /* If a city is here, return nothing (unit hidden by city). */
   if (tile_city(ptile)) {
@@ -647,14 +723,14 @@ struct unit *find_visible_unit(struct tile *ptile)
      (always return first in stack). */
   unit_list_iterate(ptile->units, punit)
     if (unit_owner(punit) == client.conn.playing) {
-      if (punit->transported_by == -1) {
+      if (!unit_transported(punit)) {
         if (get_transporter_capacity(punit) > 0) {
 	  return punit;
         } else if (!panyowned) {
 	  panyowned = punit;
         }
       }
-    } else if (!ptptother && punit->transported_by == -1) {
+    } else if (!ptptother && !unit_transported(punit)) {
       if (get_transporter_capacity(punit) > 0) {
 	ptptother = punit;
       } else if (!panyother) {
@@ -676,22 +752,23 @@ double blink_active_unit(void)
   const double blink_time = get_focus_unit_toggle_timeout(tileset);
 
   if (get_num_units_in_focus() > 0) {
-    if (!blink_timer || read_timer_seconds(blink_timer) > blink_time) {
+    if (!blink_timer || timer_read_seconds(blink_timer) > blink_time) {
       toggle_focus_unit_state(tileset);
 
       /* If we lag, we don't try to catch up.  Instead we just start a
        * new blink_time on every update. */
-      blink_timer = renew_timer_start(blink_timer, TIMER_USER, TIMER_ACTIVE);
+      blink_timer = timer_renew(blink_timer, TIMER_USER, TIMER_ACTIVE);
+      timer_start(blink_timer);
 
       unit_list_iterate(get_units_in_focus(), punit) {
 	/* We flush to screen directly here.  This is most likely faster
 	 * since these drawing operations are all small but may be spread
 	 * out widely. */
-	refresh_unit_mapcanvas(punit, punit->tile, FALSE, TRUE);
+	refresh_unit_mapcanvas(punit, unit_tile(punit), FALSE, TRUE);
       } unit_list_iterate_end;
     }
 
-    return blink_time - read_timer_seconds(blink_timer);
+    return blink_time - timer_read_seconds(blink_timer);
   }
 
   return blink_time;
@@ -708,26 +785,38 @@ double blink_turn_done_button(void)
 
   if (NULL != client.conn.playing
       && client.conn.playing->is_alive
-      && !client.conn.playing->phase_done) {
-    if (!blink_timer || read_timer_seconds(blink_timer) > blink_time) {
+      && !client.conn.playing->phase_done
+      && is_player_phase(client.conn.playing, game.info.phase)) {
+    if (!blink_timer || timer_read_seconds(blink_timer) > blink_time) {
       int is_waiting = 0, is_moving = 0;
+      bool blocking_mode;
+      struct option *opt;
 
-      players_iterate(pplayer) {
-	if (pplayer->is_alive && pplayer->is_connected) {
-	  if (pplayer->phase_done) {
-	    is_waiting++;
-	  } else {
-	    is_moving++;
-	  }
-	}
-      } players_iterate_end;
+      opt = optset_option_by_name(server_optset, "turnblock");
+      if (opt != NULL) {
+        blocking_mode = option_bool_get(opt);
+      } else {
+        blocking_mode = FALSE;
+      }
+
+      players_iterate_alive(pplayer) {
+        if ((pplayer->is_connected || blocking_mode)
+            && is_player_phase(pplayer, game.info.phase)) {
+          if (pplayer->phase_done) {
+            is_waiting++;
+          } else {
+            is_moving++;
+          }
+        }
+      } players_iterate_alive_end;
 
       if (is_moving == 1 && is_waiting > 0) {
 	update_turn_done_button(FALSE);	/* stress the slow player! */
       }
-      blink_timer = renew_timer_start(blink_timer, TIMER_USER, TIMER_ACTIVE);
+      blink_timer = timer_renew(blink_timer, TIMER_USER, TIMER_ACTIVE);
+      timer_start(blink_timer);
     }
-    return blink_time - read_timer_seconds(blink_timer);
+    return blink_time - timer_read_seconds(blink_timer);
   }
 
   return blink_time;
@@ -766,7 +855,7 @@ void update_unit_pix_label(struct unit_list *punitlist)
     set_unit_icon(-1, punit);
 
     i = 0;			/* index into unit_below_canvas */
-    unit_list_iterate(punit->tile->units, aunit) {
+    unit_list_iterate(unit_tile(punit)->units, aunit) {
       if (aunit != punit) {
 	if (i < num_units_below) {
 	  set_unit_icon(i, aunit);
@@ -793,7 +882,7 @@ void update_unit_pix_label(struct unit_list *punitlist)
 }
 
 /**************************************************************************
-...
+  Adjusts way combatants are displayed suitable for combat.
 **************************************************************************/
 void set_units_in_combat(struct unit *pattacker, struct unit *pdefender)
 {
@@ -898,15 +987,15 @@ void process_diplomat_arrival(struct unit *pdiplomat, int victim_id)
     pcity = game_city_by_number(victim_id);
     punit = game_unit_by_number(victim_id);
 
-    if (!pdiplomat || !unit_has_type_flag(pdiplomat, F_DIPLOMAT))
+    if (!pdiplomat || !unit_has_type_flag(pdiplomat, UTYF_DIPLOMAT))
       continue;
 
     if (punit
 	&& is_diplomat_action_available(pdiplomat, DIPLOMAT_ANY_ACTION,
-					punit->tile)
+					unit_tile(punit))
 	&& diplomat_can_do_action(pdiplomat, DIPLOMAT_ANY_ACTION,
-				  punit->tile)) {
-      popup_diplomat_dialog(pdiplomat, punit->tile);
+				  unit_tile(punit))) {
+      popup_diplomat_dialog(pdiplomat, unit_tile(punit));
       return;
     } else if (pcity
 	       && is_diplomat_action_available(pdiplomat, DIPLOMAT_ANY_ACTION,
@@ -931,7 +1020,8 @@ void request_unit_goto(enum unit_orders last_order)
   }
 
   if (hover_state != HOVER_GOTO) {
-    set_hover_state(punits, HOVER_GOTO, ACTIVITY_LAST, last_order);
+    set_hover_state(punits, HOVER_GOTO, ACTIVITY_LAST, NULL,
+                    last_order);
     enter_goto_state(punits);
     create_line_at_mouse_pos();
     update_unit_info_label(punits);
@@ -949,7 +1039,8 @@ static bool can_units_attack_at(struct unit_list *punits,
 				const struct tile *ptile)
 {
   unit_list_iterate(punits, punit) {
-    if (is_attack_unit(punit) && can_unit_attack_tile(punit, ptile)) {
+    if (is_attack_unit(punit)
+        && can_unit_attack_tile(punit, ptile)) {
       return TRUE;
     }
   } unit_list_iterate_end;
@@ -1044,8 +1135,11 @@ void control_mouse_cursor(struct tile *ptile)
     }
     break;
   case HOVER_NUKE:
-    /* FIXME: check for invalid tiles. */
-    mouse_cursor_type = CURSOR_NUKE;
+    if (is_valid_goto_destination(ptile)) {
+      mouse_cursor_type = CURSOR_NUKE;
+    } else {
+      mouse_cursor_type = CURSOR_INVALID;
+    }
     break;
   case HOVER_PARADROP:
     /* FIXME: check for invalid tiles. */
@@ -1072,15 +1166,64 @@ static bool is_activity_on_tile(struct tile *ptile,
 }
 
 /**************************************************************************
+  Fill orders to build recursive roads. This modifies ptile, so virtual
+  copy of the real tile should be passed.
+**************************************************************************/
+int check_recursive_road_connect(struct tile *ptile, const struct road_type *proad,
+                                 const struct unit *punit, const struct player *pplayer, int rec)
+{
+  int activity_mc = 0;
+  struct terrain *pterrain = tile_terrain(ptile);
+
+  if (rec > MAX_ROAD_TYPES) {
+    return -1;
+  }
+
+  road_deps_iterate(&(proad->reqs), pdep) {
+    if (!tile_has_road(ptile, pdep)) {
+      int single_mc;
+
+      single_mc = check_recursive_road_connect(ptile, pdep, punit, pplayer, rec + 1);
+
+      if (single_mc < 0) {
+        return -1;
+      }
+
+      activity_mc += single_mc;
+    }
+  } road_deps_iterate_end;
+
+  /* Can build road after that? */
+  if (punit != NULL) {
+    if (!can_build_road(proad, punit, ptile)) {
+      return -1;
+    }
+  } else if (pplayer != NULL) {
+    if (!player_can_build_road(proad, pplayer, ptile)) {
+      return -1;
+    }
+  }
+
+  tile_add_road(ptile, proad);
+
+  activity_mc += terrain_road_time(pterrain, road_index(proad));
+
+  return activity_mc;
+}
+
+/**************************************************************************
   Return whether the unit can connect with given activity (or with
   any activity if activity arg is set to ACTIVITY_IDLE)
 
   This function is client-specific.
 **************************************************************************/
-bool can_unit_do_connect(struct unit *punit, enum unit_activity activity) 
+bool can_unit_do_connect(struct unit *punit,
+                         enum unit_activity activity,
+                         struct act_tgt *tgt) 
 {
-  struct player *pplayer = unit_owner(punit);
-  struct terrain *pterrain = tile_terrain(punit->tile);
+  struct tile *ptile = unit_tile(punit);
+  struct terrain *pterrain = tile_terrain(ptile);
+  struct road_type *proad = NULL;
 
   /* HACK: This code duplicates that in
    * can_unit_do_activity_targeted_at(). The general logic here is that
@@ -1090,29 +1233,43 @@ bool can_unit_do_connect(struct unit *punit, enum unit_activity activity)
    *     (a) the activity has already been completed at this tile
    *     (b) it can be done by the unit at this tile. */
   switch (activity) {
-  case ACTIVITY_ROAD:
-    return terrain_control.may_road
-      && unit_has_type_flag(punit, F_SETTLERS)
-      && (tile_has_special(punit->tile, S_ROAD)
-	  || (pterrain->road_time != 0
-	      && (!tile_has_special(punit->tile, S_RIVER)
-		  || player_knows_techs_with_flag(pplayer, TF_BRIDGE))));
-  case ACTIVITY_RAILROAD:
-    /* There is no check for existing road/rail; the connect is allowed
-     * regardless. It is assumed that if you know the TF_RAILROAD flag
-     * you must also know the TF_BRIDGE flag. */
-    return (terrain_control.may_road
-	    && unit_has_type_flag(punit, F_SETTLERS)
-	    && player_knows_techs_with_flag(pplayer, TF_RAILROAD));
+  case ACTIVITY_GEN_ROAD:
+    fc_assert(tgt->type == ATT_ROAD);
+    {
+      struct tile *vtile;
+      int build_time;
+
+      proad = road_by_number(tgt->obj.road);
+
+      if (proad == NULL) {
+        return FALSE;
+      }
+
+      if (tile_has_road(ptile, proad)) {
+        /* This tile has road, can unit build road to other tiles too? */
+        return are_reqs_active(NULL, NULL, NULL, NULL,
+                               unit_type(punit), NULL, NULL,
+                               &proad->reqs, RPT_POSSIBLE);
+      }
+
+      /* To start connect, unit must be able to build road to this
+       * particular tile. */
+      vtile = tile_virtual_new(ptile);
+      build_time = check_recursive_road_connect(vtile, proad, punit, NULL, 0);
+      tile_virtual_destroy(vtile);
+
+      return build_time >= 0;
+    }
+
   case ACTIVITY_IRRIGATE:
     /* Special case for irrigation: only irrigate to make S_IRRIGATION,
      * never to transform tiles. */
-    return (terrain_control.may_irrigate
-	    && unit_has_type_flag(punit, F_SETTLERS)
-	    && (tile_has_special(punit->tile, S_IRRIGATION)
-		|| (pterrain == pterrain->irrigation_result
-		    && is_water_adjacent_to_tile(punit->tile)
-		    && !is_activity_on_tile(punit->tile, ACTIVITY_MINE))));
+    return (unit_has_type_flag(punit, UTYF_SETTLERS)
+            && (tile_has_special(ptile, S_IRRIGATION)
+                || (pterrain == pterrain->irrigation_result
+                    && can_be_irrigated(ptile, punit)
+                    && !is_activity_on_tile(ptile,
+                                            ACTIVITY_MINE))));
   default:
     break;
   }
@@ -1121,19 +1278,22 @@ bool can_unit_do_connect(struct unit *punit, enum unit_activity activity)
 }
 
 /**************************************************************************
-prompt player for entering destination point for unit connect
-(e.g. connecting with roads)
+  Prompt player for entering destination point for unit connect
+  (e.g. connecting with roads)
 **************************************************************************/
-void request_unit_connect(enum unit_activity activity)
+void request_unit_connect(enum unit_activity activity,
+                          struct act_tgt *tgt)
 {
   struct unit_list *punits = get_units_in_focus();
 
-  if (!can_units_do_connect(punits, activity)) {
+  if (!can_units_do_connect(punits, activity, tgt)) {
     return;
   }
 
-  if (hover_state != HOVER_CONNECT || connect_activity != activity) {
-    set_hover_state(punits, HOVER_CONNECT, activity, ORDER_LAST);
+  if (hover_state != HOVER_CONNECT || connect_activity != activity
+      || (activity == ACTIVITY_GEN_ROAD
+          && !cmp_act_tgt(&connect_tgt, tgt))) {
+    set_hover_state(punits, HOVER_CONNECT, activity, tgt, ORDER_LAST);
     enter_goto_state(punits);
     create_line_at_mouse_pos();
     update_unit_info_label(punits);
@@ -1149,17 +1309,17 @@ void request_unit_connect(enum unit_activity activity)
 **************************************************************************/
 struct unit *request_unit_unload_all(struct unit *punit)
 {
-  struct tile *ptile = punit->tile;
+  struct tile *ptile = unit_tile(punit);
   struct unit *plast = NULL;
 
   if (get_transporter_capacity(punit) == 0) {
-    create_event(punit->tile, E_BAD_COMMAND, ftc_client,
+    create_event(unit_tile(punit), E_BAD_COMMAND, ftc_client,
                  _("Only transporter units can be unloaded."));
     return NULL;
   }
 
   unit_list_iterate(ptile->units, pcargo) {
-    if (pcargo->transported_by == punit->id) {
+    if (unit_transport_get(pcargo) == punit) {
       request_unit_unload(pcargo);
 
       if (pcargo->activity == ACTIVITY_SENTRY) {
@@ -1176,11 +1336,11 @@ struct unit *request_unit_unload_all(struct unit *punit)
 }
 
 /**************************************************************************
-...
+  Send unit airlift request to server.
 **************************************************************************/
 void request_unit_airlift(struct unit *punit, struct city *pcity)
 {
-  dsend_packet_unit_airlift(&client.conn, punit->id,pcity->id);
+  dsend_packet_unit_airlift(&client.conn, punit->id, pcity->id);
 }
 
 /**************************************************************************
@@ -1202,7 +1362,10 @@ void request_unit_return(struct unit *punit)
       struct unit_order order;
 
       order.order = ORDER_ACTIVITY;
+      order.dir = -1;
       order.activity = ACTIVITY_SENTRY;
+      order.base = BASE_NONE;
+      order.road = ROAD_NONE;
       send_goto_path(punit, path, &order);
     } else {
       send_goto_path(punit, path, NULL);
@@ -1212,7 +1375,7 @@ void request_unit_return(struct unit *punit)
 }
 
 /**************************************************************************
-  ...
+  Wakes all owned sentried units on tile.
 **************************************************************************/
 void wakeup_sentried_units(struct tile *ptile)
 {
@@ -1233,7 +1396,7 @@ void wakeup_sentried_units(struct tile *ptile)
 **************************************************************************/
 void request_unit_wakeup(struct unit *punit)
 {
-  wakeup_sentried_units(punit->tile);
+  wakeup_sentried_units(unit_tile(punit));
 }
 
 /****************************************************************************
@@ -1273,7 +1436,7 @@ void request_unit_select(struct unit_list *punits,
   punit_first = unit_list_get(punits, 0);
 
   if (seltype == SELTYPE_SINGLE) {
-    set_unit_focus(punit_first);
+    unit_focus_set(punit_first);
     return;
   }
 
@@ -1305,7 +1468,7 @@ void request_unit_select(struct unit_list *punits,
             && !unit_type_hash_lookup(type_table, unit_type(punit), NULL)) {
           continue;
         }
-        add_unit_focus(punit);
+        unit_focus_add(punit);
       } unit_list_iterate_end;
     } tile_hash_iterate_end;
   } else {
@@ -1319,7 +1482,7 @@ void request_unit_select(struct unit_list *punits,
         continue;
       }
 
-      add_unit_focus(punit);
+      unit_focus_add(punit);
     } unit_list_iterate_end;
   }
 
@@ -1389,7 +1552,7 @@ void request_move_unit_direction(struct unit *punit, int dir)
   struct tile *dest_tile;
 
   /* Catches attempts to move off map */
-  dest_tile = mapstep(punit->tile, dir);
+  dest_tile = mapstep(unit_tile(punit), dir);
   if (!dest_tile) {
     return;
   }
@@ -1403,7 +1566,8 @@ void request_move_unit_direction(struct unit *punit, int dir)
 }
 
 /**************************************************************************
-...
+  Send request for unit activity changing to server. If activity has
+  target, use request_new_unit_activity_targeted() instead.
 **************************************************************************/
 void request_new_unit_activity(struct unit *punit, enum unit_activity act)
 {
@@ -1412,19 +1576,28 @@ void request_new_unit_activity(struct unit *punit, enum unit_activity act)
   }
 
   dsend_packet_unit_change_activity(&client.conn, punit->id, act,
-                                    S_LAST, BASE_NONE);
+                                    S_LAST);
 }
 
 /**************************************************************************
-...
+  Send request for unit activity changing to server. This is for
+  activities that are targeted to certain special or base type.
 **************************************************************************/
 void request_new_unit_activity_targeted(struct unit *punit,
 					enum unit_activity act,
-					enum tile_special_type tgt,
-                                        Base_type_id base)
+					struct act_tgt *tgt)
 {
-  dsend_packet_unit_change_activity(&client.conn, punit->id, act, tgt,
-                                    base);
+  switch (tgt->type) {
+    case ATT_SPECIAL:
+      dsend_packet_unit_change_activity(&client.conn, punit->id, act, tgt->obj.spe);
+      break;
+    case ATT_BASE:
+      dsend_packet_unit_change_activity_base(&client.conn, punit->id, act, tgt->obj.base);
+      break;
+    case ATT_ROAD:
+      dsend_packet_unit_change_activity_road(&client.conn, punit->id, act, tgt->obj.road);
+      break;
+  }
 }
 
 /**************************************************************************
@@ -1437,12 +1610,27 @@ void request_new_unit_activity_base(struct unit *punit,
     return;
   }
 
-  dsend_packet_unit_change_activity(&client.conn, punit->id, ACTIVITY_BASE,
-				    S_LAST, base_number(pbase));
+  dsend_packet_unit_change_activity_base(&client.conn, punit->id, ACTIVITY_BASE,
+				         base_number(pbase));
 }
 
 /**************************************************************************
-...
+  Request road building activity for unit
+**************************************************************************/
+void request_new_unit_activity_road(struct unit *punit,
+				    const struct road_type *proad)
+{
+  if (!can_client_issue_orders()) {
+    return;
+  }
+
+  dsend_packet_unit_change_activity_road(&client.conn, punit->id,
+                                         ACTIVITY_GEN_ROAD,
+				         road_number(proad));
+}
+
+/**************************************************************************
+  Send request to disband unit to server.
 **************************************************************************/
 void request_unit_disband(struct unit *punit)
 {
@@ -1450,23 +1638,23 @@ void request_unit_disband(struct unit *punit)
 }
 
 /**************************************************************************
-...
+  Send request to change unit homecity to server.
 **************************************************************************/
 void request_unit_change_homecity(struct unit *punit)
 {
-  struct city *pcity=tile_city(punit->tile);
-  
+  struct city *pcity=tile_city(unit_tile(punit));
+
   if (pcity) {
     dsend_packet_unit_change_homecity(&client.conn, punit->id, pcity->id);
   }
 }
 
 /**************************************************************************
-...
+  Send request to upgrade unit to server.
 **************************************************************************/
 void request_unit_upgrade(struct unit *punit)
 {
-  struct city *pcity=tile_city(punit->tile);
+  struct city *pcity=tile_city(unit_tile(punit));
 
   if (pcity) {
     dsend_packet_unit_upgrade(&client.conn, punit->id);
@@ -1478,7 +1666,7 @@ void request_unit_upgrade(struct unit *punit)
 **************************************************************************/
 void request_unit_convert(struct unit *punit)
 {
-  dsend_packet_unit_convert(&client.conn, punit->id);
+  request_new_unit_activity(punit, ACTIVITY_CONVERT);
 }
 
 /****************************************************************************
@@ -1490,7 +1678,7 @@ void request_unit_autosettlers(const struct unit *punit)
   if (punit && can_unit_do_autosettlers(punit)) {
     dsend_packet_unit_autosettlers(&client.conn, punit->id);
   } else if (punit) {
-    create_event(punit->tile, E_BAD_COMMAND, ftc_client,
+    create_event(unit_tile(punit), E_BAD_COMMAND, ftc_client,
                  _("Only settler units can be put into auto mode."));
   }
 }
@@ -1498,7 +1686,7 @@ void request_unit_autosettlers(const struct unit *punit)
 /****************************************************************************
   Send a request to the server that the cargo be loaded into the transporter.
 
-  If ptransporter is NULL a transporter will be picked at random.
+  If ptransporter is NULL a suitable transporter will be chosen.
 ****************************************************************************/
 void request_unit_load(struct unit *pcargo, struct unit *ptrans)
 {
@@ -1514,7 +1702,7 @@ void request_unit_load(struct unit *pcargo, struct unit *ptrans)
     /* Sentry the unit.  Don't request_unit_sentry since this can give a
      * recursive loop. */
     dsend_packet_unit_change_activity(&client.conn, pcargo->id,
-                                      ACTIVITY_SENTRY, S_LAST, BASE_NONE);
+                                      ACTIVITY_SENTRY, S_LAST);
   }
 }
 
@@ -1524,29 +1712,30 @@ void request_unit_load(struct unit *pcargo, struct unit *ptrans)
 ****************************************************************************/
 void request_unit_unload(struct unit *pcargo)
 {
-  struct unit *ptrans = game_unit_by_number(pcargo->transported_by);
+  struct unit *ptrans = unit_transport_get(pcargo);
 
   if (can_client_issue_orders()
       && ptrans
       && can_unit_unload(pcargo, ptrans)
-      && can_unit_survive_at_tile(pcargo, pcargo->tile)) {
+      && can_unit_survive_at_tile(pcargo, unit_tile(pcargo))) {
     dsend_packet_unit_unload(&client.conn, pcargo->id, ptrans->id);
 
     if (unit_owner(pcargo) == client.conn.playing
         && pcargo->activity == ACTIVITY_SENTRY) {
       /* Activate the unit. */
       dsend_packet_unit_change_activity(&client.conn, pcargo->id,
-                                        ACTIVITY_IDLE, S_LAST, BASE_NONE);
+                                        ACTIVITY_IDLE, S_LAST);
     }
   }
 }
 
 /**************************************************************************
-...
+  Send request to do caravan action - establishing traderoute or
+  helping in wonder building - to server.
 **************************************************************************/
 void request_unit_caravan_action(struct unit *punit, enum packet_type action)
 {
-  if (!tile_city(punit->tile)) {
+  if (!tile_city(unit_tile(punit))) {
     return;
   }
 
@@ -1564,33 +1753,33 @@ void request_unit_caravan_action(struct unit *punit, enum packet_type action)
 **************************************************************************/
 void request_unit_nuke(struct unit_list *punits)
 {
-  bool can = FALSE;
-  struct tile *offender = NULL;
-
   if (unit_list_size(punits) == 0) {
     return;
   }
+
   unit_list_iterate(punits, punit) {
-    if (unit_has_type_flag(punit, F_NUCLEAR)) {
-      can = TRUE;
-      break;
-    }
-    if (!offender) { /* Take first offender tile/unit */
-      offender = punit->tile;
+    if (!unit_has_type_flag(punit, UTYF_NUCLEAR)) {
+      create_event(unit_tile(punit), E_BAD_COMMAND, ftc_client,
+                   _("Only nuclear units can do this."));
+      return;
     }
   } unit_list_iterate_end;
-  if (can) {
-    set_hover_state(punits, HOVER_NUKE, ACTIVITY_LAST, ORDER_LAST);
-    update_unit_info_label(punits);
+
+  if (hover_state != HOVER_NUKE) {
+    set_hover_state(punits, HOVER_NUKE, ACTIVITY_LAST, NULL, ORDER_LAST);
     enter_goto_state(punits);
+    create_line_at_mouse_pos();
+    update_unit_info_label(punits);
+    control_mouse_cursor(NULL);
   } else {
-    create_event(offender, E_BAD_COMMAND, ftc_client,
-                 _("Only nuclear units can do this."));
+    fc_assert_ret(goto_is_active());
+    goto_add_waypoint();
   }
 }
 
 /**************************************************************************
-...
+  Have the player select what tile to paradrop to. Once selected a
+  paradrop request will be sent to server.
 **************************************************************************/
 void request_unit_paradrop(struct unit_list *punits)
 {
@@ -1606,11 +1795,12 @@ void request_unit_paradrop(struct unit_list *punits)
       break;
     }
     if (!offender) { /* Take first offender tile/unit */
-      offender = punit->tile;
+      offender = unit_tile(punit);
     }
   } unit_list_iterate_end;
   if (can) {
-    set_hover_state(punits, HOVER_PARADROP, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(punits, HOVER_PARADROP, ACTIVITY_LAST, NULL,
+                    ORDER_LAST);
     update_unit_info_label(punits);
   } else {
     create_event(offender, E_BAD_COMMAND, ftc_client,
@@ -1619,7 +1809,7 @@ void request_unit_paradrop(struct unit_list *punits)
 }
 
 /**************************************************************************
-...
+  Either start new patrol route planning, or add waypoint to current one.
 **************************************************************************/
 void request_unit_patrol(void)
 {
@@ -1630,7 +1820,8 @@ void request_unit_patrol(void)
   }
 
   if (hover_state != HOVER_PATROL) {
-    set_hover_state(punits, HOVER_PATROL, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(punits, HOVER_PATROL, ACTIVITY_LAST, NULL,
+                    ORDER_LAST);
     update_unit_info_label(punits);
     enter_goto_state(punits);
     create_line_at_mouse_pos();
@@ -1641,7 +1832,7 @@ void request_unit_patrol(void)
 }
 
 /****************************************************************
-...
+  Try to sentry unit.
 *****************************************************************/
 void request_unit_sentry(struct unit *punit)
 {
@@ -1651,7 +1842,7 @@ void request_unit_sentry(struct unit *punit)
 }
 
 /****************************************************************
-...
+  Try to fortify unit.
 *****************************************************************/
 void request_unit_fortify(struct unit *punit)
 {
@@ -1661,53 +1852,66 @@ void request_unit_fortify(struct unit *punit)
 }
 
 /**************************************************************************
-...
+  Send pillage request to server.
 **************************************************************************/
 void request_unit_pillage(struct unit *punit)
 {
+  struct act_tgt target = { .type = ATT_SPECIAL, .obj.spe = S_LAST };
+
   if (!game.info.pillage_select) {
     /* Leave choice up to the server */
-    request_new_unit_activity_targeted(punit, ACTIVITY_PILLAGE, S_LAST,
-                                       BASE_NONE);
+    request_new_unit_activity_targeted(punit, ACTIVITY_PILLAGE, &target);
   } else {
-    struct tile *ptile = punit->tile;
+    struct tile *ptile = unit_tile(punit);
     bv_special pspossible;
     bv_bases bspossible;
+    bv_roads rspossible;
     int count = 0;
 
     BV_CLR_ALL(pspossible);
     tile_special_type_iterate(spe) {
+      target.obj.spe = spe;
+
       if (can_unit_do_activity_targeted_at(punit, ACTIVITY_PILLAGE,
-                                           spe, ptile, BASE_NONE)) {
+                                           &target, ptile)) {
         BV_SET(pspossible, spe);
         count++;
       }
     } tile_special_type_iterate_end;
 
     BV_CLR_ALL(bspossible);
+    target.type = ATT_BASE;
     base_type_iterate(pbase) {
-      Base_type_id b = base_index(pbase);
+      target.obj.base = base_index(pbase);
+
       if (can_unit_do_activity_targeted_at(punit, ACTIVITY_PILLAGE,
-                                           S_LAST, ptile, b)) {
-        BV_SET(bspossible, b);
+                                           &target, ptile)) {
+        BV_SET(bspossible, target.obj.base);
         count++;
       }
     } base_type_iterate_end;
 
-    if (count > 1) {
-      popup_pillage_dialog(punit, pspossible, bspossible);
-    } else {
-      Base_type_id pillage_base = BASE_NONE;
-      /* Should be only one choice... */
-      int what = get_preferred_pillage(pspossible, bspossible);
+    BV_CLR_ALL(rspossible);
+    target.type = ATT_ROAD;
+    road_type_iterate(proad) {
+      target.obj.road = road_index(proad);
 
-      if (what > S_LAST) {
-        pillage_base = what - S_LAST - 1;
-        what = S_LAST;
+      if (can_unit_do_activity_targeted_at(punit, ACTIVITY_PILLAGE,
+                                           &target, ptile)) {
+        BV_SET(rspossible, target.obj.road);
+        count++;
       }
+    } road_type_iterate_end;
 
-      request_new_unit_activity_targeted(punit, ACTIVITY_PILLAGE, what,
-                                         pillage_base);
+    if (count > 1) {
+      popup_pillage_dialog(punit, pspossible, bspossible, rspossible);
+    } else {
+      /* Should be only one choice... */
+      bool found = get_preferred_pillage(&target, pspossible, bspossible, rspossible);
+
+      if (found) {
+        request_new_unit_activity_targeted(punit, ACTIVITY_PILLAGE, &target);
+      }
     }
   }
 }
@@ -1761,6 +1965,19 @@ void request_toggle_map_borders(void)
   }
 
   draw_borders ^= 1;
+  update_map_canvas_visible();
+}
+
+/**************************************************************************
+ Toggle display of native tiles on the map
+**************************************************************************/
+void request_toggle_map_native(void) 
+{
+  if (!can_client_change_view()) {
+    return;
+  }
+
+  draw_native ^= 1;
   update_map_canvas_visible();
 }
 
@@ -1908,9 +2125,9 @@ void request_toggle_mines(void)
 }
 
 /**************************************************************************
- Toggle display of fortress and airbase
+ Toggle display of bases
 **************************************************************************/
-void request_toggle_fortress_airbase(void)
+void request_toggle_bases(void)
 {
   if (!can_client_change_view()) {
     return;
@@ -2026,7 +2243,7 @@ void request_toggle_fog_of_war(void)
 }
 
 /**************************************************************************
-...
+  Center to focus unit.
 **************************************************************************/
 void request_center_focus_unit(void)
 {
@@ -2038,7 +2255,8 @@ void request_center_focus_unit(void)
 }
 
 /**************************************************************************
-...
+  Set units in list to waiting focus. If they are current focus units,
+  advance focus.
 **************************************************************************/
 void request_units_wait(struct unit_list *punits)
 {
@@ -2046,12 +2264,12 @@ void request_units_wait(struct unit_list *punits)
     punit->client.focus_status = FOCUS_WAIT;
   } unit_list_iterate_end;
   if (punits == get_units_in_focus()) {
-    advance_unit_focus();
+    unit_focus_advance();
   }
 }
 
 /**************************************************************************
-...
+  Set focus units to FOCUS_DONE state.
 **************************************************************************/
 void request_unit_move_done(void)
 {
@@ -2069,7 +2287,7 @@ void request_unit_move_done(void)
       punit->client.focus_status = new_status;
     } unit_list_iterate_end;
     if (new_status == FOCUS_DONE) {
-      advance_unit_focus();
+      unit_focus_advance();
     }
   }
 }
@@ -2081,20 +2299,20 @@ void request_unit_move_done(void)
 **************************************************************************/
 void do_move_unit(struct unit *punit, struct unit *target_unit)
 {
-  struct tile *src_tile = punit->tile, *dst_tile = target_unit->tile;
+  struct tile *src_tile = unit_tile(punit);
+  struct tile *dst_tile = unit_tile(target_unit);
   bool was_teleported, do_animation;
+  bool in_focus = unit_is_in_focus(punit);
 
   was_teleported = !is_tiles_adjacent(src_tile, dst_tile);
   do_animation = (!was_teleported && smooth_move_unit_msec > 0);
 
   if (!was_teleported
       && punit->activity != ACTIVITY_SENTRY
-      && punit->transported_by == -1) {
+      && !unit_transported(punit)) {
     audio_play_sound(unit_type(punit)->sound_move,
-		     unit_type(punit)->sound_move_alt);
+                     unit_type(punit)->sound_move_alt);
   }
-
-  unit_list_remove(src_tile->units, punit);
 
   if (unit_owner(punit) == client.conn.playing
       && auto_center_on_unit
@@ -2105,11 +2323,20 @@ void do_move_unit(struct unit *punit, struct unit *target_unit)
     center_tile_mapcanvas(dst_tile);
   }
 
-  /* Set the tile before the movement animation is done, so that everything
-   * drawn there will be up-to-date. */
-  punit->tile = dst_tile;
+  if (hover_state != HOVER_NONE && in_focus) {
+    /* Cancel current goto/patrol/connect/nuke command. */
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
+    update_unit_info_label(get_units_in_focus());
+  }
 
-  if (punit->transported_by == -1) {
+  unit_list_remove(src_tile->units, punit);
+
+  if (!unit_transported(punit)) {
+    /* Mark the unit as moving unit, then find_visible_unit() won't return
+     * it. It is especially useful to don't draw many times the unit when
+     * refreshing the canvas. */
+    punit_moving = punit;
+
     /* We have to refresh the tile before moving.  This will draw
      * the tile without the unit (because it was unlinked above). */
     refresh_unit_mapcanvas(punit, src_tile, TRUE, FALSE);
@@ -2124,9 +2351,13 @@ void do_move_unit(struct unit *punit, struct unit *target_unit)
     }
   }
 
+  unit_tile_set(punit, dst_tile);
   unit_list_prepend(dst_tile->units, punit);
 
-  if (punit->transported_by == -1) {
+  if (!unit_transported(punit)) {
+    /* For find_visible_unit(), see above. */
+    punit_moving = NULL;
+
     refresh_unit_mapcanvas(punit, dst_tile, TRUE, FALSE);
   }
 
@@ -2142,7 +2373,7 @@ void do_move_unit(struct unit *punit, struct unit *target_unit)
     update_city_description(tile_city(dst_tile));
   }
 
-  if (unit_is_in_focus(punit)) {
+  if (in_focus) {
     menus_update();
   }
 }
@@ -2155,8 +2386,6 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
   struct city *pcity = tile_city(ptile);
   struct unit_list *punits = get_units_in_focus();
   bool maybe_goto = FALSE;
-  bool possible = FALSE;
-  struct tile *offender = NULL;
 
   if (hover_state != HOVER_NONE) {
     switch (hover_state) {
@@ -2166,26 +2395,7 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
       do_unit_goto(ptile);
       break;
     case HOVER_NUKE:
-      unit_list_iterate(punits, punit) {
-	if (SINGLE_MOVE * real_map_distance(punit->tile, ptile)
-	    <= punit->moves_left) {
-	  possible = TRUE;
-	  break;
-	}
-	offender = punit->tile;
-      } unit_list_iterate_end;
-      if (!possible) {
-        create_event(offender, E_BAD_COMMAND, ftc_client,
-                     _("Too far for this unit."));
-      } else {
-        do_unit_goto(ptile);
-	if (!pcity) {
-	  unit_list_iterate(punits, punit) {
-	    /* note that this will be executed by the server after the goto */
-	    do_unit_nuke(punit);
-	  } unit_list_iterate_end;
-	}
-      }
+      do_unit_nuke(ptile);
       break;
     case HOVER_PARADROP:
       unit_list_iterate(punits, punit) {
@@ -2193,14 +2403,14 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
       } unit_list_iterate_end;
       break;
     case HOVER_CONNECT:
-      do_unit_connect(ptile, connect_activity);
+      do_unit_connect(ptile, connect_activity, &connect_tgt);
       break;
     case HOVER_PATROL:
       do_unit_patrol_to(ptile);
       break;	
     }
 
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
     update_unit_info_label(get_units_in_focus());
   }
 
@@ -2208,7 +2418,7 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
   else if (qtype != SELECT_POPUP && qtype != SELECT_APPEND) {
     struct unit *qunit = quickselect(ptile, qtype);
     if (qunit) {
-      set_unit_focus_and_select(qunit);
+      unit_focus_set_and_select(qunit);
       maybe_goto = keyboardless_goto;
     }
   }
@@ -2223,21 +2433,21 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
     maybe_goto = keyboardless_goto;
   }
   else if (unit_list_size(ptile->units) == 1
-           && !unit_list_get(ptile->units, 0)->occupy) {
+           && !get_transporter_occupancy(unit_list_get(ptile->units, 0))) {
     struct unit *punit=unit_list_get(ptile->units, 0);
 
     if (unit_owner(punit) == client.conn.playing) {
       if(can_unit_do_activity(punit, ACTIVITY_IDLE)) {
         maybe_goto = keyboardless_goto;
 	if (qtype == SELECT_APPEND) {
-	  add_unit_focus(punit);
+	  unit_focus_add(punit);
 	} else {
-	  set_unit_focus_and_select(punit);
+	  unit_focus_set_and_select(punit);
 	}
       }
     } else if (pcity) {
       /* Don't hide the unit in the city. */
-      popup_unit_select_dialog(ptile);
+//      unit_select_dialog_popup(ptile);
     }
   }
   else if(unit_list_size(ptile->units) > 0) {
@@ -2247,7 +2457,7 @@ void do_map_click(struct tile *ptile, enum quickselect_type qtype)
      * owned a unit on the tile.  This gave cheating clients an advantage,
      * and also showed you allied units if (and only if) you had a unit on
      * the tile (inconsistent). */
-    popup_unit_select_dialog(ptile);
+//    unit_select_dialog_popup(ptile);
   }
 
   /* See mapctrl_common.c */
@@ -2380,7 +2590,7 @@ static struct unit *quickselect(struct tile *ptile,
 **************************************************************************/
 void do_unit_goto(struct tile *ptile)
 {
-  if (hover_state != HOVER_GOTO && hover_state != HOVER_NUKE) {
+  if (hover_state != HOVER_GOTO) {
     return;
   }
 
@@ -2392,12 +2602,79 @@ void do_unit_goto(struct tile *ptile)
   }
 }
 
-/**************************************************************************
-Explode nuclear at a tile without enemy units
-**************************************************************************/
-void do_unit_nuke(struct unit *punit)
+/****************************************************************************
+  Destroy the client nuke data.
+****************************************************************************/
+static void client_nuke_data_destroy(void *p)
 {
-  dsend_packet_unit_nuke(&client.conn, punit->id);
+  struct client_nuke_data *data = p;
+
+  free(data->units_id);
+  free(data);
+}
+
+/****************************************************************************
+  Explode nuclear at a tile without enemy units.
+****************************************************************************/
+static void do_real_unit_nuke(void *p)
+{
+  struct client_nuke_data *data = p;
+  struct tile *ptile = index_to_tile(data->tile_idx);
+  struct unit *punit;
+  int i;
+
+  fc_assert_ret(can_client_issue_orders());
+  fc_assert_ret(ptile != NULL);
+
+  for (i = 0; i < data->units_num; i++) {
+    /* Ensure we have reached destination. */
+    punit = player_unit_by_number(client_player(), data->units_id[i]);
+    if (punit != NULL && unit_tile(punit) == ptile) {
+      dsend_packet_unit_nuke(&client.conn, punit->id);
+    }
+  }
+}
+
+/****************************************************************************
+  Send units to 'ptile' and nuke there!
+****************************************************************************/
+void do_unit_nuke(struct tile *ptile)
+{
+  if (hover_state != HOVER_NUKE) {
+    return;
+  }
+
+  if (is_valid_goto_draw_line(ptile)) {
+    struct client_nuke_data *data = fc_malloc(sizeof(*data));
+    int last_request_id_used = client.conn.client.last_request_id_used;
+    int i = 0;
+
+    data->units_id = fc_malloc(sizeof(*data->units_id)
+                               * get_num_units_in_focus());
+    unit_list_iterate(get_units_in_focus(), punit) {
+      data->units_id[i++] = punit->id;
+    } unit_list_iterate_end;
+    data->units_num = i;
+    data->tile_idx = tile_index(ptile);
+
+    send_goto_route();
+
+    if (last_request_id_used != client.conn.client.last_request_id_used) {
+      /* We sent some packets, let's wait the server to process them to know
+       * where our units hold. */
+      update_queue_connect_processing_finished_full
+          (client.conn.client.last_request_id_used,
+           do_real_unit_nuke, data, client_nuke_data_destroy);
+    } else {
+      /* We didn't sent the packets, that mean that the route was nil, or
+       * an internal error occurred. Process nuke units now. */
+      do_real_unit_nuke(data);
+      client_nuke_data_destroy(data);
+    }
+  } else {
+    create_event(ptile, E_BAD_COMMAND, ftc_client,
+                 _("Didn't find a route to the destination!"));
+  }
 }
 
 /**************************************************************************
@@ -2421,23 +2698,24 @@ void do_unit_patrol_to(struct tile *ptile)
                  _("Didn't find a route to the destination!"));
   }
 
-  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
 }
  
 /**************************************************************************
   "Connect" to the given location.
 **************************************************************************/
 void do_unit_connect(struct tile *ptile,
-		     enum unit_activity activity)
+		     enum unit_activity activity,
+                     struct act_tgt *tgt)
 {
   if (is_valid_goto_draw_line(ptile)) {
-    send_connect_route(activity);
+    send_connect_route(activity, tgt);
   } else {
     create_event(ptile, E_BAD_COMMAND, ftc_client,
                  _("Didn't find a route to the destination!"));
   }
 
-  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+  set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
 }
  
 /**************************************************************************
@@ -2451,20 +2729,20 @@ void key_cancel_action(void)
   case HOVER_GOTO:
   case HOVER_PATROL:
   case HOVER_CONNECT:
+  case HOVER_NUKE:
     if (goto_pop_waypoint()) {
       break;
     }
     /* else fall through: */
-  case HOVER_NUKE:
   case HOVER_PARADROP:
-    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, ORDER_LAST);
+    set_hover_state(NULL, HOVER_NONE, ACTIVITY_LAST, NULL, ORDER_LAST);
     update_unit_info_label(get_units_in_focus());
 
     keyboardless_goto_button_down = FALSE;
     keyboardless_goto_active = FALSE;
     keyboardless_goto_start_tile = NULL;
     break;
-  default:
+  case HOVER_NONE:
     break;
   };
 }
@@ -2474,7 +2752,7 @@ void key_cancel_action(void)
 **************************************************************************/
 void key_center_capital(void)
 {
-  struct city *capital = player_palace(client_player());
+  struct city *capital = player_capital(client_player());
 
   if (capital)  {
     /* Center on the tile, and pop up the crosshair overlay. */
@@ -2487,7 +2765,7 @@ void key_center_capital(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'end turn' input.
 **************************************************************************/
 void key_end_turn(void)
 {
@@ -2506,9 +2784,9 @@ void key_recall_previous_focus_unit(void)
    * removed from focus... */
   unit_list_iterate_safe(previous_focus, punit) {
     if (i == 0) {
-      set_unit_focus(punit);
+      unit_focus_set(punit);
     } else {
-      add_unit_focus(punit);
+      unit_focus_add(punit);
     }
     i++;
   } unit_list_iterate_safe_end;
@@ -2528,7 +2806,7 @@ void key_unit_move(enum direction8 gui_dir)
 }
 
 /**************************************************************************
-...
+  Handle use 'build city' input.
 **************************************************************************/
 void key_unit_build_city(void)
 {
@@ -2538,12 +2816,12 @@ void key_unit_build_city(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'help build wonder' input
 **************************************************************************/
 void key_unit_build_wonder(void)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
-    if (unit_has_type_flag(punit, F_HELP_WONDER)) {
+    if (unit_has_type_flag(punit, UTYF_HELP_WONDER)) {
       request_unit_caravan_action(punit, PACKET_UNIT_HELP_BUILD_WONDER);
     }
   } unit_list_iterate_end;
@@ -2552,23 +2830,23 @@ void key_unit_build_wonder(void)
 /**************************************************************************
 handle user pressing key for 'Connect' command
 **************************************************************************/
-void key_unit_connect(enum unit_activity activity)
+void key_unit_connect(enum unit_activity activity,
+                      struct act_tgt *tgt)
 {
-  request_unit_connect(activity);
+  request_unit_connect(activity, tgt);
 }
 
 /**************************************************************************
-...
+  Handle user 'diplomatic actions' input
 **************************************************************************/
 void key_unit_diplomat_actions(void)
 {
   struct city *pcity;		/* need pcity->id */
   unit_list_iterate(get_units_in_focus(), punit) {
     if (is_diplomat_unit(punit)
-	&& (pcity = tile_city(punit->tile))
-	&& diplomat_handled_in_diplomat_dialog() != -1    /* confusing otherwise? */
+	&& (pcity = tile_city(unit_tile(punit)))
 	&& diplomat_can_do_action(punit, DIPLOMAT_ANY_ACTION,
-				  punit->tile)) {
+				  unit_tile(punit))) {
       process_diplomat_arrival(punit, pcity->id);
       return;
       /* FIXME: diplomat dialog for more than one unit at a time. */
@@ -2577,7 +2855,7 @@ void key_unit_diplomat_actions(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'unit done' input
 **************************************************************************/
 void key_unit_done(void)
 {
@@ -2585,7 +2863,7 @@ void key_unit_done(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'unit goto' input
 **************************************************************************/
 void key_unit_goto(void)
 {
@@ -2601,7 +2879,7 @@ void key_unit_nuke(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'paradrop' input
 **************************************************************************/
 void key_unit_paradrop(void)
 {
@@ -2609,7 +2887,7 @@ void key_unit_paradrop(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'patrol' input
 **************************************************************************/
 void key_unit_patrol(void)
 {
@@ -2617,19 +2895,19 @@ void key_unit_patrol(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'establish traderoute' input
 **************************************************************************/
 void key_unit_trade_route(void)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
-    if (unit_has_type_flag(punit, F_TRADE_ROUTE)) {
+    if (unit_has_type_flag(punit, UTYF_TRADE_ROUTE)) {
       request_unit_caravan_action(punit, PACKET_UNIT_ESTABLISH_TRADE);
     }
   } unit_list_iterate_end;
 }
 
 /**************************************************************************
-...
+  Handle user 'unload all' input
 **************************************************************************/
 void key_unit_unload_all(void)
 {
@@ -2649,12 +2927,12 @@ void key_unit_unload_all(void)
        * don't do anything. */
       punit->client.focus_status = FOCUS_WAIT;
     } unit_list_iterate_end;
-    set_unit_focus(pnext_focus);
+    unit_focus_set(pnext_focus);
   }
 }
 
 /**************************************************************************
-...
+  Handle user 'wait' input
 **************************************************************************/
 void key_unit_wait(void)
 {
@@ -2662,7 +2940,7 @@ void key_unit_wait(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'wakeup others' input
 ***************************************************************************/
 void key_unit_wakeup_others(void)
 {
@@ -2672,13 +2950,13 @@ void key_unit_wakeup_others(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'build base of class airbase' input
 **************************************************************************/
 void key_unit_airbase(void)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
     struct base_type *pbase =
-      get_base_by_gui_type(BASE_GUI_AIRBASE, punit, punit->tile);
+      get_base_by_gui_type(BASE_GUI_AIRBASE, punit, unit_tile(punit));
 
     if (pbase) {
       request_new_unit_activity_base(punit, pbase);
@@ -2687,7 +2965,7 @@ void key_unit_airbase(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'autoexplore' input
 **************************************************************************/
 void key_unit_auto_explore(void)
 {
@@ -2732,7 +3010,7 @@ void key_unit_convert(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'clean fallout' input
 **************************************************************************/
 void key_unit_fallout(void)
 {
@@ -2744,7 +3022,7 @@ void key_unit_fallout(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'fortify' input
 **************************************************************************/
 void key_unit_fortify(void)
 {
@@ -2756,13 +3034,13 @@ void key_unit_fortify(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'build base of class fortress' input
 **************************************************************************/
 void key_unit_fortress(void)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
     struct base_type *pbase =
-      get_base_by_gui_type(BASE_GUI_FORTRESS, punit, punit->tile);
+      get_base_by_gui_type(BASE_GUI_FORTRESS, punit, unit_tile(punit));
 
     if (pbase) {
       request_new_unit_activity_base(punit, pbase);
@@ -2771,7 +3049,7 @@ void key_unit_fortress(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'change homecity' input
 **************************************************************************/
 void key_unit_homecity(void)
 {
@@ -2781,7 +3059,7 @@ void key_unit_homecity(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'irrigate' input
 **************************************************************************/
 void key_unit_irrigate(void)
 {
@@ -2793,7 +3071,7 @@ void key_unit_irrigate(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'build mine' input
 **************************************************************************/
 void key_unit_mine(void)
 {
@@ -2805,7 +3083,7 @@ void key_unit_mine(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'pillage' input
 **************************************************************************/
 void key_unit_pillage(void)
 {
@@ -2817,7 +3095,7 @@ void key_unit_pillage(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'clean pollution' input
 **************************************************************************/
 void key_unit_pollution(void)
 {
@@ -2829,21 +3107,27 @@ void key_unit_pollution(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'build road or railroad' input
 **************************************************************************/
 void key_unit_road(void)
 {
   unit_list_iterate(get_units_in_focus(), punit) {
-    if (can_unit_do_activity(punit, ACTIVITY_ROAD)) {
-      request_new_unit_activity(punit, ACTIVITY_ROAD);
-    } else if (can_unit_do_activity(punit, ACTIVITY_RAILROAD)) {
-      request_new_unit_activity(punit, ACTIVITY_RAILROAD);
+    struct road_type *proad = next_road_for_tile(unit_tile(punit),
+                                                 unit_owner(punit),
+                                                 punit);
+
+    if (proad != NULL) {
+      struct act_tgt tgt = { .type = ATT_ROAD, .obj.road = road_number(proad) };
+
+      if (can_unit_do_activity_targeted(punit, ACTIVITY_GEN_ROAD, &tgt)) {
+        request_new_unit_activity_road(punit, proad);
+      }
     }
   } unit_list_iterate_end;
 }
 
 /**************************************************************************
-...
+  Handle user 'sentry' input
 **************************************************************************/
 void key_unit_sentry(void)
 {
@@ -2855,7 +3139,7 @@ void key_unit_sentry(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'transform unit' input
 **************************************************************************/
 void key_unit_transform(void)
 {
@@ -2879,7 +3163,7 @@ void key_unit_assign_battlegroup(int battlegroup, bool append)
 	  punit->battlegroup = BATTLEGROUP_NONE;
 	  dsend_packet_unit_battlegroup(&client.conn,
 					punit->id, BATTLEGROUP_NONE);
-	  refresh_unit_mapcanvas(punit, punit->tile, TRUE, FALSE);
+	  refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
 	  unit_list_remove(battlegroups[battlegroup], punit);
 	}
       } unit_list_iterate_safe_end;
@@ -2894,11 +3178,11 @@ void key_unit_assign_battlegroup(int battlegroup, bool append)
 	dsend_packet_unit_battlegroup(&client.conn,
 				      punit->id, battlegroup);
 	unit_list_append(battlegroups[battlegroup], punit);
-	refresh_unit_mapcanvas(punit, punit->tile, TRUE, FALSE);
+	refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
       }
     } unit_list_iterate_end;
     unit_list_iterate(battlegroups[battlegroup], punit) {
-      add_unit_focus(punit);
+      unit_focus_add(punit);
     } unit_list_iterate_end;
   }
 }
@@ -2913,16 +3197,16 @@ void key_unit_select_battlegroup(int battlegroup, bool append)
     int i = 0;
 
     if (unit_list_size(battlegroups[battlegroup]) == 0 && !append) {
-      set_unit_focus(NULL);
+      unit_focus_set(NULL);
       return;
     }
 
     /* FIXME: this is very inefficient and can be improved. */
     unit_list_iterate(battlegroups[battlegroup], punit) {
       if (i == 0 && !append) {
-	set_unit_focus(punit);
+	unit_focus_set(punit);
       } else {
-	add_unit_focus(punit);
+	unit_focus_add(punit);
       }
       i++;
     } unit_list_iterate_end;
@@ -2946,7 +3230,7 @@ void key_city_output_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle map grid' input
 **************************************************************************/
 void key_map_grid_toggle(void)
 {
@@ -2962,6 +3246,14 @@ void key_map_borders_toggle(void)
 }
 
 /**************************************************************************
+  Toggle native tiles on the mapview on/off based on a keypress.
+**************************************************************************/
+void key_map_native_toggle(void)
+{
+  request_toggle_map_native();
+}
+
+/**************************************************************************
   Toggle the "Draw the city bar" option.
 **************************************************************************/
 void key_city_full_bar_toggle(void)
@@ -2970,7 +3262,7 @@ void key_city_full_bar_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle city names display' input
 **************************************************************************/
 void key_city_names_toggle(void)
 {
@@ -2996,7 +3288,7 @@ void key_city_buycost_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle city production display' input
 **************************************************************************/
 void key_city_productions_toggle(void)
 {
@@ -3013,7 +3305,7 @@ void key_city_trade_routes_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle terrain display' input
 **************************************************************************/
 void key_terrain_toggle(void)
 {
@@ -3021,7 +3313,7 @@ void key_terrain_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle coastline display' input
 **************************************************************************/
 void key_coastline_toggle(void)
 {
@@ -3029,7 +3321,7 @@ void key_coastline_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle road/railroad display' input
 **************************************************************************/
 void key_roads_rails_toggle(void)
 {
@@ -3037,7 +3329,7 @@ void key_roads_rails_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle irrigation display' input
 **************************************************************************/
 void key_irrigation_toggle(void)
 {
@@ -3045,7 +3337,7 @@ void key_irrigation_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle mine display' input
 **************************************************************************/
 void key_mines_toggle(void)
 {
@@ -3053,15 +3345,15 @@ void key_mines_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle bases display' input
 **************************************************************************/
-void key_fortress_airbase_toggle(void)
+void key_bases_toggle(void)
 {
-  request_toggle_fortress_airbase();
+  request_toggle_bases();
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle specials display' input
 **************************************************************************/
 void key_specials_toggle(void)
 {
@@ -3069,7 +3361,7 @@ void key_specials_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle pollution display' input
 **************************************************************************/
 void key_pollution_toggle(void)
 {
@@ -3077,7 +3369,7 @@ void key_pollution_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle cities display' input
 **************************************************************************/
 void key_cities_toggle(void)
 {
@@ -3085,7 +3377,7 @@ void key_cities_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle units display' input
 **************************************************************************/
 void key_units_toggle(void)
 {
@@ -3109,7 +3401,7 @@ void key_unit_shields_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle key units display' input
 **************************************************************************/
 void key_focus_unit_toggle(void)
 {
@@ -3117,7 +3409,7 @@ void key_focus_unit_toggle(void)
 }
 
 /**************************************************************************
-...
+  Handle user 'toggle fog of war display' input
 **************************************************************************/
 void key_fog_of_war_toggle(void)
 {

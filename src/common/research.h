@@ -13,6 +13,10 @@
 #ifndef FC__RESEARCH_H
 #define FC__RESEARCH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "iterator.h"
 #include "support.h"
@@ -73,8 +77,15 @@ struct player_research {
    */
   int num_known_tech_with_flag[TF_COUNT];
 
-  /* Tech upkeep in bulbs. Updated by player_research_update. */
-  int tech_upkeep;
+  union {
+    /* Add server side when needed */
+
+    struct {
+      /* Only used at the client (the server is omniscient; ./client/). */
+
+      int researching_cost;
+    } client;
+  };
 };
 
 /* Common functions. */
@@ -92,5 +103,9 @@ struct iterator *research_iter_init(struct research_iter *it);
   generic_iterate(struct research_iter, struct player_research *,           \
                   presearch, research_iter_sizeof, research_iter_init)
 #define player_researches_iterate_end generic_iterate_end
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__RESEARCH_H */

@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,11 +12,21 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #ifdef AUDIO_SDL
-#include "SDL.h"
+/* Though it would happily compile without this include,
+ * it is needed for sound to work as long as SDL-1.2 mixer is
+ * being used. It defines "main" macro to rename our main() so that
+ * it can install SDL's own. */
+#ifdef AUDIO_SDL1_2
+/* SDL */
+#include <SDL/SDL.h>
+#else  /* AUDIO_SDL1_2 */
+/* SDL2 */
+#include <SDL2/SDL.h>
+#endif /* AUDIO_SDL1_2 */
 #endif
 
 #ifdef HAVE_LOCALE_H
@@ -69,8 +79,9 @@
 #include "text.h"
 #include "tilespec.h"
 
-/* gui-gtk-2.0 */
+/* client/gui-gtk-2.0 */
 #include "chatline.h"
+#include "citizensinfo.h"
 #include "connectdlg.h"
 #include "cma_fe.h"
 #include "dialogs.h"
@@ -88,6 +99,7 @@
 #include "optiondlg.h"
 #include "pages.h"
 #include "plrdlg.h"
+#include "luaconsole.h"
 #include "spaceshipdlg.h"
 #include "repodlgs.h"
 #include "resources.h"
@@ -160,7 +172,6 @@ GtkWidget *unit_info_label;
 GtkWidget *unit_info_box;
 GtkWidget *unit_info_frame;
 
-GtkTooltips *main_tips;
 GtkWidget *econ_ebox;
 GtkWidget *bulb_ebox;
 GtkWidget *sun_ebox;
@@ -178,25 +189,30 @@ static GtkWidget *unit_below_pixmap[MAX_NUM_UNITS_BELOW];
 static GtkWidget *unit_below_pixmap_button[MAX_NUM_UNITS_BELOW];
 static GtkWidget *more_arrow_pixmap;
 static GtkWidget *more_arrow_pixmap_button;
+static GtkWidget *more_arrow_pixmap_container;
 
 static int unit_id_top;
 static int unit_ids[MAX_NUM_UNITS_BELOW];  /* ids of the units icons in 
                                             * information display: (or 0) */
 GtkTextView *main_message_area;
-GtkTextBuffer *message_buffer;
+GtkTextBuffer *message_buffer = NULL;
 static GtkWidget *allied_chat_toggle_button;
 
 static enum Display_color_type display_color_type;  /* practically unused */
 static gint timer_id;                               /*       ditto        */
-static guint input_id, ggz_input_id;
+static GIOChannel *srv_channel;
+static GIOChannel *ggz_channel;
+static guint srv_id, ggz_id;
 gint cur_x, cur_y;
 
+static bool gui_up = FALSE;
 
 static gboolean show_info_button_release(GtkWidget *w, GdkEventButton *ev, gpointer data);
 static gboolean show_info_popup(GtkWidget *w, GdkEventButton *ev, gpointer data);
 
 static void end_turn_callback(GtkWidget *w, gpointer data);
-static void get_net_input(gpointer data, gint fid, GdkInputCondition condition);
+static gboolean get_net_input(GIOChannel *source, GIOCondition condition,
+                              gpointer data);
 static void set_wait_for_writable_socket(struct connection *pc,
                                          bool socket_writable);
 
@@ -218,6 +234,8 @@ static gboolean quit_dialog_callback(void);
 
 static void allied_chat_button_toggled(GtkToggleButton *button,
                                        gpointer user_data);
+
+static void free_unit_table(void);
 
 /****************************************************************************
   Called by the tileset code to set the font size that should be used to
@@ -241,7 +259,7 @@ void set_city_names_font_sizes(int my_city_names_font_size,
 }
 
 /**************************************************************************
-...
+  Callback for freelog
 **************************************************************************/
 static void log_callback_utf8(enum log_level level, const char *message,
                               bool file_too)
@@ -271,7 +289,9 @@ static gboolean timer_callback(gpointer data)
 static void print_usage(const char *argv0)
 {
   /* add client-specific usage information here */
-  fc_fprintf(stderr, _("This client has no special command line options\n\n"));
+  fc_fprintf(stderr,
+             _("This client accepts the standard Gtk command-line options\n"
+               "after '--'. See the Gtk documentation.\n\n"));
 
   /* TRANS: No full stop after the URL, could cause confusion. */
   fc_fprintf(stderr, _("Report bugs at %s\n"), BUG_URL);
@@ -290,12 +310,14 @@ static void parse_options(int argc, char **argv)
       print_usage(argv[0]);
       exit(EXIT_SUCCESS);
     }
+    /* Can't check against unknown options, as those might be gtk options */
+
     i++;
   }
 }
 
 /**************************************************************************
-...
+  Focus on widget. Returns whether focus was really changed.
 **************************************************************************/
 static gboolean toplevel_focus(GtkWidget *w, GtkDirectionType arg)
 {
@@ -338,7 +360,7 @@ static void main_message_area_size_allocate(GtkWidget *widget,
 }
 
 /**************************************************************************
-...
+  Focus on map canvas
 **************************************************************************/
 gboolean map_canvas_focus(void)
 {
@@ -379,7 +401,7 @@ static gboolean toplevel_handler(GtkWidget *w, GdkEventKey *ev, gpointer data)
 }
 
 /**************************************************************************
-...
+  Handle keypress events when map canvas is in focus
 **************************************************************************/
 static gboolean key_press_map_canvas(GtkWidget *w, GdkEventKey *ev,
                                      gpointer data)
@@ -558,7 +580,7 @@ static gboolean key_press_map_canvas(GtkWidget *w, GdkEventKey *ev,
 }
 
 /**************************************************************************
-...
+  Handler for "key release" for toplevel window
 **************************************************************************/
 static gboolean toplevel_key_release_handler(GtkWidget *w, GdkEventKey *ev,
                                              gpointer data)
@@ -581,18 +603,54 @@ static gboolean toplevel_key_release_handler(GtkWidget *w, GdkEventKey *ev,
 static gboolean toplevel_key_press_handler(GtkWidget *w, GdkEventKey *ev,
                                            gpointer data)
 {
-  /* Inputline history code. */
+  if (inputline_has_focus()) {
+    return FALSE;
+  }
+
+  switch (ev->keyval) {
+
+  case GDK_apostrophe:
+    /* Allow this even if not in main map view; chatline is present on
+     * some other pages too */
+
+    /* Make the chatline visible if it's not currently.
+     * FIXME: should find the correct window, even when detached, from any
+     * other window; should scroll to the bottom automatically showing the
+     * latest text from other players; MUST NOT make spurious text windows
+     * at the bottom of other dialogs. */
+    if (GTK_WIDGET_MAPPED(top_vbox)) {
+      /* The main game view is visible. May need to switch notebook. */
+      if (gui_gtk2_message_chat_location == GUI_GTK_MSGCHAT_MERGED) {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(top_notebook), 1);
+      } else {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(bottom_notebook), 0);
+      }
+    }
+
+    /* If the chatline is (now) visible, focus it. */
+    if (inputline_is_visible()) {
+      inputline_grab_focus();
+      return TRUE;
+    } else {
+      break;
+    }
+
+  default:
+    break;
+  }
+
   if (!GTK_WIDGET_MAPPED(top_vbox)
-      || inputline_has_focus()
       || !can_client_change_view()) {
     return FALSE;
   }
 
   if (editor_is_active()) {
-    return handle_edit_key_press(ev);
+    if (handle_edit_key_press(ev)) {
+      return TRUE;
+    }
   }
 
-  if ((ev->state & GDK_SHIFT_MASK)) {
+  if (ev->state & GDK_SHIFT_MASK) {
     switch (ev->keyval) {
 
     case GDK_Return:
@@ -602,29 +660,8 @@ static gboolean toplevel_key_press_handler(GtkWidget *w, GdkEventKey *ev,
 
     default:
       break;
-    };
-  } else {
-  }
-
-  switch (ev->keyval) {
-
-  case GDK_apostrophe:
-    /* FIXME: should find the correct window, even when detached, from any
-     * other window; should scroll to the bottom automatically showing the
-     * latest text from other players; MUST NOT make spurious text windows
-     * at the bottom of other dialogs.
-     */
-    if (gui_gtk2_message_chat_location == GUI_GTK2_MSGCHAT_MERGED) {
-      gtk_notebook_set_current_page(GTK_NOTEBOOK(top_notebook), 1);
-    } else {
-      gtk_notebook_set_current_page(GTK_NOTEBOOK(bottom_notebook), 0);
     }
-    inputline_grab_focus();
-    return TRUE;
-
-  default:
-    break;
-  };
+  }
 
   if (0 == gtk_notebook_get_current_page(GTK_NOTEBOOK(top_notebook))) {
     /* 0 means the map view is focused. */
@@ -646,7 +683,7 @@ static gboolean toplevel_key_press_handler(GtkWidget *w, GdkEventKey *ev,
       break;
     };
   }
-#endif
+#endif /* 0 */
 
   return FALSE;
 }
@@ -684,7 +721,7 @@ static gboolean mouse_scroll_mapcanvas(GtkWidget *w, GdkEventScroll *ev)
 
   set_mapview_scroll_pos(scroll_x, scroll_y);
 
-  // Emulating mouse move now
+  /* Emulating mouse move now */
   if (!GTK_WIDGET_HAS_FOCUS(map_canvas)) {
     gtk_widget_grab_focus(map_canvas);
   }
@@ -812,10 +849,10 @@ static void populate_unit_pixmap_table(void)
   /* Note, we ref this and other widgets here so that we can unref them
    * in reset_unit_table. */
   unit_pixmap = gtk_pixcomm_new(tileset_unit_width(tileset), tileset_unit_height(tileset));
-  gtk_widget_ref(unit_pixmap);
+  g_object_ref(unit_pixmap);
   gtk_pixcomm_clear(GTK_PIXCOMM(unit_pixmap));
   unit_pixmap_button = gtk_event_box_new();
-  gtk_widget_ref(unit_pixmap_button);
+  g_object_ref(unit_pixmap_button);
   gtk_container_add(GTK_CONTAINER(unit_pixmap_button), unit_pixmap);
   gtk_table_attach_defaults(GTK_TABLE(table), unit_pixmap_button, 0, 1, 0, 1);
   g_signal_connect(unit_pixmap_button, "button_press_event",
@@ -827,9 +864,9 @@ static void populate_unit_pixmap_table(void)
     for (i = 0; i < num_units_below; i++) {
       unit_below_pixmap[i] = gtk_pixcomm_new(tileset_unit_width(tileset),
                                              tileset_unit_height(tileset));
-      gtk_widget_ref(unit_below_pixmap[i]);
+      g_object_ref(unit_below_pixmap[i]);
       unit_below_pixmap_button[i] = gtk_event_box_new();
-      gtk_widget_ref(unit_below_pixmap_button[i]);
+      g_object_ref(unit_below_pixmap_button[i]);
       gtk_container_add(GTK_CONTAINER(unit_below_pixmap_button[i]),
                         unit_below_pixmap[i]);
       g_signal_connect(unit_below_pixmap_button[i],
@@ -844,24 +881,38 @@ static void populate_unit_pixmap_table(void)
   }
 
   /* create arrow (popup for all units on the selected tile) */
-  more_arrow_pixmap = gtk_image_new_from_pixbuf(
-          sprite_get_pixbuf(get_arrow_sprite(tileset, ARROW_RIGHT)));
-  gtk_widget_ref(more_arrow_pixmap);
-  more_arrow_pixmap_button = gtk_event_box_new();
-  gtk_widget_ref(more_arrow_pixmap_button);
-  gtk_container_add(GTK_CONTAINER(more_arrow_pixmap_button),
-                    more_arrow_pixmap);
-  g_signal_connect(more_arrow_pixmap_button,
-                   "button_press_event",
-                   G_CALLBACK(select_more_arrow_pixmap_callback), NULL);
+  {
+    GdkPixbuf *more_arrow = 
+      sprite_get_pixbuf(get_arrow_sprite(tileset, ARROW_RIGHT));
+
+    more_arrow_pixmap = gtk_image_new_from_pixbuf(more_arrow);
+    g_object_ref(more_arrow_pixmap);
+    more_arrow_pixmap_button = gtk_event_box_new();
+    g_object_ref(more_arrow_pixmap_button);
+    gtk_event_box_set_visible_window(GTK_EVENT_BOX(more_arrow_pixmap_button),
+                                     FALSE);
+    gtk_container_add(GTK_CONTAINER(more_arrow_pixmap_button),
+                      more_arrow_pixmap);
+    g_signal_connect(more_arrow_pixmap_button,
+                     "button_press_event",
+                     G_CALLBACK(select_more_arrow_pixmap_callback), NULL);
+    /* An extra layer so that we can hide the clickable button but keep
+     * an explicit size request to avoid the layout jumping around */
+    more_arrow_pixmap_container = gtk_alignment_new(0.5, 0.5, 0, 0);
+    g_object_ref(more_arrow_pixmap_container);
+    gtk_container_add(GTK_CONTAINER(more_arrow_pixmap_container),
+                      more_arrow_pixmap_button);
+    gtk_widget_set_size_request(more_arrow_pixmap_container,
+                                gdk_pixbuf_get_width(more_arrow), -1);
+  }
 
   if (!gui_gtk2_small_display_layout) {
     /* Display on bottom row. */
-    gtk_table_attach_defaults(GTK_TABLE(table), more_arrow_pixmap_button,
+    gtk_table_attach_defaults(GTK_TABLE(table), more_arrow_pixmap_container,
                               MAX_NUM_UNITS_BELOW, MAX_NUM_UNITS_BELOW+1, 1, 2);
   } else {
     /* Display on top row (there is no bottom row). */
-    gtk_table_attach_defaults(GTK_TABLE(table), more_arrow_pixmap_button,
+    gtk_table_attach_defaults(GTK_TABLE(table), more_arrow_pixmap_container,
                               MAX_NUM_UNITS_BELOW, MAX_NUM_UNITS_BELOW+1, 0, 1);
   }
 
@@ -869,34 +920,43 @@ static void populate_unit_pixmap_table(void)
 }
 
 /**************************************************************************
+  Free unit pixmap table.
+**************************************************************************/
+static void free_unit_table(void)
+{
+  if (unit_pixmap_button) {
+    gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
+                         unit_pixmap_button);
+    g_object_unref(unit_pixmap);
+    g_object_unref(unit_pixmap_button);
+    if (!gui_gtk2_small_display_layout) {
+      int i;
+
+      for (i = 0; i < num_units_below; i++) {
+        gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
+                             unit_below_pixmap_button[i]);
+        g_object_unref(unit_below_pixmap[i]);
+        g_object_unref(unit_below_pixmap_button[i]);
+      }
+    }
+    gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
+                         more_arrow_pixmap_container);
+    g_object_unref(more_arrow_pixmap);
+    g_object_unref(more_arrow_pixmap_button);
+    g_object_unref(more_arrow_pixmap_container);
+  }
+}
+
+/**************************************************************************
   Called when the tileset is changed to reset the unit pixmap table.
 **************************************************************************/
 void reset_unit_table(void)
 {
-  int i;
-
-  if (unit_pixmap_button) {
-    /* Unreference all of the widgets that we're about to reallocate, thus
-     * avoiding a memory leak. Remove them from the container first, just
-     * to be safe. Note, the widgets are ref'd in
-     * populatate_unit_pixmap_table. */
-    gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
-                         unit_pixmap_button);
-    gtk_widget_unref(unit_pixmap);
-    gtk_widget_unref(unit_pixmap_button);
-    if (!gui_gtk2_small_display_layout) {
-      for (i = 0; i < num_units_below; i++) {
-        gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
-                             unit_below_pixmap_button[i]);
-        gtk_widget_unref(unit_below_pixmap[i]);
-        gtk_widget_unref(unit_below_pixmap_button[i]);
-      }
-    }
-    gtk_container_remove(GTK_CONTAINER(unit_pixmap_table),
-                         more_arrow_pixmap_button);
-    gtk_widget_unref(more_arrow_pixmap);
-    gtk_widget_unref(more_arrow_pixmap_button);
-  }
+  /* Unreference all of the widgets that we're about to reallocate, thus
+   * avoiding a memory leak. Remove them from the container first, just
+   * to be safe. Note, the widgets are ref'd in
+   * populatate_unit_pixmap_table. */
+  free_unit_table();
 
   populate_unit_pixmap_table();
 
@@ -923,6 +983,11 @@ void enable_menus(bool enable)
 {
   if (enable) {
     main_menubar = setup_menus(toplevel);
+    /* Ensure the menus are really created before performing any operations
+     * on them. */
+    while (gtk_events_pending()) {
+      gtk_main_iteration();
+    }
     gtk_box_pack_start(GTK_BOX(top_vbox), main_menubar, FALSE, FALSE, 0);
     menus_init();
     gtk_widget_show_all(main_menubar);
@@ -970,7 +1035,6 @@ static void setup_widgets(void)
 
   message_buffer = gtk_text_buffer_new(NULL);
 
-
   notebook = gtk_notebook_new();
 
   /* stop mouse wheel notebook page switching. */
@@ -996,8 +1060,6 @@ static void setup_widgets(void)
       create_load_page(), NULL);
   gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
       create_network_page(), NULL);
-
-  main_tips = gtk_tooltips_new();
 
   editgui_create_widgets();
 
@@ -1212,7 +1274,7 @@ static void setup_widgets(void)
 
   fc_snprintf(buf, sizeof(buf), "%s:\n%s",
               _("Turn Done"), _("Shift+Return"));
-  gtk_tooltips_set_tip(main_tips, turn_done_button, buf, "");
+  gtk_widget_set_tooltip_text(turn_done_button, buf);
 
   /* Selected unit status */
 
@@ -1263,7 +1325,7 @@ static void setup_widgets(void)
   
   if (gui_gtk2_small_display_layout) {
     gtk_paned_pack1(GTK_PANED(paned), top_notebook, TRUE, TRUE);
-  } else if (gui_gtk2_message_chat_location == GUI_GTK2_MSGCHAT_MERGED) {
+  } else if (gui_gtk2_message_chat_location == GUI_GTK_MSGCHAT_MERGED) {
     right_vbox = gtk_vbox_new(FALSE, 0);
 
     gtk_box_pack_start(GTK_BOX(right_vbox), top_notebook, TRUE, TRUE, 0);
@@ -1347,7 +1409,7 @@ static void setup_widgets(void)
 
   /* *** The message window -- this is a detachable widget *** */
 
-  if (gui_gtk2_message_chat_location == GUI_GTK2_MSGCHAT_MERGED) {
+  if (gui_gtk2_message_chat_location == GUI_GTK_MSGCHAT_MERGED) {
     bottom_hpaned = hpaned = paned;
     right_notebook = bottom_notebook = top_notebook;
   } else {
@@ -1380,7 +1442,7 @@ static void setup_widgets(void)
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(right_notebook), TRUE);
     g_signal_connect(right_notebook, "button-release-event",
                      G_CALLBACK(right_notebook_button_release), NULL);
-    if (gui_gtk2_message_chat_location == GUI_GTK2_MSGCHAT_SPLIT) {
+    if (gui_gtk2_message_chat_location == GUI_GTK_MSGCHAT_SPLIT) {
       gtk_paned_pack2(GTK_PANED(hpaned), right_notebook, TRUE, TRUE);
     }
   }
@@ -1412,7 +1474,7 @@ static void setup_widgets(void)
 
   main_message_area = GTK_TEXT_VIEW(text);
 
-  chat_welcome_message();
+  chat_welcome_message(TRUE);
 
   /* the chat line */
   view = inputline_toolkit_view_new();
@@ -1478,7 +1540,7 @@ static void ggz_closed(void)
 {
   set_client_page(PAGE_MAIN);
 }
-#endif
+#endif /* GGZ_GTK */
 
 /**************************************************************************
  called from main().
@@ -1648,7 +1710,9 @@ void ui_main(int argc, char **argv)
   load_cursors();
   cma_fe_init();
   diplomacy_dialog_init();
+  luaconsole_dialog_init();
   happiness_dialog_init();
+  citizens_dialog_init();
   intel_dialog_init();
   spaceship_dialog_init();
   chatline_init();
@@ -1664,15 +1728,31 @@ void ui_main(int argc, char **argv)
   /* assumes client_state is set */
   timer_id = g_timeout_add(TIMER_INTERVAL, timer_callback, NULL);
 
+  gui_up = TRUE;
   gtk_main();
+  gui_up = FALSE;
 
+  destroy_server_scans();
   free_mapcanvas_and_overview();
   spaceship_dialog_done();
   intel_dialog_done();
+  citizens_dialog_done();
+  luaconsole_dialog_done();
   happiness_dialog_done();
   diplomacy_dialog_done();
   cma_fe_done();
+  free_unit_table();
+  gtk_widget_destroy(toplevel_tabs);
+  message_buffer = NULL; /* Result of destruction of everything */
   tileset_free_tiles(tileset);
+}
+
+/**************************************************************************
+  Return whether gui is currently running.
+**************************************************************************/
+bool is_gui_up(void)
+{
+  return gui_up;
 }
 
 /**************************************************************************
@@ -1680,8 +1760,10 @@ void ui_main(int argc, char **argv)
 **************************************************************************/
 void ui_exit(void)
 {
-  g_object_unref(message_buffer);
-  message_buffer = NULL;
+  if (message_buffer != NULL) {
+    g_object_unref(message_buffer);
+    message_buffer = NULL;
+  }
 }
 
 /**************************************************************************
@@ -1783,7 +1865,7 @@ static gboolean select_unit_pixmap_callback(GtkWidget *w, GdkEvent *ev,
     punit = game_unit_by_number(unit_id_top);
     if (punit && unit_is_in_focus(punit)) {
       /* Clicking on the currently selected unit will center it. */
-      center_tile_mapcanvas(punit->tile);
+      center_tile_mapcanvas(unit_tile(punit));
     }
     return TRUE;
   }
@@ -1794,7 +1876,7 @@ static gboolean select_unit_pixmap_callback(GtkWidget *w, GdkEvent *ev,
   punit = game_unit_by_number(unit_ids[i]);
   if (NULL != punit && unit_owner(punit) == client.conn.playing) {
     /* Unit shouldn't be NULL but may be owned by an ally. */
-    set_unit_focus(punit);
+    unit_focus_set(punit);
   }
 
   return TRUE;
@@ -1810,14 +1892,14 @@ static gboolean select_more_arrow_pixmap_callback(GtkWidget *w, GdkEvent *ev,
   struct unit *punit = game_unit_by_number(unit_id_top);
 
   if (punit) {
-    popup_unit_select_dialog(punit->tile);
+    unit_select_dialog_popup(unit_tile(punit));
   }
 
   return TRUE;
 }
 
 /**************************************************************************
-...
+  Button released when showing info popup
 **************************************************************************/
 static gboolean show_info_button_release(GtkWidget *w, GdkEventButton *ev, gpointer data)
 {
@@ -1828,7 +1910,7 @@ static gboolean show_info_button_release(GtkWidget *w, GdkEventButton *ev, gpoin
 }
 
 /**************************************************************************
-...
+  Popup info box
 **************************************************************************/
 static gboolean show_info_popup(GtkWidget *w, GdkEventButton *ev, gpointer data)
 {
@@ -1866,23 +1948,29 @@ static void end_turn_callback(GtkWidget *w, gpointer data)
 }
 
 /**************************************************************************
-...
+  Read input from server socket
 **************************************************************************/
-static void get_net_input(gpointer data, gint fid, GdkInputCondition condition)
+static gboolean get_net_input(GIOChannel *source, GIOCondition condition,
+                              gpointer data)
 {
-  input_from_server(fid);
+  input_from_server(g_io_channel_unix_get_fd(source));
+
+  return TRUE;
 }
 
 /**************************************************************************
   Callback for when the GGZ socket has data pending.
 **************************************************************************/
-static void get_ggz_input(gpointer data, gint fid, GdkInputCondition condition)
+static gboolean get_ggz_input(GIOChannel *source, GIOCondition condition,
+                              gpointer data)
 {
-  input_from_ggz(fid);
+  input_from_ggz(g_io_channel_unix_get_fd(source));
+
+  return TRUE;
 }
 
 /**************************************************************************
-...
+  Set socket writability state
 **************************************************************************/
 static void set_wait_for_writable_socket(struct connection *pc,
 					 bool socket_writable)
@@ -1895,11 +1983,13 @@ static void set_wait_for_writable_socket(struct connection *pc,
     return;
 
   log_debug("set_wait_for_writable_socket(%d)", socket_writable);
-  gtk_input_remove(input_id);
-  input_id = gtk_input_add_full(client.conn.sock, GDK_INPUT_READ
-				| (socket_writable ? GDK_INPUT_WRITE : 0)
-				| GDK_INPUT_EXCEPTION,
-				get_net_input, NULL, NULL, NULL);
+
+  g_source_remove(srv_id);
+  srv_id = g_io_add_watch(srv_channel,
+                          G_IO_IN | (socket_writable ? G_IO_OUT : 0) | G_IO_ERR,
+                          get_net_input,
+                          NULL);
+
   previous_state = socket_writable;
 }
 
@@ -1909,8 +1999,15 @@ static void set_wait_for_writable_socket(struct connection *pc,
 **************************************************************************/
 void add_net_input(int sock)
 {
-  input_id = gtk_input_add_full(sock, GDK_INPUT_READ | GDK_INPUT_EXCEPTION,
-				get_net_input, NULL, NULL, NULL);
+#ifdef WIN32_NATIVE
+  srv_channel = g_io_channel_win32_new_socket(sock);
+#else
+  srv_channel = g_io_channel_unix_new(sock);
+#endif
+  srv_id = g_io_add_watch(srv_channel,
+                          G_IO_IN | G_IO_ERR,
+                          get_net_input,
+                          NULL);
   client.conn.notify_of_writable_data = set_wait_for_writable_socket;
 }
 
@@ -1920,7 +2017,8 @@ void add_net_input(int sock)
 **************************************************************************/
 void remove_net_input(void)
 {
-  gtk_input_remove(input_id);
+  g_source_remove(srv_id);
+  g_io_channel_unref(srv_channel);
   gdk_window_set_cursor(root_window, NULL);
 }
 
@@ -1929,8 +2027,15 @@ void remove_net_input(void)
 **************************************************************************/
 void add_ggz_input(int sock)
 {
-  ggz_input_id = gtk_input_add_full(sock, GDK_INPUT_READ, get_ggz_input,
-				    NULL, NULL, NULL);
+#ifdef WIN32_NATIVE
+  ggz_channel = g_io_channel_win32_new_socket(sock);
+#else
+  ggz_channel = g_io_channel_unix_new(sock);
+#endif
+  ggz_id = g_io_add_watch(ggz_channel,
+                          G_IO_IN,
+                          get_ggz_input,
+                          NULL);
 }
 
 /**************************************************************************
@@ -1939,7 +2044,8 @@ void add_ggz_input(int sock)
 **************************************************************************/
 void remove_ggz_input(void)
 {
-  gtk_input_remove(ggz_input_id);
+  g_source_remove(ggz_id);
+  g_io_channel_unref(ggz_channel);
 }
 
 /****************************************************************
@@ -1950,8 +2056,23 @@ static void quit_dialog_response(GtkWidget *dialog, gint response)
 {
   gtk_widget_destroy(dialog);
   if (response == GTK_RESPONSE_YES) {
-    client_exit();
+    start_quitting();
+    if (client.conn.used) {
+      disconnect_from_server();
+    }
+    quit_gtk_main();
   }
+}
+
+/****************************************************************
+  Exit gtk main loop.
+****************************************************************/
+void quit_gtk_main(void)
+{
+  /* Quit gtk main loop. After this it will return to finish
+   * ui_main() */
+
+  gtk_main_quit();
 }
 
 /****************************************************************
@@ -1999,13 +2120,14 @@ struct callback {
 /****************************************************************************
   A wrapper for the callback called through add_idle_callback.
 ****************************************************************************/
-static gint idle_callback_wrapper(gpointer data)
+static gboolean idle_callback_wrapper(gpointer data)
 {
   struct callback *cb = data;
 
   (cb->callback)(cb->data);
   free(cb);
-  return 0;
+
+  return FALSE;
 }
 
 /****************************************************************************
@@ -2019,7 +2141,7 @@ void add_idle_callback(void (callback)(void *), void *data)
 
   cb->callback = callback;
   cb->data = data;
-  gtk_idle_add(idle_callback_wrapper, cb);
+  g_idle_add(idle_callback_wrapper, cb);
 }
 
 /****************************************************************************

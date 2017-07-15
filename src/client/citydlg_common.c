@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -26,6 +26,7 @@
 #include "specialist.h"
 #include "unitlist.h"
 
+/* client/include */
 #include "citydlg_g.h"
 #include "mapview_g.h"
 
@@ -62,12 +63,10 @@ int get_citydlg_canvas_height(void)
 void generate_citydlg_dimensions(void)
 {
   int min_x = 0, max_x = 0, min_y = 0, max_y = 0;
-
-  int city_map_radius = 3; // temporary solution (Freeciv for Android)
-  int city_map_radius_sq = city_map_radius * city_map_radius + 1; // CITY_MAP_MAX_RADIUS_SQ
+  int max_rad = rs_max_city_radius_sq();
 
   /* use maximum possible squared city radius. */
-  city_map_iterate(city_map_radius_sq, city_index, city_x, city_y) {
+  city_map_iterate_without_index(max_rad, city_x, city_y) {
     int canvas_x, canvas_y;
 
     map_to_gui_vector(tileset, &canvas_x, &canvas_y, CITY_ABS2REL(city_x),
@@ -77,7 +76,7 @@ void generate_citydlg_dimensions(void)
     max_x = MAX(canvas_x, max_x);
     min_y = MIN(canvas_y, min_y);
     max_y = MAX(canvas_y, max_y);
-  } city_map_iterate_end;
+  } city_map_iterate_without_index_end;
 
   citydlg_map_width = max_x - min_x + tileset_tile_width(tileset);
   citydlg_map_height = max_y - min_y + tileset_tile_height(tileset);
@@ -140,8 +139,8 @@ bool canvas_to_city_pos(int *city_x, int *city_y, int city_radius_sq,
 
   /* Add on the offset of the top-left corner to get the final
    * coordinates (like in canvas_to_map_pos). */
-  *city_x += CITY_MAP_MAX_RADIUS;
-  *city_y += CITY_MAP_MAX_RADIUS;
+  *city_x = CITY_REL2ABS(*city_x);
+  *city_y = CITY_REL2ABS(*city_y);
 
   log_debug("canvas_to_city_pos(pos=(%d,%d))=(%d,%d)@radius=%d",
             orig_canvas_x, orig_canvas_y, *city_x, *city_y, city_radius_sq);
@@ -153,18 +152,18 @@ bool canvas_to_city_pos(int *city_x, int *city_y, int city_radius_sq,
  * painter's algorithm and can be used for drawing. */
 #define citydlg_iterate(pcity, ptile, pedge, pcorner, _x, _y)		\
 {									\
-  int _x##_0, _y##_0;							\
+  int _x##_0, _y##_0, _tile_x, _tile_y;                                 \
   const int _x##_w = get_citydlg_canvas_width();			\
   const int _y##_h = get_citydlg_canvas_height();			\
+  index_to_map_pos(&_tile_x, &_tile_y, tile_index((pcity)->tile));      \
 									\
-  map_to_gui_vector(tileset, &_x##_0, &_y##_0,				\
-		    (pcity)->tile->x, (pcity)->tile->y);		\
+  map_to_gui_vector(tileset, &_x##_0, &_y##_0, _tile_x, _tile_y);       \
   _x##_0 -= (_x##_w - tileset_tile_width(tileset)) / 2;			\
   _y##_0 -= (_y##_h - tileset_tile_height(tileset)) / 2;		\
   log_debug("citydlg: %d,%d + %dx%d",					\
 	    _x##_0, _y##_0, _x##_w, _y##_h);				\
 									\
-  gui_rect_iterate(_x##_0, _y##_0, _x##_w, _y##_h,			\
+  gui_rect_iterate_coord(_x##_0, _y##_0, _x##_w, _y##_h,		\
 		   ptile, pedge, pcorner, _x##_g, _y##_g) {		\
     const int _x = _x##_g - _x##_0;					\
     const int _y = _y##_g - _y##_0;					\
@@ -172,7 +171,7 @@ bool canvas_to_city_pos(int *city_x, int *city_y, int city_radius_sq,
 
 #define citydlg_iterate_end						\
     }									\
-  } gui_rect_iterate_end;						\
+  } gui_rect_iterate_coord_end;						\
 }
 
 /****************************************************************************
@@ -195,7 +194,7 @@ void city_dialog_redraw_map(struct city *pcity,
       struct city *pcity_draw = ptile ? tile_city(ptile) : NULL;
 
       put_one_element(pcanvas, layer, ptile, pedge, pcorner,
-		      punit, pcity_draw, canvas_x, canvas_y, pcity);
+                      punit, pcity_draw, canvas_x, canvas_y, pcity, NULL);
     } citydlg_iterate_end;
   } mapview_layer_iterate_end;
 }
@@ -389,7 +388,7 @@ void get_city_dialog_production_row(char *buf[], size_t column_size,
 	} else if (is_small_wonder(pimprove)) {
 	  if (improvement_obsolete(pplayer, pimprove)) {
 	    state = _("Obsolete");
-          } else if (city_from_small_wonder(pplayer, target.value.building)) {
+          } else if (wonder_is_built(pplayer, target.value.building)) {
 	    state = _("Built");
           } else {
             state = _("Small Wonder");
@@ -464,7 +463,7 @@ void get_city_dialog_output_text(const struct city *pcity,
   if (otype == O_TRADE) {
     int i;
 
-    for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+    for (i = 0; i < MAX_TRADE_ROUTES; i++) {
       if (pcity->trade[i] != 0) {
         /* There have been bugs causing the trade city to not be sent
          * properly to the client.  If this happens we trust the
@@ -509,7 +508,8 @@ void get_city_dialog_output_text(const struct city *pcity,
 	bonus += peffect->value;
 	new_total = bonus * base / 100;
 	cat_snprintf(buf, bufsz,
-		     _("%+4d : Bonus from %s (%+d%%)\n"),
+                     (peffect->value > 0) ? _("%+4d : Bonus from %s (%+d%%)\n")
+                                          : _("%+4d : Loss from %s (%+d%%)\n"),
 		     (new_total - total), buf2,
 		     peffect->value);
 	total = new_total;
@@ -519,17 +519,43 @@ void get_city_dialog_output_text(const struct city *pcity,
   }
 
   if (pcity->waste[otype] != 0) {
-    char *fmt;
-    switch (otype) {
-      case O_SHIELD:
-      default: /* FIXME other output types? */
-        fmt = _("%+4d : Waste\n");
-        break;
-      case O_TRADE:
-        fmt = _("%+4d : Corruption\n");
-        break;
+    int wastetypes[OLOSS_LAST];
+    bool breakdown_ok;
+    int regular_waste;
+    /* FIXME: this will give the wrong answer in rulesets with waste on
+     * taxed outputs, such as 'science waste', as total includes tax whereas
+     * the equivalent bit in set_city_production() does not */
+    if (city_waste(pcity, otype, total, wastetypes) == pcity->waste[otype]) {
+      /* Our calculation matches the server's, so we trust our breakdown. */
+      if (wastetypes[OLOSS_SIZE] > 0) {
+        cat_snprintf(buf, bufsz,
+                     _("%+4d : Size penalty\n"), -wastetypes[OLOSS_SIZE]);
+      }
+      regular_waste = wastetypes[OLOSS_WASTE];
+      breakdown_ok = TRUE;
+    } else {
+      /* Our calculation doesn't match what the server sent. Account it all
+       * to corruption/waste. */
+      regular_waste = pcity->waste[otype];
+      breakdown_ok = FALSE;
     }
-    cat_snprintf(buf, bufsz, fmt, -pcity->waste[otype]);
+    if (regular_waste > 0) {
+      char *fmt;
+      switch (otype) {
+        case O_SHIELD:
+        default: /* FIXME other output types? */
+          /* TRANS: %s is normally empty, but becomes '?' if client is
+           * uncertain about its accounting (should never happen) */
+          fmt = _("%+4d : Waste%s\n");
+          break;
+        case O_TRADE:
+          /* TRANS: %s is normally empty, but becomes '?' if client is
+           * uncertain about its accounting (should never happen) */
+          fmt = _("%+4d : Corruption%s\n");
+          break;
+      }
+      cat_snprintf(buf, bufsz, fmt, -regular_waste, breakdown_ok ? "" : "?");
+    }
     total -= pcity->waste[otype];
   }
 
@@ -543,6 +569,16 @@ void get_city_dialog_output_text(const struct city *pcity,
     cat_snprintf(buf, bufsz,
 		 _("%+4d : Used\n"), -pcity->usage[otype]);
     total -= pcity->usage[otype];
+  }
+
+  /* This should never happen, but if it does, at least acknowledge to
+   * the user that we are confused, rather than displaying an incorrect
+   * sum. */
+  if (total != pcity->surplus[otype]) {
+    cat_snprintf(buf, bufsz,
+                 /* TRANS: City output that we cannot explain.
+                  * Should never happen. */
+                 _("%+4d : (unknown)\n"), pcity->surplus[otype] - total);
   }
 
   cat_snprintf(buf, bufsz,
@@ -587,7 +623,8 @@ void get_city_dialog_illness_text(const struct city *pcity,
     get_effect_req_text(peffect, buf2, sizeof(buf2));
 
     cat_snprintf(buf, bufsz,
-                 _("%+5.1f : Bonus from %s\n"),
+                 (peffect->value > 0) ? _("%+5.1f : Bonus from %s\n")
+                                      : _("%+5.1f : Risk from %s\n"),
                  -(0.1 * ill_base * peffect->value / 100), buf2);
   } effect_list_iterate_end;
   effect_list_destroy(plist);
@@ -605,7 +642,11 @@ void get_city_dialog_pollution_text(const struct city *pcity,
 {
   int pollu, prod, pop, mod;
 
-  pollu = city_pollution_types(pcity, pcity->prod[O_SHIELD],
+  /* On the server, pollution is calculated before production is deducted
+   * for disorder; we need to compensate for that */
+  pollu = city_pollution_types(pcity,
+                               pcity->prod[O_SHIELD]
+                               + pcity->unhappy_penalty[O_SHIELD],
 			       &prod, &pop, &mod);
   buf[0] = '\0';
 
@@ -652,10 +693,10 @@ int get_city_citizen_types(struct city *pcity, enum citizen_feeling index,
     }
   } specialist_type_iterate_end;
 
-  if (pcity->size != i) {
+  if (city_size_get(pcity) != i) {
     log_error("get_city_citizen_types() %d citizens "
               "not equal %d city size in \"%s\".",
-              i, pcity->size, city_name(pcity));
+              i, city_size_get(pcity), city_name(pcity));
   }
   return i;
 }
@@ -705,7 +746,7 @@ void activate_all_units(struct tile *ptile)
   } unit_list_iterate_end;
   if (pmyunit) {
     /* Put the focus on one of the activated units. */
-    set_unit_focus(pmyunit);
+    unit_focus_set(pmyunit);
   }
 }
 

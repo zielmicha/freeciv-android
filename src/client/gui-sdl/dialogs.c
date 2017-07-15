@@ -20,10 +20,10 @@
 ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "bitvector.h"
@@ -42,6 +42,7 @@
 #include "client_main.h"
 #include "climap.h" /* for client_tile_get_known() */
 #include "goto.h"
+#include "helpdata.h" /* for helptext_nation() */
 #include "packhand.h"
 #include "text.h"
 
@@ -62,6 +63,7 @@
 #include "inteldlg.h"
 #include "mapctrl.h"
 #include "mapview.h"
+#include "menu.h"
 #include "messagewin.h"
 #include "optiondlg.h"
 #include "plrdlg.h"
@@ -88,15 +90,16 @@ int exit_advanced_terrain_dlg_callback(struct widget *pWidget);
 
 static char *pLeaderName = NULL;
 
-static void popdown_unit_select_dialog(void);
+static void unit_select_dialog_popdown(void);
 static void popdown_terrain_info_dialog(void);
 static void popdown_pillage_dialog(void);
 static void popdown_connect_dialog(void);
 static void popdown_revolution_dialog(void);
 static void popdown_unit_upgrade_dlg(void);
+static void popdown_unit_disband_dlg(void);
 
 /********************************************************************** 
-  ...
+  Place window near given tile on screen.
 ***********************************************************************/
 void put_window_near_map_tile(struct widget *pWindow,
   		int window_width, int window_height, struct tile *ptile)
@@ -144,11 +147,12 @@ void put_window_near_map_tile(struct widget *pWindow,
 void popdown_all_game_dialogs(void)
 {
   popdown_caravan_dialog();  
-  popdown_unit_select_dialog();
+  unit_select_dialog_popdown();
   popdown_advanced_terrain_dialog();
   popdown_terrain_info_dialog();
   popdown_newcity_dialog();
-  popdown_optiondlg();
+  popdown_optiondlg(TRUE);
+  undraw_order_widgets();
   popdown_diplomat_dialog();
   popdown_pillage_dialog();
   popdown_incite_dialog();
@@ -168,6 +172,7 @@ void popdown_all_game_dialogs(void)
   popdown_players_dialog();
   popdown_goto_airlift_dialog();
   popdown_unit_upgrade_dlg();
+  popdown_unit_disband_dlg();
   popdown_help_dialog();
   popdown_notify_goto_dialog();
 
@@ -467,7 +472,7 @@ void popup_connect_msg(const char *headline, const char *message)
 struct ADVANCED_DLG *pNotifyDlg = NULL;
 
 /**************************************************************************
-...
+  User interacted with generic notify dialog.
 **************************************************************************/
 static int notify_dialog_window_callback(struct widget *pWindow)
 {
@@ -478,7 +483,7 @@ static int notify_dialog_window_callback(struct widget *pWindow)
 }
 
 /**************************************************************************
-...
+  User interacted with notify dialog close button.
 **************************************************************************/
 static int exit_notify_dialog_callback(struct widget *pWidget)
 {
@@ -514,9 +519,9 @@ void popup_notify_dialog(const char *caption, const char *headline,
    
   pStr = create_str16_from_char(caption, adj_font(12));
   pStr->style |= TTF_STYLE_BOLD;
-  
+
   pWindow = create_window_skeleton(NULL, pStr, 0);
-  
+
   pWindow->action = notify_dialog_window_callback;
   set_wstate(pWindow, FC_WS_NORMAL);
   
@@ -541,9 +546,9 @@ void popup_notify_dialog(const char *caption, const char *headline,
     
   pStr = create_str16_from_char(headline, adj_font(16));
   pStr->style |= TTF_STYLE_BOLD;
-  
+
   pHeadline = create_text_surf_from_str16(pStr);
-    
+
   if(lines && *lines != '\0') {
     change_ptsize16(pStr, adj_font(12));
     pStr->style &= ~TTF_STYLE_BOLD;
@@ -552,9 +557,9 @@ void popup_notify_dialog(const char *caption, const char *headline,
   } else {
     pLines = NULL;
   }
-  
+
   FREESTRING16(pStr);
-  
+
   area.w = MAX(area.w, pHeadline->w);
   if(pLines) {
     area.w = MAX(area.w, pLines->w);
@@ -565,7 +570,7 @@ void popup_notify_dialog(const char *caption, const char *headline,
     area.h += pLines->h + adj_size(10);
   }
   
-  resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                 (pWindow->size.w - pWindow->area.w) + area.w,
                 (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -602,12 +607,12 @@ void popup_notify_dialog(const char *caption, const char *headline,
 }
 
 /* =======================================================================*/
-/* ======================== UNIT UPGRADE DIALOG ========================*/
+/* ========================= UNIT UPGRADE DIALOG =========================*/
 /* =======================================================================*/
 static struct SMALL_DLG *pUnit_Upgrade_Dlg = NULL;
 
 /****************************************************************
-...
+  User interacted with upgrade unit widget.
 *****************************************************************/
 static int upgrade_unit_window_callback(struct widget *pWindow)
 {
@@ -618,7 +623,7 @@ static int upgrade_unit_window_callback(struct widget *pWindow)
 }
 
 /****************************************************************
-...
+  User interacted with upgrade unit dialog cancel -button 
 *****************************************************************/
 static int cancel_upgrade_unit_callback(struct widget *pWidget)
 {
@@ -632,7 +637,7 @@ static int cancel_upgrade_unit_callback(struct widget *pWidget)
 }
 
 /****************************************************************
-...
+  User interacted with unit upgrade dialog "Upgrade" -button.
 *****************************************************************/
 static int ok_upgrade_unit_window_callback(struct widget *pWidget)
 {
@@ -649,7 +654,7 @@ static int ok_upgrade_unit_window_callback(struct widget *pWidget)
 }
 
 /****************************************************************
-...
+  Open unit upgrade dialog.
 *****************************************************************/
 void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
 {
@@ -691,7 +696,7 @@ void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
   /* create text label */
   pStr = create_str16_from_char(cBuf, adj_font(10));
   pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-  pStr->fgcol = *get_game_colorRGB(COLOR_THEME_UNITUPGRADE_TEXT);
+  pStr->fgcol = *get_theme_color(COLOR_THEME_UNITUPGRADE_TEXT);
   
   pText = create_text_surf_from_str16(pStr);
   FREESTRING16(pStr);
@@ -728,7 +733,7 @@ void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
   
   pUnit_Upgrade_Dlg->pBeginWidgetList = pBuf;
   
-  resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                 (pWindow->size.w - pWindow->area.w) + area.w,
                 (pWindow->size.h - pWindow->area.h) + area.h);
   
@@ -739,7 +744,7 @@ void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
     window_y = Main.event.motion.y;
   } else {
     put_window_near_map_tile(pWindow, pWindow->size.w, pWindow->size.h,
-                             pUnit->tile);
+                             unit_tile(pUnit));
   }
   
   widget_set_position(pWindow, window_x, window_y);
@@ -756,7 +761,7 @@ void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
   pBuf->size.y = area.y + area.h - pBuf->size.h - adj_size(7);
 
   if (UU_OK == unit_upgrade_result) {
-    /* sell button */
+    /* upgrade button */
     pBuf = pBuf->prev;
     pBuf->size.x = area.x + (area.w - (2 * pBuf->size.w + adj_size(10))) / 2;
     pBuf->size.y = pBuf->next->size.y;
@@ -779,7 +784,7 @@ void popup_unit_upgrade_dlg(struct unit *pUnit, bool city)
 }
 
 /****************************************************************
-...
+  Close unit upgrade dialog.
 *****************************************************************/
 static void popdown_unit_upgrade_dlg(void)
 {
@@ -791,12 +796,206 @@ static void popdown_unit_upgrade_dlg(void)
 }
 
 /* =======================================================================*/
+/* ========================= UNIT DISBAND DIALOG =========================*/
+/* =======================================================================*/
+static struct SMALL_DLG *pUnit_Disband_Dlg = NULL;
+
+/****************************************************************
+  User interacted with disband unit widget.
+*****************************************************************/
+static int disband_unit_window_callback(struct widget *pWindow)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    move_window_group(pUnit_Disband_Dlg->pBeginWidgetList, pWindow);
+  }
+  return -1;
+}
+
+/****************************************************************
+  User interacted with disband unit dialog cancel -button 
+*****************************************************************/
+static int cancel_disband_unit_callback(struct widget *pWidget)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    popdown_unit_disband_dlg();
+    /* enable city dlg */
+    enable_city_dlg_widgets();
+    flush_dirty();
+  }
+  return -1;
+}
+
+/****************************************************************
+  User interacted with unit disband dialog "Disband" -button.
+*****************************************************************/
+static int ok_disband_unit_window_callback(struct widget *pWidget)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    struct unit *pUnit = pWidget->data.unit;
+    popdown_unit_disband_dlg();
+    /* enable city dlg */
+    enable_city_dlg_widgets();
+    free_city_units_lists();
+    request_unit_disband(pUnit);
+    flush_dirty();
+  }
+  return -1;
+}
+
+/****************************************************************
+  Open unit disband dialog.
+*****************************************************************/
+void popup_unit_disband_dlg(struct unit *pUnit, bool city)
+{
+  char cBuf[128];
+  struct widget *pBuf = NULL, *pWindow;
+  SDL_String16 *pStr;
+  SDL_Surface *pText;
+  SDL_Rect dst;
+  int window_x = 0, window_y = 0;
+  bool unit_disband_result;
+  SDL_Rect area;
+  
+  if (pUnit_Disband_Dlg) {
+    /* just in case */
+    flush_dirty();
+    return;
+  }
+
+  pUnit_Disband_Dlg = fc_calloc(1, sizeof(struct SMALL_DLG));
+
+  {
+    struct unit_list *pUnits = unit_list_new();
+    unit_list_append(pUnits, pUnit);
+    unit_disband_result = get_units_disband_info(cBuf, sizeof(cBuf), pUnits);
+    unit_list_destroy(pUnits);
+  }
+
+  pStr = create_str16_from_char(_("Disband Units"), adj_font(12));
+  pStr->style |= TTF_STYLE_BOLD;
+
+  pWindow = create_window_skeleton(NULL, pStr, 0);
+
+  pWindow->action = disband_unit_window_callback;
+  set_wstate(pWindow, FC_WS_NORMAL);
+
+  pUnit_Disband_Dlg->pEndWidgetList = pWindow;
+
+  add_to_gui_list(ID_WINDOW, pWindow);
+
+  area = pWindow->area;
+  
+  /* ============================================================= */
+  
+  /* create text label */
+  pStr = create_str16_from_char(cBuf, adj_font(10));
+  pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
+  pStr->fgcol = *get_theme_color(COLOR_THEME_UNITDISBAND_TEXT);
+  
+  pText = create_text_surf_from_str16(pStr);
+  FREESTRING16(pStr);
+  
+  area.w = MAX(area.w, pText->w + adj_size(20));
+  area.h += (pText->h + adj_size(10));
+  
+  /* cancel button */
+  pBuf = create_themeicon_button_from_chars(pTheme->CANCEL_Icon,
+			    pWindow->dst, _("Cancel"), adj_font(12), 0);
+
+  pBuf->action = cancel_disband_unit_callback;
+  set_wstate(pBuf, FC_WS_NORMAL);
+
+  area.h += (pBuf->size.h + adj_size(20));
+  
+  add_to_gui_list(ID_BUTTON, pBuf);
+
+  if (unit_disband_result) {
+    pBuf = create_themeicon_button_from_chars(pTheme->OK_Icon, pWindow->dst,
+					      _("Disband"), adj_font(12), 0);
+        
+    pBuf->action = ok_disband_unit_window_callback;
+    set_wstate(pBuf, FC_WS_NORMAL);
+    pBuf->data.unit = pUnit;    
+    add_to_gui_list(ID_BUTTON, pBuf);
+    pBuf->size.w = MAX(pBuf->size.w, pBuf->next->size.w);
+    pBuf->next->size.w = pBuf->size.w;
+    area.w = MAX(area.w, adj_size(30) + pBuf->size.w * 2);
+  } else {
+    area.w = MAX(area.w, pBuf->size.w + adj_size(20));
+  }
+  /* ============================================ */
+  
+  pUnit_Disband_Dlg->pBeginWidgetList = pBuf;
+  
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
+                (pWindow->size.w - pWindow->area.w) + area.w,
+                (pWindow->size.h - pWindow->area.h) + area.h);
+  
+  area = pWindow->area;
+  
+  if(city) {
+    window_x = Main.event.motion.x;
+    window_y = Main.event.motion.y;
+  } else {
+    put_window_near_map_tile(pWindow, pWindow->size.w, pWindow->size.h,
+                             unit_tile(pUnit));
+  }
+  
+  widget_set_position(pWindow, window_x, window_y);
+  
+  /* setup rest of widgets */
+  /* label */
+  dst.x = area.x + (area.w - pText->w) / 2;
+  dst.y = area.y + adj_size(10);
+  alphablit(pText, NULL, pWindow->theme, &dst);
+  FREESURFACE(pText);
+   
+  /* cancel button */
+  pBuf = pWindow->prev;
+  pBuf->size.y = area.y + area.h - pBuf->size.h - adj_size(7);
+
+  if (unit_disband_result) {
+    /* disband button */
+    pBuf = pBuf->prev;
+    pBuf->size.x = area.x + (area.w - (2 * pBuf->size.w + adj_size(10))) / 2;
+    pBuf->size.y = pBuf->next->size.y;
+    
+    /* cancel button */
+    pBuf->next->size.x = pBuf->size.x + pBuf->size.w + adj_size(10);
+  } else {
+    /* x position of cancel button */
+    pBuf->size.x = area.x + area.w - pBuf->size.w - adj_size(10);
+  }
+  
+  
+  /* ================================================== */
+  /* redraw */
+  redraw_group(pUnit_Disband_Dlg->pBeginWidgetList, pWindow, 0);
+    
+  widget_mark_dirty(pWindow);
+  flush_dirty();
+  
+}
+
+/****************************************************************
+  Close unit disband dialog.
+*****************************************************************/
+static void popdown_unit_disband_dlg(void)
+{
+  if (pUnit_Disband_Dlg) {
+    popdown_window_group_dialog(pUnit_Disband_Dlg->pBeginWidgetList,
+			      pUnit_Disband_Dlg->pEndWidgetList);
+    FC_FREE(pUnit_Disband_Dlg);
+  }
+}
+
+/* =======================================================================*/
 /* ======================== UNIT SELECTION DIALOG ========================*/
 /* =======================================================================*/
 static struct ADVANCED_DLG *pUnit_Select_Dlg = NULL;
 
 /**************************************************************************
-...
+  User interacted with unit selection window.
 **************************************************************************/
 static int unit_select_window_callback(struct widget *pWindow)
 {
@@ -807,19 +1006,19 @@ static int unit_select_window_callback(struct widget *pWindow)
 }
 
 /**************************************************************************
-...
+  User requested unit select window to be closed.
 **************************************************************************/
 static int exit_unit_select_callback( struct widget *pWidget )
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
-    popdown_unit_select_dialog();
+    unit_select_dialog_popdown();
     is_unit_move_blocked = FALSE;
   }
   return -1;
 }
 
 /**************************************************************************
-...
+  User selected unit from unit select window.
 **************************************************************************/
 static int unit_select_callback( struct widget *pWidget )
 {
@@ -827,10 +1026,10 @@ static int unit_select_callback( struct widget *pWidget )
     struct unit *pUnit =
       player_unit_by_number(client_player(), MAX_ID - pWidget->ID);
   
-    popdown_unit_select_dialog();
+    unit_select_dialog_popdown();
     if (pUnit) {
       request_new_unit_activity(pUnit, ACTIVITY_IDLE);
-      set_unit_focus(pUnit);
+      unit_focus_set(pUnit);
     }
   }
   return -1;
@@ -839,7 +1038,7 @@ static int unit_select_callback( struct widget *pWidget )
 /**************************************************************************
   Popdown a dialog window to select units on a particular tile.
 **************************************************************************/
-static void popdown_unit_select_dialog(void)
+static void unit_select_dialog_popdown(void)
 {
   if (pUnit_Select_Dlg) {
     is_unit_move_blocked = FALSE;
@@ -855,7 +1054,7 @@ static void popdown_unit_select_dialog(void)
 /**************************************************************************
   Popup a dialog window to select units on a particular tile.
 **************************************************************************/
-void popup_unit_select_dialog(struct tile *ptile)
+void unit_select_dialog_popup(struct tile *ptile)
 {
   struct widget *pBuf = NULL, *pWindow;
   SDL_String16 *pStr;
@@ -865,7 +1064,7 @@ void popup_unit_select_dialog(struct tile *ptile)
   int i, w = 0, n;
   SDL_Rect area;
   
-  #define NUM_SEEN	20
+#define NUM_SEEN	20
   
   n = unit_list_size(ptile->units);
   
@@ -881,7 +1080,7 @@ void popup_unit_select_dialog(struct tile *ptile)
   pStr->style |= TTF_STYLE_BOLD;
   
   pWindow = create_window_skeleton(NULL, pStr, 0);
-  
+
   pWindow->action = unit_select_window_callback;
   set_wstate(pWindow, FC_WS_NORMAL);
   
@@ -904,33 +1103,36 @@ void popup_unit_select_dialog(struct tile *ptile)
   add_to_gui_list(ID_UNIT_SELLECT_DLG_EXIT_BUTTON, pBuf);
     
   /* ---------- */
- 
-  for(i = 0; i < n; i++) {
+
+  for (i = 0; i < n; i++) {
+    const char *vetname;
+
     pUnit = unit_list_get(ptile->units, i);
     pUnitType = unit_type(pUnit);
+    vetname = utype_veteran_name_translation(pUnitType, pUnit->veteran);
         
     if (unit_owner(pUnit) == client.conn.playing) {
-      fc_snprintf(cBuf , sizeof(cBuf), _("Contact %s (%d / %d) %s(%d,%d,%d) %s"),
-            pUnit->veteran ? _("Veteran") : "" ,
-            pUnit->hp, pUnitType->hp,
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-	    unit_activity_text(pUnit));
+      fc_snprintf(cBuf , sizeof(cBuf), _("Contact %s (%d / %d) %s(%d,%d,%s) %s"),
+                  (vetname != NULL ? vetname : ""),
+                  pUnit->hp, pUnitType->hp,
+                  utype_name_translation(pUnitType),
+                  pUnitType->attack_strength,
+                  pUnitType->defense_strength,
+                  move_points_text(pUnitType->move_rate, FALSE),
+                  unit_activity_text(pUnit));
     } else {
       int att_chance, def_chance;
-      
-      fc_snprintf(cBuf , sizeof(cBuf), _("%s %s %s(A:%d D:%d M:%d FP:%d) HP:%d%%"),
-            nation_adjective_for_player(unit_owner(pUnit)),
-            (pUnit->veteran ? _("Veteran") : ""),
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-      	    pUnitType->firepower,
-	    (pUnit->hp * 100 / pUnitType->hp + 9) / 10);
-      
+
+      fc_snprintf(cBuf , sizeof(cBuf), _("%s %s %s(A:%d D:%d M:%s FP:%d) HP:%d%%"),
+                  nation_adjective_for_player(unit_owner(pUnit)),
+                  (vetname != NULL ? vetname : ""),
+                  utype_name_translation(pUnitType),
+                  pUnitType->attack_strength,
+                  pUnitType->defense_strength,
+                  move_points_text(pUnitType->move_rate, FALSE),
+                  pUnitType->firepower,
+                  (pUnit->hp * 100 / pUnitType->hp + 9) / 10);
+
       /* calculate chance to win */
       if (sdl_get_chance_to_win(&att_chance, &def_chance, pUnit, pFocus)) {
           /* TRANS: "CtW" = "Chance to Win" */
@@ -978,8 +1180,8 @@ void popup_unit_select_dialog(struct tile *ptile)
   area = pWindow->area;
   
   put_window_near_map_tile(pWindow, pWindow->size.w, pWindow->size.h,
-                           pUnit->tile);
-  
+                           unit_tile(pUnit));
+
   w = area.w;
   
   if(pUnit_Select_Dlg->pScroll) {
@@ -1006,6 +1208,14 @@ void popup_unit_select_dialog(struct tile *ptile)
   redraw_group(pUnit_Select_Dlg->pBeginWidgetList, pWindow, 0);
 
   widget_flush(pWindow);
+}
+
+/**************************************************************************
+  Update the dialog window to select units on a particular tile.
+**************************************************************************/
+void unit_select_dialog_update_real(void)
+{
+  /* PORTME */
 }
 
 /* ====================================================================== */
@@ -1058,9 +1268,12 @@ const char *sdl_get_tile_defense_info_text(struct tile *ptile)
   static char buffer[64];
   int bonus = (tile_terrain(ptile)->defense_bonus - 10) * 10;    
   
-  if(tile_has_special(ptile, S_RIVER)) {
-    bonus += terrain_control.river_defense_bonus;
-  }
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)
+        && road_has_flag(proad, RF_NATURAL)) {
+      bonus += proad->defense_bonus;
+    }
+  } road_type_iterate_end;
 
   fc_snprintf(buffer, sizeof(buffer), _("Terrain Defense Bonus: +%d%% "), bonus);
 
@@ -1085,10 +1298,11 @@ static void popup_terrain_info_dialog(SDL_Surface *pDest, struct tile *ptile)
       
   pSurf = get_terrain_surface(ptile);
   pTerrain_Info_Dlg = fc_calloc(1, sizeof(struct SMALL_DLG));
-    
-  /* ----------- */  
-  fc_snprintf(cBuf, sizeof(cBuf), "%s [%d,%d]", _("Terrain Info"), ptile->x , ptile->y);
-  
+
+  /* ----------- */
+  fc_snprintf(cBuf, sizeof(cBuf), "%s [%d,%d]", _("Terrain Info"),
+              TILE_XY(ptile));
+
   pWindow = create_window_skeleton(NULL, create_str16_from_char(cBuf , adj_font(12)), 0);
   pWindow->string16->style |= TTF_STYLE_BOLD;
   
@@ -1113,7 +1327,7 @@ static void popup_terrain_info_dialog(SDL_Surface *pDest, struct tile *ptile)
   area.w = MAX(area.w, pBuf->size.w + adj_size(20));
   area.h = MAX(area.h, pBuf->size.h);
 
-  resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                 (pWindow->size.w - pWindow->area.w) + area.w,
                 (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -1168,7 +1382,7 @@ void popdown_advanced_terrain_dialog(void)
 }
 
 /**************************************************************************
-  ...
+  User selected "Advanced Menu"
 **************************************************************************/
 int advanced_terrain_window_dlg_callback(struct widget *pWindow)
 {
@@ -1179,7 +1393,7 @@ int advanced_terrain_window_dlg_callback(struct widget *pWindow)
 }
 
 /**************************************************************************
-  ...
+  User requested closing of advanced terrain dialog.
 **************************************************************************/
 int exit_advanced_terrain_dlg_callback(struct widget *pWidget)
 {
@@ -1191,7 +1405,7 @@ int exit_advanced_terrain_dlg_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User requested terrain info.
 **************************************************************************/
 static int terrain_info_callback(struct widget *pWidget)
 {
@@ -1207,7 +1421,7 @@ static int terrain_info_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User requested zoom to city.
 **************************************************************************/
 static int zoom_to_city_callback(struct widget *pWidget)
 {
@@ -1222,7 +1436,7 @@ static int zoom_to_city_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User requested production change.
 **************************************************************************/
 static int change_production_callback(struct widget *pWidget)
 {
@@ -1235,7 +1449,7 @@ static int change_production_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User requested hurry production.
 **************************************************************************/
 static int hurry_production_callback(struct widget *pWidget)
 {
@@ -1250,7 +1464,7 @@ static int hurry_production_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User requested opening of cma settings.
 **************************************************************************/
 static int cma_callback(struct widget *pWidget)
 {
@@ -1263,7 +1477,7 @@ static int cma_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-...
+  User selected unit.
 **************************************************************************/
 static int adv_unit_select_callback(struct widget *pWidget)
 {
@@ -1274,14 +1488,14 @@ static int adv_unit_select_callback(struct widget *pWidget)
     
     if (pUnit) {
       request_new_unit_activity(pUnit, ACTIVITY_IDLE);
-      set_unit_focus(pUnit);
+      unit_focus_set(pUnit);
     }
   }
   return -1;
 }
 
 /**************************************************************************
-...
+  User selected all units from tile.
 **************************************************************************/
 static int adv_unit_select_all_callback(struct widget *pWidget)
 {
@@ -1291,29 +1505,29 @@ static int adv_unit_select_all_callback(struct widget *pWidget)
     popdown_advanced_terrain_dialog();
     
     if (pUnit) {
-      activate_all_units(pUnit->tile);
+      activate_all_units(unit_tile(pUnit));
     }
   }
   return -1;
 }
 
 /**************************************************************************
-...
+  Sentry unit widget contains.
 **************************************************************************/
 static int adv_unit_sentry_idle_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
     struct unit *pUnit = pWidget->data.unit;
-  
+
     popdown_advanced_terrain_dialog();
     
     if (pUnit) {
-      struct tile *ptile = pUnit->tile;
+      struct tile *ptile = unit_tile(pUnit);
       unit_list_iterate(ptile->units, punit) {
         if (unit_owner(punit) == client.conn.playing
-         && ACTIVITY_IDLE == punit->activity
-         && !punit->ai_controlled
-         && can_unit_do_activity(punit, ACTIVITY_SENTRY)) {
+	    && ACTIVITY_IDLE == punit->activity
+	    && !punit->ai_controlled
+	    && can_unit_do_activity(punit, ACTIVITY_SENTRY)) {
           request_new_unit_activity(punit, ACTIVITY_SENTRY);
         }
       } unit_list_iterate_end;
@@ -1323,7 +1537,7 @@ static int adv_unit_sentry_idle_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  Initiate goto to selected tile.
 **************************************************************************/
 static int goto_here_callback(struct widget *pWidget)
 {
@@ -1332,7 +1546,7 @@ static int goto_here_callback(struct widget *pWidget)
     int y = pWidget->data.cont->id1;
       
     popdown_advanced_terrain_dialog();
-    
+
     /* may not work */
     send_goto_tile(head_of_units_in_focus(), map_pos_to_tile(x, y));
   }
@@ -1340,7 +1554,7 @@ static int goto_here_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  Initiate patrol to selected tile.
 **************************************************************************/
 static int patrol_here_callback(struct widget *pWidget)
 {
@@ -1362,13 +1576,13 @@ static int patrol_here_callback(struct widget *pWidget)
       do_unit_patrol_to(pUnit, map_pos_to_tile(x, y));
       exit_goto_state();
     }
-#endif  
+#endif /* 0 */
   }
   return -1;
 }
 
 /**************************************************************************
-  ...
+  Initiate paradrop to selected tile.
 **************************************************************************/
 static int paradrop_here_callback(struct widget *pWidget)
 {
@@ -1390,7 +1604,7 @@ static int paradrop_here_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  Show help about unit type.
 **************************************************************************/
 static int unit_help_callback(struct widget *pWidget)
 {
@@ -1402,7 +1616,6 @@ static int unit_help_callback(struct widget *pWidget)
   }
   return -1;
 }
-
 
 /**************************************************************************
   Popup a generic dialog to display some generic information about
@@ -1438,11 +1651,11 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
   is_unit_move_blocked = TRUE;
     
   pAdvanced_Terrain_Dlg = fc_calloc(1, sizeof(struct ADVANCED_DLG));
-  
+
   pCont = fc_calloc(1, sizeof(struct CONTAINER));
-  pCont->id0 = ptile->x;
-  pCont->id1 = ptile->y;
-  
+  pCont->id0 = index_to_map_pos_x(tile_index(ptile));
+  pCont->id1 = index_to_map_pos_y(tile_index(ptile));
+
   pStr = create_str16_from_char(_("Advanced Menu") , adj_font(12));
   pStr->style |= TTF_STYLE_BOLD;
   
@@ -1548,8 +1761,9 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
     
   }
   /* ---------- */
-  
-  if(pFocus_Unit && (pFocus_Unit->tile->x != ptile->x || pFocus_Unit->tile->y != ptile->y)) {
+
+  if(pFocus_Unit
+     && (tile_index(unit_tile(pFocus_Unit)) != tile_index(ptile))) {
     /* separator */
     pBuf = create_iconlabel(NULL, pWindow->dst, NULL, WF_FREE_THEME);
     
@@ -1592,16 +1806,15 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
       area.h += pBuf->size.h;
       
     }
-#endif
+#endif /* 0 */
 
+    /* FIXME: This logic seems to try to mirror do_paradrop() why? */
     if(can_unit_paradrop(pFocus_Unit) && client_tile_get_known(ptile) &&
-      !(is_ocean_tile(ptile) && is_ground_unit(pFocus_Unit)) &&
-      !(is_sailing_unit(pFocus_Unit) && (!is_ocean_tile(ptile) || !pCity)) &&
       !(((pCity && pplayers_non_attack(client.conn.playing, city_owner(pCity)))
       || is_non_attack_unit_tile(ptile, client.conn.playing))) &&
       (unit_type(pFocus_Unit)->paratroopers_range >=
-	    real_map_distance(pFocus_Unit->tile, ptile))) {
-	      
+            real_map_distance(unit_tile(pFocus_Unit), ptile))) {
+
       create_active_iconlabel(pBuf, pWindow->dst, pStr, _("Paradrop here"),
 						    paradrop_here_callback);
       pBuf->data.cont = pCont;
@@ -1636,28 +1849,31 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
       struct widget *pLast = pBuf;
       bool reset = FALSE;
       int my_units = 0;
-      
+      const char *vetname;
+
       #define ADV_NUM_SEEN  15
-      
+
       pDefender = (pFocus_Unit ? get_defender(pFocus_Unit, ptile) : NULL);
       pAttacker = (pFocus_Unit ? get_attacker(pFocus_Unit, ptile) : NULL);
-      for(i=0; i<n; i++) {
+      for (i = 0; i < n; i++) {
         pUnit = unit_list_get(ptile->units, i);
-	if (pUnit == pFocus_Unit) {
-	  continue;
-	}
+        if (pUnit == pFocus_Unit) {
+          continue;
+        }
         pUnitType = unit_type(pUnit);
+        vetname = utype_veteran_name_translation(pUnitType, pUnit->veteran);
+
         if (unit_owner(pUnit) == client.conn.playing) {
           fc_snprintf(cBuf, sizeof(cBuf),
-            _("Activate %s (%d / %d) %s (%d,%d,%d) %s"),
-            pUnit->veteran ? _("Veteran") : "" ,
-            pUnit->hp, pUnitType->hp,
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-	    unit_activity_text(pUnit));
-    
+                      _("Activate %s (%d / %d) %s (%d,%d,%s) %s"),
+                      (vetname != NULL ? vetname : ""),
+                      pUnit->hp, pUnitType->hp,
+                      utype_name_translation(pUnitType),
+                      pUnitType->attack_strength,
+                      pUnitType->defense_strength,
+                      move_points_text(pUnitType->move_rate, FALSE),
+                      unit_activity_text(pUnit));
+
 	  create_active_iconlabel(pBuf, pWindow->dst, pStr,
 	       cBuf, adv_unit_select_callback);
           pBuf->data.unit = pUnit;
@@ -1666,38 +1882,38 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
 	  my_units++;
 	} else {
 	  int att_chance, def_chance;
-	  
-          fc_snprintf(cBuf, sizeof(cBuf), _("%s %s %s (A:%d D:%d M:%d FP:%d) HP:%d%%"),
-            nation_adjective_for_player(unit_owner(pUnit)),
-            (pUnit->veteran ? _("Veteran") : ""),
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-      	    pUnitType->firepower,
-	    ((pUnit->hp * 100) / pUnitType->hp));
-    
+
+          fc_snprintf(cBuf, sizeof(cBuf), _("%s %s %s (A:%d D:%d M:%s FP:%d) HP:%d%%"),
+                      nation_adjective_for_player(unit_owner(pUnit)),
+                      (vetname != NULL ? vetname : ""),
+                      utype_name_translation(pUnitType),
+                      pUnitType->attack_strength,
+                      pUnitType->defense_strength,
+                      move_points_text(pUnitType->move_rate, FALSE),
+                      pUnitType->firepower,
+                      ((pUnit->hp * 100) / pUnitType->hp));
+
           /* calculate chance to win */
           if (sdl_get_chance_to_win(&att_chance, &def_chance, pUnit, pFocus_Unit)) {
             /* TRANS: "CtW" = "Chance to Win" */
             cat_snprintf(cBuf, sizeof(cBuf), _(" CtW: Att:%d%% Def:%d%%"),
                att_chance, def_chance);
 	  }
-	  
-	  if (pAttacker && pAttacker == pUnit) {
-	    pStr->fgcol = *(get_game_colorRGB(COLOR_OVERVIEW_ENEMY_UNIT));		  
-	    reset = TRUE;
-	  } else {
-	    if (pDefender && pDefender == pUnit) {
-	      pStr->fgcol = *(get_game_colorRGB(COLOR_OVERVIEW_MY_UNIT));			
-	      reset = TRUE;
-	    }
-	  }
-	  
+
+          if (pAttacker && pAttacker == pUnit) {
+            pStr->fgcol = *(get_game_color(COLOR_OVERVIEW_ENEMY_UNIT));
+            reset = TRUE;
+          } else {
+            if (pDefender && pDefender == pUnit) {
+              pStr->fgcol = *(get_game_color(COLOR_OVERVIEW_MY_UNIT));
+              reset = TRUE;
+            }
+          }
+
 	  create_active_iconlabel(pBuf, pWindow->dst, pStr, cBuf, NULL);
           
 	  if (reset) {
-	    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_ADVANCEDTERRAINDLG_TEXT);
+	    pStr->fgcol = *get_theme_color(COLOR_THEME_ADVANCEDTERRAINDLG_TEXT);
 	    reset = FALSE;
 	  }
 	  
@@ -1762,19 +1978,21 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
       pUnit = unit_list_get(ptile->units, 0);
       pUnitType = unit_type(pUnit);
       if (pUnit != pFocus_Unit) {
+        const char *vetname;
+
+        vetname = utype_veteran_name_translation(pUnitType, pUnit->veteran);
         if ((pCity && city_owner(pCity) == client.conn.playing)
-	 || (unit_owner(pUnit) == client.conn.playing))
-        {
+            || (unit_owner(pUnit) == client.conn.playing)) {
           fc_snprintf(cBuf, sizeof(cBuf),
-            _("Activate %s (%d / %d) %s (%d,%d,%d) %s"),
-            pUnit->veteran ? _("Veteran") : "" ,
-            pUnit->hp, pUnitType->hp,
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-	    unit_activity_text(pUnit));
-    
+                      _("Activate %s (%d / %d) %s (%d,%d,%s) %s"),
+                      (vetname != NULL ? vetname : ""),
+                      pUnit->hp, pUnitType->hp,
+                      utype_name_translation(pUnitType),
+                      pUnitType->attack_strength,
+                      pUnitType->defense_strength,
+                      move_points_text(pUnitType->move_rate, FALSE),
+                      unit_activity_text(pUnit));
+
 	  create_active_iconlabel(pBuf, pWindow->dst, pStr,
 	    		cBuf, adv_unit_select_callback);
 	  pBuf->data.unit = pUnit;
@@ -1792,17 +2010,17 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
           area.h += pBuf->next->size.h;
         } else {
 	  int att_chance, def_chance;
-	
-          fc_snprintf(cBuf, sizeof(cBuf), _("%s %s %s (A:%d D:%d M:%d FP:%d) HP:%d%%"),
-            nation_adjective_for_player(unit_owner(pUnit)),
-            (pUnit->veteran ? _("Veteran") : ""),
-            utype_name_translation(pUnitType),
-            pUnitType->attack_strength,
-            pUnitType->defense_strength,
-            (pUnitType->move_rate / SINGLE_MOVE),
-      	    pUnitType->firepower,
-	    ((pUnit->hp * 100) / pUnitType->hp));
-    
+
+          fc_snprintf(cBuf, sizeof(cBuf), _("%s %s %s (A:%d D:%d M:%s FP:%d) HP:%d%%"),
+                      nation_adjective_for_player(unit_owner(pUnit)),
+                      (vetname != NULL ? vetname : ""),
+                      utype_name_translation(pUnitType),
+                      pUnitType->attack_strength,
+                      pUnitType->defense_strength,
+                      move_points_text(pUnitType->move_rate, FALSE),
+                      pUnitType->firepower,
+                      ((pUnit->hp * 100) / pUnitType->hp));
+
 	    /* calculate chance to win */
             if (sdl_get_chance_to_win(&att_chance, &def_chance, pUnit, pFocus_Unit)) {
               cat_snprintf(cBuf, sizeof(cBuf), _(" CtW: Att:%d%% Def:%d%%"),
@@ -1899,7 +2117,7 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
       area2.w = pBuf->size.w - adj_size(20);
       
       SDL_FillRect(pBuf->theme, &area2, map_rgba(pBuf->theme->format,
-                    *get_game_colorRGB(COLOR_THEME_ADVANCEDTERRAINDLG_TEXT)));
+                    *get_theme_color(COLOR_THEME_ADVANCEDTERRAINDLG_TEXT)));
     }
     
     if(pBuf == pAdvanced_Terrain_Dlg->pBeginWidgetList || 
@@ -1930,6 +2148,9 @@ void popup_advanced_terrain_dialog(struct tile *ptile, Uint16 pos_x, Uint16 pos_
 /* ====================================================================== */
 static struct SMALL_DLG *pPillage_Dlg = NULL;
 
+/**************************************************************************
+  User interacted with pillage dialog.
+**************************************************************************/
 static int pillage_window_callback(struct widget *pWindow)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -1938,6 +2159,9 @@ static int pillage_window_callback(struct widget *pWindow)
   return -1;
 }
 
+/**************************************************************************
+  User selected what to pillage.
+**************************************************************************/
 static int pillage_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -1945,23 +2169,32 @@ static int pillage_callback(struct widget *pWidget)
     int what = MAX_ID - pWidget->ID;
 
     popdown_pillage_dialog();
-    
-    if (pUnit) 
-    {
-      Base_type_id pillage_base = -1;
 
-      if (what > S_LAST) {
-        pillage_base = what - S_LAST - 1;
-        what = S_LAST;
+    if (pUnit)
+    {
+      struct act_tgt target;
+
+      if (what >= S_LAST + game.control.num_base_types) {
+        target.type = ATT_ROAD;
+        target.obj.road = what - S_LAST - game.control.num_base_types;
+      } else if (what >= S_LAST) {
+        target.type = ATT_BASE;
+        target.obj.base = what - S_LAST;
+      } else {
+        target.type = ATT_SPECIAL;
+        target.obj.spe = what;
       }
 
-      request_new_unit_activity_targeted(pUnit, ACTIVITY_PILLAGE, what,
-                                         pillage_base);
+      request_new_unit_activity_targeted(pUnit, ACTIVITY_PILLAGE,
+                                         &target);
     }
   }  
   return -1;
 }
 
+/**************************************************************************
+  User requested closing of pillage dialog.
+**************************************************************************/
 static int exit_pillage_dlg_callback(struct widget *pWidget)
 {
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
@@ -1990,13 +2223,14 @@ static void popdown_pillage_dialog(void)
   pillage.
 **************************************************************************/
 void popup_pillage_dialog(struct unit *pUnit,
-			  bv_special may_pillage,
-                          bv_bases bases)
+			  bv_special spe,
+                          bv_bases bases,
+                          bv_roads roads)
 {
   struct widget *pWindow = NULL, *pBuf = NULL;
   SDL_String16 *pStr;
-  int what;
   SDL_Rect area;
+  struct act_tgt tgt;
 
   if (pPillage_Dlg) {
     return;
@@ -2034,25 +2268,33 @@ void popup_pillage_dialog(struct unit *pUnit,
   
   add_to_gui_list(ID_PILLAGE_DLG_EXIT_BUTTON, pBuf);
   /* ---------- */
-  
-  while ((what = get_preferred_pillage(may_pillage, bases)) != S_LAST) {
-    const char *name;
 
-    if (what > S_LAST) {
-      struct base_type *pbase = base_by_number(what - S_LAST - 1);
-      name = base_name_translation(pbase);
-    } else {
-      name = special_name_translation(what);
+  while (get_preferred_pillage(&tgt, spe, bases, roads)) {
+    const char *name = NULL;
+    int what = S_LAST;
+
+    switch (tgt.type) {
+      case ATT_SPECIAL:
+        name = special_name_translation(tgt.obj.spe);
+        clear_special(&spe, tgt.obj.spe);
+        what = tgt.obj.spe;
+        break;
+      case ATT_BASE:
+        name = base_name_translation(base_by_number(tgt.obj.base));
+        BV_CLR(bases, tgt.obj.base);
+        what = tgt.obj.base + S_LAST;
+        break;
+      case ATT_ROAD:
+        name = road_name_translation(road_by_number(tgt.obj.road));
+        BV_CLR(roads, tgt.obj.road);
+        what = tgt.obj.road + S_LAST + game.control.num_base_types;
+        break;
     }
+
+    fc_assert(name != NULL);
 
     create_active_iconlabel(pBuf, pWindow->dst, pStr,
                             (char *) name, pillage_callback);
-
-    if (what > S_LAST) {
-      BV_CLR(bases, what - S_LAST - 1);
-    } else {
-      clear_special(&may_pillage, what);
-    }
 
     pBuf->data.unit = pUnit;
     set_wstate(pBuf, FC_WS_NORMAL);
@@ -2073,7 +2315,7 @@ void popup_pillage_dialog(struct unit *pUnit,
   area = pWindow->area;
   
   put_window_near_map_tile(pWindow, pWindow->size.w, pWindow->size.h,
-                           pUnit->tile);
+                           unit_tile(pUnit));
   
   /* setup widget size and start position */
 
@@ -2120,7 +2362,7 @@ static void popdown_connect_dialog(void)
 static struct SMALL_DLG *pRevolutionDlg = NULL;
   
 /**************************************************************************
-  ...
+  User confirmed revolution.
 **************************************************************************/
 static int revolution_dlg_ok_callback(struct widget *pButton)
 {
@@ -2135,7 +2377,7 @@ static int revolution_dlg_ok_callback(struct widget *pButton)
 }
 
 /**************************************************************************
-  ...
+  User cancelled revolution.
 **************************************************************************/
 static int revolution_dlg_cancel_callback(struct widget *pCancel_Button)
 {
@@ -2147,7 +2389,7 @@ static int revolution_dlg_cancel_callback(struct widget *pCancel_Button)
 }
 
 /**************************************************************************
-  ...
+  User requested move of revolution dialog.
 **************************************************************************/
 static int move_revolution_dlg_callback(struct widget *pWindow)
 {
@@ -2191,7 +2433,7 @@ static void popdown_government_dialog(void)
 }
 
 /**************************************************************************
-  ...
+  User selected government button.
 **************************************************************************/
 static int government_dlg_callback(struct widget *pGov_Button)
 {
@@ -2204,7 +2446,7 @@ static int government_dlg_callback(struct widget *pGov_Button)
 }
 
 /**************************************************************************
-  ...
+  User requested move of government dialog.
 **************************************************************************/
 static int move_government_dlg_callback(struct widget *pWindow)
 {
@@ -2354,7 +2596,7 @@ void popup_revolution_dialog(void)
   /* create text label */
   pStr = create_str16_from_char(_("You say you wanna revolution?"), adj_font(10));
   pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-  pStr->fgcol = *get_game_colorRGB(COLOR_THEME_REVOLUTIONDLG_TEXT);
+  pStr->fgcol = *get_theme_color(COLOR_THEME_REVOLUTIONDLG_TEXT);
   pLabel = create_iconlabel(NULL, pWindow->dst, pStr, 0);
   add_to_gui_list(ID_REVOLUTION_DLG_LABEL, pLabel);
 
@@ -2428,14 +2670,20 @@ static struct SMALL_DLG *pHelpDlg = NULL;
 struct NAT {
   unsigned char nation_city_style; /* selected city style */
   unsigned char selected_leader;   /* if not unique -> selected leader */
-  unsigned char nation;            /* selected nation */
+  Nation_type_id nation;           /* selected nation */
   bool leader_sex;                 /* selected leader sex */
+  struct nation_set *set;
   struct widget *pChange_Sex;
   struct widget *pName_Edit;
   struct widget *pName_Next;
   struct widget *pName_Prev;
+  struct widget *pset_name;
+  struct widget *pset_next;
+  struct widget *pset_prev;
 };
 
+static int next_set_callback(struct widget *next_button);
+static int prev_set_callback(struct widget *prev_button);
 static int nations_dialog_callback(struct widget *pWindow);
 static int nation_button_callback(struct widget *pNation);
 static int races_dialog_ok_callback(struct widget *pStart_Button);
@@ -2447,7 +2695,7 @@ static void select_random_leader(Nation_type_id nation);
 static void change_nation_label(void);
 
 /**************************************************************************
-  ...
+  User interaceted with nations dialog.
 **************************************************************************/
 static int nations_dialog_callback(struct widget *pWindow)
 {
@@ -2460,7 +2708,7 @@ static int nations_dialog_callback(struct widget *pWindow)
 }
 
 /**************************************************************************
-  ...
+  User accepted nation.
 **************************************************************************/
 static int races_dialog_ok_callback(struct widget *pStart_Button)
 {
@@ -2491,7 +2739,7 @@ static int races_dialog_ok_callback(struct widget *pStart_Button)
 }
 
 /**************************************************************************
-  ...
+  User requested leader gender change.
 **************************************************************************/
 static int change_sex_callback(struct widget *pSex)
 {
@@ -2517,7 +2765,7 @@ static int change_sex_callback(struct widget *pSex)
 }
 
 /**************************************************************************
-  ...
+  User requested next leader name.
 **************************************************************************/
 static int next_name_callback(struct widget *pNext)
 {
@@ -2558,10 +2806,9 @@ static int next_name_callback(struct widget *pNext)
     widget_redraw(pSetup->pName_Edit);
     widget_redraw(pSetup->pName_Prev);
     widget_redraw(pSetup->pName_Next);
-    dirty_rect(pSetup->pName_Edit->size.x - pSetup->pName_Prev->size.w,
-                  pSetup->pName_Edit->size.y,
-                  pSetup->pName_Edit->size.w + pSetup->pName_Prev->size.w +
-                  pSetup->pName_Next->size.w, pSetup->pName_Edit->size.h);
+    widget_mark_dirty(pSetup->pName_Edit);
+    widget_mark_dirty(pSetup->pName_Prev);
+    widget_mark_dirty(pSetup->pName_Next);
     
     widget_redraw(pSetup->pChange_Sex);
     widget_mark_dirty(pSetup->pChange_Sex);
@@ -2572,7 +2819,7 @@ static int next_name_callback(struct widget *pNext)
 }
 
 /**************************************************************************
-  ...
+  User requested previous leader name.
 **************************************************************************/
 static int prev_name_callback(struct widget *pPrev)
 {
@@ -2613,10 +2860,9 @@ static int prev_name_callback(struct widget *pPrev)
     widget_redraw(pSetup->pName_Edit);
     widget_redraw(pSetup->pName_Prev);
     widget_redraw(pSetup->pName_Next);
-    dirty_rect(pSetup->pName_Edit->size.x - pSetup->pName_Prev->size.w,
-                  pSetup->pName_Edit->size.y, pSetup->pName_Edit->size.w +
-                  pSetup->pName_Prev->size.w + pSetup->pName_Next->size.w,
-                  pSetup->pName_Edit->size.h);
+    widget_mark_dirty(pSetup->pName_Edit);
+    widget_mark_dirty(pSetup->pName_Prev);
+    widget_mark_dirty(pSetup->pName_Next);
     
     widget_redraw(pSetup->pChange_Sex);
     widget_mark_dirty(pSetup->pChange_Sex);
@@ -2627,7 +2873,46 @@ static int prev_name_callback(struct widget *pPrev)
 }
 
 /**************************************************************************
-  ...
+  User requested next nationset
+**************************************************************************/
+static int next_set_callback(struct widget *next_button)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    struct NAT *pSetup = (struct NAT *)(pNationDlg->pEndWidgetList->data.ptr);
+    struct option *poption = optset_option_by_name(server_optset, "nationset");
+
+    fc_assert(pSetup->set != NULL
+              && nation_set_index(pSetup->set) < nation_set_count() - 1);
+
+    pSetup->set = nation_set_by_number(nation_set_index(pSetup->set) + 1);
+
+    option_str_set(poption, nation_set_rule_name(pSetup->set));
+  }
+
+  return -1;
+}
+
+/**************************************************************************
+  User requested prev nationset
+**************************************************************************/
+static int prev_set_callback(struct widget *prev_button)
+{
+  if (Main.event.button.button == SDL_BUTTON_LEFT) {
+    struct NAT *pSetup = (struct NAT *)(pNationDlg->pEndWidgetList->data.ptr);
+    struct option *poption = optset_option_by_name(server_optset, "nationset");
+
+    fc_assert(pSetup->set != NULL && nation_set_index(pSetup->set) > 0);
+
+    pSetup->set = nation_set_by_number(nation_set_index(pSetup->set) - 1);
+
+    option_str_set(poption, nation_set_rule_name(pSetup->set));
+  }
+
+  return -1;
+}
+
+/**************************************************************************
+  User cancelled nations dialog.
 **************************************************************************/
 static int races_dialog_cancel_callback(struct widget *pButton)
 {
@@ -2639,7 +2924,7 @@ static int races_dialog_cancel_callback(struct widget *pButton)
 }
 
 /**************************************************************************
-  ...
+  User interacted with city style widget.
 **************************************************************************/
 static int city_style_callback(struct widget *pWidget)
 {
@@ -2664,7 +2949,7 @@ static int city_style_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-  ...
+  User interacted with help dialog.
 **************************************************************************/
 static int help_dlg_callback(struct widget *pWindow)
 {
@@ -2672,7 +2957,7 @@ static int help_dlg_callback(struct widget *pWindow)
 }
 
 /**************************************************************************
-  ...
+  User requested closing of help dialog.
 **************************************************************************/
 static int cancel_help_dlg_callback(struct widget *pWidget)
 {
@@ -2690,7 +2975,7 @@ static int cancel_help_dlg_callback(struct widget *pWidget)
 }
 
 /**************************************************************************
-   ...
+  User selected nation.
 **************************************************************************/
 static int nation_button_callback(struct widget *pNationButton)
 {
@@ -2719,10 +3004,10 @@ static int nation_button_callback(struct widget *pNationButton)
     redraw_group(pNationDlg->pBeginWidgetList, pNationDlg->pEndWidgetList, 0);
     widget_flush(pNationDlg->pEndWidgetList);
   } else {
-    /* pop up legend info */
+    /* pop up nation description */
     struct widget *pWindow, *pOK_Button;
     SDL_String16 *pStr;
-    SDL_Surface *pText, *pText2;
+    SDL_Surface *pText;
     SDL_Rect area, area2;
     struct nation_type *pNation = nation_by_number(MAX_ID - pNationButton->ID);
       
@@ -2733,7 +3018,8 @@ static int nation_button_callback(struct widget *pNationButton)
     
       pHelpDlg = fc_calloc(1, sizeof(struct SMALL_DLG));
     
-      pStr = create_str16_from_char(_("Nation's Legend"), adj_font(12));
+      pStr = create_str16_from_char(nation_plural_translation(pNation),
+                                    adj_font(12));
       pStr->style |= TTF_STYLE_BOLD;
   
       pWindow = create_window_skeleton(NULL, pStr, 0);
@@ -2761,28 +3047,24 @@ static int nation_button_callback(struct widget *pNationButton)
 
     area = pWindow->area;
     
-    if (pNation->legend && *(pNation->legend) != '\0') {
-      pStr = create_str16_from_char(pNation->legend, adj_font(12));
-    } else {
-      pStr = create_str16_from_char(_("SORRY... NO INFO"), adj_font(12));
+    {
+      char info[4096];
+      helptext_nation(info, sizeof(info), pNation, NULL);
+      pStr = create_str16_from_char(info, adj_font(12));
     }
     
-    pStr->fgcol = *get_game_colorRGB(COLOR_THEME_NATIONDLG_LEGEND);
+    pStr->fgcol = *get_theme_color(COLOR_THEME_NATIONDLG_LEGEND);
     pText = create_text_surf_smaller_that_w(pStr, Main.screen->w - adj_size(20));
-  
-    copy_chars_to_string16(pStr, nation_plural_translation(pNation));
-    pText2 = create_text_surf_from_str16(pStr);
   
     FREESTRING16(pStr);
     
     /* create window background */
-    area.w = MAX(area.w, pText2->w + adj_size(20));
     area.w = MAX(area.w, pText->w + adj_size(20));
     area.w = MAX(area.w, pOK_Button->size.w + adj_size(20));
-    area.h = MAX(area.h, adj_size(9) + pText2->h + adj_size(10) + pText->h
+    area.h = MAX(area.h, adj_size(9) + pText->h
                          + adj_size(10) + pOK_Button->size.h + adj_size(10));
 
-    resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+    resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                   (pWindow->size.w - pWindow->area.w) + area.w,
                   (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -2792,10 +3074,6 @@ static int nation_button_callback(struct widget *pNationButton)
     
     area2.x = area.x + adj_size(7);
     area2.y = area.y + adj_size(6);
-    alphablit(pText2, NULL, pWindow->theme, &area2);
-    area2.y += (pText2->h + adj_size(10));
-    FREESURFACE(pText2);
-  
     alphablit(pText, NULL, pWindow->theme, &area2);
     FREESURFACE(pText);
   
@@ -2814,7 +3092,7 @@ static int nation_button_callback(struct widget *pNationButton)
 }
 
 /**************************************************************************
-   ...
+  User interacted with leader name edit widget.
 **************************************************************************/
 static int leader_name_edit_callback(struct widget *pEdit)
 {
@@ -2836,7 +3114,7 @@ static int leader_name_edit_callback(struct widget *pEdit)
 /* =========================================================== */
 
 /**************************************************************************
-   ...
+  Update nation label.
 **************************************************************************/
 static void change_nation_label(void)
 {
@@ -2908,14 +3186,15 @@ static void select_random_leader(Nation_type_id nation)
 }
 
 /**************************************************************************
-  ...
+   Count available playable nations.
 **************************************************************************/
 static int get_playable_nation_count(void)
 {
   int playable_nation_count = 0;
     
   nations_iterate(pnation) {
-    if (pnation->is_playable && !pnation->player && pnation->is_available)
+    if (is_nation_playable(pnation) && !pnation->player
+        && is_nation_pickable(pnation))
       ++playable_nation_count;        
   } nations_iterate_end;
 
@@ -2941,9 +3220,11 @@ void popup_races_dialog(struct player *pplayer)
   struct NAT *pSetup;
   SDL_Rect area;
   int i;
+  struct widget *nationsets = NULL;
+  int natinfo_y, natinfo_h;
 
-  #define TARGETS_ROW 5
-  #define TARGETS_COL 1
+#define TARGETS_ROW 5
+#define TARGETS_COL 1
   
   if (pNationDlg) {
     return;
@@ -2974,7 +3255,7 @@ void popup_races_dialog(struct player *pplayer)
   SDL_FillRect(pMain_Bg, NULL, map_rgba(pMain_Bg->format, bg_color));
   putframe(pMain_Bg,
            0, 0, pMain_Bg->w - 1, pMain_Bg->h - 1,
-           get_game_colorRGB(COLOR_THEME_NATIONDLG_FRAME));
+           get_theme_color(COLOR_THEME_NATIONDLG_FRAME));
   
   pStr = create_string16(NULL, 0, adj_font(12));
   pStr->style |= (SF_CENTER|TTF_STYLE_BOLD);
@@ -2985,7 +3266,7 @@ void popup_races_dialog(struct player *pplayer)
     
   nations_iterate(pNation) {
 
-    if (!is_nation_playable(pNation) || !pNation->is_available) {
+    if (!is_nation_playable(pNation) || !is_nation_pickable(pNation)) {
       continue;
     }
 
@@ -3003,7 +3284,7 @@ void popup_races_dialog(struct player *pplayer)
       change_ptsize16(pStr, adj_font(10));
       pText_Class = create_text_surf_smaller_that_w(pStr, pTmp_Surf->w - adj_size(4));
     }
-#endif    
+#endif /* 0 */
     
     dst.x = (pTmp_Surf->w - pTmp_Surf_zoomed->w) / 2;
     len = pTmp_Surf_zoomed->h +
@@ -3054,22 +3335,72 @@ void popup_races_dialog(struct player *pplayer)
   }
   
   /* ----------------------------------------------------------------- */
-    
+
+  /* nation set selection */
+  if (nation_set_count() > 1) {
+    SDL_String16 *natset_str;
+    struct option *poption;
+
+    natset_str = create_str16_from_char(_("Nation set"), adj_font(12));
+    change_ptsize16(natset_str, adj_font(24));
+    nationsets = create_iconlabel(NULL, pWindow->dst, natset_str, 0);
+    add_to_gui_list(ID_LABEL, nationsets);
+
+    /* create nation set name label */
+    poption = optset_option_by_name(server_optset, "nationset");
+    pSetup->set = nation_set_by_setting_value(option_str_get(poption));
+
+    natset_str = create_str16_from_char(nation_set_name_translation(pSetup->set),
+                                        adj_font(12));
+    change_ptsize16(natset_str, adj_font(24));
+
+    pWidget = create_iconlabel(NULL, pWindow->dst, natset_str, 0);
+
+    add_to_gui_list(ID_LABEL, pWidget);
+    pSetup->pset_name = pWidget;
+
+    /* create next nationset button */
+    pWidget = create_themeicon_button(pTheme->R_ARROW_Icon,
+                                      pWindow->dst, NULL, 0);
+    pWidget->action = next_set_callback;
+    if (nation_set_index(pSetup->set) < nation_set_count() - 1) {
+      set_wstate(pWidget, FC_WS_NORMAL);
+    }
+    add_to_gui_list(ID_NATION_NEXT_NATIONSET_BUTTON, pWidget);
+    pWidget->size.h = pWidget->next->size.h;
+    pSetup->pset_next = pWidget;
+
+    /* create prev nationset button */
+    pWidget = create_themeicon_button(pTheme->L_ARROW_Icon,
+                                      pWindow->dst, NULL, 0);
+    pWidget->action = prev_set_callback;
+    if (nation_set_index(pSetup->set) > 0) {
+      set_wstate(pWidget, FC_WS_NORMAL);
+    }
+    add_to_gui_list(ID_NATION_PREV_NATIONSET_BUTTON, pWidget);
+    pWidget->size.h = pWidget->next->size.h;
+    pSetup->pset_prev = pWidget;
+  }
+
   /* nation name */
-  
   pSetup->nation = fc_rand(get_playable_nation_count());
   pSetup->nation_city_style = city_style_of_nation(nation_by_number(pSetup->nation));
   
   copy_chars_to_string16(pStr, nation_plural_translation(nation_by_number(pSetup->nation)));
   change_ptsize16(pStr, adj_font(24));
   pStr->render = 2;
-  pStr->fgcol = *get_game_colorRGB(COLOR_THEME_NATIONDLG_TEXT);
+  pStr->fgcol = *get_theme_color(COLOR_THEME_NATIONDLG_TEXT);
   
   pTmp_Surf_zoomed = adj_surf(get_nation_flag_surface(nation_by_number(pSetup->nation)));
   
   pWidget = create_iconlabel(pTmp_Surf_zoomed, pWindow->dst, pStr,
-  			(WF_ICON_ABOVE_TEXT|WF_ICON_CENTER|WF_FREE_GFX));
-  pBuf = pWidget;
+                             (WF_ICON_ABOVE_TEXT|WF_ICON_CENTER|WF_FREE_GFX));
+  if (nationsets == NULL) {
+    pBuf = pWidget;
+  } else {
+    pBuf = nationsets;
+  }
+
   add_to_gui_list(ID_LABEL, pWidget);
   
   /* create leader name edit */
@@ -3099,7 +3430,6 @@ void popup_races_dialog(struct player *pplayer)
   pSetup->pName_Prev = pWidget;
   
   /* change sex button */
-  
   pWidget = create_icon_button_from_chars(NULL, pWindow->dst, _("Male"), adj_font(14), 0);
   pWidget->action = change_sex_callback;
   pWidget->size.w = adj_size(100);
@@ -3219,17 +3549,49 @@ void popup_races_dialog(struct player *pplayer)
     SDL_FillRectAlpha(pWindow->theme, &area2, &bg_color);
     putframe(pWindow->theme,
              area2.x, area2.y - 1, area2.x + area2.w, area2.y + area2.h,
-             get_game_colorRGB(COLOR_THEME_NATIONDLG_FRAME));
+             get_theme_color(COLOR_THEME_NATIONDLG_FRAME));
+  }
+
+  if (nationsets != NULL) {
+    /* Nationsets header */
+    pBuf->size.x = area.x + area.w / 2 + (area.w / 2 - pBuf->size.w) / 2;
+    pBuf->size.y = area.y + adj_size(46);
+
+    natinfo_y = pBuf->size.y;
+    natinfo_h = area.h -= pBuf->size.y;
+
+    /* Nationset name */
+    pBuf = pBuf->prev;
+    pBuf->size.x = area.x + area.w / 2 + (area.w / 2 - pBuf->size.w) / 2;
+    pBuf->size.y = natinfo_y + adj_size(46);
+
+    natinfo_y += adj_size(46);
+    natinfo_h -= adj_size(46);
+
+    /* Next Nationset Button */
+    pBuf = pBuf->prev;
+    pBuf->size.x = pBuf->next->size.x + pBuf->next->size.w;
+    pBuf->size.y = pBuf->next->size.y;
+
+    /* Prev Nationset Button */
+    pBuf = pBuf->prev;
+    pBuf->size.x = pBuf->next->next->size.x - pBuf->size.w;
+    pBuf->size.y = pBuf->next->size.y;
+
+    pBuf = pBuf->prev;
+  } else {
+    natinfo_y = area.y;
+    natinfo_h = area.h;
   }
    
-  /* Sellected Nation Name */
+  /* Selected Nation Name */
   pBuf->size.x = area.x + area.w / 2 + (area.w / 2 - pBuf->size.w) / 2;
-  pBuf->size.y = area.y + adj_size(46);
+  pBuf->size.y = natinfo_y + adj_size(46);
   
   /* Leader Name Edit */
   pBuf = pBuf->prev;
   pBuf->size.x = area.x + area.w / 2 + (area.w/2 - pBuf->size.w) / 2;
-  pBuf->size.y = area.y + (area.h - pBuf->size.h) / 2 - adj_size(30);
+  pBuf->size.y = natinfo_y + (natinfo_h - pBuf->size.h) / 2 - adj_size(30);
   
   /* Next Leader Name Button */
   pBuf = pBuf->prev;
@@ -3262,15 +3624,15 @@ void popup_races_dialog(struct player *pplayer)
   
   putline(pWindow->theme,
           area.x,
-          area.y + area.h - adj_size(7) - pBuf->prev->size.h - adj_size(10),
+          natinfo_y + natinfo_h - adj_size(7) - pBuf->prev->size.h - adj_size(10),
           area.w - 1, 
-          area.y + area.h - adj_size(7) - pBuf->prev->size.h - adj_size(10),
-          get_game_colorRGB(COLOR_THEME_NATIONDLG_FRAME));
+          natinfo_y + natinfo_h - adj_size(7) - pBuf->prev->size.h - adj_size(10),
+          get_theme_color(COLOR_THEME_NATIONDLG_FRAME));
   
   /* Disconnect Button */
   pBuf = pBuf->prev;
   pBuf->size.x = area.x + adj_size(10);
-  pBuf->size.y = area.y + area.h - adj_size(7) - pBuf->size.h;
+  pBuf->size.y = natinfo_y + natinfo_h - adj_size(7) - pBuf->size.h;
   
   /* Start Button */
   pBuf = pBuf->prev;
@@ -3306,6 +3668,30 @@ void popdown_races_dialog(void)
 }
 
 /**************************************************************************
+  The server has changed the set of selectable nations.
+**************************************************************************/
+void races_update_pickable(bool nationset_change)
+{
+  /* If this is because of nationset change, update will take
+   * place later when the new option value is received */
+  if (pNationDlg != NULL && !nationset_change) {
+    popdown_races_dialog();
+    popup_races_dialog(client.conn.playing);
+  }
+}
+
+/**************************************************************************
+  Nationset selection update
+**************************************************************************/
+void nationset_changed(void)
+{
+  if (pNationDlg != NULL) {
+    popdown_races_dialog();
+    popup_races_dialog(client.conn.playing);
+  }
+}
+
+/**************************************************************************
   In the nation selection dialog, make already-taken nations unavailable.
   This information is contained in the packet_nations_used packet.
 **************************************************************************/
@@ -3315,16 +3701,17 @@ void races_toggles_set_sensitive()
   bool change = FALSE;
   struct widget *pNat;
 
-  if (!pNationDlg)
+  if (!pNationDlg) {
     return;
-  
+  }
+
   pSetup = (struct NAT *)(pNationDlg->pEndWidgetList->data.ptr);
   
   nations_iterate(nation) {
   
-    if (!nation->is_available || nation->player) {
+    if (!is_nation_pickable(nation) || nation->player) {
       log_debug("  [%d]: %d = %s", nation_index(nation),
-                (!nation->is_available || nation->player),
+                (!is_nation_pickable(nation) || nation->player),
                 nation_rule_name(nation));
 
       pNat = get_widget_pointer_form_main_list(MAX_ID - nation_index(nation));
@@ -3363,6 +3750,14 @@ void popup_tileset_suggestion_dialog(void)
 {
 }
 
+/****************************************************************
+  Ruleset (modpack) has suggested loading certain soundset. Confirm from
+  user and load.
+*****************************************************************/
+void popup_soundset_suggestion_dialog(void)
+{
+}
+
 /**************************************************************************
   Tileset (modpack) has suggested loading certain theme. Confirm from
   user and load.
@@ -3371,4 +3766,20 @@ bool popup_theme_suggestion_dialog(const char *theme_name)
 {
   /* Don't load */
   return FALSE;
+}
+
+/****************************************************************
+  Player has gained a new tech.
+*****************************************************************/
+void show_tech_gained_dialog(Tech_type_id tech)
+{
+  /* PORTME */
+}
+
+/****************************************************************
+  Show tileset error dialog.
+*****************************************************************/
+void show_tileset_error(const char *msg)
+{
+  /* PORTME */
 }

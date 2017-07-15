@@ -1,4 +1,4 @@
-/**********************************************************************
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -11,18 +11,18 @@
    GNU General Public License for more details.
 ***********************************************************************/
 
-/**********************************************************************
+/***********************************************************************
                           mapctrl.c  -  description
                              -------------------
     begin                : Thu Sep 05 2002
     copyright            : (C) 2002 by Rafał Bursig
     email                : Rafał Bursig <bursig@poczta.fm>
- **********************************************************************/
+***********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
@@ -36,6 +36,7 @@
 #include "client_main.h"
 #include "climisc.h"
 #include "overview_common.h"
+#include "update_queue.h"
 
 /* client/gui-sdl */
 #include "citydlg.h"
@@ -744,7 +745,7 @@ static void popup_minimap_scale_dialog(void)
   
   area.h += adj_size(20); 
 
-  resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                 (pWindow->size.w - pWindow->area.w) + area.w,
                 (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -1086,7 +1087,7 @@ static void popup_unitinfo_scale_dialog(void)
   area.h += pBuf->size.h + adj_size(10);
   area.w = MAX(area.w, pBuf->size.w + adj_size(20));
   
-  resize_window(pWindow, NULL, get_game_colorRGB(COLOR_THEME_BACKGROUND),
+  resize_window(pWindow, NULL, get_theme_color(COLOR_THEME_BACKGROUND),
                 (pWindow->size.w - pWindow->area.w) + area.w,
                 (pWindow->size.h - pWindow->area.h) + area.h);
 
@@ -1358,7 +1359,7 @@ void set_new_minimap_window_pos(void)
                       area.y + area.h - pWidget->size.h - 2);
 }
 
-void popup_unitinfo_window() {
+void popup_unitinfo_window(void) {
   struct widget *pWidget, *pWindow;
   SDL_Surface *pIcon_theme = NULL;
   char buf[256];
@@ -1467,7 +1468,7 @@ void popup_unitinfo_window() {
   widget_redraw(pUnits_Info_Window);
 }
 
-void show_unitinfo_window_buttons()
+void show_unitinfo_window_buttons(void)
 {
   struct widget *pWidget = get_unit_info_window_widget();
     
@@ -1488,7 +1489,7 @@ void show_unitinfo_window_buttons()
   clear_wflag(pWidget, WF_HIDDEN);
 }
 
-void hide_unitinfo_window_buttons()
+void hide_unitinfo_window_buttons(void)
 {
   struct widget *pWidget = get_unit_info_window_widget();
     
@@ -1509,7 +1510,7 @@ void hide_unitinfo_window_buttons()
   set_wflag(pWidget, WF_HIDDEN);
 }
   
-void disable_unitinfo_window_buttons()
+void disable_unitinfo_window_buttons(void)
 {
   struct widget *pWidget = get_unit_info_window_widget();
     
@@ -1526,7 +1527,7 @@ void disable_unitinfo_window_buttons()
   set_wstate(pWidget, FC_WS_DISABLED);
 }
 
-void popdown_unitinfo_window()
+void popdown_unitinfo_window(void)
 {
   if (pUnitInfo_Dlg) {
     popdown_window_group_dialog(pUnitInfo_Dlg->pBeginWidgetList, pUnitInfo_Dlg->pEndWidgetList);
@@ -1535,7 +1536,8 @@ void popdown_unitinfo_window()
   }
 }
 
-void popup_minimap_window() {
+void popup_minimap_window(void)
+{
   struct widget *pWidget, *pWindow;
   SDL_Surface *pIcon_theme = NULL;
   SDL_Color black = {0, 0, 0, 255};
@@ -1687,7 +1689,7 @@ void popup_minimap_window() {
   widget_redraw(pMiniMap_Window);
 }
 
-void show_minimap_window_buttons()
+void show_minimap_window_buttons(void)
 {
   struct widget *pWidget = get_minimap_window_widget();
   
@@ -1726,7 +1728,7 @@ void show_minimap_window_buttons()
   clear_wflag(pWidget, WF_HIDDEN);
 }
 
-void hide_minimap_window_buttons()
+void hide_minimap_window_buttons(void)
 {
   struct widget *pWidget = get_minimap_window_widget();
   
@@ -1765,7 +1767,7 @@ void hide_minimap_window_buttons()
   set_wflag(pWidget, WF_HIDDEN);
 }
 
-void redraw_minimap_window_buttons()
+void redraw_minimap_window_buttons(void)
 {
   struct widget *pWidget = get_minimap_window_widget();
   
@@ -1803,7 +1805,7 @@ void redraw_minimap_window_buttons()
   widget_redraw(pWidget);
 }
 
-void disable_minimap_window_buttons()
+void disable_minimap_window_buttons(void)
 {
   struct widget *pWidget = get_minimap_window_widget();
   
@@ -1834,7 +1836,7 @@ void disable_minimap_window_buttons()
   #endif
 }
 
-void popdown_minimap_window()
+void popdown_minimap_window(void)
 {
   if (pMiniMap_Dlg) {
     popdown_window_group_dialog(pMiniMap_Dlg->pBeginWidgetList, pMiniMap_Dlg->pEndWidgetList);
@@ -1843,7 +1845,7 @@ void popdown_minimap_window()
   }
 }
 
-void show_game_page()
+void show_game_page(void)
 {
   struct widget *pWidget;
   SDL_Surface *pIcon_theme = NULL;
@@ -1903,7 +1905,7 @@ void show_game_page()
   enable_order_buttons();
 }
 
-void close_game_page()
+void close_game_page(void)
 {
   struct widget *pWidget;
 
@@ -1922,7 +1924,7 @@ void close_game_page()
   SDL_Client_Flags &= ~CF_MAP_UNIT_W_CREATED;
 }
 
-static void disable_minimap_widgets()
+static void disable_minimap_widgets(void)
 {
   struct widget *pBuf, *pEnd;
 
@@ -1967,7 +1969,7 @@ static void disable_minimap_widgets()
   redraw_group(pBuf, pEnd, TRUE);
 }
 
-static void disable_unitinfo_widgets()
+static void disable_unitinfo_widgets(void)
 {
   struct widget *pBuf = pUnits_Info_Window->private_data.adv_dlg->pBeginWidgetList;
   struct widget *pEnd = pUnits_Info_Window->private_data.adv_dlg->pEndWidgetList;
@@ -1989,7 +1991,7 @@ void disable_main_widgets(void)
   }
 }
 
-static void enable_minimap_widgets()
+static void enable_minimap_widgets(void)
 {
   struct widget *pBuf, *pEnd;
 
@@ -2037,7 +2039,7 @@ static void enable_minimap_widgets()
   }
 }
 
-static void enable_unitinfo_widgets()
+static void enable_unitinfo_widgets(void)
 {
   struct widget *pBuf, *pEnd;
 
@@ -2370,10 +2372,13 @@ bool map_event_handler(SDL_keysym Key)
           key_map_borders_toggle();
         }
         return FALSE;
-  
-      /* show city names - Ctrl+n */
+
       case SDLK_n:
-        if (LCTRL || RCTRL) {
+        /* show native tiles - Ctrl+Shift+n */ 
+        if ((LCTRL || RCTRL) && (LSHIFT || RSHIFT)) {
+          key_map_native_toggle();
+        } else if (LCTRL || RCTRL) {
+          /* show city names - Ctrl+n */
           key_city_names_toggle();
         }
         return FALSE;
@@ -2426,10 +2431,10 @@ bool map_event_handler(SDL_keysym Key)
         }
         return FALSE;
   
-      /* show fortresses and airbases - Ctrl+Shift+f */
+      /* show bases - Ctrl+Shift+f */
       case SDLK_f:
         if ((LCTRL || RCTRL) && (LSHIFT || RSHIFT)) {
-          request_toggle_fortress_airbase();
+          request_toggle_bases();
         }
         return FALSE;
   
@@ -2608,7 +2613,7 @@ void popup_newcity_dialog(struct unit *pUnit, const char *pSuggestname)
 					  _("OK"), adj_font(10), 0);
   pOK_Button->action = newcity_ok_callback;
   pOK_Button->key = SDLK_RETURN;  
-  pOK_Button->data.tile = pUnit->tile;  
+  pOK_Button->data.tile = unit_tile(pUnit);
 
   area.h += pOK_Button->size.h;
 
@@ -2618,7 +2623,7 @@ void popup_newcity_dialog(struct unit *pUnit, const char *pSuggestname)
   			pWindow->dst, _("Cancel"), adj_font(10), 0);
   pCancel_Button->action = newcity_cancel_callback;
   pCancel_Button->key = SDLK_ESCAPE; 
-  pCancel_Button->data.tile = pUnit->tile; 
+  pCancel_Button->data.tile = unit_tile(pUnit);
 
   /* correct sizes */
   pCancel_Button->size.w += adj_size(5);
@@ -2627,7 +2632,7 @@ void popup_newcity_dialog(struct unit *pUnit, const char *pSuggestname)
   /* create text label */
   pStr = create_str16_from_char(_("What should we call our new city?"), adj_font(10));
   pStr->style |= (TTF_STYLE_BOLD|SF_CENTER);
-  pStr->fgcol = *get_game_colorRGB(COLOR_THEME_NEWCITYDLG_TEXT);
+  pStr->fgcol = *get_theme_color(COLOR_THEME_NEWCITYDLG_TEXT);
   pLabel = create_iconlabel(NULL, pWindow->dst, pStr, WF_DRAW_TEXT_LABEL_WITH_SPACE);
   
   area.h += pLabel->size.h;
@@ -2716,7 +2721,8 @@ void popdown_newcity_dialog(void)
 **************************************************************************/
 void set_turn_done_button_state(bool state)
 {
-  if (PAGE_GAME == get_current_client_page()) {
+  if (PAGE_GAME == get_current_client_page()
+      && !update_queue_is_switching_page()) {
     if (state) {
       set_wstate(pNew_Turn_Button, FC_WS_NORMAL);
     } else {
@@ -2724,6 +2730,7 @@ void set_turn_done_button_state(bool state)
     }
     widget_redraw(pNew_Turn_Button);
     widget_flush(pNew_Turn_Button);
+    redraw_unit_info_label(get_units_in_focus());
   }
 }
 

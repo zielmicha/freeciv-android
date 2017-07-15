@@ -14,6 +14,10 @@
 #ifndef FC__MAPVIEW_COMMON_H
 #define FC__MAPVIEW_COMMON_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "support.h"            /* bool type */
 
@@ -81,42 +85,41 @@ extern bool can_slide;
  *
  * _x, _y: the canvas position of the current element, declared inside
  * the macro.  Each element is assumed to be tileset_tile_width(tileset) *
- * tileset_tile_height(tileset) in size.  If an element is larger, the
+ * tileset_tile_height(tileset) in size.  If an element is larger, the 
  * caller needs to use a larger rectangle of iteration.
  *
  * The grid of iteration is rather complicated.  For a picture of it see
- * http://bugs.freeciv.org/Ticket/Attachment/89565/56824/newgrid.png
- * or the other text in PR#12085.
+ * http://article.gmane.org/gmane.games.freeciv.devel/50449
+ * (formerly newgrid.png in PR#12085).
  */
-#define gui_rect_iterate(GRI_x0, GRI_y0, GRI_width, GRI_height,		\
-			 _t, _e, _c, _x, _y)				\
+#define gui_rect_iterate(GRI_x0, GRI_y0, GRI_width, GRI_height,         \
+			 _t, _e, _c)                                    \
 {									\
-  int _x##_0 = (GRI_x0), _y##_0 = (GRI_y0);				\
-  int _x##_w = (GRI_width), _y##_h = (GRI_height);			\
+  int _x_##_0 = (GRI_x0), _y_##_0 = (GRI_y0);				\
+  int _x_##_w = (GRI_width), _y_##_h = (GRI_height);			\
 									\
-  if (_x##_w < 0) {							\
-    _x##_0 += _x##_w;							\
-    _x##_w = -_x##_w;							\
+  if (_x_##_w < 0) {							\
+    _x_##_0 += _x_##_w;							\
+    _x_##_w = -_x_##_w;							\
   }									\
-  if (_y##_h < 0) {							\
-    _y##_0 += _y##_h;							\
-    _y##_h = -_y##_h;							\
+  if (_y_##_h < 0) {							\
+    _y_##_0 += _y_##_h;							\
+    _y_##_h = -_y_##_h;							\
   }									\
-  if (_x##_w > 0 && _y##_h > 0) {					\
+  if (_x_##_w > 0 && _y_##_h > 0) {					\
     struct tile_edge _t##_e;						\
     struct tile_corner _t##_c;						\
     int _t##_xi, _t##_yi, _t##_si, _t##_di;				\
-    int _x, _y;								\
     const int _t##_r1 = (tileset_is_isometric(tileset) ? 2 : 1);	\
     const int _t##_r2 = _t##_r1 * 2; /* double the ratio */		\
     const int _t##_w = tileset_tile_width(tileset);			\
     const int _t##_h = tileset_tile_height(tileset);			\
     /* Don't divide by _r2 yet, to avoid integer rounding errors. */	\
-    const int _t##_x0 = DIVIDE(_x##_0 * _t##_r2, _t##_w) - _t##_r1 / 2;	\
-    const int _t##_y0 = DIVIDE(_y##_0 * _t##_r2, _t##_h) - _t##_r1 / 2;	\
-    const int _t##_x1 = DIVIDE((_x##_0 + _x##_w) * _t##_r2 + _t##_w - 1,\
+    const int _t##_x0 = DIVIDE(_x_##_0 * _t##_r2, _t##_w) - _t##_r1 / 2;\
+    const int _t##_y0 = DIVIDE(_y_##_0 * _t##_r2, _t##_h) - _t##_r1 / 2;\
+    const int _t##_x1 = DIVIDE((_x_##_0 + _x_##_w) * _t##_r2 + _t##_w - 1,\
 			       _t##_w) + _t##_r1;			\
-    const int _t##_y1 = DIVIDE((_y##_0 + _y##_h) * _t##_r2 + _t##_h - 1,\
+    const int _t##_y1 = DIVIDE((_y_##_0 + _y_##_h) * _t##_r2 + _t##_h - 1,\
 			       _t##_h) + _t##_r1;			\
     const int _t##_count = (_t##_x1 - _t##_x0) * (_t##_y1 - _t##_y0);	\
     int _t##_index = 0;							\
@@ -215,14 +218,24 @@ extern bool can_slide;
 					  (_t##_yi - 1) / 2);	/*E*/	\
 	  }								\
 	}								\
-      }									\
-      _x = _t##_xi * _t##_w / _t##_r2 - _t##_w / 2;			\
-      _y = _t##_yi * _t##_h / _t##_r2 - _t##_h / 2;
+      }
 
 #define gui_rect_iterate_end						\
     }									\
   }									\
 }
+
+#define gui_rect_iterate_coord(GRI_x0, GRI_y0, GRI_width, GRI_height,	\
+			       _t, _e, _c, _x, _y)                      \
+  gui_rect_iterate(GRI_x0, GRI_y0, GRI_width, GRI_height,               \
+                   _t, _e, _c) {                                        \
+    int _x, _y;                                                         \
+                                                                        \
+    _x = _t##_xi * _t##_w / _t##_r2 - _t##_w / 2;                       \
+    _y = _t##_yi * _t##_h / _t##_r2 - _t##_h / 2;
+
+#define gui_rect_iterate_coord_end                                      \
+  } gui_rect_iterate_end
 
 void refresh_tile_mapcanvas(struct tile *ptile,
 			    bool full_refresh, bool write_to_screen);
@@ -253,8 +266,10 @@ void center_tile_mapcanvas(struct tile *ptile);
 bool tile_visible_mapcanvas(struct tile *ptile);
 bool tile_visible_and_not_on_border_mapcanvas(struct tile *ptile);
 
-void put_unit(const struct unit *punit,
-	      struct canvas *pcanvas, int canvas_x, int canvas_y);
+void put_unit(const struct unit *punit, struct canvas *pcanvas, int canvas_x,
+              int canvas_y);
+void put_unittype(const struct unit_type *putype, struct canvas *pcanvas,
+                  int canvas_x, int canvas_y);
 void put_city(struct city *pcity,
 	      struct canvas *pcanvas, int canvas_x, int canvas_y);
 void put_terrain(struct tile *ptile,
@@ -275,7 +290,8 @@ void put_one_element(struct canvas *pcanvas, enum mapview_layer layer,
                      const struct tile_corner *pcorner,
                      const struct unit *punit, const struct city *pcity,
                      int canvas_x, int canvas_y,
-                     const struct city *citymode);
+                     const struct city *citymode,
+                     const struct unit_type *putype);
 
 void put_drawn_sprites(struct canvas *pcanvas,
                        int canvas_x, int canvas_y,
@@ -285,15 +301,18 @@ void put_drawn_sprites(struct canvas *pcanvas,
 void update_map_canvas(int canvas_x, int canvas_y, int width, int height);
 void update_map_canvas_visible(void);
 void update_city_description(struct city *pcity);
+void update_tile_label(struct tile *ptile);
 
 void show_city_descriptions(int canvas_x, int canvas_y,
 			    int width, int height);
+void show_tile_labels(int canvas_x, int canvas_y,
+                      int width, int height);
 bool show_unit_orders(struct unit *punit);
 
 void draw_segment(struct tile *ptile, enum direction8 dir);
 void undraw_segment(struct tile *ptile, enum direction8 dir);
 
-void decrease_unit_hp_smooth(struct unit *punit0, int hp0,
+void decrease_unit_hp_smooth(struct unit *punit0, int hp0, 
 			     struct unit *punit1, int hp1);
 void move_unit_map_canvas(struct unit *punit,
 			  struct tile *ptile, int dx, int dy);
@@ -332,6 +351,10 @@ void link_marks_decrease_turn_counters(void);
 
 void link_mark_add_new(enum text_link_type type, int id);
 void link_mark_restore(enum text_link_type type, int id);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 void global_update_tile(int x, int y);
 void global_set_mapview_center(int gui_x, int gui_y);

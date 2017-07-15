@@ -1,0 +1,34 @@
+
+; Modifying this file:
+; You should not modify this file except to make bugfixes or
+; for other "maintenance".  If you want to make custom changes
+; you should create a new datadir subdirectory and copy this file
+; into that directory, and then modify that copy.  Then use the
+; command "rulesetdir <mysubdir>" in the server to have freeciv
+; use your new customized file.
+
+[datafile]
+description="Classic nations data for Freeciv"
+options="+Freeciv-2.5-ruleset"
+
+[compatibility]
+; Initial government for all the nations that do not
+; have it explicitly defined
+default_government = "Despotism"
+
+[default_traits]
+; Default values for the AI traits. These are used if nation specific
+; value for some trait has not been used. If these default too are
+; not defined, the ultimate default is 50.
+
+; Value of trait "expansionist" defines how much AI wants to settle new territory.
+;expansionist = 50
+
+; Value of trait "trader" defines how much AI wants to establish trade routes.
+;trader = 50
+
+; Value of trait "aggressive" defines how easily AI declares war.
+;aggressive = 50
+
+
+*include "default/nationlist.ruleset"

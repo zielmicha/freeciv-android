@@ -13,6 +13,12 @@
 #ifndef FC__SPACESHIP_H
 #define FC__SPACESHIP_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/* utility */
+#include "bitvector.h"
 #include "support.h"            /* bool type */
 
 /**********************************************************************
@@ -44,7 +50,7 @@ including numbering of parts:
 22_:::-:::-# M11  #:::-:::-# M5   #:::-[23]\F5/\  P5  /:::-
    :::-:::-# S3   #:::-:::-# S1   #:::-[s ][s ][s ]:::-:::-
 24_!!!-!!!-/++++++\!!!-!!!-/++++++\!!!-[25][27][29]!!!-!!!-
-   :::-:::-:::-:::-:::-:::-:::-:::-:::-:::-/C14/  C14 \:::-
+   :::-:::-:::-:::-:::-:::-:::-:::-:::-:::-/C14/  C15 \:::-
 26_:::-:::-:::-:::-:::-:::-:::-:::-:::-:::-\F7/\  P7  /:::-
    :::-:::-:::-:::-:::-:::-:::-:::-:::-:::-:::-:::-:::-:::-
 28_!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-!!!-
@@ -75,9 +81,12 @@ the one which must be there for P2 and P3).
 enum spaceship_state {SSHIP_NONE, SSHIP_STARTED,
 		      SSHIP_LAUNCHED, SSHIP_ARRIVED};
 
-#define NUM_SS_STRUCTURALS 32
+#define NUM_SS_STRUCTURALS 32 /* Used in the network protocol. */
 #define NUM_SS_COMPONENTS 16
 #define NUM_SS_MODULES 12
+
+/* Used in the network protocol. */
+BV_DEFINE(bv_spaceship_structure, NUM_SS_STRUCTURALS);
 
 struct player_spaceship {
   /* how many of each part built, including any "unplaced": */
@@ -85,7 +94,7 @@ struct player_spaceship {
   int components;
   int modules;
   /* which structurals placed: (array of booleans) */
-  bool structure[NUM_SS_STRUCTURALS];
+  bv_spaceship_structure structure;
   /* which components and modules placed: (may or may not be connected) */
   int fuel;
   int propulsion;
@@ -115,5 +124,9 @@ extern const struct sship_part_info modules_info[NUM_SS_MODULES];
 
 void spaceship_init(struct player_spaceship *ship);
 int num_spaceship_structurals_placed(const struct player_spaceship *ship);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__SPACESHIP_H */

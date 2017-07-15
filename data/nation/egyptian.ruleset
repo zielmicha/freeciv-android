@@ -1,8 +1,10 @@
 [nation_egyptian]
 
+translation_domain="freeciv"
+
 name=_("Egyptian")
 plural=_("?plural:Egyptians")
-groups="Ancient", "African"
+groups="Ancient", "African", "Core"
 legend=_("Egypt was the second-oldest of the world's civilizations.  Since\
  ancient times it has been unusually urbanized, supporting a large\
  population on silt deposited by the annual floodings of the Nile.")
@@ -22,6 +24,8 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",          "female_title"
+ "Anarchy",         _("Usurper %s"),       _("?female:Usurper %s")
+ "Democracy",       _("Chancellor %s"),    _("?female:Chancellor %s")
  "Despotism",       _("Pharaoh %s"),       _("?female:Pharaoh %s")
  "Monarchy",        _("Great Pharaoh %s"), _("?female:Great Pharaoh %s")
 }
@@ -32,7 +36,6 @@ city_style = "Babylonian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations="nubian"

@@ -1,9 +1,11 @@
 [nation_arab]
 
+translation_domain="freeciv"
+
 name=_("Arab")
 plural=_("?plural:Arabs")
-groups="Medieval", "Asian", "African"
-legend=_("The Arab/Islamic civilization of 622 AD-1495 AD.")
+groups="Medieval", "Asian", "African", "Core"
+legend=_("The Arab/Islamic civilization of 622 to 1495 CE.")
 
 leaders = {
  "name",                "sex"
@@ -19,9 +21,8 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",      "female_title"
  "Despotism",       _("Sheikh %s"),    _("Shaykha %s")
- "Monarchy",        _("Malik %s"),     _("Malika %s")
- "Republic",        _("Sultan %s"),    _("Sultana %s")
- "Communism",       _("Caliph %s"),    _("Calipha %s")
+ "Republic",        _("Vizier %s"),    _("?female:Vizier %s")
+ "Fundamentalism",  _("Caliph %s"),    _("Calipha %s")
 }
 
 flag ="arab"
@@ -30,17 +31,19 @@ city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 ; Should not appear with other Arabic nations from the beginning but...
 conflicts_with="Iraqi", "Libyan", "Sudanese", "Syrian", "Egyptian Arab",
- "Moroccan", "Tunisian", "Algerian", "Al-Andalus", "Saudi", "Palestinian",
- "Yemeni", "South Yemeni", "Lebanese", "Emirati"
+ "Moroccan", "Tunisian", "Algerian", "Andalusi", "Saudi", "Palestinian",
+ "Yemeni", "South Yemeni", "Lebanese", "Emirati", "Jordanian", "Omani",
+ "Sahrawi", "Mauritanian", "Kuwaiti", "Qatari", "Bahraini", "Mamluk",
+ "Cyrenaican"
 ; ...civil war to them.
 civilwar_nations="Iraqi", "Libyan", "Sudanese", "Syrian", "Egyptian Arab",
- "Moroccan", "Tunisian", "Algerian", "Al-Andalus", "Saudi", "Palestinian",
- "Yemeni", "Lebanese", "Emirati"
+ "Moroccan", "Tunisian", "Algerian", "Andalusi", "Saudi", "Palestinian",
+ "Yemeni", "Lebanese", "Emirati", "Jordanian", "Omani", "Sahrawi",
+ "Mauritanian", "Kuwaiti", "Qatari", "Bahraini"
 
 ; Arab Peninsula and Near East.  City names are mostly from the Ummayyad 
 ; and Abbasid periods.  These are Arab spellings rather than Anglicized ones;
@@ -48,10 +51,71 @@ civilwar_nations="Iraqi", "Libyan", "Sudanese", "Syrian", "Egyptian Arab",
 
 cities =
 
-  "Makkah", "Al-Madinah", "Al-Rijadh", "Al-Qahira", "Baghdad",
-  "Timbuktu", "Sijilmasa", "Jidda", "Al-Hufuf", "Buraydah", "At Taif", 
-  "Sana'a", "Al-Hudaydah", "Al'Adan",
-  "Al-Mukalla", "Taizz", "Masquat", "Abu Zaby", "Dubayy",
-  "Ad-Dawhah", "Al-Manamah", "Ad-Damman", "Al-Kuwayt", "Al-Jahrah",
-  "Al-Amman", "Dimashq", "Bayrut", "Hamah", "Aleppo", "Hums",
-  "Al-Ayn", "Al-Basrah", "Khorramshar"
+ "Makka",
+ "Al-Madina",
+ "Ar-Riyadh",
+ "Al-Qahira",
+ "Baghdad",
+ "Dimashq ash-Sham",
+ "Al-Quds",
+ "Jidda",
+ "Eskendereyya",
+ "Sana'a'",
+ "'Adan",
+ "Maskat",
+ "'Amman",
+ "Bayrut",
+ "Qurtuba",
+ "Timbuktu",
+ "Halab",
+ "Hims",
+ "Sijilmasa",
+ "Al-Hufuf",
+ "Burayda",
+ "At-Ta’if", 
+ "Al-Hudayda",
+ "Al-Mukalla",
+ "Ta'izz",
+ "Abu Zabi",
+ "Dubayy",
+ "Gharnata",
+ "Marrakush",
+ "Ad-Dawha",
+ "Al-Jaza'ir",
+ "Al-Basra",
+ "Al-Manama",
+ "Tarabulus",
+ "Al-'Aqaba",
+ "Al-Kufa",
+ "Ad-Dammam",
+ "Madinat al-Kuwayt",
+ "As-Suways",
+ "Wahran",
+ "Al-Jahra",
+ "Ar-Rabat",
+ "Al-Qayrawan",
+ "Sayda",
+ "Fas",
+ "Hama",
+ "Al-'Ayn",
+ "Khorramshar",
+ "Tunis",
+ "Bur Sa'id",
+ "An-Najaf",
+ "Ad-Dar al-Baydha",
+ "Kirkuk",
+ "Sur",
+ "Tulaytula",
+ "Bur Sudan",
+ "Tikrit",
+ "Kaysaria",
+ "Miknas",
+ "Al-Ladhiqiya",
+ "Al-Khartum",
+ "Ishbiliya",
+ "Al-Qatta'i",
+ "Al-Mosul",
+ "Al-Maydiya",
+ "Binzart",
+ "Banghazi",
+ "Ariha"

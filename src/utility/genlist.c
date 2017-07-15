@@ -12,59 +12,18 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdlib.h>
 
 /* utility */
+#include "fcthread.h"
 #include "log.h"
 #include "mem.h"
 #include "shared.h"  /* array_shuffle */
 
 #include "genlist.h"
-
-/* A single element of a genlist, storing the pointer to user
- * data, and pointers to the next and previous elements: */
-struct genlist_link {
-  struct genlist_link *next, *prev;
-  void *dataptr;
-};
-
-/* A genlist, storing the number of elements (for quick retrieval and
- * testing for empty lists), and pointers to the first and last elements
- * of the list. */
-struct genlist {
-  int nelements;
-  struct genlist_link *head_link;
-  struct genlist_link *tail_link;
-  genlist_free_fn_t free_data_func;
-};
-
-/****************************************************************************
-  Default function of type genlist_free_fn_t.
-****************************************************************************/
-static void genlist_default_free_data_func(void *data)
-{
-  /* Do nothing. */
-}
-
-/****************************************************************************
-  Default function of type genlist_copy_fn_t.
-****************************************************************************/
-static void *genlist_default_copy_data_func(const void *data)
-{
-  return (void *) data; /* Returns the data. */
-}
-
-/****************************************************************************
-  Default function of type genlist_comp_fn_t.
-****************************************************************************/
-static bool genlist_default_comp_data_func(const void *data1,
-                                           const void *data2)
-{
-  return data1 == data2;
-}
 
 /****************************************************************************
   Create a new empty genlist.
@@ -85,9 +44,9 @@ struct genlist *genlist_new_full(genlist_free_fn_t free_data_func)
   pgenlist->nelements = 0;
   pgenlist->head_link = NULL;
   pgenlist->tail_link = NULL;
-#endif
-  pgenlist->free_data_func = (free_data_func ? free_data_func
-                              : genlist_default_free_data_func);
+#endif /* ZERO_VARIABLES_FOR_SEARCHING */
+  fc_init_mutex(&pgenlist->mutex);
+  pgenlist->free_data_func = free_data_func;
 
   return pgenlist;
 }
@@ -97,8 +56,12 @@ struct genlist *genlist_new_full(genlist_free_fn_t free_data_func)
 ****************************************************************************/
 void genlist_destroy(struct genlist *pgenlist)
 {
-  fc_assert_ret(NULL != pgenlist);
+  if (pgenlist == NULL) {
+    return;
+  }
+
   genlist_clear(pgenlist);
+  fc_destroy_mutex(&pgenlist->mutex);
   free(pgenlist);
 }
 
@@ -149,7 +112,9 @@ static void genlist_link_destroy(struct genlist *pgenlist,
 
   /* NB: detach the link before calling the free function for avoiding
    * re-entrant code. */
-  pgenlist->free_data_func(plink->dataptr);
+  if (NULL != pgenlist->free_data_func) {
+    pgenlist->free_data_func(plink->dataptr);
+  }
   free(plink);
 }
 
@@ -206,12 +171,15 @@ struct genlist *genlist_copy_full(const struct genlist *pgenlist,
   if (pgenlist) {
     struct genlist_link *plink;
 
-    if (NULL == copy_data_func) {
-      copy_data_func = genlist_default_copy_data_func;
-    }
-    for (plink = pgenlist->head_link; plink; plink = plink->next) {
-      genlist_link_new(pcopy, copy_data_func(plink->dataptr),
-                       pcopy->tail_link, NULL);
+    if (NULL != copy_data_func) {
+      for (plink = pgenlist->head_link; plink; plink = plink->next) {
+        genlist_link_new(pcopy, copy_data_func(plink->dataptr),
+                         pcopy->tail_link, NULL);
+      }
+    } else {
+      for (plink = pgenlist->head_link; plink; plink = plink->next) {
+        genlist_link_new(pcopy, plink->dataptr, pcopy->tail_link, NULL);
+      }
     }
   }
 
@@ -236,14 +204,6 @@ struct genlist_link *genlist_link(const struct genlist *pgenlist, int idx)
 {
   fc_assert_ret_val(NULL != pgenlist, NULL);
   return genlist_link_at_pos(pgenlist, idx);
-}
-
-/****************************************************************************
-  Returns the head link of the genlist.
-****************************************************************************/
-struct genlist_link *genlist_head(const struct genlist *pgenlist)
-{
-  return (NULL != pgenlist ? pgenlist->head_link : NULL);
 }
 
 /****************************************************************************
@@ -299,11 +259,18 @@ void genlist_clear(struct genlist *pgenlist)
 
     pgenlist->nelements = 0;
 
-    do {
-      plink2 = plink->next;
-      free_data_func(plink->dataptr);
-      free(plink);
-    } while ((plink = plink2) != NULL);
+    if (NULL != free_data_func) {
+      do {
+        plink2 = plink->next;
+        free_data_func(plink->dataptr);
+        free(plink);
+      } while (NULL != (plink = plink2));
+    } else {
+      do {
+        plink2 = plink->next;
+        free(plink);
+      } while (NULL != (plink = plink2));
+    }
   }
 }
 
@@ -329,17 +296,24 @@ void genlist_unique_full(struct genlist *pgenlist,
   if (2 <= pgenlist->nelements) {
     struct genlist_link *plink = pgenlist->head_link, *plink2;
 
-    if (NULL == comp_data_func) {
-      comp_data_func = genlist_default_comp_data_func;
+    if (NULL != comp_data_func) {
+      do {
+        plink2 = plink->next;
+        if (NULL != plink2 && comp_data_func(plink->dataptr,
+                                             plink2->dataptr)) {
+          /* Remove this element. */
+          genlist_link_destroy(pgenlist, plink);
+        }
+      } while ((plink = plink2) != NULL);
+    } else {
+      do {
+        plink2 = plink->next;
+        if (NULL != plink2 && plink->dataptr == plink2->dataptr) {
+          /* Remove this element. */
+          genlist_link_destroy(pgenlist, plink);
+        }
+      } while ((plink = plink2) != NULL);
     }
-    do {
-      plink2 = plink->next;
-      if (NULL != plink2 && comp_data_func(plink->dataptr,
-                                           plink2->dataptr)) {
-        /* Remove this element. */
-        genlist_link_destroy(pgenlist, plink);
-      }
-    } while ((plink = plink2) != NULL);
   }
 }
 
@@ -622,8 +596,8 @@ struct genlist_link *genlist_search_if(const struct genlist *pgenlist,
 void genlist_sort(struct genlist *pgenlist,
                   int (*compar) (const void *, const void *))
 {
-  const int n = genlist_size(pgenlist);
-  void *sortbuf[n];
+  const size_t n = genlist_size(pgenlist);
+  void **sortbuf;
   struct genlist_link *myiter;
   int i;
 
@@ -631,6 +605,7 @@ void genlist_sort(struct genlist *pgenlist,
     return;
   }
 
+  sortbuf = fc_malloc(n * sizeof(void *));
   myiter = genlist_head(pgenlist);
   for (i = 0; i < n; i++, myiter = myiter->next) {
     sortbuf[i] = myiter->dataptr;
@@ -642,6 +617,7 @@ void genlist_sort(struct genlist *pgenlist,
   for (i = 0; i < n; i++, myiter = myiter->next) {
     myiter->dataptr = sortbuf[i];
   }
+  FC_FREE(sortbuf);
 }
 
 /****************************************************************************
@@ -701,25 +677,17 @@ void genlist_reverse(struct genlist *pgenlist)
 }
 
 /****************************************************************************
-  Returns the pointer of this link.
+  Allocates list mutex
 ****************************************************************************/
-void *genlist_link_data(const struct genlist_link *plink)
+void genlist_allocate_mutex(struct genlist *pgenlist)
 {
-  return (NULL != plink ? plink->dataptr : NULL);
+  fc_allocate_mutex(&pgenlist->mutex);
 }
 
 /****************************************************************************
-  Returns the previous link.
+  Releases list mutex
 ****************************************************************************/
-struct genlist_link *genlist_link_prev(const struct genlist_link *plink)
+void genlist_release_mutex(struct genlist *pgenlist)
 {
-  return plink->prev;
-}
-
-/****************************************************************************
-  Returns the next link.
-****************************************************************************/
-struct genlist_link *genlist_link_next(const struct genlist_link *plink)
-{
-  return plink->next;
+  fc_release_mutex(&pgenlist->mutex);
 }

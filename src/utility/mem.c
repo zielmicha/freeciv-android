@@ -18,12 +18,13 @@
 **********************************************************************/ 
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdlib.h>
 #include <string.h>
 
+/* utility */
 #include "fcintl.h"
 #include "log.h"
 #include "shared.h"		/* TRUE, FALSE */

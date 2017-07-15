@@ -18,7 +18,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -44,6 +44,7 @@
 #include "unitlist.h"
 
 /* server */
+#include "aiiface.h"
 #include "citytools.h"
 #include "gamehand.h"
 #include "maphand.h"
@@ -86,7 +87,7 @@ bool is_sea_barbarian(struct player *pplayer)
 
   Dead barbarians forget the map and lose the money.
 **************************************************************************/
-static struct player *create_barbarian_player(enum barbarian_type type)
+struct player *create_barbarian_player(enum barbarian_type type)
 {
   struct player *barbarians;
   struct nation_type *nation;
@@ -98,8 +99,13 @@ static struct player *create_barbarian_player(enum barbarian_type type)
         barbarians->economic.gold = 0;
         barbarians->is_alive = TRUE;
         player_status_reset(barbarians);
-        sz_strlcpy(barbarians->name,
-                   pick_random_player_name(nation_of_player(barbarians)));
+
+        /* Free old name so pick_random_player_name() can select it again.
+         * This is needed in case ruleset defines just one leader for
+         * barbarian nation. */
+        barbarians->name[0] = '\0';
+        server_player_set_name(barbarians,
+            pick_random_player_name(nation_of_player(barbarians)));
         sz_strlcpy(barbarians->username, ANON_USER_NAME);
         /* I need to make them to forget the map, I think */
 	whole_map_iterate(ptile) {
@@ -112,25 +118,31 @@ static struct player *create_barbarian_player(enum barbarian_type type)
   } players_iterate_end;
 
   /* make a new player, or not */
-  barbarians = server_create_player(-1);
+  barbarians = server_create_player(-1, default_ai_type_name(), NULL);
   if (!barbarians) {
     return NULL;
   }
-
   server_player_init(barbarians, TRUE, TRUE);
 
-  nation = pick_a_nation(NULL, FALSE, TRUE, type);
-  player_set_nation(barbarians, nation);
-  sz_strlcpy(barbarians->name, pick_random_player_name(nation));
+  nation = pick_a_nation(NULL, FALSE, FALSE, type);
+
+  /* Ruleset loading time checks should guarantee that there always is
+     suitable nation available */
+  fc_assert(nation != NULL);
+
+  player_nation_defaults(barbarians, nation, TRUE);
+  if (game_was_started()) {
+    /* Find a color for the new player. */
+    assign_player_colors();
+  }
 
   server.nbarbarians++;
-  game.server.max_players = MAX(player_count(), game.server.max_players);
 
   sz_strlcpy(barbarians->username, ANON_USER_NAME);
   barbarians->is_connected = FALSE;
-  barbarians->government = nation->server.init_government;
+  barbarians->government = nation->init_government;
   fc_assert(barbarians->revolution_finishes < 0);
-  barbarians->server.capital = FALSE;
+  barbarians->server.got_first_city = FALSE;
   barbarians->economic.gold = 100;
 
   barbarians->phase_done = TRUE;
@@ -151,6 +163,8 @@ static struct player *create_barbarian_player(enum barbarian_type type)
     }
   } players_iterate_end;
 
+  CALL_PLR_AI_FUNC(gained_control, barbarians, barbarians);
+
   log_verbose("Created barbarian %s, player %d", player_name(barbarians),
               player_number(barbarians));
   notify_player(NULL, NULL, E_UPRISING, ftc_server,
@@ -162,24 +176,6 @@ static struct player *create_barbarian_player(enum barbarian_type type)
   send_player_all_c(barbarians, NULL);
 
   return barbarians;
-}
-
-/**************************************************************************
-  Check if a tile is land and free of enemy units
-**************************************************************************/
-static bool is_free_land(struct tile *ptile, struct player *who)
-{
-  return (!is_ocean_tile(ptile)
-	  && !is_non_allied_unit_tile((ptile), who));
-}
-
-/**************************************************************************
-  Check if a tile is sea and free of enemy units
-**************************************************************************/
-static bool is_free_sea(struct tile *ptile, struct player *who)
-{
-  return (is_ocean_tile(ptile)
-	  && !is_non_allied_unit_tile((ptile), who));
 }
 
 /**************************************************************************
@@ -253,7 +249,7 @@ bool unleash_barbarians(struct tile *ptile)
       || game.info.turn < game.server.onsetbarbarian
       || num_role_units(L_BARBARIAN) == 0) {
     unit_list_iterate_safe((ptile)->units, punit) {
-      wipe_unit(punit);
+      wipe_unit(punit, ULR_BARB_UNLEASH, NULL);
     } unit_list_iterate_safe_end;
     return FALSE;
   }
@@ -263,7 +259,8 @@ bool unleash_barbarians(struct tile *ptile)
     return FALSE;
   }
 
-  ai_data_phase_init(barbarians, TRUE);
+  adv_data_phase_init(barbarians, TRUE);
+  CALL_PLR_AI_FUNC(phase_begin, barbarians, barbarians, TRUE);
 
   unit_cnt = 3 + fc_rand(4);
   for (i = 0; i < unit_cnt; i++) {
@@ -288,12 +285,14 @@ bool unleash_barbarians(struct tile *ptile)
     dir_tiles[dir] = mapstep(ptile, dir);
     if (dir_tiles[dir] == NULL) {
       terrainc[dir] = terrain_class_invalid();
-    } else if (is_free_land(dir_tiles[dir], barbarians)) {
-      terrainc[dir] = TC_LAND;
-      land_tiles++;
-    } else if (is_free_sea(dir_tiles[dir], barbarians)) {
-      terrainc[dir] = TC_OCEAN;
-      ocean_tiles++;
+    } else if (!is_non_allied_unit_tile(dir_tiles[dir], barbarians)) {
+      if (is_ocean_tile(dir_tiles[dir])) {
+        terrainc[dir] = TC_OCEAN;
+        ocean_tiles++;
+      } else {
+        terrainc[dir] = TC_LAND;
+        land_tiles++;
+      }
     } else {
       terrainc[dir] = terrain_class_invalid();
     }
@@ -400,7 +399,7 @@ bool unleash_barbarians(struct tile *ptile)
     /* There's barbarian in this village! Kill the explorer. */
     unit_list_iterate_safe((ptile)->units, punit2) {
       if (unit_owner(punit2) != barbarians) {
-        wipe_unit(punit2);
+        wipe_unit(punit2, ULR_BARB_UNLEASH, NULL);
         alive = FALSE;
       } else {
         send_unit_info(NULL, punit2);
@@ -484,7 +483,7 @@ static void try_summon_barbarians(void)
   }
 
   if (!(pc = find_closest_city(ptile, NULL, NULL, FALSE, FALSE, FALSE, FALSE,
-                               FALSE))) {
+                               FALSE, NULL))) {
     /* any city */
     return;
   }
@@ -563,7 +562,6 @@ static void try_summon_barbarians(void)
     if (!barbarians) {
       return;
     }
-
     /* Setup data phase if it's not already set up. Created ferries may
        need that data.
        We don't know if create_barbarian_player() above created completely
@@ -571,14 +569,17 @@ static void try_summon_barbarians(void)
        one, phase has already been set up at turn begin and will be closed
        at turn end. If this is completely new player, we have to take care
        of both opening and closing the data phase. Return value of
-       ai_data_phase_init() tells us if data phase was already initialized
+       adv_data_phase_init() tells us if data phase was already initialized
        at turn beginning. */
-    miniphase = ai_data_phase_init(barbarians, TRUE);
+    miniphase = adv_data_phase_init(barbarians, TRUE);
+    if (miniphase) {
+      CALL_PLR_AI_FUNC(phase_begin, barbarians, barbarians, TRUE);
+    }
 
     boat = find_a_unit_type(L_BARBARIAN_BOAT,-1);
 
     if (is_native_tile(boat, utile)
-        && (!utype_has_flag(boat, F_TRIREME) || is_safe_ocean(utile))) {
+        && (!utype_has_flag(boat, UTYF_TRIREME) || is_safe_ocean(utile))) {
       int cap;
 
       ptrans = create_unit(barbarians, utile, boat, 0, 0, -1);
@@ -606,7 +607,8 @@ static void try_summon_barbarians(void)
     }
 
     if (miniphase) {
-      ai_data_phase_done(barbarians);
+      CALL_PLR_AI_FUNC(phase_finished, barbarians, barbarians);
+      adv_data_phase_done(barbarians);
     }
   }
 

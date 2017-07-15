@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,6 +12,11 @@
 ***********************************************************************/
 #ifndef FC__CARAVAN_H
 #define FC__CARAVAN_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 
 /* utility */
 #include "log.h"                /* enum log_level */
@@ -27,7 +32,7 @@
  * don't have anything better to set it to.
  * The optimization does not take into account other caravans in transit.
  * It also knows nothing about moving caravans except what pathfinding will
- * tell it -- ferries, for instance, aren't handled.  Set ignore_transit_time
+ * tell it -- ferries, for instance, aren't handled here. Set ignore_transit_time
  * to work around this.
  */
 
@@ -42,6 +47,7 @@ struct caravan_result {
 
   double value;
   bool help_wonder;
+  bool required_boat;
 };
 
 struct caravan_parameter {
@@ -80,7 +86,7 @@ struct caravan_parameter {
 
     /*
      * Allow trading with allies and peaceful neighbours.
-     * BUG: currently we consider enemies too.
+     * BUG: currently we only consider allies.
      */
     bool allow_foreign_trade;
 
@@ -122,11 +128,11 @@ void caravan_parameter_log_real(const struct caravan_parameter *parameter,
 #define caravan_parameter_log(parameter, loglevel)                          \
   if (log_do_output_for_level(loglevel)) {                                  \
     caravan_parameter_log_real(parameter, loglevel, __FILE__,               \
-                               __FUNCTION__, __LINE__);                     \
+                               __FUNCTION__, __FC_LINE__);                  \
   }
 
 void caravan_result_init_zero(struct caravan_result *result);
-int caravan_result_compare(const struct caravan_result *a, 
+int caravan_result_compare(const struct caravan_result *a,
                            const struct caravan_result *b);
 
 void caravan_evaluate(const struct unit *caravan, const struct city *dest,
@@ -141,4 +147,8 @@ void caravan_optimize_allpairs(const struct unit *caravan,
                                const struct caravan_parameter *parameter,
                                struct caravan_result *result);
 
-#endif
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+  
+#endif /* FC__CARAVAN_H */

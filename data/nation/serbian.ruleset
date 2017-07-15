@@ -32,6 +32,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",      "female_title"
  "Despotism",       _("Duke %s"),      _("Duchess %s")
+ "Fundamentalism",  _("Patriarch %s"), _("Matriarch %s")
 }
 
 flag="serbia"
@@ -40,7 +41,6 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 civilwar_nations = "montenegrin", "croatian", "bosnian-herzegovinian", "kosovar"

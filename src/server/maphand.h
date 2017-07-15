@@ -33,6 +33,7 @@ struct player_tile {
   struct player *owner; 		/* NULL for unowned */
   bv_special special;
   bv_bases bases;
+  bv_roads roads;
 
   /* If you build a city with an unknown square within city radius
      the square stays unknown. However, we still have to keep count
@@ -45,7 +46,11 @@ struct player_tile {
 
 void global_warming(int effect);
 void nuclear_winter(int effect);
-void upgrade_city_rails(struct player *pplayer, bool discovery);
+void climate_change(bool warming, int effect);
+bool upgrade_city_roads(struct city *pcity, struct road_type **gained);
+void upgrade_all_city_roads(struct player *pplayer, bool discovery);
+bool upgrade_city_bases(struct city *pcity, struct base_type **gained);
+void upgrade_all_city_bases(struct player *pplayer, bool discovery);
 
 void give_map_from_player_to_player(struct player *pfrom, struct player *pdest);
 void give_seamap_from_player_to_player(struct player *pfrom, struct player *pdest);
@@ -80,6 +85,7 @@ void show_map_to_all(void);
 
 void player_map_init(struct player *pplayer);
 void player_map_free(struct player *pplayer);
+void remove_player_from_maps(struct player *pplayer);
 
 struct vision_site *map_get_player_city(const struct tile *ptile,
 					const struct player *pplayer);
@@ -101,11 +107,18 @@ void enable_fog_of_war_player(struct player *pplayer);
 void disable_fog_of_war_player(struct player *pplayer);
 
 void map_calculate_borders(void);
-void map_claim_border(struct tile *ptile, struct player *powner);
+void map_claim_border(struct tile *ptile, struct player *powner,
+                      int radius_sq);
 void map_claim_ownership(struct tile *ptile, struct player *powner,
                          struct tile *psource);
 void map_clear_border(struct tile *ptile);
+void map_update_border(struct tile *ptile, struct player *owner,
+                       int old_radius_sq, int new_radius_sq);
 
+void map_claim_base(struct tile *ptile, struct base_type *pbase,
+                    struct player *powner, struct player *ploser);
+
+void terrain_changed(struct tile *ptile);
 void check_terrain_change(struct tile *ptile, struct terrain *oldter);
 void fix_tile_on_terrain_change(struct tile *ptile,
                                 struct terrain *oldter,
@@ -124,5 +137,8 @@ void change_playertile_site(struct player_tile *ptile,
 void create_base(struct tile *ptile, struct base_type *pbase,
                  struct player *pplayer);
 void destroy_base(struct tile *ptile, struct base_type *pbase);
+
+void give_distorted_map(struct player *pfrom, struct player *pto, int good,
+                        int bad, bool reveal_cities);
 
 #endif  /* FC__MAPHAND_H */

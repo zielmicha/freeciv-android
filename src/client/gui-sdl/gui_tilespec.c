@@ -20,14 +20,17 @@
  **********************************************************************/
  
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
 #include "log.h"
+
+/* common */
+#include "specialist.h"
 
 /* client */
 #include "client_main.h"
@@ -75,6 +78,9 @@ do {							\
  *******************************************************************************/
 static void reload_small_citizens_icons(int style)
 {
+  int i;
+  int spe_max;
+
   /* free info icons */
   FREESURFACE(pIcons->pMale_Content);
   FREESURFACE(pIcons->pFemale_Content);
@@ -84,11 +90,12 @@ static void reload_small_citizens_icons(int style)
   FREESURFACE(pIcons->pFemale_Unhappy);
   FREESURFACE(pIcons->pMale_Angry);
   FREESURFACE(pIcons->pFemale_Angry);
-  
-  FREESURFACE(pIcons->pSpec_Lux); /* Elvis */
-  FREESURFACE(pIcons->pSpec_Tax); /* TaxMan */
-  FREESURFACE(pIcons->pSpec_Sci); /* Scientist */
-  
+
+  spe_max = specialist_count();
+  for (i = 0; i < spe_max; i++) {
+    FREESURFACE(pIcons->specialists[i]);
+  }
+
   /* allocate icons */
   pIcons->pMale_Happy = adj_surf(get_citizen_surface(CITIZEN_HAPPY, 0));
   pIcons->pFemale_Happy = adj_surf(get_citizen_surface(CITIZEN_HAPPY, 1));
@@ -98,9 +105,10 @@ static void reload_small_citizens_icons(int style)
   pIcons->pFemale_Unhappy = adj_surf(get_citizen_surface(CITIZEN_UNHAPPY, 1));
   pIcons->pMale_Angry = adj_surf(get_citizen_surface(CITIZEN_ANGRY, 0));
   pIcons->pFemale_Angry = adj_surf(get_citizen_surface(CITIZEN_ANGRY, 1));
-  pIcons->pSpec_Lux = get_tax_surface(O_LUXURY);
-  pIcons->pSpec_Tax = get_tax_surface(O_GOLD);
-  pIcons->pSpec_Sci = get_tax_surface(O_SCIENCE);
+
+  for (i = 0; i < spe_max; i++) {
+    pIcons->specialists[i] = adj_surf(get_citizen_surface(CITIZEN_SPECIALIST + i, 0));
+  }
 }
 
 /* ================================================================================= */
@@ -118,7 +126,7 @@ void reload_citizens_icons(int style)
 }
 
 /**************************************************************************
-  ...
+  Load theme city screen graphics.
 **************************************************************************/
 void tilespec_setup_city_gfx(void) {
   struct sprite *pSpr =
@@ -135,24 +143,23 @@ void tilespec_setup_city_gfx(void) {
 ***********************************************************************/
 void tilespec_setup_city_icons(void)
 {
-
   struct sprite *pSpr = NULL;
-  
+
   pIcons = ( struct City_Icon *)fc_calloc(1,  sizeof( struct City_Icon ));
-  
+
   load_city_icon_surface(pSpr, pBIG_Food_Corr, "city.food_waste");
   load_city_icon_surface(pSpr, pBIG_Shield_Corr, "city.shield_waste");
   load_city_icon_surface(pSpr, pBIG_Trade_Corr, "city.trade_waste");
   load_city_icon_surface(pSpr, pBIG_Food, "city.food");
-      
+
   pIcons->pBIG_Food_Surplus = crop_rect_from_surface(pIcons->pBIG_Food, NULL);
   SDL_SetAlpha(pIcons->pBIG_Food_Surplus, SDL_SRCALPHA, 128);
-    
+
   load_city_icon_surface(pSpr, pBIG_Shield, "city.shield");
-  
+
   pIcons->pBIG_Shield_Surplus = crop_rect_from_surface(pIcons->pBIG_Shield, NULL);
   SDL_SetAlpha(pIcons->pBIG_Shield_Surplus, SDL_SRCALPHA, 128);
-  
+
   load_city_icon_surface(pSpr, pBIG_Trade, "city.trade");
   load_city_icon_surface(pSpr, pBIG_Luxury, "city.lux");
   load_city_icon_surface(pSpr, pBIG_Coin, "city.coin");
@@ -180,16 +187,16 @@ void tilespec_setup_city_icons(void)
 		  SDL_MapRGB(pIcons->pWorklist->format, 255, 255,255));
   putframe(pIcons->pWorklist,
            0,0, pIcons->pWorklist->w - 1, pIcons->pWorklist->h - 1,
-           get_game_colorRGB(COLOR_THEME_CITYREP_FRAME));
+           get_theme_color(COLOR_THEME_CITYREP_FRAME));
   putline(pIcons->pWorklist,
           3, 2, 5, 2,
-          get_game_colorRGB(COLOR_THEME_CITYREP_FRAME));
+          get_theme_color(COLOR_THEME_CITYREP_FRAME));
   putline(pIcons->pWorklist,
           3, 4, 7, 4,
-          get_game_colorRGB(COLOR_THEME_CITYREP_FRAME));
+          get_theme_color(COLOR_THEME_CITYREP_FRAME));
   putline(pIcons->pWorklist,
           3, 6, 6, 6,
-          get_game_colorRGB(COLOR_THEME_CITYREP_FRAME));
+          get_theme_color(COLOR_THEME_CITYREP_FRAME));
   
   /* ================================================================= */
   
@@ -197,38 +204,17 @@ void tilespec_setup_city_icons(void)
   pIcons->style = 999;
 }
 
+/**********************************************************************
+  Free resources associated with city screen icons.
+***********************************************************************/
 void tilespec_free_city_icons(void)
 {
+  int i;
+  int spe_max;
+
   if (!pIcons) {
     return;
   }
-  
-  FREESURFACE(pIcons->pBIG_Food_Corr);
-  FREESURFACE(pIcons->pBIG_Shield_Corr);
-  FREESURFACE(pIcons->pBIG_Trade_Corr);
-  FREESURFACE(pIcons->pBIG_Food);
-  FREESURFACE(pIcons->pBIG_Food_Surplus);
-  FREESURFACE(pIcons->pBIG_Shield);
-  FREESURFACE(pIcons->pBIG_Shield_Surplus);
-  FREESURFACE(pIcons->pBIG_Trade);
-  FREESURFACE(pIcons->pBIG_Luxury);
-  FREESURFACE(pIcons->pBIG_Coin);
-  FREESURFACE(pIcons->pBIG_Colb);
-  FREESURFACE(pIcons->pBIG_Face);
-  FREESURFACE(pIcons->pBIG_Coin_Corr);
-  FREESURFACE(pIcons->pBIG_Coin_UpKeep);
-
-  FREESURFACE(pIcons->pFood);
-  FREESURFACE(pIcons->pShield);
-  FREESURFACE(pIcons->pTrade);
-  FREESURFACE(pIcons->pFace);
-  FREESURFACE(pIcons->pLuxury);
-  FREESURFACE(pIcons->pCoin);		  
-  FREESURFACE(pIcons->pColb);		  
-
-  FREESURFACE(pIcons->pPollution);
-  FREESURFACE(pIcons->pPolice);
-  FREESURFACE(pIcons->pWorklist);
 
   /* small citizens */
   FREESURFACE(pIcons->pMale_Content);
@@ -240,22 +226,21 @@ void tilespec_free_city_icons(void)
   FREESURFACE(pIcons->pMale_Angry);
   FREESURFACE(pIcons->pFemale_Angry);
 
-  FREESURFACE(pIcons->pSpec_Lux); /* Elvis */
-  FREESURFACE(pIcons->pSpec_Tax); /* TaxMan */
-  FREESURFACE(pIcons->pSpec_Sci); /* Scientist */
+  spe_max = specialist_count();
+  for (i = 0; i < spe_max; i++) {
+    FREESURFACE(pIcons->specialists[i]);
+  }
 
   FC_FREE(pIcons);
-  
 }
-
 
 /* =================================================== */
 /* ===================== THEME ======================= */
 /* =================================================== */
 
-/*
- *	Alloc and fill Theme struct
- */
+/**********************************************************************
+  Alloc and fill Theme struct
+***********************************************************************/
 void tilespec_setup_theme(void)
 {
   struct sprite *pBuf = NULL;
@@ -363,136 +348,36 @@ void tilespec_setup_theme(void)
   return;
 }
 
-/*
- *	Free memmory
- */
+/**********************************************************************
+  Free theme memory
+***********************************************************************/
 void tilespec_free_theme(void)
 {
   if (!pTheme) {
     return;
   }
 
-  FREESURFACE(pTheme->FR_Left);
-  FREESURFACE(pTheme->FR_Right);
-  FREESURFACE(pTheme->FR_Top);
-  FREESURFACE(pTheme->FR_Bottom);
-  
-  FREESURFACE(pTheme->Button);
-  
-  FREESURFACE(pTheme->Edit);
-
-  FREESURFACE(pTheme->CBOX_Sell_Icon);
-  FREESURFACE(pTheme->CBOX_Unsell_Icon);
-
-  FREESURFACE(pTheme->UP_Icon);
-  FREESURFACE(pTheme->DOWN_Icon);
-#if 0
-  FREESURFACE(pTheme->LEFT_Icon);
-  FREESURFACE(pTheme->RIGHT_Icon);
-#endif
-  FREESURFACE(pTheme->Vertic);
-  FREESURFACE(pTheme->Horiz);
-  
-  /* ------------------- */
-  
-  FREESURFACE(pTheme->OK_Icon);
-  FREESURFACE(pTheme->CANCEL_Icon);
-  FREESURFACE(pTheme->Small_OK_Icon);
-  FREESURFACE(pTheme->Small_CANCEL_Icon);
-  FREESURFACE(pTheme->FORWARD_Icon);
-  FREESURFACE(pTheme->BACK_Icon);
-  FREESURFACE(pTheme->L_ARROW_Icon);
-  FREESURFACE(pTheme->R_ARROW_Icon);
-  FREESURFACE(pTheme->MAP_Icon);
-  FREESURFACE(pTheme->FindCity_Icon);
-  FREESURFACE(pTheme->NEW_TURN_Icon);
-  FREESURFACE(pTheme->LOG_Icon);
-  FREESURFACE(pTheme->UNITS_Icon);
-  FREESURFACE(pTheme->UNITS2_Icon);
-  FREESURFACE(pTheme->PLAYERS_Icon);
-  FREESURFACE(pTheme->Options_Icon);
-  FREESURFACE(pTheme->Block);
-  FREESURFACE(pTheme->INFO_Icon);
-  FREESURFACE(pTheme->Army_Icon);
-  FREESURFACE(pTheme->Happy_Icon);
-  FREESURFACE(pTheme->Support_Icon);
-  FREESURFACE(pTheme->Buy_PROD_Icon);
-  FREESURFACE(pTheme->PROD_Icon);
-  FREESURFACE(pTheme->QPROD_Icon);
-  FREESURFACE(pTheme->CMA_Icon);
-  FREESURFACE(pTheme->LOCK_Icon);
-  FREESURFACE(pTheme->UNLOCK_Icon);
-  FREESURFACE(pTheme->OK_PACT_Icon);
-  FREESURFACE(pTheme->CANCEL_PACT_Icon);
-  FREESURFACE(pTheme->SAVE_Icon);
-  FREESURFACE(pTheme->LOAD_Icon);
-  FREESURFACE(pTheme->DELETE_Icon);
-  FREESURFACE(pTheme->BORDERS_Icon);
-  /* ------------------------------ */
-  FREESURFACE(pTheme->Tech_Tree_Icon);
-  /* ------------------------------ */
-
-  FREESURFACE(pTheme->Order_Icon);
-  FREESURFACE(pTheme->OAutoAtt_Icon);
-  FREESURFACE(pTheme->OAutoConnect_Icon);
-  FREESURFACE(pTheme->OAutoExp_Icon);
-  FREESURFACE(pTheme->OAutoSett_Icon);
-  FREESURFACE(pTheme->OBuildCity_Icon);
-  FREESURFACE(pTheme->OCutDownForest_Icon);
-  FREESURFACE(pTheme->OPlantForest_Icon);
-  FREESURFACE(pTheme->OMine_Icon);
-  FREESURFACE(pTheme->OIrrigation_Icon);
-  FREESURFACE(pTheme->ODone_Icon);
-  FREESURFACE(pTheme->ODisband_Icon);
-  FREESURFACE(pTheme->OFortify_Icon);
-  FREESURFACE(pTheme->OGoto_Icon);
-  FREESURFACE(pTheme->OGotoCity_Icon);
-  FREESURFACE(pTheme->OHomeCity_Icon);
-  FREESURFACE(pTheme->ONuke_Icon);
-  FREESURFACE(pTheme->OParaDrop_Icon);
-  FREESURFACE(pTheme->OPatrol_Icon);
-  FREESURFACE(pTheme->OPillage_Icon);
-  FREESURFACE(pTheme->ORailRoad_Icon);
-  FREESURFACE(pTheme->ORoad_Icon);
-  FREESURFACE(pTheme->OSentry_Icon);
-  FREESURFACE(pTheme->OUnload_Icon);
-  FREESURFACE(pTheme->OWait_Icon);
-  FREESURFACE(pTheme->OFortress_Icon);
-  FREESURFACE(pTheme->OFallout_Icon);
-  FREESURFACE(pTheme->OPollution_Icon);
-  FREESURFACE(pTheme->OAirBase_Icon);
-  FREESURFACE(pTheme->OTransform_Icon);
-  FREESURFACE(pTheme->OAddCity_Icon);
-  FREESURFACE(pTheme->OWonder_Icon);
-  FREESURFACE(pTheme->OTrade_Icon);
-  FREESURFACE(pTheme->OSpy_Icon);
-  FREESURFACE(pTheme->OWakeUp_Icon);
-  FREESURFACE(pTheme->OReturn_Icon);
-  FREESURFACE(pTheme->OAirLift_Icon);
-  FREESURFACE(pTheme->OLoad_Icon);
-
   FC_FREE(pTheme);
-  return;
 }
 
 /**************************************************************************
-  ...
+  Setup icons for special (non-real) technologies.
 **************************************************************************/
 void setup_auxiliary_tech_icons(void)
 {
   SDL_Color bg_color = {255, 255, 255, 136};
 
   SDL_Surface *pSurf;
-  SDL_String16 *pStr = create_str16_from_char(_("None"), adj_font(10));
-  
+  SDL_String16 *pStr = create_str16_from_char(Q_("?tech:None"), adj_font(10));
+
   pStr->style |= (TTF_STYLE_BOLD | SF_CENTER);
-    
+
   /* create icons */
   pSurf = create_surf_alpha(adj_size(50), adj_size(50), SDL_SWSURFACE);
   SDL_FillRect(pSurf, NULL, map_rgba(pSurf->format, bg_color));
   putframe(pSurf,
            0 , 0, pSurf->w - 1, pSurf->h - 1,
-           get_game_colorRGB(COLOR_THEME_SCIENCEDLG_FRAME));
+           get_theme_color(COLOR_THEME_SCIENCEDLG_FRAME));
 
   pNeutral_Tech_Icon = SDL_DisplayFormatAlpha(pSurf);
   pNone_Tech_Icon = SDL_DisplayFormatAlpha(pSurf);    
@@ -520,7 +405,7 @@ void setup_auxiliary_tech_icons(void)
 }
 
 /**************************************************************************
-  ...
+  Free resources associated with aux tech icons.
 **************************************************************************/
 void free_auxiliary_tech_icons(void)
 {
@@ -530,7 +415,7 @@ void free_auxiliary_tech_icons(void)
 }
 
 /**************************************************************************
-  ...
+  Return tech icon surface.
 **************************************************************************/
 SDL_Surface * get_tech_icon(Tech_type_id tech)
 {
@@ -554,37 +439,37 @@ SDL_Surface * get_tech_icon(Tech_type_id tech)
 }
 
 /**************************************************************************
-  ...
+  Return color associated with current tech knowledge state.
 **************************************************************************/
-SDL_Color * get_tech_color(Tech_type_id tech_id)
+SDL_Color *get_tech_color(Tech_type_id tech_id)
 {
   if (player_invention_reachable(client.conn.playing, tech_id, FALSE))
   {
     switch (player_invention_state(client.conn.playing, tech_id))
     {
       case TECH_UNKNOWN:
-        return get_game_colorRGB(COLOR_REQTREE_UNKNOWN);
+        return get_game_color(COLOR_REQTREE_UNKNOWN);
       case TECH_KNOWN:
-        return get_game_colorRGB(COLOR_REQTREE_KNOWN);
+        return get_game_color(COLOR_REQTREE_KNOWN);
       case TECH_PREREQS_KNOWN:
-        return get_game_colorRGB(COLOR_REQTREE_PREREQS_KNOWN);
+        return get_game_color(COLOR_REQTREE_PREREQS_KNOWN);
       default:
-        return get_game_colorRGB(COLOR_REQTREE_BACKGROUND);
+        return get_game_color(COLOR_REQTREE_BACKGROUND);
     }
   }
-  return get_game_colorRGB(COLOR_REQTREE_UNREACHABLE);
+  return get_game_color(COLOR_REQTREE_UNREACHABLE);
 }
 
 /**************************************************************************
-  ...
+  Return current city screen graphics
 **************************************************************************/
-SDL_Surface * get_city_gfx(void)
+SDL_Surface *get_city_gfx(void)
 {
   return pCity_Surf;
 }
 
 /**************************************************************************
-  ...
+  Draw theme intro gfx.
 **************************************************************************/
 void draw_intro_gfx(void)
 {

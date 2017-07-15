@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -32,7 +32,7 @@
 /* client */
 #include "options.h"
 
-/* gui-gtk-2.0 */
+/* client/gui-gtk-2.0 */
 #include "dialogs.h"
 #include "gui_main.h"
 #include "gui_stuff.h"
@@ -67,7 +67,8 @@ void popup_find_dialog(void)
 
     pos = get_center_tile_mapcanvas();
 
-    gui_dialog_new(&find_dialog_shell, GTK_NOTEBOOK(bottom_notebook), NULL);
+    gui_dialog_new(&find_dialog_shell, GTK_NOTEBOOK(bottom_notebook), NULL,
+                   TRUE);
     gui_dialog_set_title(find_dialog_shell, _("Find City"));
     gui_dialog_set_default_size(find_dialog_shell, -1, 240);
 
@@ -131,7 +132,7 @@ void popup_find_dialog(void)
 
 
 /**************************************************************************
-...
+  Update find dialog with current cities
 **************************************************************************/
 static void update_find_dialog(GtkListStore *store)
 {
@@ -156,7 +157,7 @@ static void update_find_dialog(GtkListStore *store)
 }
 
 /**************************************************************************
-...
+  User responded to find dialog
 **************************************************************************/
 static void find_response(struct gui_dialog *dlg, int response, gpointer data)
 {
@@ -181,7 +182,7 @@ static void find_response(struct gui_dialog *dlg, int response, gpointer data)
 }
 
 /**************************************************************************
-...
+  Find dialog destroyed
 **************************************************************************/
 static void find_destroy_callback(GtkWidget *w, gpointer data)
 {
@@ -191,7 +192,7 @@ static void find_destroy_callback(GtkWidget *w, gpointer data)
 }
 
 /**************************************************************************
-...
+  User selected city from find dialog
 **************************************************************************/
 static void find_selection_callback(GtkTreeSelection *selection,
 				    GtkTreeModel *model)

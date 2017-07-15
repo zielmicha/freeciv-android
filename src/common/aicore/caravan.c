@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <math.h>
@@ -22,6 +22,7 @@
 
 /* common */
 #include "game.h"
+#include "traderoutes.h"
 
 /* aicore */
 #include "path_finding.h"
@@ -53,11 +54,11 @@ void caravan_parameter_init_from_unit(struct caravan_parameter *parameter,
                                       const struct unit *caravan)
 {
   caravan_parameter_init_default(parameter);
-  if (!unit_has_type_flag(caravan, F_TRADE_ROUTE)) {
+  if (!unit_has_type_flag(caravan, UTYF_TRADE_ROUTE)) {
     parameter->consider_windfall = FALSE;
     parameter->consider_trade = FALSE;
   }
-  if (!unit_has_type_flag(caravan, F_HELP_WONDER)) {
+  if (!unit_has_type_flag(caravan, UTYF_HELP_WONDER)) {
     parameter->consider_wonders = FALSE;
   }
 }
@@ -122,6 +123,7 @@ void caravan_result_init_zero(struct caravan_result *result)
   result->arrival_time = 0;
   result->value = 0;
   result->help_wonder = FALSE;
+  result->required_boat = FALSE;
 }
 
 /***************************************************************************
@@ -136,9 +138,18 @@ static void caravan_result_init(struct caravan_result *result,
   result->src = src;
   result->dest = dest;
   result->arrival_time = arrival_time;
-
+  
   result->value = 0;
   result->help_wonder = FALSE;
+  if ((src != NULL) && (dest != NULL)) {
+    if (tile_continent(src->tile) != tile_continent(dest->tile)) {
+      result->required_boat = TRUE;
+    } else {
+      result->required_boat = FALSE;
+    }
+  } else {
+    result->required_boat = FALSE;
+  }
 }
 
 /***************************************************************************
@@ -259,13 +270,12 @@ static int one_city_trade_benefit(const struct city *pcity,
     newtrade = 0;
   }
 
-  if (city_num_trade_routes(pcity) < NUM_TRADE_ROUTES) {
+  if (city_num_trade_routes(pcity) < max_trade_routes(pcity)) {
     /* if the city can handle this route, we don't break any old routes */
     losttrade = 0;
   } else {
-    int slot;
-    int oldtrade = get_city_min_trade_route(pcity, &slot);
-    struct city *losercity = game_city_by_number(pcity->trade[slot]);
+    struct city_list *would_remove = (countloser ? city_list_new() : NULL);
+    int oldtrade = city_trade_removable(pcity, would_remove);
 
     /* if we own the city, the trade benefit is only by how much
        better we are than the old trade route */
@@ -273,10 +283,21 @@ static int one_city_trade_benefit(const struct city *pcity,
       newtrade -= oldtrade;
     }
 
-    /* if the city that lost a trade route is one of ours, and if we
+    /* if the cities that lost a trade route is one of ours, and if we
        care about accounting for the lost trade, count it. */
-    if (countloser && city_owner(losercity) == pplayer) {
-      losttrade = oldtrade;
+    if (countloser) {
+      city_list_iterate(would_remove, losercity) {
+        if (city_owner(losercity) == pplayer) {
+          int i;
+
+          for (i = 0; i < MAX_TRADE_ROUTES; i++) {
+            if (losercity->trade[i] == pcity->id) {
+              losttrade += losercity->trade_value[i];
+            }
+          }
+        }
+      } city_list_iterate_end;
+      city_list_destroy(would_remove);
     }
   }
 
@@ -300,6 +321,11 @@ static double trade_benefit(const struct player *caravan_owner,
 
   /* first, see if a new route is made. */
   if (!can_cities_trade(src, dest) || !can_establish_trade_route(src, dest)) {
+    return 0;
+  }
+  if (max_trade_routes(src) <= 0 || max_trade_routes(dest) <= 0) {
+    /* Can't create new traderoutes even by replacing old ones if
+     * there's no slots at all. */
     return 0;
   }
 
@@ -394,16 +420,32 @@ static void get_discounted_reward(const struct unit *caravan,
   const struct city *dest = result->dest;
   int arrival_time = result->arrival_time;
   double discount = parameter->discount;
+  struct player *pplayer_src = city_owner(src);
+  struct player *pplayer_dest = city_owner(dest);
 
   /* if no foreign trade is allowed, just quit. */
-  if (!parameter->allow_foreign_trade && city_owner(src) != city_owner(dest)) {
+  if (!parameter->allow_foreign_trade && pplayer_src != pplayer_dest) {
     caravan_result_init_zero(result);
     return;
+  } else {
+    /* foreign trade allowed, we only do business with allies */
+    if (pplayers_allied(pplayer_src, pplayer_dest)) {
+      /* do some business */
+    } else {
+      caravan_result_init_zero(result);
+      return;
+    }
   }
 
-  trade = trade_benefit(city_owner(src), src, dest, parameter);
+  trade = trade_benefit(pplayer_src, src, dest, parameter);
   windfall = windfall_benefit(src, dest, parameter);
-  wonder = wonder_benefit(caravan, arrival_time, dest, parameter);
+  if (pplayer_src == pplayer_dest) {
+    wonder = wonder_benefit(caravan, arrival_time, dest, parameter);
+    /* we want to aid for wonder building */
+    wonder *= 2;
+  } else {
+    wonder = 0;
+  }
 
   if (parameter->horizon == FC_INFINITY) {
     trade = perpetuity(trade, discount);
@@ -414,7 +456,7 @@ static void get_discounted_reward(const struct unit *caravan,
   windfall = presentvalue(windfall, arrival_time, discount);
   wonder = presentvalue(wonder, arrival_time, discount);
 
-  if(trade + windfall >= wonder) {
+  if (trade + windfall >= wonder) {
     result->value = trade + windfall;
     result->help_wonder = FALSE;
   } else {
@@ -486,7 +528,7 @@ static void caravan_evaluate_withtransit(const struct unit *caravan,
   data.param = param;
   caravan_result_init(result, game_city_by_number(caravan->homecity),
                       dest, 0);
-  caravan_search_from(caravan, param, caravan->tile, 0,
+  caravan_search_from(caravan, param, unit_tile(caravan), 0,
                       caravan->moves_left, cewt_callback, &data);
 }
 
@@ -515,14 +557,15 @@ static void caravan_find_best_destination_notransit(const struct unit *caravan,
                                                    struct caravan_result *best)
 {
   struct caravan_result current;
-
-  caravan_result_init(best, game_city_by_number(caravan->homecity), NULL, 0);
+  struct city *pcity = game_city_by_number(caravan->homecity);
+  
+  caravan_result_init(best, pcity, NULL, 0);
   current = *best;
-
+  
   cities_iterate(dest) {
-    current.dest = dest;
+    caravan_result_init(&current, pcity, dest, 0);
     get_discounted_reward(caravan, param, &current);
-
+    
     if (caravan_result_compare(&current, best) > 0) {
       *best = current;
     }
@@ -576,7 +619,7 @@ static void caravan_find_best_destination_withtransit(
   if (src->id != caravan->homecity) {
     start_tile = src->tile;
   } else {
-    start_tile = caravan->tile;
+    start_tile = unit_tile(caravan);
   }
 
   caravan_search_from(caravan, param, start_tile, turns_before,
@@ -597,6 +640,8 @@ void caravan_find_best_destination(const struct unit *caravan,
     caravan_find_best_destination_notransit(caravan, parameter, result);
   } else {
     const struct city *src = game_city_by_number(caravan->homecity);
+
+    fc_assert(src != NULL);
 
     caravan_find_best_destination_withtransit(caravan, parameter, src, 0, 
                                               caravan->moves_left, result);
@@ -685,7 +730,7 @@ static void caravan_optimize_withtransit(const struct unit *caravan,
   data.caravan = caravan;
   data.best = result;
   caravan_result_init_zero(data.best);
-  caravan_search_from(caravan, param, caravan->tile, 0,
+  caravan_search_from(caravan, param, unit_tile(caravan), 0,
                       caravan->moves_left, cowt_callback, &data);
 }
 

@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,6 +12,10 @@
 ***********************************************************************/
 #ifndef FC__UPDATE_QUEUE_H
 #define FC__UPDATE_QUEUE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 typedef void (*uq_callback_t) (void *data);
 #define UQ_CALLBACK(fn) ((uq_callback_t) fn)
@@ -55,5 +59,11 @@ void update_queue_connect_processing_finished_full(int request_id,
                                                    void *data,
                                                    uq_free_fn_t
                                                    free_data_func);
+
+bool update_queue_is_switching_page(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__UPDATE_QUEUE_H */

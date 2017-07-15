@@ -20,9 +20,9 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",          "female_title"
- "Despotism",       _("%s Jarl"),          _("?female:%s Jarl")
- "Monarchy",        _("Duke %s"),          _("Duchess %s")
- "Republic",        _("Bailiff %s"),       _("?Female:Bailiff %s")
+ "Democracy",        _("Chancellor %s"),   _("?female:Chancellor %s")
+ "Despotism",        _("Duke %s"),         _("Duchess %s")
+ "Fundamentalism",   _("Bishop %s"),       _("Mother Superior %s")
 }
 
 flag="normandy"
@@ -31,7 +31,6 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations = "viking", "french", "english", "sicilian"
 

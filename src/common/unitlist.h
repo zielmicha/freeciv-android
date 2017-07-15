@@ -14,9 +14,13 @@
 #ifndef FC__UNITLIST_H
 #define FC__UNITLIST_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include "fc_types.h"
 #include "unit.h"		/* for diplomat_actions */
-#include "unittype.h"		/* for unit_flag_id */
+#include "unittype.h"		/* for unit_type_flag_id */
 
 /* get 'struct unit_list' and related functions: */
 #define SPECLIST_TAG unit
@@ -26,6 +30,10 @@
 #define unit_list_iterate(unitlist, punit) \
     TYPED_LIST_ITERATE(struct unit, unitlist, punit)
 #define unit_list_iterate_end  LIST_ITERATE_END
+#define unit_list_both_iterate(unitlist, plink, punit) \
+    TYPED_LIST_BOTH_ITERATE(struct unit_list_link, struct unit, unitlist, \
+                            plink, punit)
+#define unit_list_both_iterate_end LIST_BOTH_ITERATE_END
 
 #define unit_list_iterate_safe(unitlist, _unit)				\
 {									\
@@ -62,14 +70,17 @@ bool can_units_do(const struct unit_list *punits,
 		  bool (can_fn)(const struct unit *punit));
 bool can_units_do_activity(const struct unit_list *punits,
 			   enum unit_activity activity);
+bool can_units_do_any_road(const struct unit_list *punits);
 bool can_units_do_base(const struct unit_list *punits,
                        Base_type_id base);
+bool can_units_do_road(const struct unit_list *punits,
+                       Road_type_id road);
 bool can_units_do_base_gui(const struct unit_list *punits,
                            enum base_gui_type base_gui);
 bool can_units_do_diplomat_action(const struct unit_list *punits,
 				  enum diplomat_actions action);
-bool units_have_flag(const struct unit_list *punits, enum unit_flag_id flag,
-		     bool has_flag);
+bool units_have_type_flag(const struct unit_list *punits,
+                          enum unit_type_flag_id flag, bool has_flag);
 bool units_are_occupied(const struct unit_list *punits);
 bool units_can_load(const struct unit_list *punits);
 bool units_can_unload(const struct unit_list *punits);
@@ -78,5 +89,9 @@ bool units_have_activity_on_tile(const struct unit_list *punits,
 
 bool units_can_upgrade(const struct unit_list *punits);
 bool units_can_convert(const struct unit_list *punits);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__UNITLIST_H */

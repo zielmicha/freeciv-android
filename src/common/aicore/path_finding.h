@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2003 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,6 +12,11 @@
 ***********************************************************************/
 #ifndef FC__PATH_FINDING_H
 #define FC__PATH_FINDING_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 
 /* utility */
 #include "log.h"        /* enum log_level */
@@ -271,7 +276,10 @@
 enum tile_behavior {
   TB_IGNORE = 0,        /* This one will be ignored. */
   TB_DONT_LEAVE,        /* Paths can lead _to_ such tile, but are not
-                         * allowed to go _through_. */
+                         * allowed to go _through_. This move cost is
+                         * always evaluated to a constant single move cost,
+                         * prefering straight paths because we don't need
+                         * moves left to leave this tile. */
   TB_NORMAL             /* Well, normal .*/
 };
 
@@ -315,7 +323,7 @@ struct pf_parameter {
   int move_rate;                /* Move rate of the virtual unit */
   int fuel;                     /* Should be 1 for units without fuel. */
 
-  struct player *owner;
+  const struct player *owner;
   const struct unit_class *uclass;
 
   bv_unit_type_flags unit_flags; /* Like F_MARINE and F_TRIREME */
@@ -436,21 +444,25 @@ const struct pf_parameter *pf_map_parameter(const struct pf_map *pfm);
 
 /* Paths functions. */
 void pf_path_destroy(struct pf_path *path);
+struct pf_path *pf_path_concat(struct pf_path *dest_path,
+                               const struct pf_path *src_path);
+bool pf_path_advance(struct pf_path *path, struct tile *ptile);
 const struct pf_position *pf_path_last_position(const struct pf_path *path);
 void pf_path_print_real(const struct pf_path *path, enum log_level level,
                         const char *file, const char *function, int line);
 #define pf_path_print(path, level)                                          \
   if (log_do_output_for_level(level)) {                                     \
-    pf_path_print_real(path, level, __FILE__, __FUNCTION__, __LINE__);      \
+    pf_path_print_real(path, level, __FILE__, __FUNCTION__, __FC_LINE__);   \
   }
 
 
 /* Reverse map functions (Costs to go to start tile). */
-struct pf_reverse_map *pf_reverse_map_new(struct player *pplayer,
+struct pf_reverse_map *pf_reverse_map_new(const struct player *pplayer,
                                           struct tile *start_tile,
                                           int max_turns)
                        fc__warn_unused_result;
 struct pf_reverse_map *pf_reverse_map_new_for_city(const struct city *pcity,
+                                                   const struct player *attacker,
                                                    int max_turns)
                        fc__warn_unused_result;
 struct pf_reverse_map *pf_reverse_map_new_for_unit(const struct unit *punit,
@@ -492,6 +504,7 @@ if ((COND_from_start) || pf_map_iterate((ARG_pfm))) {                       \
   struct tile *NAME_tile;                                                   \
   do {                                                                      \
     NAME_tile = pf_map_iter(_MY_pf_map_);
+
 #define pf_map_tiles_iterate_end                                            \
   } while (pf_map_iterate(_MY_pf_map_));                                    \
 }
@@ -513,8 +526,9 @@ if ((COND_from_start) || pf_map_iterate((ARG_pfm))) {                       \
   struct tile *NAME_tile;                                                   \
   int NAME_cost;                                                            \
   do {                                                                      \
-    NAME_tile = pf_map_iter(_MY_pf_map_);                              \
+    NAME_tile = pf_map_iter(_MY_pf_map_);                                   \
     NAME_cost = pf_map_iter_move_cost(_MY_pf_map_);
+
 #define pf_map_move_costs_iterate_end                                       \
   } while (pf_map_iterate(_MY_pf_map_));                                    \
 }
@@ -534,6 +548,7 @@ if ((COND_from_start) || pf_map_iterate((ARG_pfm))) {                       \
   struct pf_position NAME_pos;                                              \
   do {                                                                      \
     pf_map_iter_position(_MY_pf_map_, &NAME_pos);
+
 #define pf_map_positions_iterate_end                                        \
   } while (pf_map_iterate(_MY_pf_map_));                                    \
 }
@@ -553,8 +568,13 @@ if ((COND_from_start) || pf_map_iterate((ARG_pfm))) {                       \
   struct pf_path *NAME_path;\
   do {\
     NAME_path = pf_map_iter_path(_MY_pf_map_);
+
 #define pf_map_paths_iterate_end                                            \
   } while (pf_map_iterate(_MY_pf_map_));                                    \
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__PATH_FINDING_H */

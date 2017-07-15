@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <ctype.h>
@@ -85,6 +85,7 @@ void load_intro_gfx(void)
   int have_face;
   const char *motto = freeciv_motto();
   XFontSetExtents *exts;
+  const char *rev_ver = fc_svn_revision();
 
   /* metrics */
 
@@ -120,7 +121,7 @@ void load_intro_gfx(void)
   radar_gfx_sprite = load_gfxfile(tileset_mini_intro_filename(tileset));
   tot = radar_gfx_sprite->width;
 
-  y = radar_gfx_sprite->height - (lin +
+  y = radar_gfx_sprite->height - (2 * lin +
       1.5 * (exts->max_logical_extent.height + exts->max_logical_extent.y));
 
   w = XmbTextEscapement(main_font_set, word_version(), strlen(word_version()));
@@ -139,9 +140,11 @@ void load_intro_gfx(void)
 
   y += lin;
 
-  fc_snprintf(s, sizeof(s), "%d.%d.%d%s",
-	      MAJOR_VERSION, MINOR_VERSION,
-	      PATCH_VERSION, VERSION_LABEL);
+  if (rev_ver != NULL) {
+    fc_snprintf(s, sizeof(s), "%s (%s)", VERSION_STRING, rev_ver);
+  } else {
+    fc_snprintf(s, sizeof(s), "%s", VERSION_STRING);
+  }
   w = XmbTextEscapement(main_font_set, s, strlen(s));
   XSetForeground(display, font_gc,
 		 get_color(tileset, COLOR_OVERVIEW_UNKNOWN)->color.pixel);
@@ -153,6 +156,20 @@ void load_intro_gfx(void)
   XmbDrawString(display, radar_gfx_sprite->pixmap,
 		main_font_set, font_gc,
 		tot / 2 - w / 2, y, s, strlen(s));
+
+  y += lin;
+  
+  w = XmbTextEscapement(main_font_set, client_string, strlen(client_string));
+  XSetForeground(display, font_gc,
+		 get_color(tileset, COLOR_OVERVIEW_UNKNOWN)->color.pixel);
+  XmbDrawString(display, radar_gfx_sprite->pixmap,
+		main_font_set, font_gc,
+		(tot / 2 - w / 2) + 1, y + 1, client_string, strlen(client_string));
+  XSetForeground(display, font_gc,
+		 get_color(tileset, COLOR_OVERVIEW_VIEWRECT)->color.pixel);
+  XmbDrawString(display, radar_gfx_sprite->pixmap,
+		main_font_set, font_gc,
+		tot / 2 - w / 2, y, client_string, strlen(client_string));
 
   /* free colors */
 
@@ -216,6 +233,41 @@ struct sprite *crop_sprite(struct sprite *source,
 }
 
 /****************************************************************************
+  Create a sprite with the given height, width and color.
+****************************************************************************/
+struct sprite *create_sprite(int width, int height, struct color *pcolor)
+{
+  struct sprite *plrcolor;
+
+  fc_assert_ret_val(width > 0, NULL);
+  fc_assert_ret_val(height > 0, NULL);
+  fc_assert_ret_val(pcolor != NULL, NULL);
+
+  {
+    /* FIXME: I do not know why it works but the code below allows the creation
+     *        of the needed player color sprites. */
+    fc_assert_ret_val(tileset != NULL, NULL);
+    struct sprite *psprite_dummy = get_basic_fog_sprite(tileset);
+    Pixmap mypixmap, mymask;
+    GC plane_gc;
+
+    mypixmap = XCreatePixmap(display, root_window, width, height,
+                             display_depth);
+    mymask = XCreatePixmap(display, root_window, width, height, 1);
+    plane_gc = XCreateGC(display, mymask, 0, NULL);
+    XCopyArea(display, psprite_dummy->mask, mymask, plane_gc,
+              0, 0, width, height, 0, 0);
+    XFreeGC(display, plane_gc);
+    plrcolor = ctor_sprite_mask(mypixmap, mymask, width, height);
+  }
+
+  XSetForeground(display, fill_bg_gc, pcolor->color.pixel);
+  XFillRectangle(display, plrcolor->pixmap, fill_bg_gc, 0, 0, width, height);
+
+  return plrcolor;
+}
+
+/****************************************************************************
   Find the dimensions of the sprite.
 ****************************************************************************/
 void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
@@ -260,6 +312,7 @@ static struct sprite *ctor_sprite(Pixmap mypixmap, int width, int height)
   mysprite->pixmap=mypixmap;
   mysprite->width=width;
   mysprite->height=height;
+  mysprite->ncols = 0;
   mysprite->pcolorarray = NULL;
   mysprite->has_mask=0;
   return mysprite;
@@ -625,7 +678,8 @@ Pixmap create_overlay_unit(const struct unit_type *punittype)
 
   /* Finally, put a picture of the unit in the tile */
 /*  if(i<utype_count()) */ {
-    struct sprite *s = get_unittype_sprite(tileset, punittype);
+    struct sprite *s = get_unittype_sprite(tileset, punittype,
+                                           direction8_invalid(), TRUE);
 
     XSetClipOrigin(display,civ_gc,0,0);
     XSetClipMask(display,civ_gc,s->mask);

@@ -20,7 +20,7 @@
  * not quite, all displays will be truecolor. */
 
 enum theme_color {
-  COLOR_THEME_BACKGROUND = COLOR_LAST, 
+  COLOR_THEME_BACKGROUND,
   COLOR_THEME_CHECKBOX_LABEL_TEXT,  
   COLOR_THEME_CUSTOM_WIDGET_NORMAL_TEXT,
   COLOR_THEME_CUSTOM_WIDGET_SELECTED_FRAME,  
@@ -120,12 +120,13 @@ enum theme_color {
   COLOR_THEME_UNITSREP_FRAME,  
   COLOR_THEME_UNITSREP_TEXT,  
   COLOR_THEME_UNITUPGRADE_TEXT,
+  COLOR_THEME_UNITDISBAND_TEXT,
   COLOR_THEME_USERPASSWDDLG_FRAME,  
   COLOR_THEME_USERPASSWDDLG_TEXT,
   COLOR_THEME_WARDLG_TEXT,
   COLOR_THEME_WLDLG_FRAME,
-  
-  THEME_COLOR_LAST
+
+  COLOR_THEME_LAST
 };
 
 struct color;
@@ -133,7 +134,7 @@ struct theme_color_system;
 struct theme;
 
 struct color *theme_get_color(const struct theme *t, enum theme_color color);
-        
+
 /* Functions used by the theme to allocate the color system. */
 struct theme_color_system *theme_color_system_read(struct section_file *file);
 

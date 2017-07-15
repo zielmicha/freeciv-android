@@ -1,4 +1,4 @@
-/**********************************************************************
+/********************************************************************** 
  Freeciv - Copyright (C) 2005 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,13 +12,14 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <limits.h> /* USHRT_MAX */
 
 /* utility */
 #include "bitvector.h"
+#include "capability.h"
 #include "fcintl.h"
 #include "log.h"
 #include "shared.h"
@@ -39,6 +40,7 @@
 #include "utilities.h"
 
 /* server */
+#include "aiiface.h"
 #include "citytools.h"
 #include "cityturn.h"
 #include "connecthand.h"
@@ -144,9 +146,11 @@ static void check_edited_tile_terrains(void)
     need_continents_reassigned = FALSE;
   }
 
+#ifdef SANITY_CHECKING
   tile_hash_iterate(modified_tile_table, ptile) {
     sanity_check_tile(ptile);
   } tile_hash_iterate_end;
+#endif /* SANITY_CHECKING */
   tile_hash_clear(modified_tile_table);
 }
 
@@ -272,6 +276,9 @@ static bool edit_tile_special_handling(struct tile *ptile,
                                        bool remove_mode,
                                        bool send_tile_info)
 {
+  fc_assert_ret_val(special != S_OLD_FORTRESS && special != S_OLD_AIRBASE, FALSE);
+  fc_assert_ret_val(special != S_OLD_ROAD && special != S_OLD_RAILROAD, FALSE);
+
   if (remove_mode) {
     if (!tile_has_special(ptile, special)) {
       return FALSE;
@@ -279,8 +286,7 @@ static bool edit_tile_special_handling(struct tile *ptile,
 
     tile_remove_special(ptile, special);
 
-    /* RoadNative and RiverNative units may need bouncing */
-    bounce_units_on_terrain_change(ptile);
+    terrain_changed(ptile);
 
   } else {
     if (tile_has_special(ptile, special)
@@ -294,6 +300,89 @@ static bool edit_tile_special_handling(struct tile *ptile,
   if (send_tile_info) {
     update_tile_knowledge(ptile);
   }
+
+  return TRUE;
+}
+
+/****************************************************************************
+  Recursively add all road dependencies to add given road.
+****************************************************************************/
+static bool add_recursive_roads(struct tile *ptile, struct road_type *proad,
+                                int rec)
+{
+  if (rec > MAX_ROAD_TYPES) {
+    /* Infinite recursion */
+    return FALSE;
+  }
+
+  /* First place dependency roads */
+  road_deps_iterate(&(proad->reqs), pdep) {
+    if (!tile_has_road(ptile, pdep)) {
+      add_recursive_roads(ptile, pdep, rec + 1);
+    }
+  } road_deps_iterate_end;
+
+  /* Is tile native for road after that? */
+  if (!is_native_tile_to_road(proad, ptile)) {
+    return FALSE;
+  }
+
+  tile_add_road(ptile, proad);
+
+  return TRUE;
+}
+
+/****************************************************************************
+  Base function to edit the road property of a tile. Returns TRUE if
+  the road state has changed.
+****************************************************************************/
+static bool edit_tile_road_handling(struct tile *ptile,
+                                    struct road_type *proad,
+                                    bool remove_mode, bool send_tile_info)
+{
+  if (remove_mode) {
+    if (!tile_has_road(ptile, proad)) {
+      return FALSE;
+    }
+
+    tile_remove_road(ptile, proad);
+  } else {
+    if (!add_recursive_roads(ptile, proad, 0)) {
+      return FALSE;
+    }
+  }
+
+  if (send_tile_info) {
+    update_tile_knowledge(ptile);
+  }
+
+  return TRUE;
+}
+
+/****************************************************************************
+  Recursively add all base dependencies to add given base.
+****************************************************************************/
+static bool add_recursive_bases(struct tile *ptile, struct base_type *pbase,
+                                int rec)
+{
+  if (rec > MAX_BASE_TYPES) {
+    /* Infinite recursion */
+    return FALSE;
+  }
+
+  /* First place dependency roads */
+  base_deps_iterate(&(pbase->reqs), pdep) {
+    if (!tile_has_base(ptile, pdep)) {
+      add_recursive_bases(ptile, pdep, rec + 1);
+    }
+  } base_deps_iterate_end;
+
+  /* Is tile native for base after that? */
+  if (!is_native_tile_to_base(pbase, ptile)) {
+    return FALSE;
+  }
+
+  create_base(ptile, pbase, NULL);
 
   return TRUE;
 }
@@ -313,12 +402,9 @@ static bool edit_tile_base_handling(struct tile *ptile,
 
     tile_remove_base(ptile, pbase);
   } else {
-    if (tile_has_base(ptile, pbase)
-        || !is_native_tile_to_base(pbase, ptile)) {
+    if (!add_recursive_bases(ptile, pbase, 0)) {
       return FALSE;
     }
-
-    tile_add_base(ptile, pbase);
   }
 
   if (send_tile_info) {
@@ -428,6 +514,41 @@ void handle_edit_tile_special(struct connection *pc, int tile,
 }
 
 /****************************************************************************
+  Handle a request to change the road at one or more than one tile.
+****************************************************************************/
+void handle_edit_tile_road(struct connection *pc, int tile,
+                           Road_type_id id, bool remove, int size)
+{
+  struct tile *ptile_center;
+  struct road_type *proad;
+
+  ptile_center = index_to_tile(tile);
+  if (!ptile_center) {
+    notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
+                _("Cannot edit the tile because %d is not a valid "
+                  "tile index on this map!"), tile);
+    return;
+  }
+
+  proad = road_by_number(id);
+
+  if (!proad) {
+    notify_conn(pc->self, ptile_center, E_BAD_COMMAND, ftc_editor,
+                /* TRANS: ..." the tile <tile-coordinates> because"... */
+                _("Cannot modify road for the tile %s because "
+                  "%d is not a valid road type id."),
+                tile_link(ptile_center), id);
+    return;
+  }
+
+  conn_list_do_buffer(game.est_connections);
+  square_iterate(ptile_center, size - 1, ptile) {
+    edit_tile_road_handling(ptile, proad, remove, TRUE);
+  } square_iterate_end;
+  conn_list_do_unbuffer(game.est_connections);
+}
+
+/****************************************************************************
   Handle a request to change the military base at one or more than one tile.
 ****************************************************************************/
 void handle_edit_tile_base(struct connection *pc, int tile,
@@ -482,9 +603,20 @@ void handle_edit_tile(struct connection *pc,
   /* Handle changes in specials. */
   if (!BV_ARE_EQUAL(packet->specials, ptile->special)) {
     tile_special_type_iterate(spe) {
-      edit_tile_special_handling(ptile, spe,
-                                 !BV_ISSET(packet->specials, spe), FALSE);
+      if (edit_tile_special_handling(ptile, spe,
+                                     !BV_ISSET(packet->specials, spe), FALSE)) {
+        changed = TRUE;
+      }
     } tile_special_type_iterate_end;
+  }
+
+  /* Handle changes in roads. */
+  if (!(BV_ARE_EQUAL(packet->roads, ptile->roads))) {
+    road_type_iterate(proad) {
+      edit_tile_road_handling(ptile, proad,
+                              !BV_ISSET(packet->roads, road_number(proad)),
+                              FALSE);
+    } road_type_iterate_end;
     changed = TRUE;
   }
 
@@ -495,6 +627,11 @@ void handle_edit_tile(struct connection *pc,
                               !BV_ISSET(packet->bases, base_number(pbase)),
                               FALSE);
     } base_type_iterate_end;
+    changed = TRUE;
+  }
+
+  /* Handle changes in label */
+  if (tile_set_label(ptile, packet->label)) {
     changed = TRUE;
   }
 
@@ -520,7 +657,6 @@ void handle_edit_unit_create(struct connection *pc, int owner, int tile,
   struct player *pplayer;
   struct city *homecity;
   struct unit *punit;
-  bool only_ocean;
   int id, i;
 
   ptile = index_to_tile(tile);
@@ -579,11 +715,8 @@ void handle_edit_unit_create(struct connection *pc, int owner, int tile,
     send_player_info_c(pplayer, NULL);
   }
 
-  /* FIXME: Make this more general? */
-  only_ocean = is_sailing_unittype(punittype);
-
-  homecity = find_closest_city(ptile, NULL, pplayer, only_ocean, FALSE, FALSE,
-                               TRUE, FALSE);
+  homecity = find_closest_city(ptile, NULL, pplayer, FALSE, FALSE, FALSE,
+                               TRUE, FALSE, utype_class(punittype));
   id = homecity ? homecity->id : 0;
 
   conn_list_do_buffer(game.est_connections);
@@ -650,7 +783,7 @@ void handle_edit_unit_remove(struct connection *pc, int owner,
         || unit_owner(punit) != pplayer) {
       continue;
     }
-    wipe_unit(punit);
+    wipe_unit(punit, ULR_EDITOR, NULL);
     i++;
   } unit_list_iterate_safe_end;
 }
@@ -669,7 +802,7 @@ void handle_edit_unit_remove_by_id(struct connection *pc, Unit_type_id id)
     return;
   }
 
-  wipe_unit(punit);
+  wipe_unit(punit, ULR_EDITOR, NULL);
 }
 
 /****************************************************************************
@@ -678,9 +811,7 @@ void handle_edit_unit_remove_by_id(struct connection *pc, Unit_type_id id)
 void handle_edit_unit(struct connection *pc,
                       const struct packet_edit_unit *packet)
 {
-  struct tile *ptile;
   struct unit_type *putype;
-  struct player *pplayer;
   struct unit *punit;
   int id;
   bool changed = FALSE;
@@ -694,11 +825,13 @@ void handle_edit_unit(struct connection *pc,
     return;
   }
 
-  ptile = unit_tile(punit);
   putype = unit_type(punit);
-  pplayer = unit_owner(punit);
 
-  moves_left = CLIP(0, packet->moves_left, putype->move_rate);
+  if (has_capability("extended_move_rate", pc->capability)) {
+    moves_left = packet->moves_left_new;
+  } else {
+    moves_left = packet->moves_left_old;
+  }
   if (moves_left != punit->moves_left) {
     punit->moves_left = moves_left;
     changed = TRUE;
@@ -726,10 +859,9 @@ void handle_edit_unit(struct connection *pc,
     changed = TRUE;
   }
 
-  if (packet->veteran != punit->veteran
-      && !unit_has_type_flag(punit, F_NO_VETERAN)) {
+  if (packet->veteran != punit->veteran) {
     int v = packet->veteran;
-    if (rule_name(&putype->veteran[v].name) == '\0') {
+    if (!utype_veteran_level(putype, v)) {
       notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                   _("Invalid veteran level %d for unit %d (%s)."),
                   v, id, unit_link(punit));
@@ -772,7 +904,7 @@ void handle_edit_city_create(struct connection *pc, int owner, int tile,
     notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                 /* TRANS: ..." at <tile-coordinates> because"... */
                 _("Cannot create a city at %s because the "
-                  "given owner's player id %d is invalid"),
+                  "given owner's player id %d is invalid"), 
                 tile_link(ptile), owner);
     return;
 
@@ -795,12 +927,13 @@ void handle_edit_city_create(struct connection *pc, int owner, int tile,
   conn_list_do_buffer(game.est_connections);
 
   map_show_tile(pplayer, ptile);
-  create_city(pplayer, ptile, city_name_suggestion(pplayer, ptile));
+  create_city(pplayer, ptile, city_name_suggestion(pplayer, ptile),
+              pplayer);
   pcity = tile_city(ptile);
 
   if (size > 1) {
     /* FIXME: Slow and inefficient for large size changes. */
-    city_change_size(pcity, CLIP(1, size, MAX_CITY_SIZE));
+    city_change_size(pcity, CLIP(1, size, MAX_CITY_SIZE), pplayer);
     send_city_info(NULL, pcity);
   }
 
@@ -851,14 +984,14 @@ void handle_edit_city(struct connection *pc,
   }
 
   /* Handle size change. */
-  if (packet->size != pcity->size) {
+  if (packet->size != city_size_get(pcity)) {
     if (!(0 < packet->size && packet->size <= MAX_CITY_SIZE)) {
       notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                   _("Invalid city size %d for city %s."),
                   packet->size, city_link(pcity));
     } else {
       /* FIXME: Slow and inefficient for large size changes. */
-      city_change_size(pcity, packet->size);
+      city_change_size(pcity, packet->size, NULL);
       changed = TRUE;
     }
   }
@@ -914,10 +1047,10 @@ void handle_edit_city(struct connection *pc,
       changed = TRUE;
     }
   } improvement_iterate_end;
-
+ 
   /* Handle food stock change. */
   if (packet->food_stock != pcity->food_stock) {
-    int max = city_granary_size(pcity->size);
+    int max = city_granary_size(city_size_get(pcity));
     if (!(0 <= packet->food_stock && packet->food_stock <= max)) {
       notify_conn(pc->self, ptile, E_BAD_COMMAND, ftc_editor,
                   _("Invalid city food stock amount %d for city %s "
@@ -952,7 +1085,7 @@ void handle_edit_city(struct connection *pc,
     city_refresh_queue_processing();
 
     /* FIXME: city_refresh_queue_processing only sends to city owner? */
-    send_city_info(NULL, pcity);
+    send_city_info(NULL, pcity);  
 
     conn_list_do_unbuffer(game.est_connections);
   }
@@ -1003,21 +1136,23 @@ void handle_edit_player_create(struct connection *pc, int tag)
     return;
   }
 
-
-  pplayer = server_create_player(-1);
+  pplayer = server_create_player(-1, default_ai_type_name(), NULL);
   if (!pplayer) {
     notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
                 _("Player creation failed."));
     return;
   }
-
   server_player_init(pplayer, TRUE, TRUE);
-  player_set_nation(pplayer, pnation);
-  server_player_set_name(pplayer, pick_random_player_name(pnation));
+
+  player_nation_defaults(pplayer, pnation, TRUE);
+  if (game_was_started()) {
+    /* Find a color for the new player. */
+    assign_player_colors();
+  }
   sz_strlcpy(pplayer->username, ANON_USER_NAME);
   pplayer->is_connected = FALSE;
-  pplayer->government = pnation->server.init_government;
-  pplayer->server.capital = FALSE;
+  pplayer->government = pnation->init_government;
+  pplayer->server.got_first_city = FALSE;
 
   pplayer->economic.gold = 0;
   pplayer->economic = player_limit_to_max_rates(pplayer);
@@ -1049,20 +1184,17 @@ void handle_edit_player_remove(struct connection *pc, int id)
   /* Don't use conn_list_iterate here because connection_detach() can be
    * recursive and free the next connection pointer. */
   while (conn_list_size(pplayer->connections) > 0) {
-    connection_detach(conn_list_get(pplayer->connections, 0));
+    connection_detach(conn_list_get(pplayer->connections, 0), FALSE);
   }
 
   kill_player(pplayer);
-  whole_map_iterate(ptile) {
-    map_clear_known(ptile, pplayer);
-  } whole_map_iterate_end;
   server_remove_player(pplayer);
 }
 
 /**************************************************************************
   Handle editing of any or all player properties.
 ***************************************************************************/
-void handle_edit_player(struct connection *pc,
+void handle_edit_player(struct connection *pc, 
                         const struct packet_edit_player *packet)
 {
   struct player *pplayer;
@@ -1115,11 +1247,34 @@ void handle_edit_player(struct connection *pc,
                   packet->nation, nation_plural_translation(pnation),
                   player_number(pnation->player),
                   player_name(pnation->player));
+    } else if (!nation_is_in_current_set(pnation)) {
+      notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
+                  _("Cannot change nation for player %d (%s) "
+                    "to nation %d (%s) because that nation is "
+                    "not in the current nation set."),
+                  player_number(pplayer), player_name(pplayer),
+                  packet->nation, nation_plural_translation(pnation));
+    } else if (pplayer->ai_common.barbarian_type
+               != nation_barbarian_type(pnation)
+               || (!is_barbarian(pplayer) && !is_nation_playable(pnation))) {
+      notify_conn(pc->self, NULL, E_BAD_COMMAND, ftc_editor,
+                  _("Cannot change nation for player %d (%s) "
+                    "to nation %d (%s) because that nation is "
+                    "unsuitable for this player."),
+                  player_number(pplayer), player_name(pplayer),
+                  packet->nation, nation_plural_translation(pnation));
     } else {
       changed = player_set_nation(pplayer, pnation);
     }
   }
 
+  /* Handle a change in research progress. */
+  if (packet->bulbs_researched != research->bulbs_researched) {
+    research->bulbs_researched = packet->bulbs_researched;
+    changed = TRUE;
+    update_research = TRUE;
+  }
+  
   /* Handle a change in known inventions. */
   /* FIXME: Modifies struct player_research directly. */
   advance_index_iterate(A_FIRST, tech) {
@@ -1220,10 +1375,6 @@ void handle_edit_player_vision(struct connection *pc, int plr_no,
 
   conn_list_do_buffer(game.est_connections);
   square_iterate(ptile_center, size - 1, ptile) {
-
-    if (known && map_is_known(ptile, pplayer)) {
-      continue;
-    }
 
     if (!known) {
       struct city *pcity = tile_city(ptile);
@@ -1456,6 +1607,11 @@ void handle_edit_game(struct connection *pc,
     changed = TRUE;
   }
 
+  if (packet->startpos_nations != game.scenario.startpos_nations) {
+    game.scenario.startpos_nations = packet->startpos_nations;
+    changed = TRUE;
+  }
+
   if (changed) {
     send_scenario_info(NULL);
     send_game_info(NULL);
@@ -1481,19 +1637,4 @@ void handle_save_scenario(struct connection *pc, const char *name)
   }
 
   save_game(name, "Scenario", TRUE);
-}
-
-/****************************************************************************
-  Handle scenario information packet
-****************************************************************************/
-void handle_scenario_info_SERVER(struct connection *pc,
-                          const struct packet_scenario_info *packet)
-{
-  game.scenario.is_scenario = packet->is_scenario;
-  sz_strlcpy(game.scenario.name, packet->name);
-  sz_strlcpy(game.scenario.description, packet->description);
-  game.scenario.players = packet->players;
-
-  /* Send new info to everybody. */
-  send_scenario_info(NULL);
 }

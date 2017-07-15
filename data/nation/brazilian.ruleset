@@ -1,8 +1,10 @@
 [nation_brazilian]
 
+translation_domain="freeciv"
+
 name=_("Brazilian")
 plural=_("?plural:Brazilians")
-groups="Modern", "American"
+groups="Modern", "American", "Core"
 legend=_("Brazil was founded as a colony of Portugal but became\
  independent in 1822 as a result of Portugal's occupation by Napoleonic\
  France. The country was first established as an empire under the exiled\
@@ -26,7 +28,7 @@ ruler_titles = {
  "government",      "male_title",      "female_title"
  "Despotism",       _("Dictator %s"),  _("Dictatrix %s")
  "Monarchy",        _("Emperor %s"),   _("Empress %s")
- "Communism",       _("Chairman %s"),  _("Chairperson %s")
+ "Communism",       _("Chairman %s"),  _("Chairwoman %s")
  "Fundamentalism", _("Director-President %s"), _("?female:Director-President %s")
 }
 
@@ -36,9 +38,8 @@ city_style = "Tropical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations = "akwe", "tupi", "rio-grandense"
+civilwar_nations = "akwe", "tupi", "acrean", "rio-grandense"
 
 cities =
  "São Paulo",

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -265,7 +265,7 @@ void create_intel_dialog(struct intel_dialog *pdialog, bool raise)
     fc_snprintf(buf, sizeof(buf), _("Researching: %s(%d/%d)"),
 		advance_name_researching(pdialog->pplayer),
 		player_research_get(pdialog->pplayer)->bulbs_researched,
-		total_bulbs_required(pdialog->pplayer));
+                player_research_get(pdialog->pplayer)->client.researching_cost);
     break;
   };
 
@@ -275,7 +275,7 @@ void create_intel_dialog(struct intel_dialog *pdialog, bool raise)
 			  XtNlabel, buf,
 			  NULL);
 
-  pcity = player_palace(pdialog->pplayer);
+  pcity = player_capital(pdialog->pplayer);
   fc_snprintf(buf, sizeof(buf), _("Capital: %s"),
 	      /* TRANS: "unknown" location */
 	      (!pcity) ? _("(unknown)") : city_name(pcity));

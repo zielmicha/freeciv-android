@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <gtk/gtk.h>
@@ -149,7 +149,7 @@ GtkWidget *voteinfo_bar_new(bool split_bar)
   g_signal_connect(button, "clicked",
                    G_CALLBACK(voteinfo_bar_do_vote_callback),
                    GINT_TO_POINTER(CVT_YES));
-  gtk_widget_set_size_request(button, 70, BUTTON_HEIGHT);
+  gtk_widget_set_size_request(button, 50, BUTTON_HEIGHT);
   gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
   evbox = gtk_event_box_new();
   gtk_container_add(GTK_CONTAINER(evbox), button);
@@ -170,7 +170,7 @@ GtkWidget *voteinfo_bar_new(bool split_bar)
   g_signal_connect(button, "clicked",
                    G_CALLBACK(voteinfo_bar_do_vote_callback),
                    GINT_TO_POINTER(CVT_NO));
-  gtk_widget_set_size_request(button, 70, BUTTON_HEIGHT);
+  gtk_widget_set_size_request(button, 50, BUTTON_HEIGHT);
   gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
   evbox = gtk_event_box_new();
   gtk_container_add(GTK_CONTAINER(evbox), button);
@@ -191,7 +191,7 @@ GtkWidget *voteinfo_bar_new(bool split_bar)
   g_signal_connect(button, "clicked",
                    G_CALLBACK(voteinfo_bar_do_vote_callback),
                    GINT_TO_POINTER(CVT_ABSTAIN));
-  gtk_widget_set_size_request(button, 70, BUTTON_HEIGHT);
+  gtk_widget_set_size_request(button, 50, BUTTON_HEIGHT);
   gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
   evbox = gtk_event_box_new();
   gtk_container_add(GTK_CONTAINER(evbox), button);
@@ -226,7 +226,7 @@ void voteinfo_gui_update(void)
   int vote_count, index;
   struct voteinfo_bar *vib = NULL;
   struct voteinfo *vi = NULL;
-  char buf[512], status[128], ordstr[128], color[32];
+  char buf[1024], status[1024], ordstr[128], color[32];
   bool running, need_scroll;
   gchar *escaped_desc, *escaped_user;
 

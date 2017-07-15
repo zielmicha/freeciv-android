@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -22,10 +22,6 @@
 
 #ifdef HAVE_LIBREADLINE
 #include <readline/readline.h>
-#ifdef HAVE_NEWLIBREADLINE
-#define completion_matches(x,y) rl_completion_matches(x,y)
-#define filename_completion_function rl_filename_completion_function
-#endif
 #endif
 
 /* utility */
@@ -47,19 +43,17 @@
 #include "featured_text.h"
 #include "game.h"
 #include "map.h"
+#include "mapimg.h"
 #include "packets.h"
 #include "player.h"
+#include "rgbcolor.h"
 #include "unitlist.h"
 #include "version.h"
 
-/* ai */
-#include "advmilitary.h"        /* assess_danger_player() */
-
 /* server */
+#include "aiiface.h"
 #include "citytools.h"
-#include "commands.h"
 #include "connecthand.h"
-#include "console.h"
 #include "diplhand.h"
 #include "gamehand.h"
 #include "ggzserver.h"
@@ -81,11 +75,14 @@
 #include "voting.h"
 
 /* server/scripting */
-#include "script.h"
+#include "script_server.h"
+#include "script_fcdb.h"
 
 #include "stdinhand.h"
 
 #define TOKEN_DELIMITERS " \t\n,"
+
+#define OPTION_NAME_SPACE 25
 
 static enum cmdlevel default_access_level = ALLOW_BASIC;
 static enum cmdlevel first_access_level = ALLOW_BASIC;
@@ -114,23 +111,30 @@ static bool cut_client_connection(struct connection *caller, char *name,
                                   bool check);
 static bool show_help(struct connection *caller, char *arg);
 static bool show_list(struct connection *caller, char *arg);
+static void show_colors(struct connection *caller);
 static bool set_ai_level_named(struct connection *caller, const char *name,
                                const char *level_name, bool check);
 static bool set_ai_level(struct connection *caller, const char *name,
                          enum ai_level level, bool check);
-static bool set_away(struct connection *caller, char *name, bool check);
+static bool away_command(struct connection *caller, bool check);
 static bool set_rulesetdir(struct connection *caller, char *str, bool check,
                            int read_recursion);
 static bool show_command(struct connection *caller, char *str, bool check);
-static void show_changed(struct connection *caller, bool check,
-                         int read_recursion);
+static bool show_settings(struct connection *caller,
+                          enum command_id called_as,
+                          char *str, bool check);
+static void show_settings_one(struct connection *caller, enum command_id cmd,
+                              struct setting *pset);
+static void show_changed(struct connection *caller, enum command_id cmd,
+                         bool check, int read_recursion);
+static void show_mapimg(struct connection *caller, enum command_id cmd);
 static bool set_command(struct connection *caller, char *str, bool check);
 
-static bool create_command(struct connection *caller, const char *arg,
+static bool create_command(struct connection *caller, const char *str,
                            bool check);
 static bool end_command(struct connection *caller, char *str, bool check);
 static bool surrender_command(struct connection *caller, char *str, bool check);
-static bool handle_stdin_input_real(struct connection *caller, const char *str,
+static bool handle_stdin_input_real(struct connection *caller, char *str,
                                     bool check, int read_recursion);
 static bool read_init_script_real(struct connection *caller,
                                   char *script_filename, bool from_cmdline,
@@ -139,9 +143,20 @@ static bool reset_command(struct connection *caller, char *arg, bool check,
                           int read_recursion);
 static bool lua_command(struct connection *caller, char *arg, bool check);
 static bool kick_command(struct connection *caller, char *name, bool check);
+static bool delegate_command(struct connection *caller, char *arg,
+                             bool check);
+static const char *delegate_player_str(struct player *pplayer, bool observer);
+static bool fcdb_command(struct connection *caller, char *arg, bool check);
+static const char *fcdb_accessor(int i);
 static char setting_status(struct connection *caller,
                            const struct setting *pset);
 static bool player_name_check(const char* name, char *buf, size_t buflen);
+static bool playercolor_command(struct connection *caller,
+                                char *str, bool check);
+static bool mapimg_command(struct connection *caller, char *arg, bool check);
+static const char *mapimg_accessor(int i);
+
+static void show_delegations(struct connection *caller);
 
 static const char horiz_line[] =
 "------------------------------------------------------------------------------";
@@ -183,7 +198,7 @@ static bool player_name_check(const char* name, char *buf, size_t buflen)
 /**************************************************************************
   Convert a named command into an id.
   If accept_ambiguity is true, return the first command in the
-  enum list which matches, else return CMD_AMBIGOUS on ambiguity.
+  enum list which matches, else return CMD_AMBIGUOUS on ambiguity.
   (This is a trick to allow ambiguity to be handled in a flexible way
   without importing notify_player() messages inside this routine - rp)
 **************************************************************************/
@@ -383,11 +398,8 @@ static void cmd_reply_prefix(enum command_id cmd, struct connection *caller,
 /**************************************************************************
   var-args version as above, no prefix
 **************************************************************************/
-static void cmd_reply(enum command_id cmd, struct connection *caller,
-		      enum rfc_status rfc_status, const char *format, ...)
-     fc__attribute((__format__ (__printf__, 4, 5)));
-static void cmd_reply(enum command_id cmd, struct connection *caller,
-		      enum rfc_status rfc_status, const char *format, ...)
+void cmd_reply(enum command_id cmd, struct connection *caller,
+               enum rfc_status rfc_status, const char *format, ...)
 {
   va_list ap;
   va_start(ap, format);
@@ -396,7 +408,8 @@ static void cmd_reply(enum command_id cmd, struct connection *caller,
 }
 
 /**************************************************************************
-...
+  Command specific argument parsing has detected that player argument
+  is invalid. This function is common handling for that situation.
 **************************************************************************/
 static void cmd_reply_no_such_player(enum command_id cmd,
 				     struct connection *caller,
@@ -430,7 +443,8 @@ static void cmd_reply_no_such_player(enum command_id cmd,
 }
 
 /**************************************************************************
-...
+  Command specific argument parsing has detected that connection argument
+  is invalid. This function is common handling for that situation.
 **************************************************************************/
 static void cmd_reply_no_such_conn(enum command_id cmd,
 				   struct connection *caller,
@@ -464,11 +478,12 @@ static void cmd_reply_no_such_conn(enum command_id cmd,
 }
 
 /**************************************************************************
-...
+  Start sending game info to metaserver.
 **************************************************************************/
-static void open_metaserver_connection(struct connection *caller)
+static void open_metaserver_connection(struct connection *caller,
+                                       bool persistent)
 {
-  server_open_meta();
+  server_open_meta(persistent);
   if (send_server_info_to_metaserver(META_INFO)) {
     cmd_reply(CMD_METACONN, caller, C_OK,
               _("Open metaserver connection to [%s]."),
@@ -477,7 +492,7 @@ static void open_metaserver_connection(struct connection *caller)
 }
 
 /**************************************************************************
-...
+  Stop sending game info to metaserver.
 **************************************************************************/
 static void close_metaserver_connection(struct connection *caller)
 {
@@ -490,13 +505,15 @@ static void close_metaserver_connection(struct connection *caller)
 }
 
 /**************************************************************************
-...
+  Handle metaconnection command.
 **************************************************************************/
 static bool metaconnection_command(struct connection *caller, char *arg, 
                                    bool check)
 {
-  if ((*arg == '\0') ||
-      (0 == strcmp (arg, "?"))) {
+  bool persistent = FALSE;
+
+  if ((*arg == '\0')
+      || (!strcmp(arg, "?"))) {
     if (is_metaserver_open()) {
       cmd_reply(CMD_METACONN, caller, C_COMMENT,
                 _("Metaserver connection is open."));
@@ -504,38 +521,47 @@ static bool metaconnection_command(struct connection *caller, char *arg,
       cmd_reply(CMD_METACONN, caller, C_COMMENT,
                 _("Metaserver connection is closed."));
     }
-  } else if (0 == fc_strcasecmp(arg, "u")
-             || 0 == fc_strcasecmp(arg, "up")) {
+    return TRUE;
+  }
+
+  if (!fc_strcasecmp(arg, "p")
+      || !fc_strcasecmp(arg, "persistent")) {
+    persistent = TRUE;
+  }
+
+  if (persistent
+      || !fc_strcasecmp(arg, "u")
+      || !fc_strcasecmp(arg, "up")) {
     if (!is_metaserver_open()) {
       if (!check) {
-        open_metaserver_connection(caller);
+        open_metaserver_connection(caller, persistent);
       }
     } else {
       cmd_reply(CMD_METACONN, caller, C_METAERROR,
-		_("Metaserver connection is already open."));
+                _("Metaserver connection is already open."));
       return FALSE;
     }
-  } else if (0 == fc_strcasecmp(arg, "d")
-             || 0 == fc_strcasecmp(arg, "down")) {
+  } else if (!fc_strcasecmp(arg, "d")
+             || !fc_strcasecmp(arg, "down")) {
     if (is_metaserver_open()) {
       if (!check) {
         close_metaserver_connection(caller);
       }
     } else {
       cmd_reply(CMD_METACONN, caller, C_METAERROR,
-		_("Metaserver connection is already closed."));
+                _("Metaserver connection is already closed."));
       return FALSE;
     }
   } else {
     cmd_reply(CMD_METACONN, caller, C_METAERROR,
-	      _("Argument must be 'u', 'up', 'd', 'down', or '?'."));
+              _("Argument must be 'u', 'up', 'd', 'down', 'p', 'persistent', or '?'."));
     return FALSE;
   }
   return TRUE;
 }
 
 /**************************************************************************
-...
+  Handle metapatches command.
 **************************************************************************/
 static bool metapatches_command(struct connection *caller, 
                                 char *arg, bool check)
@@ -560,7 +586,7 @@ static bool metapatches_command(struct connection *caller,
 }
 
 /**************************************************************************
-...
+  Handle metamessage command.
 **************************************************************************/
 static bool metamessage_command(struct connection *caller, 
                                 char *arg, bool check)
@@ -584,7 +610,7 @@ static bool metamessage_command(struct connection *caller,
 }
 
 /**************************************************************************
-...
+  Handle metaserver command.
 **************************************************************************/
 static bool metaserver_command(struct connection *caller, char *arg, 
                                bool check)
@@ -640,6 +666,7 @@ static bv_handicap handicap_of_skill_level(int level)
      BV_SET(handicap, H_DIPLOMAT);
      BV_SET(handicap, H_LIMITEDHUTS);
      BV_SET(handicap, H_DEFENSIVE);
+     BV_SET(handicap, H_DIPLOMACY);
      BV_SET(handicap, H_REVOLUTION);
      BV_SET(handicap, H_EXPANSION);
      BV_SET(handicap, H_DANGER);
@@ -665,6 +692,9 @@ static bv_handicap handicap_of_skill_level(int level)
    case AI_LEVEL_EXPERIMENTAL:
      BV_SET(handicap, H_EXPERIMENTAL);
      break;
+   case AI_LEVEL_CHEATING:
+     BV_SET(handicap, H_RATES);
+     break;
   }
 
   return handicap;
@@ -676,7 +706,7 @@ level (1 to 10).  See ai_fuzzy() in common/player.c
 **************************************************************************/
 static int fuzzy_of_skill_level(int level)
 {
-  int f[11] = { -1, 0, 600/*novice*/, 300/*easy*/, 0, 0, 0, 0, 0, 0, 0 };
+  int f[11] = { -1, 0, 400/*novice*/, 300/*easy*/, 0, 0, 0, 0, 0, 0, 0 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
   return f[level];
@@ -691,7 +721,7 @@ science twice as fast as the human
 **************************************************************************/
 static int science_cost_of_skill_level(int level) 
 {
-  int x[11] = { -1, 100, 350/*novice*/, 100/*easy*/, 100, 100, 100, 100,
+  int x[11] = { -1, 100, 250/*novice*/, 100/*easy*/, 100, 100, 100, 100, 
                 100, 100, 100 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
@@ -705,7 +735,7 @@ compared to defaults.  0 means _never_ build new cities, > 100 means to
 **************************************************************************/
 static int expansionism_of_skill_level(int level)
 {
-  int x[11] = { -1, 100, 7/*novice*/, 10/*easy*/, 100, 100, 100, 100,
+  int x[11] = { -1, 100, 10/*novice*/, 10/*easy*/, 100, 100, 100, 100, 
                 100, 100, 100 };
 
   fc_assert_ret_val(level > 0 && level <= 10, 0);
@@ -730,57 +760,50 @@ static bool save_command(struct connection *caller, char *arg, bool check)
 }
 
 /**************************************************************************
-...
+  For command "scensave foo";
+  Save the game, with filename=arg, provided server state is ok.
+**************************************************************************/
+#ifdef DEBUG
+static bool scensave_command(struct connection *caller, char *arg, bool check)
+{
+  if (is_restricted(caller)) {
+    cmd_reply(CMD_SAVE, caller, C_FAIL,
+              _("You cannot save games manually on this server."));
+    return FALSE;
+  }
+  if (!check) {
+    save_game(arg, "Scenario", TRUE);
+  }
+  return TRUE;
+}
+#endif /* DEBUG */
+
+/**************************************************************************
+  Handle ai player ai toggling.
 **************************************************************************/
 void toggle_ai_player_direct(struct connection *caller, struct player *pplayer)
 {
   fc_assert_ret(pplayer != NULL);
-  if (is_barbarian(pplayer)) {
-    cmd_reply(CMD_AITOGGLE, caller, C_FAIL,
-	      _("Cannot toggle a barbarian player."));
-    return;
-  }
 
-  pplayer->ai_controlled = !pplayer->ai_controlled;
-  if (pplayer->ai_controlled) {
+  if (!pplayer->ai_controlled) {
     cmd_reply(CMD_AITOGGLE, caller, C_OK,
 	      _("%s is now under AI control."),
 	      player_name(pplayer));
-    if (pplayer->ai_common.skill_level == 0) {
-      pplayer->ai_common.skill_level = game.info.skill_level;
-    }
-    /* Set the skill level explicitly, because eg: the player skill
-       level could have been set as AI, then toggled, then saved,
-       then reloaded. */ 
-    set_ai_level(caller, player_name(pplayer),
-                 pplayer->ai_common.skill_level, FALSE);
-    /* the AI can't do active diplomacy */
-    cancel_all_meetings(pplayer);
-    /* The following is sometimes necessary to avoid using
-       uninitialized data... */
-    if (S_S_RUNNING == server_state()) {
-      assess_danger_player(pplayer);
-
-      /* In case this was last player who has not pressed turn done. */
-      check_for_full_turn_done();
-    }
+    player_set_to_ai_mode(pplayer, pplayer->ai_common.skill_level == 0
+                          ? game.info.skill_level
+                          : pplayer->ai_common.skill_level);
+    fc_assert(pplayer->ai_controlled == TRUE);
   } else {
     cmd_reply(CMD_AITOGGLE, caller, C_OK,
 	      _("%s is now under human control."),
 	      player_name(pplayer));
-
-    /* because the AI `cheats' with government rates but humans shouldn't */
-    if (!game.info.is_new_game) {
-      check_player_max_rates(pplayer);
-    }
-    /* Remove hidden dialogs from clients. This way the player can initiate
-     * new meeting */
-    cancel_all_meetings(pplayer);
+    player_set_under_human_control(pplayer);
+    fc_assert(pplayer->ai_controlled == FALSE);
   }
 }
 
 /**************************************************************************
-...
+  Handle aitoggle command.
 **************************************************************************/
 static bool toggle_ai_command(struct connection *caller, char *arg, bool check)
 {
@@ -805,18 +828,40 @@ static bool toggle_ai_command(struct connection *caller, char *arg, bool check)
   (see creat_command_newcomer(). In the later case, first free player slots
   are used before the slots of dead players are (re)used.
 **************************************************************************/
-static bool create_command(struct connection *caller, const char *arg,
+static bool create_command(struct connection *caller, const char *str,
                            bool check)
 {
   enum rfc_status status;
-  char buf[128];
+  char buf[MAX_LEN_CONSOLE_LINE];
+
+  /* 2 legal arguments, and extra space for stuffing illegal part */
+  char *arg[3];
+  int ntokens;
+  const char *ai_type_name;
+
+  sz_strlcpy(buf, str);
+  ntokens = get_tokens(buf, arg, 3, TOKEN_DELIMITERS);
+
+  if (ntokens == 1) {
+    ai_type_name = default_ai_type_name();
+  } else if (ntokens == 2) {
+    ai_type_name = arg[1];
+  } else {
+    cmd_reply(CMD_CREATE, caller, C_SYNTAX,
+              _("Wrong number of arguments to create command."));
+    free_tokens(arg, ntokens);
+    return FALSE;
+  }
 
   if (game_was_started()) {
-    status = create_command_newcomer(arg, check, NULL, NULL, buf,
-                                     sizeof(buf));
+    status = create_command_newcomer(arg[0], ai_type_name, check,
+                                     NULL, NULL, buf, sizeof(buf));
   } else {
-    status = create_command_pregame(arg, check, NULL, buf, sizeof(buf));
+    status = create_command_pregame(arg[0], ai_type_name, check,
+                                    NULL, buf, sizeof(buf));
   }
+
+  free_tokens(arg, ntokens);
 
   if (status != C_OK) {
     /* No player created. */
@@ -841,7 +886,9 @@ static bool create_command(struct connection *caller, const char *arg,
 
   If 'pnation' is defined this nation is used for the new player.
 **************************************************************************/
-enum rfc_status create_command_newcomer(const char *name, bool check,
+enum rfc_status create_command_newcomer(const char *name,
+                                        const char *ai,
+                                        bool check,
                                         struct nation_type *pnation,
                                         struct player **newplayer,
                                         char *buf, size_t buflen)
@@ -872,6 +919,13 @@ enum rfc_status create_command_newcomer(const char *name, bool check,
   }
 
   if (pnation) {
+    if (!nation_is_in_current_set(pnation)) {
+      fc_snprintf(buf, buflen,
+                  _("Can't create player, requested nation %s not in "
+                    "current nation set."),
+                  nation_plural_translation(pnation));
+      return C_FAIL;
+    }
     players_iterate(aplayer) {
       if (0 > nations_match(pnation, nation_of_player(aplayer), FALSE)) {
         fc_snprintf(buf, buflen,
@@ -924,8 +978,18 @@ enum rfc_status create_command_newcomer(const char *name, bool check,
     new_slot = TRUE;
   }
 
+ if (new_slot) {
+   if (normal_player_count() == game.server.max_players) {
+
+      fc_assert(game.server.max_players < MAX_NUM_PLAYERS);
+
+      game.server.max_players++;
+      log_debug("Increased 'maxplayers' for creation of a new player.");
+    }
+  }
+
   /* Create the new player. */
-  pplayer = server_create_player(-1);
+  pplayer = server_create_player(-1, ai, NULL);
   if (!pplayer) {
     fc_snprintf(buf, buflen, _("Failed to create new player %s."), name);
     return C_FAIL;
@@ -937,14 +1001,16 @@ enum rfc_status create_command_newcomer(const char *name, bool check,
   }
 
   /* We have a player; now initialise all needed data. */
-  aifill(game.info.aifill);
+  (void) aifill(game.info.aifill);
 
   /* Initialise player. */
   server_player_init(pplayer, TRUE, TRUE);
 
-  player_set_nation(pplayer, pnation);
-  pplayer->government = pnation->server.init_government;
-  pplayer->target_government = pnation->server.init_government;
+  player_nation_defaults(pplayer, pnation, FALSE);
+  pplayer->government = pnation->init_government;
+  pplayer->target_government = pnation->init_government;
+  /* Find a color for the new player. */
+  assign_player_colors();
 
   /* TRANS: keep one space at the beginning of the string. */
   cat_snprintf(buf, buflen, _(" Nation of the new player: %s."),
@@ -961,6 +1027,8 @@ enum rfc_status create_command_newcomer(const char *name, bool check,
   pplayer->ai_controlled = TRUE;
   set_ai_level_directer(pplayer, game.info.skill_level);
 
+  CALL_PLR_AI_FUNC(gained_control, pplayer, pplayer);
+
   send_player_info_c(pplayer, NULL);
   /* Send updated diplstate information to all players. */
   send_player_diplstate_c(NULL, NULL);
@@ -973,9 +1041,11 @@ enum rfc_status create_command_newcomer(const char *name, bool check,
 }
 
 /**************************************************************************
-  ...
+  Create player in pregame.
 **************************************************************************/
-enum rfc_status create_command_pregame(const char *name, bool check,
+enum rfc_status create_command_pregame(const char *name,
+                                       const char *ai,
+                                       bool check,
                                        struct player **newplayer,
                                        char *buf, size_t buflen)
 {
@@ -997,24 +1067,35 @@ enum rfc_status create_command_pregame(const char *name, bool check,
   }
 
   /* Search for first uncontrolled player */
-  players_iterate(played) {
-    if (!played->is_connected && !played->was_created) {
-      pplayer = played;
-      break;
-    }
-  } players_iterate_end;
+  pplayer = find_uncontrolled_player();
 
   if (NULL == pplayer) {
     /* Check that we are not going over max players setting */
-    if (player_count() >= game.server.max_players) {
+    if (normal_player_count() >= game.server.max_players) {
       fc_snprintf(buf, buflen,
                   _("Can't add more players, server is full."));
       return C_FAIL;
     }
     /* Check that we have nations available */
-    if (player_count() - server.nbarbarians >= server.playable_nations) {
+    if (normal_player_count() >= server.playable_nations) {
+      if (nation_set_count() > 1) {
+        fc_snprintf(buf, buflen,
+                    _("Can't add more players, not enough playable nations "
+                      "in current nation set (see 'nationset' setting)."));
+      } else {
+        fc_snprintf(buf, buflen,
+                    _("Can't add more players, not enough playable nations."));
+      }
+      return C_FAIL;
+    }
+  }
+
+  if (pplayer) {
+    struct ai_type *ait = ai_type_by_name(ai);
+
+    if (ait == NULL) {
       fc_snprintf(buf, buflen,
-                  _("Can't add more players, not enough nations."));
+                  _("There is no AI type %s."), ai);
       return C_FAIL;
     }
   }
@@ -1028,9 +1109,18 @@ enum rfc_status create_command_pregame(const char *name, bool check,
     return C_OK;
   }
 
-  if (NULL == pplayer) {
+  if (pplayer) {
+    fc_snprintf(buf, buflen,
+                /* TRANS: <name> replacing <name> ... */
+                _("%s replacing %s as an AI-controlled player."),
+                name, player_name(pplayer));
+
+    team_remove_player(pplayer);
+    pplayer->ai = ai_type_by_name(ai);
+  } else {
     /* add new player */
-    pplayer = server_create_player(-1);
+    pplayer = server_create_player(-1, ai, NULL);
+    /* pregame so no need to assign_player_colors() */
     if (!pplayer) {
       fc_snprintf(buf, buflen,
                   _("Failed to create new player %s."), name);
@@ -1038,16 +1128,9 @@ enum rfc_status create_command_pregame(const char *name, bool check,
     }
 
     fc_snprintf(buf, buflen,
-                _("%s has been added as an AI-controlled player."),
-                name);
-  } else {
-    fc_snprintf(buf, buflen,
-                /* TRANS: <name> replacing <name> ... */
-                _("%s replacing %s as an AI-controlled player."),
-                name, player_name(pplayer));
+                _("%s has been added as an AI-controlled player (%s)."),
+                name, ai_name(pplayer->ai));
   }
-
-  team_remove_player(pplayer);
   server_player_init(pplayer, FALSE, TRUE);
 
   server_player_set_name(pplayer, name);
@@ -1056,9 +1139,10 @@ enum rfc_status create_command_pregame(const char *name, bool check,
   pplayer->was_created = TRUE; /* must use /remove explicitly to remove */
   pplayer->ai_controlled = TRUE;
   set_ai_level_directer(pplayer, game.info.skill_level);
+  CALL_PLR_AI_FUNC(gained_control, pplayer, pplayer);
   send_player_info_c(pplayer, game.est_connections);
 
-  aifill(game.info.aifill);
+  (void) aifill(game.info.aifill);
   reset_all_start_commands();
   (void) send_server_info_to_metaserver(META_INFO);
 
@@ -1069,9 +1153,10 @@ enum rfc_status create_command_pregame(const char *name, bool check,
 }
 
 /**************************************************************************
-...
+  Handle remove command.
 **************************************************************************/
-static bool remove_player(struct connection *caller, char *arg, bool check)
+static bool remove_player_command(struct connection *caller, char *arg,
+                                  bool check)
 {
   enum m_pre_result match_result;
   struct player *pplayer;
@@ -1084,9 +1169,10 @@ static bool remove_player(struct connection *caller, char *arg, bool check)
     return FALSE;
   }
 
-  if (game_was_started()) {
+  if (game_was_started() && caller && caller->access_level < ALLOW_ADMIN) {
     cmd_reply(CMD_REMOVE, caller, C_FAIL,
-	      _("Players cannot be removed once the game has started."));
+              _("Command level '%s' or greater needed to remove a player "
+                "once the game has started."), cmdlevel_name(ALLOW_ADMIN));
     return FALSE;
   }
   if (check) {
@@ -1099,7 +1185,7 @@ static bool remove_player(struct connection *caller, char *arg, bool check)
     cmd_reply(CMD_REMOVE, caller, C_OK,
 	      _("Removed player %s from the game."), name);
   }
-  aifill(game.info.aifill);
+  (void) aifill(game.info.aifill);
   return TRUE;
 }
 
@@ -1196,7 +1282,7 @@ static bool read_init_script_real(struct connection *caller,
     }
     fclose(script_file);
 
-    show_changed(caller, check, read_recursion);
+    show_changed(caller, CMD_READ_SCRIPT, check, read_recursion);
 
     return TRUE;
   } else {
@@ -1210,8 +1296,9 @@ static bool read_init_script_real(struct connection *caller,
 }
 
 /**************************************************************************
-...
-(Should this take a 'caller' argument for output? --dwp)
+  Write current settings to new init script.
+
+  (Should this take a 'caller' argument for output? --dwp)
 **************************************************************************/
 static void write_init_script(char *script_filename)
 {
@@ -1227,7 +1314,11 @@ static void write_init_script(char *script_filename)
     fputs("# These are server options saved from a running freeciv-server.\n",
 	script_file);
 
-    /* first, some state info from commands (we can't save everything) */
+    /* first rulesetdir. Setting rulesetdir resets the settings to their
+     * default value, so they would be lost if placed before this.  */
+    fprintf(script_file, "rulesetdir %s\n", game.server.rulesetdir);
+
+    /* some state info from commands (we can't save everything) */
 
     fprintf(script_file, "cmdlevel %s new\n",
             cmdlevel_name(default_access_level));
@@ -1252,13 +1343,10 @@ static void write_init_script(char *script_filename)
 
     /* then, the 'set' option settings */
 
-    settings_iterate(pset) {
+    settings_iterate(SSET_ALL, pset) {
       fprintf(script_file, "set %s \"%s\"\n", setting_name(pset),
               setting_value_name(pset, FALSE, buf, sizeof(buf)));
     } settings_iterate_end;
-
-    /* rulesetdir */
-    fprintf(script_file, "rulesetdir %s\n", game.server.rulesetdir);
 
     fclose(script_file);
 
@@ -1327,9 +1415,9 @@ static bool a_connection_exists(void)
 }
 
 /********************************************************************
-...
+  Return whether first access level is already taken.
 *********************************************************************/
-static bool first_access_level_is_taken(void)
+static bool is_first_access_level_taken(void)
 {
   conn_list_iterate(game.est_connections, pconn) {
     if (pconn->access_level >= first_access_level) {
@@ -1341,7 +1429,7 @@ static bool first_access_level_is_taken(void)
 }
 
 /********************************************************************
-...
+  Return access level for next connection
 *********************************************************************/
 enum cmdlevel access_level_for_next_connection(void)
 {
@@ -1354,12 +1442,13 @@ enum cmdlevel access_level_for_next_connection(void)
 }
 
 /********************************************************************
-...
+  Check if first access level is available and if it is, notify
+  connections about it.
 *********************************************************************/
 void notify_if_first_access_level_is_available(void)
 {
   if (first_access_level > default_access_level
-      && !first_access_level_is_taken()) {
+      && !is_first_access_level_taken()) {
     notify_conn(NULL, NULL, E_SETTING, ftc_any,
                 _("Anyone can now become game organizer "
                   "'%s' by issuing the 'first' command."),
@@ -1404,7 +1493,7 @@ static bool cmdlevel_command(struct connection *caller, char *str, bool check)
   /* A level name was supplied; set the level. */
   level = cmdlevel_by_name(arg[0], fc_strcasecmp);
   if (!cmdlevel_is_valid(level)) {
-    const char *cmdlevel_names[cmdlevel_max()];
+    const char *cmdlevel_names[CMDLEVEL_COUNT];
     struct astring astr = ASTRING_INIT;
     int i = 0;
 
@@ -1518,7 +1607,7 @@ static bool firstlevel_command(struct connection *caller, bool check)
 	_("You already have command access level '%s' or better."),
 		cmdlevel_name(first_access_level));
     return FALSE;
-  } else if (first_access_level_is_taken()) {
+  } else if (is_first_access_level_taken()) {
     cmd_reply(CMD_FIRSTLEVEL, caller, C_FAIL,
 	_("Someone else is already game organizer."));
     return FALSE;
@@ -1531,6 +1620,15 @@ static bool firstlevel_command(struct connection *caller, bool check)
   return TRUE;
 }
 
+/**************************************************************************
+  Adjust default command level on game start.
+**************************************************************************/
+void set_running_game_access_level(void)
+{
+  if (default_access_level > ALLOW_BASIC) {
+    default_access_level = ALLOW_BASIC;
+  }
+}
 
 /**************************************************************************
   Returns possible parameters for the commands that take server options
@@ -1541,20 +1639,21 @@ static const char *optname_accessor(int i)
   return setting_name(setting_by_number(i));
 }
 
-#if defined HAVE_LIBREADLINE || defined HAVE_NEWLIBREADLINE
+#ifdef HAVE_LIBREADLINE
 /**************************************************************************
   Returns possible parameters for the /show command.
 **************************************************************************/
 static const char *olvlname_accessor(int i)
 {
-  /* for 0->4, uses option levels, otherwise returns a setting name */
-  if (i < OLEVELS_NUM) {
-    return sset_level_name(i);
+  if (i == 0) {
+    return "rulesetdir";
+  } else if (i < OLEVELS_NUM+1) {
+    return sset_level_name(i-1);
   } else {
-    return optname_accessor(i-OLEVELS_NUM);
+    return optname_accessor(i-OLEVELS_NUM-1);
   }
 }
-#endif
+#endif /* HAVE_LIBREADLINE */
 
 /**************************************************************************
   Set timeout options.
@@ -1617,10 +1716,10 @@ static enum sset_level lookup_option_level(const char *name)
 }
 
 /* Special return values of lookup options */
-#define LOOKUP_OPTION_NO_RESULT   -1
-#define LOOKUP_OPTION_AMBIGUOUS   -2
-#define LOOKUP_OPTION_LEVEL_NAME  -3
-#define LOOKUP_OPTION_RULESETDIR  -4
+#define LOOKUP_OPTION_NO_RESULT   (-1)
+#define LOOKUP_OPTION_AMBIGUOUS   (-2)
+#define LOOKUP_OPTION_LEVEL_NAME  (-3)
+#define LOOKUP_OPTION_RULESETDIR  (-4)
 
 /**************************************************************************
   Find option index by name. Return index (>=0) on success, else returned
@@ -1663,6 +1762,7 @@ static void show_help_option(struct connection *caller,
 {
   char val_buf[256], def_buf[256];
   struct setting *pset = setting_by_number(id);
+  const char *sethelp;
 
   if (setting_short_help(pset)) {
     cmd_reply(help_cmd, caller, C_COMMENT,
@@ -1675,8 +1775,9 @@ static void show_help_option(struct connection *caller,
               _("Option: %s"), setting_name(pset));
   }
 
-  if (strlen(setting_extra_help(pset)) > 0) {
-    char *help = fc_strdup(_(setting_extra_help(pset)));
+  sethelp = setting_extra_help(pset, FALSE);
+  if (strlen(sethelp) > 0) {
+    char *help = fc_strdup(sethelp);
 
     fc_break_lines(help, LINE_BREAK);
     cmd_reply(help_cmd, caller, C_COMMENT, _("Description:"));
@@ -1750,7 +1851,7 @@ static void show_help_option_list(struct connection *caller,
 	    _("Explanations are available for the following server options:"));
   cmd_reply(help_cmd, caller, C_COMMENT, horiz_line);
   if(!caller && con_get_style()) {
-    settings_iterate(pset) {
+    settings_iterate(SSET_ALL, pset) {
       cmd_reply(help_cmd, caller, C_COMMENT, "%s", setting_name(pset));
     } settings_iterate_end
   } else {
@@ -1758,7 +1859,7 @@ static void show_help_option_list(struct connection *caller,
     int j = 0;
     buf[0] = '\0';
 
-    settings_iterate(pset) {
+    settings_iterate(SSET_ALL, pset) {
       if (setting_is_visible(pset, caller)) {
         cat_snprintf(buf, sizeof(buf), "%-19s", setting_name(pset));
         if ((++j % 4) == 0) {
@@ -1776,7 +1877,7 @@ static void show_help_option_list(struct connection *caller,
 }
 
 /**************************************************************************
- ...
+  Handle explain command
 **************************************************************************/
 static bool explain_option(struct connection *caller, char *str, bool check)
 {
@@ -1798,7 +1899,8 @@ static bool explain_option(struct connection *caller, char *str, bool check)
       cmd_reply(CMD_EXPLAIN, caller, C_FAIL, _("Ambiguous option name."));
       return FALSE;
     } else {
-      log_error("Unexpected case %d in %s line %d", cmd, __FILE__, __LINE__);
+      log_error("Unexpected case %d in %s line %d", cmd, __FILE__,
+                __FC_LINE__);
       return FALSE;
     }
   } else {
@@ -1973,33 +2075,37 @@ static bool set_ai_level(struct connection *caller, const char *name,
 /******************************************************************
   Set user to away mode.
 ******************************************************************/
-static bool set_away(struct connection *caller, char *name, bool check)
+static bool away_command(struct connection *caller, bool check)
 {
+  struct player *pplayer;
+
   if (caller == NULL) {
     cmd_reply(CMD_AWAY, caller, C_FAIL, _("This command is client only."));
     return FALSE;
-  } else if (name && strlen(name) > 0) {
-    cmd_reply(CMD_AWAY, caller, C_SYNTAX, _("Usage:\n%s"),
-              command_synopsis(command_by_number(CMD_AWAY)));
-    return FALSE;
-  } else if (NULL == caller->playing || caller->observer) {
+  }
+
+  if (!conn_controls_player(caller)) {
     /* This happens for detached or observer connections. */
     cmd_reply(CMD_AWAY, caller, C_FAIL,
               _("Only players may use the away command."));
     return FALSE;
-  } else if (!caller->playing->ai_controlled && !check) {
+  }
+
+  if (check) {
+    return TRUE;
+  }
+
+  pplayer = conn_get_player(caller);
+  if (!pplayer->ai_controlled) {
     cmd_reply(CMD_AWAY, caller, C_OK,
-              _("%s set to away mode."), player_name(caller->playing));
-    set_ai_level_directer(caller->playing, AI_LEVEL_AWAY);
-    caller->playing->ai_controlled = TRUE;
-    cancel_all_meetings(caller->playing);
-  } else if (!check) {
+              _("%s set to away mode."), player_name(pplayer));
+    player_set_to_ai_mode(pplayer, AI_LEVEL_AWAY);
+    fc_assert(pplayer->ai_controlled == TRUE);
+  } else {
     cmd_reply(CMD_AWAY, caller, C_OK,
-              _("%s returned to game."), player_name(caller->playing));
-    caller->playing->ai_controlled = FALSE;
-    /* We have to do it, because the client doesn't display 
-     * dialogs for meetings in AI mode. */
-    cancel_all_meetings(caller->playing);
+              _("%s returned to game."), player_name(pplayer));
+    player_set_under_human_control(pplayer);
+    fc_assert(pplayer->ai_controlled == FALSE);
   }
 
   send_player_info_c(caller->playing, game.est_connections);
@@ -2010,16 +2116,25 @@ static bool set_away(struct connection *caller, char *name, bool check)
 /**************************************************************************
   Show changed settings.
 **************************************************************************/
-static void show_changed(struct connection *caller, bool check,
-                         int read_recursion)
+static void show_changed(struct connection *caller, enum command_id cmd,
+                         bool check, int read_recursion)
 {
+  char *show_arg = "changed";
+
   if (read_recursion != 0) {
     return;
   }
 
   /* show changed settings only at the top level of recursion */
-  char *show_arg = "changed";
-  show_command(caller, show_arg, check);
+  show_settings(caller, cmd, show_arg, check);
+}
+
+/**************************************************************************
+  /show command: show settings and their values.
+**************************************************************************/
+static bool show_command(struct connection *caller, char *str, bool check)
+{
+  return show_settings(caller, CMD_SHOW, str, check);
 }
 
 /**************************************************************************
@@ -2027,10 +2142,10 @@ static void show_changed(struct connection *caller, bool check,
   are at most 4 digits, except seeds, which we let overflow their columns,
   plus a sign character. Only show options which the caller can SEE.
 **************************************************************************/
-static bool show_command(struct connection *caller, char *str, bool check)
+static bool show_settings(struct connection *caller,
+                          enum command_id called_as,
+                          char *str, bool check)
 {
-  char buf[MAX_LEN_CONSOLE_LINE], value[MAX_LEN_CONSOLE_LINE];
-  bool is_changed;
   int cmd;
   enum sset_level level = SSET_ALL;
   size_t clen = 0;
@@ -2045,7 +2160,7 @@ static bool show_command(struct connection *caller, char *str, bool check)
       level = SSET_NONE;
 
       if (!setting_is_visible(setting_by_number(cmd), caller)) {
-        cmd_reply(CMD_SHOW, caller, C_FAIL,
+        cmd_reply(called_as, caller, C_FAIL,
                   _("Sorry, you do not have access to view option '%s'."),
                   str);
         return FALSE;
@@ -2055,7 +2170,7 @@ static bool show_command(struct connection *caller, char *str, bool check)
     /* Valid negative values for 'cmd' are defined as LOOKUP_OPTION_*. */
     switch (cmd) {
     case LOOKUP_OPTION_NO_RESULT:
-      cmd_reply(CMD_SHOW, caller, C_FAIL, _("Unknown option '%s'."), str);
+      cmd_reply(called_as, caller, C_FAIL, _("Unknown option '%s'."), str);
       return FALSE;
     case LOOKUP_OPTION_AMBIGUOUS:
       /* Allow ambiguous: show all matching. */
@@ -2067,7 +2182,7 @@ static bool show_command(struct connection *caller, char *str, bool check)
       break;
     case LOOKUP_OPTION_RULESETDIR:
       /* Ruleset. */
-      cmd_reply(CMD_SHOW, caller, C_COMMENT,
+      cmd_reply(called_as, caller, C_COMMENT,
                 _("Current ruleset directory is \"%s\""),
                 game.server.rulesetdir);
       return TRUE;
@@ -2083,17 +2198,8 @@ static bool show_command(struct connection *caller, char *str, bool check)
                     || cmd == LOOKUP_OPTION_LEVEL_NAME
                     || cmd == LOOKUP_OPTION_NO_RESULT, FALSE);
 
-#define cmd_reply_show(string)  cmd_reply(CMD_SHOW, caller, C_COMMENT, "%s", string)
-
-  /* Each option value will be displayed as:
-   *
-   * [OPTION_NAME_SPACE length for name] ## [value] ([min], [max])
-   *
-   * where '##' is a combination of ' ', '!' or '+' followed by ' ' or '=' with
-   *  - '!': the option is locked by the ruleset
-   *  - '+': you may change the option
-   *  - '=': the option is on its default value */
-#define OPTION_NAME_SPACE 25
+#define cmd_reply_show(string)                                               \
+  cmd_reply(called_as, caller, C_COMMENT, "%s", string)
 
   {
     const char *heading = NULL;
@@ -2133,74 +2239,131 @@ static bool show_command(struct connection *caller, char *str, bool check)
   cmd_reply_show(_(" - a '+' means you may change the option."));
   cmd_reply_show(_(" - a '=' means the option is on its default value."));
   cmd_reply_show(horiz_line);
-  cmd_reply(CMD_SHOW, caller, C_COMMENT, _("%-*s ## value (min, max)"),
+  cmd_reply(called_as, caller, C_COMMENT, _("%-*s ## value (min, max)"),
             OPTION_NAME_SPACE, _("Option"));
   cmd_reply_show(horiz_line);
 
-  buf[0] = '\0';
+  /* Update changed and locked levels. */
+  settings_list_update();
 
-  settings_iterate(pset) {
-    if (!setting_is_visible(pset, caller)) {
-      continue;
+  switch(level) {
+  case SSET_NONE:
+    /* Show _one_ setting. */
+    fc_assert_ret_val(0 <= cmd, FALSE);
+    {
+      struct setting *pset = setting_by_number(cmd);
+
+      show_settings_one(caller, called_as, pset);
     }
-
-    is_changed = setting_changed(pset);
-    if (0 <= cmd) {
-      if (cmd != setting_number(pset)) {
+    break;
+  case SSET_CHANGED:
+  case SSET_ALL:
+  case SSET_VITAL:
+  case SSET_SITUATIONAL:
+  case SSET_RARE:
+  case SSET_LOCKED:
+    settings_iterate(level, pset) {
+      if (!setting_is_visible(pset, caller)) {
         continue;
       }
-    } else if (LOOKUP_OPTION_AMBIGUOUS == cmd
-               && 0 != fc_strncasecmp(setting_name(pset), str, clen)) {
-      continue;
-    } else if (SSET_CHANGED == level) {
-      if (!is_changed) {
-        continue;
-      }
-    } else if (SSET_LOCKED == level) {
-      if (!setting_locked(pset)) {
-        continue;
-      }
-    } else if (SSET_ALL != level && level != setting_level(pset)) {
-      continue;
-    }
 
-    setting_value_name(pset, TRUE, value, sizeof(value));
-    if (is_changed) {
-      /* Emphasizes the changed option. */
-      featured_text_apply_tag(value, buf, sizeof(buf), TTT_COLOR,
-                              0, FT_OFFSET_UNSET, ftc_changed);
-      sz_strlcpy(value, buf);
-    }
-    if (SSET_INT == setting_type(pset)) {
-      /* Add the range. */
-      cat_snprintf(value, sizeof(value), " (%d, %d)",
-                   setting_int_min(pset), setting_int_max(pset));
-    }
+      if (LOOKUP_OPTION_AMBIGUOUS == cmd
+          && 0 != fc_strncasecmp(setting_name(pset), str, clen)) {
+          continue;
+      }
 
-    cmd_reply(CMD_SHOW, caller, C_COMMENT, "%-*s %c%c %s",
-              OPTION_NAME_SPACE, setting_name(pset),
-              setting_status(caller, pset), is_changed ? ' ' : '=', value);
-  } settings_iterate_end;
+      show_settings_one(caller, called_as, pset);
+    } settings_iterate_end;
+    break;
+  case OLEVELS_NUM:
+    /* nothing */
+    break;
+  }
+
   cmd_reply_show(horiz_line);
-  cmd_reply_show(_("A help text for each option is available via 'help "
-                   "<option>'."));
-  cmd_reply_show(horiz_line);
-  if (level == SSET_VITAL) {
-    cmd_reply_show(_("Try 'show situational' or 'show rare' to show "
-                     "more options.\n"
-                     "Try 'show changed' to show settings with "
-                     "non-default values.\n"
-                     "Try 'show locked' to show settings locked "
-                     "by the ruleset."));
+  /* Only emit this additional help for bona fide 'show' command */
+  if (called_as == CMD_SHOW) {
+    cmd_reply_show(_("A help text for each option is available via 'help "
+                     "<option>'."));
     cmd_reply_show(horiz_line);
+    if (level == SSET_VITAL) {
+      cmd_reply_show(_("Try 'show situational' or 'show rare' to show "
+                       "more options.\n"
+                       "Try 'show changed' to show settings with "
+                       "non-default values.\n"
+                       "Try 'show locked' to show settings locked "
+                       "by the ruleset."));
+      cmd_reply_show(horiz_line);
+    }
   }
   return TRUE;
 #undef cmd_reply_show
-#undef OPTION_NAME_SPACE
+}
+
+/*****************************************************************************
+  Show one setting.
+
+  Each option value will be displayed as:
+
+  [OPTION_NAME_SPACE length for name] ## [value] ([min], [max])
+
+  where '##' is a combination of ' ', '!' or '+' followed by ' ' or '=' with
+   - '!': the option is locked by the ruleset
+   - '+': you may change the option
+   - '=': the option is on its default value
+*****************************************************************************/
+static void show_settings_one(struct connection *caller, enum command_id cmd,
+                              struct setting *pset)
+{
+  char buf[MAX_LEN_CONSOLE_LINE] = "", value[MAX_LEN_CONSOLE_LINE] = "";
+  bool is_changed;
+  static char prefix[OPTION_NAME_SPACE + 4 + 1] = "";
+
+  fc_assert_ret(pset != NULL);
+
+  is_changed = setting_changed(pset);
+  setting_value_name(pset, TRUE, value, sizeof(value));
+
+  /* Wrap long option values, such as bitwise options */
+  fc_break_lines(value, LINE_BREAK - (sizeof(prefix)-1));
+
+  if (prefix[0] == '\0') {
+    memset(prefix, ' ', sizeof(prefix)-1);
+  }
+
+  if (is_changed) {
+    /* Emphasizes the changed option. */
+    /* Apply tags to each line fragment. */
+    size_t startpos = 0;
+    char *nl;
+    do {
+      nl = strchr(value + startpos, '\n');
+      featured_text_apply_tag(value, buf, sizeof(buf), TTT_COLOR,
+                              startpos, nl ? nl - value : FT_OFFSET_UNSET,
+                              ftc_changed);
+      sz_strlcpy(value, buf);
+      if (nl) {
+        char *p = strchr(nl, '\n');
+        fc_assert_action(p != NULL, break);
+        startpos = p + 1 - value;
+      }
+    } while (nl);
+  }
+
+  if (SSET_INT == setting_type(pset)) {
+    /* Add the range. */
+    cat_snprintf(value, sizeof(value), " (%d, %d)",
+                 setting_int_min(pset), setting_int_max(pset));
+  }
+
+  cmd_reply_prefix(cmd, caller, C_COMMENT, prefix, "%-*s %c%c %s",
+                   OPTION_NAME_SPACE, setting_name(pset),
+                   setting_status(caller, pset), is_changed ? ' ' : '=',
+                   value);
 }
 
 /******************************************************************
-...
+  Handle team command
 ******************************************************************/
 static bool team_command(struct connection *caller, char *str, bool check)
 {
@@ -2601,11 +2764,9 @@ static bool debug_command(struct connection *caller, char *str,
       players++;
       city_list_iterate(plr->cities, pcity) {
         cities++;
-        citizens += pcity->size;
+        citizens += city_size_get(pcity);
       } city_list_iterate_end;
-      unit_list_iterate(plr->units, punit) {
-        units++;
-      } unit_list_iterate_end;
+      units += unit_list_size(plr->units);
     } players_iterate_end;
     log_normal(_("players=%d cities=%d citizens=%d units=%d"),
                players, cities, citizens, units);
@@ -2728,7 +2889,7 @@ static bool debug_command(struct connection *caller, char *str,
 }
 
 /******************************************************************
-  ...
+  Handle set command
 ******************************************************************/
 static bool set_command(struct connection *caller, char *str, bool check)
 {
@@ -2948,7 +3109,7 @@ static bool is_allowed_to_take(struct player *pplayer, bool will_obs,
       return FALSE;
     }
 
-    if (player_count() >= game.server.max_players) {
+    if (normal_player_count() >= game.server.max_players) {
       fc_snprintf(msg, msg_len,
                   /* TRANS: Do not translate "maxplayers". */
                   PL_("You cannot take a new player because "
@@ -3164,7 +3325,7 @@ static bool observe_command(struct connection *caller, char *str, bool check)
       sz_strlcpy(name, player_name(pplayer));
     }
 
-    connection_detach(pconn);
+    connection_detach(pconn, TRUE);
 
     if (pplayer) {
       /* find pplayer again, the pointer might have been changed */
@@ -3210,13 +3371,12 @@ static bool take_command(struct connection *caller, char *str, bool check)
   struct connection *pconn = caller;
   struct player *pplayer = NULL;
   bool res = FALSE;
-  bool player_was_created;
 
   /******** PART I: fill pconn and pplayer ********/
 
   sz_strlcpy(buf, str);
   ntokens = get_tokens(buf, arg, 2, TOKEN_DELIMITERS);
-  
+
   /* check syntax */
   if (!caller && ntokens != 2) {
     cmd_reply(CMD_TAKE, caller, C_SYNTAX, _("Usage:\n%s"),
@@ -3268,6 +3428,15 @@ static bool take_command(struct connection *caller, char *str, bool check)
 
   /******** PART II: do the attaching ********/
 
+  /* Take not possible if the player is involved in a delegation (either
+   * it's being controlled, or it's been put aside by the delegate). */
+  if (player_delegation_active(pplayer)) {
+    cmd_reply(CMD_TAKE, caller, C_FAIL, _("A delegation is active for player "
+                                          "'%s'. /take not possible."),
+              player_name(pplayer));
+    goto end;
+  }
+
   /* check allowtake for permission */
   if (!is_allowed_to_take(pplayer, FALSE, msg, sizeof(msg))) {
     cmd_reply(CMD_TAKE, caller, C_FAIL, "%s", msg);
@@ -3288,8 +3457,8 @@ static bool take_command(struct connection *caller, char *str, bool check)
    * detached connections only. Others can reuse the slot
    * they first release. */
   if (!pplayer && !pconn->playing
-      && (player_count() >= game.server.max_players
-          || player_count() - server.nbarbarians >= server.playable_nations)) {
+      && (normal_player_count() >= game.server.max_players
+          || normal_player_count() >= server.playable_nations)) {
     cmd_reply(CMD_TAKE, caller, C_FAIL,
               _("There is no free player slot for %s."),
               pconn->username);
@@ -3301,8 +3470,6 @@ static bool take_command(struct connection *caller, char *str, bool check)
   if (check) {
     goto end;
   }
-
-  player_was_created = (NULL != pplayer ? pplayer->was_created : FALSE);
 
   /* If the player is controlled by another user, forcibly detach
    * the user. */
@@ -3318,15 +3485,11 @@ static bool take_command(struct connection *caller, char *str, bool check)
                   caller->username);
     }
 
-    /* HACK: to keep this player on S_S_INITIAL state, we set temporarily
-     * it as created with the /create command. */
-    pplayer->was_created = TRUE;
-
     /* We are reassigning this nation, so we need to detach the current
      * user to set a new one. */
     conn_list_iterate(pplayer->connections, aconn) {
       if (!aconn->observer) {
-        connection_detach(aconn);
+        connection_detach(aconn, FALSE);
       }
     } conn_list_iterate_end;
   }
@@ -3342,7 +3505,7 @@ static bool take_command(struct connection *caller, char *str, bool check)
       sz_strlcpy(name, player_name(pplayer));
     }
 
-    connection_detach(pconn);
+    connection_detach(pconn, TRUE);
 
     if (pplayer) {
       /* find pplayer again; the pointer might have been changed */
@@ -3372,8 +3535,6 @@ static bool take_command(struct connection *caller, char *str, bool check)
               _("%s failed to attach to any player."),
               pconn->username);
   }
-
-  pplayer->was_created = player_was_created;
 
   end:;
   /* free our args */
@@ -3451,7 +3612,7 @@ static bool detach_command(struct connection *caller, char *str, bool check)
   }
 
   /* Actually do the detaching. */
-  connection_detach(pconn);
+  connection_detach(pconn, TRUE);
 
   /* The user explicitly wanted to detach, so if a player is marked for him,
    * reset its username. */
@@ -3464,7 +3625,9 @@ static bool detach_command(struct connection *caller, char *str, bool check)
 
   check_for_full_turn_done();
 
-  end:;
+  end:
+  fc_assert_ret_val(ntokens <= 1, FALSE);
+
   /* free our args */
   for (i = 0; i < ntokens; i++) {
     free(arg[i]);
@@ -3493,9 +3656,10 @@ static bool detach_command(struct connection *caller, char *str, bool check)
     legitimate but has inconsistencies) and would lead to a broken server
     afterwards.
 **************************************************************************/
-bool load_command(struct connection *caller, const char *filename, bool check)
+bool load_command(struct connection *caller, const char *filename, bool check,
+                  bool cmdline_load)
 {
-  struct timer *loadtimer, *uloadtimer;  
+  struct timer *loadtimer, *uloadtimer;
   struct section_file *file;
   char arg[MAX_LEN_PATH];
   struct conn_list *global_observers;
@@ -3525,15 +3689,31 @@ bool load_command(struct connection *caller, const char *filename, bool check)
       get_save_dirs(), get_scenario_dirs(), NULL
     };
     const char *exts[] = {
-      "sav", "gz", "bz2", "sav.gz", "sav.bz2", NULL
+      "sav", "gz", "bz2", "xz", "sav.gz", "sav.bz2", "sav.xz", NULL
     };
     const char **ext, *found = NULL;
     const struct strvec **path;
 
+    if (cmdline_load) {
+      /* Allow plain names being loaded with '--file' option, but not otherwise
+       * (no loading of arbitrary files by unauthorized users)
+       * Iterate through ALL paths to check for file with plain name before
+       * looking any path with an extension, i.e., prefer plain name file
+       * in later directory over file with extension in name in earlier
+       * directory. */
+      for (path = pathes; !found && *path; path++) {
+        found = fileinfoname(*path, filename);
+        if (found != NULL) {
+          sz_strlcpy(arg, found);
+        }
+      }
+    }
+
     for (path = pathes; !found && *path; path++) {
       for (ext = exts; !found && *ext; ext++) {
         fc_snprintf(testfile, sizeof(testfile), "%s.%s", filename, *ext);
-        if ((found = fileinfoname(*path, testfile))) {
+        found = fileinfoname(*path, testfile);
+        if (found != NULL) {
           sz_strlcpy(arg, found);
         }
       }
@@ -3553,9 +3733,9 @@ bool load_command(struct connection *caller, const char *filename, bool check)
   /* attempt to parse the file */
 
   if (!(file = secfile_load(arg, FALSE))) {
+    log_error("Error loading savefile '%s': %s", arg, secfile_error());
     cmd_reply(CMD_LOAD, caller, C_FAIL, _("Could not load savefile: %s"),
               arg);
-    log_debug("Error loading savefile '%s':\n%s", arg, secfile_error());
     dlsend_packet_game_load(game.est_connections, TRUE, arg);
     return FALSE;
   }
@@ -3568,19 +3748,23 @@ bool load_command(struct connection *caller, const char *filename, bool check)
   global_observers = conn_list_new();
   conn_list_iterate(game.est_connections, pconn) {
     if (pconn->playing != NULL) {
-      connection_detach(pconn);
+      connection_detach(pconn, TRUE);
     } else if (pconn->observer) {
       conn_list_append(global_observers, pconn);
-      connection_detach(pconn);
+      connection_detach(pconn, TRUE);
     }
   } conn_list_iterate_end;
+
+  player_info_freeze();
 
   /* Now free all game data. */
   server_game_free();
   server_game_init();
 
-  loadtimer = new_timer_start(TIMER_CPU, TIMER_ACTIVE);
-  uloadtimer = new_timer_start(TIMER_USER, TIMER_ACTIVE);
+  loadtimer = timer_new(TIMER_CPU, TIMER_ACTIVE);
+  timer_start(loadtimer);
+  uloadtimer = timer_new(TIMER_USER, TIMER_ACTIVE);
+  timer_start(uloadtimer);
 
   sz_strlcpy(srvarg.load_filename, arg);
 
@@ -3589,9 +3773,9 @@ bool load_command(struct connection *caller, const char *filename, bool check)
   secfile_destroy(file);
 
   log_verbose("Load time: %g seconds (%g apparent)",
-              read_timer_seconds(loadtimer), read_timer_seconds(uloadtimer));
-  free_timer(loadtimer);
-  free_timer(uloadtimer);
+              timer_read_seconds(loadtimer), timer_read_seconds(uloadtimer));
+  timer_destroy(loadtimer);
+  timer_destroy(uloadtimer);
 
   sanity_check();
 
@@ -3604,7 +3788,8 @@ bool load_command(struct connection *caller, const char *filename, bool check)
   conn_list_compression_thaw(game.est_connections);
 
   /* Send information about the new players. */
-  send_player_all_c(NULL, NULL);
+  player_info_thaw();
+  send_player_diplstate_c(NULL, NULL);
 
   /* Everything seemed to load ok; spread the good news. */
   dlsend_packet_game_load(game.est_connections, TRUE, srvarg.load_filename);
@@ -3629,7 +3814,7 @@ bool load_command(struct connection *caller, const char *filename, bool check)
   } conn_list_iterate_end;
   conn_list_destroy(global_observers);
 
-  aifill(game.info.aifill);
+  (void) aifill(game.info.aifill);
   return TRUE;
 }
 
@@ -3683,14 +3868,22 @@ static bool set_rulesetdir(struct connection *caller, char *str, bool check,
   }
 
   if (!check) {
-    cmd_reply(CMD_RULESETDIR, caller, C_OK, 
-              _("Ruleset directory set to \"%s\""), str);
+    bool success = TRUE;
+    char old[512];
 
+    sz_strlcpy(old, game.server.rulesetdir);
     log_verbose("set_rulesetdir() does load_rulesets() with \"%s\"", str);
     sz_strlcpy(game.server.rulesetdir, str);
 
     /* load the ruleset (and game settings defined in the ruleset) */
-    load_rulesets();
+    player_info_freeze();
+    if (!load_rulesets(old, TRUE)) {
+      success = FALSE;
+
+      /* While loading of the requested ruleset failed, we might
+       * have changed ruleset from third one to default. Handle
+       * rest of the ruleset changing accordingly. */
+    }
 
     if (game.est_connections) {
       /* Now that the rulesets are loaded we immediately send updates to any
@@ -3698,7 +3891,19 @@ static bool set_rulesetdir(struct connection *caller, char *str, bool check,
       send_rulesets(game.est_connections);
     }
     /* list changed values */
-    show_changed(caller, check, read_recursion);
+    show_changed(caller, CMD_RULESETDIR, check, read_recursion);
+    player_info_thaw();
+
+    if (success) {
+      cmd_reply(CMD_RULESETDIR, caller, C_OK, 
+                _("Ruleset directory set to \"%s\""), str);
+    } else {
+      cmd_reply(CMD_RULESETDIR, caller, C_SYNTAX,
+                _("Failed loading rulesets from directory \"%s\", using \"%s\""),
+                str, game.server.rulesetdir);
+    }
+
+    return success;
   }
 
   return TRUE;
@@ -3828,34 +4033,92 @@ static bool unignore_command(struct connection *caller,
   return TRUE;
 }
 
-/**************************************************************************
-  Cutting away a trailing comment by putting a '\0' on the '#'. The
-  method handles # in single or double quotes. It also takes care of
-  "\#".
-**************************************************************************/
-static void cut_comment(char *str)
+/****************************************************************************
+  /playercolor command handler.
+****************************************************************************/
+static bool playercolor_command(struct connection *caller,
+                                char *str, bool check)
 {
-  int i;
-  bool in_single_quotes = FALSE, in_double_quotes = FALSE;
+  enum m_pre_result match_result;
+  struct player *pplayer;
+  struct rgbcolor *prgbcolor = NULL;
+  int ntokens = 0;
+  char *token[2];
+  bool ret = TRUE;
 
-  log_debug("cut_comment(str =' %s')", str);
+  ntokens = get_tokens(str, token, 2, TOKEN_DELIMITERS);
 
-  for (i = 0; i < strlen(str); i++) {
-    if (str[i] == '"' && !in_single_quotes) {
-      in_double_quotes = !in_double_quotes;
-    } else if (str[i] == '\'' && !in_double_quotes) {
-      in_single_quotes = !in_single_quotes;
-    } else if (str[i] == '#' && !(in_single_quotes || in_double_quotes)
-	       && (i == 0 || str[i - 1] != '\\')) {
-      str[i] = '\0';
-      break;
-    }
+  if (ntokens != 2) {
+    cmd_reply(CMD_PLAYERCOLOR, caller, C_SYNTAX,
+              _("Two arguments needed. See '/help playercolor'."));
+    ret = FALSE;
+    goto cleanup;
   }
-  log_debug("cut_comment: returning '%s'", str);
+
+  pplayer = player_by_name_prefix(token[0], &match_result);
+
+  if (!pplayer) {
+    cmd_reply_no_such_player(CMD_PLAYERCOLOR, caller, token[0], match_result);
+    ret = FALSE;
+    goto cleanup;
+  }
+
+  if (!game_was_started() && game.server.plrcolormode != PLRCOL_PLR_SET) {
+    cmd_reply(CMD_PLAYERCOLOR, caller, C_FAIL,
+              _("Can only set player color prior to game start if "
+                "'plrcolormode' is PLR_SET."));
+    ret = FALSE;
+    goto cleanup;
+  }
+
+  if (0 == fc_strcasecmp(token[1], "reset")) {
+    if (!game_was_started()) {
+      prgbcolor = NULL;
+    } else {
+      cmd_reply(CMD_PLAYERCOLOR, caller, C_FAIL,
+                _("Can only unset player color before game starts."));
+      ret = FALSE;
+      goto cleanup;
+    }
+  } else if (!rgbcolor_from_hex(&prgbcolor, token[1])) {
+    cmd_reply(CMD_PLAYERCOLOR, caller, C_SYNTAX,
+              _("Invalid player color definition. See '/help playercolor'."));
+    ret = FALSE;
+    goto cleanup;
+  }
+
+  if (prgbcolor != NULL) {
+    players_iterate(pother) {
+      if (pother != pplayer && pother->rgb != NULL
+          && rgbcolors_are_equal(pother->rgb, prgbcolor)) {
+        cmd_reply(CMD_PLAYERCOLOR, caller, C_WARNING,
+                  /* TRANS: "... [c0ffee] for Caesar ... to Hammurabi." */
+                  _("Warning: new color [%s] for %s is identical to %s."),
+                  player_color_ftstr(pother), player_name(pplayer),
+                  player_name(pother));
+      }
+    } players_iterate_end;
+  }
+
+  if (check) {
+    goto cleanup;
+  }
+
+  server_player_set_color(pplayer, prgbcolor);
+  cmd_reply(CMD_PLAYERCOLOR, caller, C_OK,
+            _("Color of player %s set to [%s]."), player_name(pplayer),
+            player_color_ftstr(pplayer));
+
+ cleanup:
+
+  rgbcolor_destroy(prgbcolor);
+  free_tokens(token, ntokens);
+
+  return ret;
 }
 
 /**************************************************************************
-...
+  Handle quit command
 **************************************************************************/
 static bool quit_game(struct connection *caller, bool check)
 {
@@ -3870,10 +4133,9 @@ static bool quit_game(struct connection *caller, bool check)
 /**************************************************************************
   Main entry point for "command input".
 **************************************************************************/
-bool handle_stdin_input(struct connection *caller, const char *str,
-                        bool check)
+bool handle_stdin_input(struct connection *caller, char *str)
 {
-  return handle_stdin_input_real(caller, str, check, 0);
+  return handle_stdin_input_real(caller, str, FALSE, 0);
 }
 
 /**************************************************************************
@@ -3884,16 +4146,33 @@ bool handle_stdin_input(struct connection *caller, const char *str,
 
   If check is TRUE, then do nothing, just check syntax.
 **************************************************************************/
-static bool handle_stdin_input_real(struct connection *caller,
-                                    const char *str, bool check,
-                                    int read_recursion)
+static bool handle_stdin_input_real(struct connection *caller, char *str,
+                                    bool check, int read_recursion)
 {
-  char command[MAX_LEN_CONSOLE_LINE], arg[MAX_LEN_CONSOLE_LINE],
-      allargs[MAX_LEN_CONSOLE_LINE], full_command[MAX_LEN_CONSOLE_LINE],
-      *cptr_s, *cptr_d;
-  int i;
+  char full_command[MAX_LEN_CONSOLE_LINE];
+  char command[MAX_LEN_CONSOLE_LINE], arg[MAX_LEN_CONSOLE_LINE];
+  char *cptr_s, *cptr_d;
   enum command_id cmd;
   enum cmdlevel level;
+
+  /* Remove leading and trailing spaces, and server command prefix. */
+  cptr_s = str = skip_leading_spaces(str);
+  if ('\0' == *cptr_s || '#' == *cptr_s) {
+    /* This appear to be a comment or blank line. */
+    return FALSE;
+  }
+
+  if (SERVER_COMMAND_PREFIX == *cptr_s) {
+    /* Commands may be prefixed with SERVER_COMMAND_PREFIX, even when
+     * given on the server command line. */
+    cptr_s++;
+    remove_leading_spaces(cptr_s);
+    if ('\0' == *cptr_s) {
+      /* This appear to be a blank line. */
+      return FALSE;
+    }
+  }
+  remove_trailing_spaces(cptr_s);
 
   /* notify to the server console */
   if (!check && caller) {
@@ -3905,21 +4184,6 @@ static bool handle_stdin_input_real(struct connection *caller,
     cmd_reply(CMD_HELP, caller, C_FAIL,
 	_("Sorry, you are not allowed to use server commands."));
      return FALSE;
-  }
-
-  /* Is it a comment or a blank line? */
-  /* line is comment if the first non-whitespace character is '#': */
-  cptr_s = skip_leading_spaces((char *)str);
-  if (*cptr_s == '\0' || *cptr_s == '#') {
-    return FALSE;
-  }
-
-  /* commands may be prefixed with SERVER_COMMAND_PREFIX, even when
-     given on the server command line - rp */
-  if (*cptr_s == SERVER_COMMAND_PREFIX) cptr_s++;
-
-  for (; *cptr_s != '\0' && !fc_isalnum(*cptr_s); cptr_s++) {
-    /* nothing */
   }
 
   /* copy the full command, in case we need it for voting purposes. */
@@ -3936,19 +4200,8 @@ static bool handle_stdin_input_real(struct connection *caller,
   }
   *cptr_d = '\0';
 
-  cptr_s = skip_leading_spaces(cptr_s);
-
-  /* keep this before we cut everything after a space */
-  sz_strlcpy(allargs, cptr_s);
-  cut_comment(allargs);
-
-  sz_strlcpy(arg, cptr_s);
-  cut_comment(arg);
-
-  i = strlen(arg) - 1;
-  while (i > 0 && fc_isspace(arg[i])) {
-    arg[i--] = '\0';
-  }
+  /* cptr_s now contains the arguments. */
+  sz_strlcpy(arg, skip_leading_spaces(cptr_s));
 
   cmd = command_named(command, FALSE);
   if (cmd == CMD_AMBIGUOUS) {
@@ -3967,7 +4220,8 @@ static bool handle_stdin_input_real(struct connection *caller,
   level = command_level(command_by_number(cmd));
 
   if (conn_can_vote(caller, NULL) && level == ALLOW_CTRL
-      && conn_get_access(caller) == ALLOW_BASIC && !check) {
+      && conn_get_access(caller) == ALLOW_BASIC && !check
+      && !vote_would_pass_immediately(caller, cmd)) {
     struct vote *vote;
     bool caller_had_vote = (NULL != get_vote_by_caller(caller));
 
@@ -3976,7 +4230,7 @@ static bool handle_stdin_input_real(struct connection *caller,
      * have one vote at a time. This is done by vote_new(). */
     if (handle_stdin_input_real(caller, full_command, TRUE,
                                 read_recursion + 1)
-        && (vote = vote_new(caller, allargs, cmd))) {
+        && (vote = vote_new(caller, arg, cmd))) {
       char votedesc[MAX_LEN_CONSOLE_LINE];
       const struct player *teamplr;
       const char *what;
@@ -4020,8 +4274,10 @@ static bool handle_stdin_input_real(struct connection *caller,
     }
   }
 
-  if (caller && !(check && conn_get_access(caller) >= ALLOW_BASIC
-                  && level == ALLOW_CTRL)
+  if (caller
+      && !((check || vote_would_pass_immediately(caller, cmd))
+           && conn_get_access(caller) >= ALLOW_BASIC
+           && level == ALLOW_CTRL)
       && conn_get_access(caller) < level) {
     cmd_reply(cmd, caller, C_FAIL,
 	      _("You are not allowed to use this command."));
@@ -4067,11 +4323,15 @@ static bool handle_stdin_input_real(struct connection *caller,
 
   switch(cmd) {
   case CMD_REMOVE:
-    return remove_player(caller, arg, check);
+    return remove_player_command(caller, arg, check);
   case CMD_SAVE:
-    return save_command(caller,arg, check);
+    return save_command(caller, arg, check);
+#ifdef DEBUG
+  case CMD_SCENSAVE:
+    return scensave_command(caller, arg, check);
+#endif
   case CMD_LOAD:
-    return load_command(caller, arg, check);
+    return load_command(caller, arg, check, FALSE);
   case CMD_METAPATCHES:
     return metapatches_command(caller, arg, check);
   case CMD_METAMESSAGE:
@@ -4097,7 +4357,7 @@ static bool handle_stdin_input_real(struct connection *caller,
   case CMD_CREATE:
     return create_command(caller, arg, check);
   case CMD_AWAY:
-    return set_away(caller, arg, check);
+    return away_command(caller, check);
   case CMD_NOVICE:
   case CMD_EASY:
   case CMD_NORMAL:
@@ -4139,6 +4399,12 @@ static bool handle_stdin_input_real(struct connection *caller,
     return lua_command(caller, arg, check);
   case CMD_KICK:
     return kick_command(caller, arg, check);
+  case CMD_DELEGATE:
+    return delegate_command(caller, arg, check);
+  case CMD_FCDB:
+    return fcdb_command(caller, arg, check);
+  case CMD_MAPIMG:
+    return mapimg_command(caller, arg, check);
   case CMD_RFCSTYLE:	/* see console.h for an explanation */
     if (!check) {
       con_set_style(!con_get_style());
@@ -4149,7 +4415,7 @@ static bool handle_stdin_input_real(struct connection *caller,
   case CMD_FIRSTLEVEL:
     return firstlevel_command(caller, check);
   case CMD_TIMEOUT:
-    return timeout_command(caller, allargs, check);
+    return timeout_command(caller, arg, check);
   case CMD_START_GAME:
     return start_command(caller, check, FALSE);
   case CMD_END_GAME:
@@ -4160,6 +4426,8 @@ static bool handle_stdin_input_real(struct connection *caller,
     return ignore_command(caller, arg, check);
   case CMD_UNIGNORE:
     return unignore_command(caller, arg, check);
+  case CMD_PLAYERCOLOR:
+    return playercolor_command(caller, arg, check);
   case CMD_NUM:
   case CMD_UNRECOGNIZED:
   case CMD_AMBIGUOUS:
@@ -4180,7 +4448,7 @@ static bool end_command(struct connection *caller, char *str, bool check)
       return TRUE;
     }
     notify_conn(game.est_connections, NULL, E_GAME_END, ftc_server,
-                _("Game ended in a draw."));
+                _("Game is over."));
     set_server_state(S_S_OVER);
     force_end_of_sniff = TRUE;
     cmd_reply(CMD_END_GAME, caller, C_OK,
@@ -4200,19 +4468,35 @@ static bool end_command(struct connection *caller, char *str, bool check)
 **************************************************************************/
 static bool surrender_command(struct connection *caller, char *str, bool check)
 {
-  if (S_S_RUNNING == server_state() && caller && NULL != caller->playing) {
-    if (check) {
-      return TRUE;
-    }
-    notify_conn(game.est_connections, NULL, E_GAME_END, ftc_server,
-                _("%s has conceded the game and can no longer win."),
-                player_name(caller->playing));
-    player_status_add(caller->playing, PSTATUS_SURRENDER);
-    return TRUE;
-  } else {
+  struct player *pplayer;
+
+  if (caller == NULL || !conn_controls_player(caller)) {
+    cmd_reply(CMD_SURRENDER, caller, C_FAIL,
+              _("You are not allowed to use this command."));
+    return FALSE;
+  }
+
+  if (S_S_RUNNING != server_state()) {
     cmd_reply(CMD_SURRENDER, caller, C_FAIL, _("You cannot surrender now."));
     return FALSE;
   }
+
+  pplayer = conn_get_player(caller);
+  if (player_status_check(pplayer, PSTATUS_SURRENDER)) {
+    cmd_reply(CMD_SURRENDER, caller, C_FAIL,
+              _("You have already conceded the game."));
+    return FALSE;
+  }
+
+  if (check) {
+    return TRUE;
+  }
+
+  notify_conn(game.est_connections, NULL, E_GAME_END, ftc_server,
+              _("%s has conceded the game and can no longer win."),
+              player_name(pplayer));
+  player_status_add(pplayer, PSTATUS_SURRENDER);
+  return TRUE;
 }
 
 /* Define the possible arguments to the reset command */
@@ -4300,10 +4584,14 @@ static bool reset_command(struct connection *caller, char *arg, bool check,
     break;
 
   case RESET_RULESET:
-    cmd_reply(CMD_RESET, caller, C_OK,
-              _("Reset all settings to ruleset values."));
     /* Restore game settings save in game.ruleset. */
-    reload_rulesets_settings();
+    if (reload_rulesets_settings()) {
+      cmd_reply(CMD_RESET, caller, C_OK,
+                _("Reset all settings to ruleset values."));
+    } else {
+      cmd_reply(CMD_RESET, caller, C_FAIL,
+                _("Failed to reset settings to ruleset values."));
+    }
     break;
 
   case RESET_SCRIPT:
@@ -4335,20 +4623,1005 @@ static bool reset_command(struct connection *caller, char *arg, bool check,
   cmd_reply(CMD_RESET, caller, C_OK, _("Settings re-initialized."));
 
   /* list changed values */
-  show_changed(caller, check, read_recursion);
+  show_changed(caller, CMD_RESET, check, read_recursion);
+
   return TRUE;
 }
 
-/**************************************************************************
-  Evaluate a line of lua script
-**************************************************************************/
+/* Define the possible arguments to the delegation command */
+#define SPECENUM_NAME lua_args
+#define SPECENUM_VALUE0     LUA_CMD
+#define SPECENUM_VALUE0NAME "cmd"
+#define SPECENUM_VALUE1     LUA_FILE
+#define SPECENUM_VALUE1NAME "file"
+#include "specenum_gen.h"
+
+/*****************************************************************************
+  Returns possible parameters for the reset command.
+*****************************************************************************/
+static const char *lua_accessor(int i)
+{
+  i = CLIP(0, i, lua_args_max());
+  return lua_args_name((enum lua_args) i);
+}
+
+/*****************************************************************************
+  Evaluate a line of lua script or a lua script file.
+*****************************************************************************/
 static bool lua_command(struct connection *caller, char *arg, bool check)
 {
-  if (check) {
-    return TRUE;
+  FILE *script_file;
+  const char extension[] = ".lua", *real_filename = NULL;
+  char luafile[4096], tilde_filename[4096];
+  char *tokens[1], *luaarg = NULL;
+  int ntokens, ind;
+  enum m_pre_result result;
+  bool ret = FALSE;
+
+  ntokens = get_tokens(arg, tokens, 1, TOKEN_DELIMITERS);
+
+  if (ntokens > 0) {
+    /* match the argument */
+    result = match_prefix(lua_accessor, lua_args_max() + 1, 0,
+                          fc_strncasecmp, NULL, tokens[0], &ind);
+
+    switch (result) {
+    case M_PRE_EXACT:
+    case M_PRE_ONLY:
+      /* We have a match */
+      luaarg = arg + strlen(lua_args_name(ind));
+      luaarg = skip_leading_spaces(luaarg);
+      break;
+    case M_PRE_EMPTY:
+      /* Nothing. */
+      break;
+    case M_PRE_AMBIGUOUS:
+    case M_PRE_LONG:
+    case M_PRE_FAIL:
+    case M_PRE_LAST:
+      /* Fall back to depreciated 'lua <script command>' syntax. */
+      cmd_reply(CMD_LUA, caller, C_SYNTAX,
+                _("Fall back to old syntax '%slua <script command>'."),
+                caller ? "/" : "");
+      ind = LUA_CMD;
+      luaarg = arg;
+      break;
+    }
   }
 
-  return script_do_string(arg);
+  if (luaarg == NULL) {
+    cmd_reply(CMD_LUA, caller, C_FAIL,
+              _("No lua command or lua script file. See '%shelp lua'."),
+              caller ? "/" : "");
+    ret = TRUE;
+    goto cleanup;
+  }
+
+  switch (ind) {
+  case LUA_CMD:
+    /* Nothing to check. */
+    break;
+  case LUA_FILE:
+    /* Abuse real_filename to find if we already have a .lua extension. */
+    real_filename = luaarg + strlen(luaarg) - MIN(strlen(extension),
+                                                  strlen(luaarg));
+    if (strcmp(real_filename, extension) != 0) {
+      fc_snprintf(luafile, sizeof(luafile), "%s%s", luaarg, extension);
+    } else {
+      sz_strlcpy(luafile, luaarg);
+    }
+
+    if (is_restricted(caller)) {
+      if (!is_safe_filename(luafile)) {
+        cmd_reply(CMD_LUA, caller, C_FAIL,
+                  _("Freeciv script '%s' disallowed for security reasons."),
+                  luafile);
+        ret = FALSE;
+        goto cleanup;;
+      }
+      sz_strlcpy(tilde_filename, luafile);
+    } else {
+      interpret_tilde(tilde_filename, sizeof(tilde_filename), luafile);
+    }
+
+    real_filename = fileinfoname(get_data_dirs(), tilde_filename);
+    if (!real_filename) {
+      if (is_restricted(caller)) {
+        cmd_reply(CMD_LUA, caller, C_FAIL,
+                  _("No Freeciv script found by the name '%s'."),
+                  tilde_filename);
+        ret = FALSE;
+        goto cleanup;
+      }
+      /* File is outside data directories */
+      real_filename = tilde_filename;
+    }
+    break;
+  }
+
+  if (check) {
+    ret = TRUE;
+    goto cleanup;
+  }
+
+  switch (ind) {
+  case LUA_CMD:
+    ret = script_server_do_string(caller, luaarg);
+    break;
+  case LUA_FILE:
+    cmd_reply(CMD_LUA, caller, C_COMMENT,
+              _("Loading Freeciv script file '%s'."), real_filename);
+
+    if (is_reg_file_for_access(real_filename, FALSE)
+        && (script_file = fc_fopen(real_filename, "r"))) {
+      ret = script_server_do_file(caller, real_filename);
+      goto cleanup;
+    } else {
+      cmd_reply(CMD_LUA, caller, C_FAIL,
+                _("Cannot read Freeciv script '%s'."), real_filename);
+      ret = FALSE;
+      goto cleanup;
+    }
+  }
+
+ cleanup:
+  free_tokens(tokens, ntokens);
+  return ret;
+}
+
+/* Define the possible arguments to the delegation command */
+#define SPECENUM_NAME delegate_args
+#define SPECENUM_VALUE0     DELEGATE_CANCEL
+#define SPECENUM_VALUE0NAME "cancel"
+#define SPECENUM_VALUE1     DELEGATE_RESTORE
+#define SPECENUM_VALUE1NAME "restore"
+#define SPECENUM_VALUE2     DELEGATE_SHOW
+#define SPECENUM_VALUE2NAME "show"
+#define SPECENUM_VALUE3     DELEGATE_TAKE
+#define SPECENUM_VALUE3NAME "take"
+#define SPECENUM_VALUE4     DELEGATE_TO
+#define SPECENUM_VALUE4NAME "to"
+#include "specenum_gen.h"
+
+/*****************************************************************************
+  Returns possible parameters for the 'delegate' command.
+*****************************************************************************/
+static const char *delegate_accessor(int i)
+{
+  i = CLIP(0, i, delegate_args_max());
+  return delegate_args_name((enum delegate_args) i);
+}
+
+/*****************************************************************************
+  Handle delegation of control.
+*****************************************************************************/
+static bool delegate_command(struct connection *caller, char *arg,
+                             bool check)
+{
+  char *tokens[3];
+  int ntokens, ind = delegate_args_invalid();
+  enum m_pre_result result;
+  bool player_specified = FALSE; /* affects messages only */
+  bool ret = FALSE;
+  const char *username = NULL;
+  struct player *dplayer = NULL;
+
+  if (!game_was_started()) {
+    cmd_reply(CMD_DELEGATE, caller, C_FAIL, _("Game not started - "
+                                              "cannot delegate yet."));
+    return FALSE;
+  }
+
+  ntokens = get_tokens(arg, tokens, 3, TOKEN_DELIMITERS);
+
+  if (ntokens > 0) {
+    /* match the argument */
+    result = match_prefix(delegate_accessor, delegate_args_max() + 1, 0,
+                          fc_strncasecmp, NULL, tokens[0], &ind);
+
+    switch (result) {
+    case M_PRE_EXACT:
+    case M_PRE_ONLY:
+      /* we have a match */
+      break;
+    case M_PRE_EMPTY:
+      if (caller) {
+        /* Use 'delegate show' as default. */
+        ind = DELEGATE_SHOW;
+      }
+      break;
+    case M_PRE_AMBIGUOUS:
+    case M_PRE_LONG:
+    case M_PRE_FAIL:
+    case M_PRE_LAST:
+      ind = delegate_args_invalid();
+      break;
+    }
+  } else {
+    if (caller) {
+      /* Use 'delegate show' as default. */
+      ind = DELEGATE_SHOW;
+    }
+  }
+
+  if (!delegate_args_is_valid(ind)) {
+    char buf[256] = "";
+    enum delegate_args valid_args;
+
+    for (valid_args = delegate_args_begin();
+         valid_args != delegate_args_end();
+         valid_args = delegate_args_next(valid_args)) {
+      cat_snprintf(buf, sizeof(buf), "'%s'",
+                   delegate_args_name(valid_args));
+      if (valid_args != delegate_args_max()) {
+        cat_snprintf(buf, sizeof(buf), ", ");
+      }
+    }
+
+    cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+              /* TRANS: do not translate the command 'delegate'. */
+              _("Valid arguments for 'delegate' are: %s."), buf);
+    ret =  FALSE;
+    goto cleanup;
+  }
+
+  /* Get the data (player, username for delegation) and validate it. */
+  switch (ind) {
+  case DELEGATE_CANCEL:
+    /* delegate cancel [player] */
+    if (ntokens > 1) {
+      if (!caller || conn_get_access(caller) >= ALLOW_ADMIN) {
+        player_specified = TRUE;
+        dplayer = player_by_name_prefix(tokens[1], &result);
+        if (!dplayer) {
+          cmd_reply_no_such_player(CMD_DELEGATE, caller, tokens[1], result);
+          ret = FALSE;
+          goto cleanup;
+        }
+      } else {
+        cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                  _("Command level '%s' or greater needed to modify "
+                    "others' delegations."), cmdlevel_name(ALLOW_ADMIN));
+        ret = FALSE;
+        goto cleanup;
+      }
+    } else {
+      dplayer = conn_get_player(caller);
+      if (!dplayer) {
+        cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                  _("Please specify a player for whom delegation should "
+                    "be canceled."));
+        ret = FALSE;
+        goto cleanup;
+      }
+    }
+    break;
+  case DELEGATE_RESTORE:
+    /* delegate restore */
+    if (!caller) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("You can't switch players from the console."));
+      ret = FALSE;
+      goto cleanup;
+    }
+    break;
+  case DELEGATE_SHOW:
+    /* delegate show [player] */
+    if (ntokens > 1) {
+      player_specified = TRUE;
+      dplayer = player_by_name_prefix(tokens[1], &result);
+      if (!dplayer) {
+        cmd_reply_no_such_player(CMD_DELEGATE, caller, tokens[1], result);
+        ret = FALSE;
+        goto cleanup;
+      }
+    } else {
+      dplayer = conn_get_player(caller);
+      if (!dplayer) {
+        cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                  _("Please specify a player for whom the delegation should "
+                    "be shown."));
+        ret = FALSE;
+        goto cleanup;
+      }
+    }
+    break;
+  case DELEGATE_TAKE:
+    /* delegate take <player> */
+    if (!caller) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("You can't switch players from the console."));
+      ret = FALSE;
+      goto cleanup;
+    }
+    if (ntokens > 1) {
+      player_specified = TRUE;
+      dplayer = player_by_name_prefix(tokens[1], &result);
+      if (!dplayer) {
+        cmd_reply_no_such_player(CMD_DELEGATE, caller, tokens[1], result);
+        ret = FALSE;
+        goto cleanup;
+      }
+    } else {
+      cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                _("Please specify a player to take control of."));
+      ret = FALSE;
+      goto cleanup;
+    }
+    break;
+  case DELEGATE_TO:
+    /* delegate to <username> [player] */
+    if (ntokens > 1) {
+      username = tokens[1];
+    } else {
+      cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                _("Please specify a user to whom control is to be delegated."));
+      ret = FALSE;
+      goto cleanup;
+    }
+    if (ntokens > 2) {
+      if (!caller || conn_get_access(caller) >= ALLOW_ADMIN) {
+        player_specified = TRUE;
+        dplayer = player_by_name_prefix(tokens[2], &result);
+        if (!dplayer) {
+          cmd_reply_no_such_player(CMD_DELEGATE, caller, tokens[2], result);
+          ret = FALSE;
+          goto cleanup;
+        }
+      } else {
+        cmd_reply(CMD_DELEGATE, caller, C_SYNTAX,
+                  _("Command level '%s' or greater needed to modify "
+                    "others' delegations."), cmdlevel_name(ALLOW_ADMIN));
+        ret = FALSE;
+        goto cleanup;
+      }
+    } else {
+      dplayer = conn_controls_player(caller) ? conn_get_player(caller) : NULL;
+      if (!dplayer) {
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  _("You do not control a player."));
+        ret = FALSE;
+        goto cleanup;
+      }
+    }
+    break;
+  }
+
+  /* All checks done to this point will give pretty much the same result at
+   * any time. Checks after this point are more likely to vary over time. */
+  if (check) {
+    ret = TRUE;
+    goto cleanup;
+  }
+
+  switch (ind) {
+  case DELEGATE_TO:
+    /* Delegate control of player to another user. */
+    fc_assert_ret_val(dplayer, FALSE);
+    fc_assert_ret_val(username != NULL, FALSE);
+
+    /* Forbid delegation of players already controlled by a delegate, and
+     * those 'put aside' by a delegate.
+     * For the former, if player is already under active delegate control,
+     * we wouldn't handle the revocation that would be necessary if their
+     * delegation changed; and the authority granted to delegates does not
+     * include the ability to sub-delegate.
+     * For the latter, allowing control of the 'put aside' player to be
+     * delegated would break the invariant that whenever a user is connected,
+     * they are attached to 'their' player. */
+    if (player_delegation_active(dplayer)) {
+      if (!player_delegation_get(dplayer)) {
+        /* Attempting to change a 'put aside' player. Must be admin 
+         * or console. */
+        fc_assert(player_specified);
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  _("Can't delegate control of '%s' belonging to %s while "
+                    "they are controlling another player."),
+                    player_name(dplayer), dplayer->username);
+      } else if (player_specified) {
+        /* Admin or console attempting to change a controlled player. */
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  _("Can't change delegation of '%s' while controlled by "
+                    "delegate %s."), player_name(dplayer), dplayer->username);
+      } else {
+        /* Caller must be the delegate. Give more specific message.
+         * (We don't know if they thought they were delegating their
+         * original or delegated player, but we don't allow either.) */
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  _("You can't delegate control while you are controlling "
+                    "a delegated player yourself."));
+      }
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    /* Forbid delegation to player's original owner
+     * (from above test we know that dplayer->username is the original now) */
+    if (fc_strcasecmp(dplayer->username, username) == 0) {
+      if (player_specified) {
+        /* Probably admin or console. */
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  /* TRANS: don't translate 'delegate cancel' */
+                  _("%s already owns '%s', so cannot also be delegate. "
+                    "Use '%sdelegate cancel' to cancel an existing "
+                    "delegation."),
+                  username, player_name(dplayer), caller?"/":"");
+      } else {
+        /* Player not specified on command line, so they must have been trying
+         * to delegate control to themself. Give more specific message. */
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                  /* TRANS: don't translate '/delegate cancel' */
+                  _("You can't delegate control to yourself. "
+                    "Use '/delegate cancel' to cancel an existing "
+                    "delegation."));
+      }
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    /* FIXME: if control was already delegated to someone else, that
+     * delegation is implicitly canceled. Perhaps we should tell someone. */
+
+    player_delegation_set(dplayer, username);
+    cmd_reply(CMD_DELEGATE, caller, C_OK,
+              _("Control of player '%s' delegated to user %s."),
+              player_name(dplayer), username);
+    ret = TRUE;
+    goto cleanup;
+    break;
+
+  case DELEGATE_SHOW:
+    /* Show delegations. */
+    fc_assert_ret_val(dplayer, FALSE);
+
+    if (player_delegation_get(dplayer) == NULL) {
+      /* No delegation set. */
+      cmd_reply(CMD_DELEGATE, caller, C_COMMENT,
+                _("No delegation defined for '%s'."),
+                player_name(dplayer));
+    } else {
+      cmd_reply(CMD_DELEGATE, caller, C_COMMENT,
+                _("Control of player '%s' delegated to user %s."),
+                player_name(dplayer), player_delegation_get(dplayer));
+    }
+    ret = TRUE;
+    goto cleanup;
+    break;
+
+  case DELEGATE_CANCEL:
+    if (player_delegation_get(dplayer) == NULL) {
+      /* No delegation set. */
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("No delegation defined for '%s'."),
+                player_name(dplayer));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    if (player_delegation_active(dplayer)) {
+      /* Delegation is currently in use. Forcibly break connection. */
+      struct connection *pdelegate;
+      /* (Can only happen if admin/console issues this command, as owner
+       * will end use by their mere presence.) */
+      fc_assert(player_specified);
+      pdelegate = conn_by_user(player_delegation_get(dplayer));
+      fc_assert_ret_val(pdelegate != NULL, FALSE);
+      if (!connection_delegate_restore(pdelegate)) {
+        /* Should never happen. Generic failure message. */
+        log_error("Failed to restore %s's connection as %s during "
+                  "'delegate cancel'.", pdelegate->username,
+                  delegate_player_str(pdelegate->server.delegation.playing,
+                                      pdelegate->server.delegation.observer));
+        cmd_reply(CMD_DELEGATE, caller, C_FAIL, _("Unexpected failure."));
+        ret = FALSE;
+        goto cleanup;
+      }
+      notify_conn(pdelegate->self, NULL, E_CONNECTION, ftc_server,
+                  _("Your delegated control of player '%s' was canceled."),
+                  player_name(dplayer));
+    }
+
+    player_delegation_set(dplayer, NULL);
+    cmd_reply(CMD_DELEGATE, caller, C_OK, _("Delegation of '%s' canceled."),
+              player_name(dplayer));
+    ret = TRUE;
+    goto cleanup;
+    break;
+
+  case DELEGATE_TAKE:
+    /* Try to take another player. */
+    fc_assert_ret_val(dplayer, FALSE);
+    fc_assert_ret_val(caller, FALSE);
+
+    if (caller->server.delegation.status) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                /* TRANS: don't translate '/delegate restore'. */
+                _("You are already controlling a delegated player. "
+                  "Use '/delegate restore' to relinquish control of your "
+                  "current player first."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    /* Don't allow 'put aside' players to be delegated; the invariant is
+     * that while the owning user is connected to the server, they are
+     * in sole control of 'their' player. */
+    if (conn_controls_player(caller)
+        && player_delegation_get(conn_get_player(caller)) != NULL) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                /* TRANS: don't translate '/delegate cancel'. */
+                _("Can't take player while you have delegated control "
+                  "yourself. Use '/delegate cancel' to cancel your own "
+                  "delegation first."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    /* Taking your own player makes no sense. */
+    if (conn_controls_player(caller)
+        && dplayer == conn_get_player(caller)) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL, _("You already control '%s'."),
+                player_name(conn_get_player(caller)));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    if (!player_delegation_get(dplayer)
+        || fc_strcasecmp(player_delegation_get(dplayer), caller->username) != 0) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("Control of player '%s' has not been delegated to you."),
+                player_name(dplayer));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    /* If the player is controlled by another user, fail. */
+    if (dplayer->is_connected) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("Another user already controls player '%s'."),
+                player_name(dplayer));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    if (!connection_delegate_take(caller, dplayer)) {
+      /* Should never happen. Generic failure message. */
+      log_error("%s failed to take control of '%s' during 'delegate take'.",
+                caller->username, player_name(dplayer));
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL, _("Unexpected failure."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    cmd_reply(CMD_DELEGATE, caller, C_OK,
+              _("%s is now controlling player '%s'."), caller->username,
+              player_name(conn_get_player(caller)));
+    ret = TRUE;
+    goto cleanup;
+    break;
+
+  case DELEGATE_RESTORE:
+    /* Delegate user relinquishes control of delegated player, returning to 
+     * previous view (e.g. observer) if any. */
+    fc_assert_ret_val(caller, FALSE);
+
+    if (!caller->server.delegation.status) {
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL,
+                _("You are not currently controlling a delegated player."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    if (!connection_delegate_restore(caller)) {
+      /* Should never happen. Generic failure message. */
+      log_error("Failed to restore %s's connection as %s during "
+                "'delegate restore'.", caller->username,
+                delegate_player_str(caller->server.delegation.playing,
+                                    caller->server.delegation.observer));
+      cmd_reply(CMD_DELEGATE, caller, C_FAIL, _("Unexpected failure."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    cmd_reply(CMD_DELEGATE, caller, C_OK,
+              /* TRANS: "<user> is now connected to <player>" where <player>
+               * can also be "global observer" or "nothing" */
+              _("%s is now connected as %s."), caller->username,
+              delegate_player_str(conn_get_player(caller), caller->observer));
+    ret = TRUE;
+    goto cleanup;
+    break;
+  }
+
+ cleanup:
+  free_tokens(tokens, ntokens);
+  return ret;
+}
+
+/*****************************************************************************
+  Return static string describing what a connection is connected to.
+*****************************************************************************/
+static const char *delegate_player_str(struct player *pplayer, bool observer)
+{
+  static struct astring buf;
+
+  if (pplayer) {
+    if (observer) {
+      astr_set(&buf, _("%s (observer)"), player_name(pplayer));
+    } else {
+      astr_set(&buf, "%s", player_name(pplayer));
+    }
+  } else if (observer) {
+    astr_set(&buf, "%s", _("global observer"));
+  } else {
+    /* TRANS: in place of player name or "global observer" */
+    astr_set(&buf, "%s", _("nothing"));
+  }
+
+  return astr_str(&buf);
+}
+
+/* Define the possible arguments to the mapimg command */
+/* map image layers */
+#define SPECENUM_NAME mapimg_args
+#define SPECENUM_VALUE0     MAPIMG_COLORTEST
+#define SPECENUM_VALUE0NAME "colortest"
+#define SPECENUM_VALUE1     MAPIMG_CREATE
+#define SPECENUM_VALUE1NAME "create"
+#define SPECENUM_VALUE2     MAPIMG_DEFINE
+#define SPECENUM_VALUE2NAME "define"
+#define SPECENUM_VALUE3     MAPIMG_DELETE
+#define SPECENUM_VALUE3NAME "delete"
+#define SPECENUM_VALUE4     MAPIMG_SHOW
+#define SPECENUM_VALUE4NAME "show"
+#define SPECENUM_COUNT      MAPIMG_COUNT
+#include "specenum_gen.h"
+
+/**************************************************************************
+  Returns possible parameters for the mapimg command.
+**************************************************************************/
+static const char *mapimg_accessor(int i)
+{
+  i = CLIP(0, i, mapimg_args_max());
+  return mapimg_args_name((enum mapimg_args) i);
+}
+
+/**************************************************************************
+  Handle mapimg command
+**************************************************************************/
+static bool mapimg_command(struct connection *caller, char *arg, bool check)
+{
+  enum m_pre_result result;
+  int ind, ntokens, id;
+  char *token[2];
+  bool ret = TRUE;
+
+  ntokens = get_tokens(arg, token, 2, TOKEN_DELIMITERS);
+
+  if (ntokens > 0) {
+    /* match the argument */
+    result = match_prefix(mapimg_accessor, MAPIMG_COUNT, 0,
+                          fc_strncasecmp, NULL, token[0], &ind);
+
+    switch (result) {
+    case M_PRE_EXACT:
+    case M_PRE_ONLY:
+      /* we have a match */
+      break;
+    case M_PRE_AMBIGUOUS:
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Ambiguous 'mapimg' command."));
+      ret =  FALSE;
+      goto cleanup;
+      break;
+    case M_PRE_EMPTY:
+      /* use 'show' as default */
+      ind = MAPIMG_SHOW;
+      break;
+    case M_PRE_LONG:
+    case M_PRE_FAIL:
+    case M_PRE_LAST:
+      {
+        char buf[256] = "";
+        enum mapimg_args valid_args;
+
+        for (valid_args = mapimg_args_begin();
+             valid_args != mapimg_args_end();
+             valid_args = mapimg_args_next(valid_args)) {
+          cat_snprintf(buf, sizeof(buf), "'%s'",
+                       mapimg_args_name(valid_args));
+          if (valid_args != mapimg_args_max()) {
+            cat_snprintf(buf, sizeof(buf), ", ");
+          }
+        }
+
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                  _("The valid arguments are: %s."), buf);
+        ret =  FALSE;
+        goto cleanup;
+      }
+      break;
+    }
+  } else {
+    /* use 'show' as default */
+    ind = MAPIMG_SHOW;
+  }
+
+  switch (ind) {
+  case MAPIMG_DEFINE:
+    if (ntokens == 1) {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Missing argument for 'mapimg define'."));
+      ret = FALSE;
+    } else {
+      /* 'mapimg define <mapstr>' */
+      if (!mapimg_define(token[1], check)) {
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                  _("Can't use definition: %s."), mapimg_error());
+        ret = FALSE;
+      } else if (check) {
+        /* Validated OK, bail out now */
+        goto cleanup;
+      } else if (game_was_started()
+                 && mapimg_isvalid(mapimg_count() - 1) == NULL) {
+        /* game was started - error in map image definition check */
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                  _("Can't use definition: %s."), mapimg_error());
+        ret = FALSE;
+      } else {
+        char str[MAX_LEN_MAPDEF];
+
+        id = mapimg_count() - 1;
+
+        mapimg_id2str(id, str, sizeof(str));
+        cmd_reply(CMD_MAPIMG, caller, C_OK, _("Defined as map image "
+                                              "definition %d: '%s'."),
+                  id, str);
+      }
+    }
+    break;
+
+  case MAPIMG_DELETE:
+    if (ntokens == 1) {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Missing argument for 'mapimg delete'."));
+      ret = FALSE;
+    } else if (ntokens == 2 && strcmp(token[1], "all") == 0) {
+      /* 'mapimg delete all' */
+      if (check) {
+        goto cleanup;
+      }
+
+      while (mapimg_count() > 0) {
+        mapimg_delete(0);
+      }
+      cmd_reply(CMD_MAPIMG, caller, C_OK, _("All map image definitions "
+                                            "deleted."));
+    } else if (ntokens == 2 && sscanf(token[1], "%d", &id) != 0) {
+      /* 'mapimg delete <id>' */
+      if (check) {
+        goto cleanup;
+      }
+
+      if (!mapimg_delete(id)) {
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                  _("Couldn't delete definition: %s."), mapimg_error());
+        ret = FALSE;
+      } else {
+        cmd_reply(CMD_MAPIMG, caller, C_OK, _("Map image definition %d "
+                                              "deleted."), id);
+      }
+    } else {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Bad argument for 'mapimg delete': '%s'."), token[1]);
+      ret = FALSE;
+    }
+    break;
+
+  case MAPIMG_SHOW:
+    if (ntokens < 2 || (ntokens == 2 && strcmp(token[1], "all") == 0)) {
+      /* 'mapimg show' or 'mapimg show all' */
+      if (check) {
+        goto cleanup;
+      }
+      show_mapimg(caller, CMD_MAPIMG);
+    } else if (ntokens == 2 && sscanf(token[1], "%d", &id) != 0) {
+      char str[2048];
+      /* 'mapimg show <id>' */
+      if (check) {
+        goto cleanup;
+      }
+
+      if (mapimg_show(id, str, sizeof(str), TRUE)) {
+        cmd_reply(CMD_MAPIMG, caller, C_OK, "%s", str);
+      } else {
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                  _("Couldn't show definition: %s."), mapimg_error());
+        ret = FALSE;
+      }
+    } else {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Bad argument for 'mapimg show': '%s'."), token[1]);
+      ret = FALSE;
+    }
+    break;
+
+  case MAPIMG_COLORTEST:
+    if (check) {
+      goto cleanup;
+    }
+
+    mapimg_colortest(game.server.save_name, NULL);
+    cmd_reply(CMD_MAPIMG, caller, C_OK, _("Map color test images saved."));
+    break;
+
+  case MAPIMG_CREATE:
+    if (ntokens < 2) {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Missing argument for 'mapimg create'."));
+      ret = FALSE;
+      goto cleanup;
+    }
+
+    if (strcmp(token[1], "all") == 0) {
+      /* 'mapimg create all' */
+      if (check) {
+        goto cleanup;
+      }
+
+      for (id = 0; id < mapimg_count(); id++) {
+        struct mapdef *pmapdef = mapimg_isvalid(id);
+
+        if (pmapdef == NULL
+            || !mapimg_create(pmapdef, TRUE, game.server.save_name,
+                              srvarg.saves_pathname)) {
+          cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Error saving map image %d: %s."), id, mapimg_error());
+          ret = FALSE;
+        }
+      }
+    } else if (sscanf(token[1], "%d", &id) != 0) {
+      struct mapdef *pmapdef;
+
+      /* 'mapimg create <id>' */
+      if (check) {
+        goto cleanup;
+      }
+
+      pmapdef = mapimg_isvalid(id);
+      if (pmapdef == NULL
+          || !mapimg_create(pmapdef, TRUE, game.server.save_name,
+                            srvarg.saves_pathname)) {
+        cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+              _("Error saving map image %d: %s."), id, mapimg_error());
+        ret = FALSE;
+      }
+    } else {
+      cmd_reply(CMD_MAPIMG, caller, C_FAIL,
+                _("Bad argument for 'mapimg create': '%s'."), token[1]);
+      ret = FALSE;
+    }
+    break;
+  }
+
+  cleanup:
+
+  free_tokens(token, ntokens);
+
+  return ret;
+}
+
+/* Define the possible arguments to the fcdb command */
+#define SPECENUM_NAME fcdb_args
+#define SPECENUM_VALUE0     FCDB_RELOAD
+#define SPECENUM_VALUE0NAME "reload"
+#define SPECENUM_VALUE1     FCDB_LUA
+#define SPECENUM_VALUE1NAME "lua"
+#define SPECENUM_COUNT      FCDB_COUNT
+#include "specenum_gen.h"
+
+/**************************************************************************
+  Returns possible parameters for the fcdb command.
+**************************************************************************/
+static const char *fcdb_accessor(int i)
+{
+  i = CLIP(0, i, fcdb_args_max());
+  return fcdb_args_name((enum fcdb_args) i);
+}
+
+/**************************************************************************
+  Handle the freeciv database script module.
+**************************************************************************/
+static bool fcdb_command(struct connection *caller, char *arg, bool check)
+{
+  enum m_pre_result result;
+  int ind, ntokens;
+  char *token[1];
+  bool ret = TRUE;
+  bool usage = FALSE;
+
+#ifndef HAVE_FCDB
+  cmd_reply(CMD_FCDB, caller, C_FAIL,
+            _("Freeciv database script deactivated at compile time."));
+  return FALSE;
+#endif
+
+  ntokens = get_tokens(arg, token, 1, TOKEN_DELIMITERS);
+
+  if (ntokens > 0) {
+    /* match the argument */
+    result = match_prefix(fcdb_accessor, FCDB_COUNT, 0,
+                          fc_strncasecmp, NULL, token[0], &ind);
+
+    switch (result) {
+    case M_PRE_EXACT:
+    case M_PRE_ONLY:
+      /* we have a match */
+      break;
+    case M_PRE_AMBIGUOUS:
+      cmd_reply(CMD_FCDB, caller, C_FAIL,
+                _("Ambiguous fcdb command."));
+      ret =  FALSE;
+      goto cleanup;
+      break;
+    case M_PRE_EMPTY:
+    case M_PRE_LONG:
+    case M_PRE_FAIL:
+    case M_PRE_LAST:
+      usage = TRUE;
+      break;
+    }
+  } else {
+    usage = TRUE;
+  }
+
+  if (usage) {
+    char buf[256] = "";
+    enum fcdb_args valid_args;
+
+    for (valid_args = fcdb_args_begin();
+        valid_args != fcdb_args_end();
+        valid_args = fcdb_args_next(valid_args)) {
+      cat_snprintf(buf, sizeof(buf), "'%s'",
+                   fcdb_args_name(valid_args));
+      if (valid_args != fcdb_args_max()) {
+        cat_snprintf(buf, sizeof(buf), ", ");
+      }
+    }
+
+    cmd_reply(CMD_FCDB, caller, C_FAIL,
+              _("The valid arguments are: %s."), buf);
+    ret =  FALSE;
+    goto cleanup;
+  }
+
+  if (check) {
+    ret = TRUE;
+    goto cleanup;
+  }
+
+  switch (ind) {
+  case FCDB_RELOAD:
+    /* Reload database lua script. */
+    script_fcdb_free();
+    script_fcdb_init(NULL);
+    break;
+
+  case FCDB_LUA:
+    /* Skip whitespaces. */
+    arg = skip_leading_spaces(arg);
+    /* Skip the base argument 'lua'. */
+    arg += 3;
+    /* Now execute the scriptlet. */
+    ret = script_fcdb_do_string(caller, arg);
+    break;
+  }
+
+  cleanup:
+
+  free_tokens(token, ntokens);
+
+  return ret;
 }
 
 /**************************************************************************
@@ -4385,15 +5658,16 @@ bool start_command(struct connection *caller, bool check, bool notify)
         game.server.max_players = map_startpos_count();
       }
 
-      if (player_count() > game.server.max_players) {
+      if (normal_player_count() > game.server.max_players) {
         int i;
         struct player *pplayer;
+
         for (i = player_slot_count() - 1; i >= 0; i--) {
           pplayer = player_by_number(i);
           if (pplayer) {
             server_remove_player(pplayer);
           }
-          if (player_count() <= game.server.max_players) {
+          if (normal_player_count() <= game.server.max_players) {
             break;
           }
         }
@@ -4412,19 +5686,34 @@ bool start_command(struct connection *caller, bool check, bool notify)
       }
     } players_iterate_end;
 
-    /* check min_players */
-    if (human_players < game.server.min_players) {
-      start_cmd_reply(caller, notify,
-                      _("Not enough human players; game will not start."));
+    /* check min_players.
+     * Allow continuing of savegames where some of the original
+     * players have died */
+    if (game.info.is_new_game
+        && human_players < game.server.min_players) {
+      char buf[512] = "";
+
+      fc_snprintf(buf, sizeof(buf),
+                  _("Not enough human players ('minplayers' server setting has value %d); game will not start."),
+                  game.server.min_players);
+      start_cmd_reply(caller, notify, buf);
       return FALSE;
     } else if (player_count() < 1) {
       /* At least one player required */
       start_cmd_reply(caller, notify,
                       _("No players; game will not start."));
       return FALSE;
-    } else if (player_count() - server.nbarbarians > server.playable_nations) {
-      cmd_reply(CMD_START_GAME, caller, C_FAIL,
-		_("Not enough nations for all players; game will not start."));
+    } else if (normal_player_count() > server.playable_nations) {
+      if (nation_set_count() > 1) {
+        start_cmd_reply(caller, notify,
+                        _("Not enough nations in the current nation set "
+                          "for all players; game will not start. "
+                          "(See 'nationset' setting.)"));
+      } else {
+        start_cmd_reply(caller, notify,
+                        _("Not enough nations for all players; game will "
+                          "not start."));
+      }
       return FALSE;
     } else if (check) {
       return TRUE;
@@ -4437,7 +5726,7 @@ bool start_command(struct connection *caller, bool check, bool notify)
       }
       start_game();
       return TRUE;
-    } else if (NULL == caller->playing || !caller->playing->is_connected) {
+    } else if (NULL == caller->playing || caller->observer) {
       /* A detached or observer player can't do /start. */
       return TRUE;
     } else {
@@ -4464,7 +5753,7 @@ bool start_command(struct connection *caller, bool check, bool notify)
 }
 
 /**************************************************************************
-...
+  Handle cut command
 **************************************************************************/
 static bool cut_client_connection(struct connection *caller, char *name, 
                                   bool check)
@@ -4488,7 +5777,7 @@ static bool cut_client_connection(struct connection *caller, char *name,
 
   cmd_reply(CMD_CUT, caller, C_DISCONNECTED,
             _("Cutting connection %s."), ptarget->username);
-  connection_close(ptarget, _("connection cut"));
+  connection_close_server(ptarget, _("connection cut"));
 
   return TRUE;
 }
@@ -4625,7 +5914,7 @@ static bool kick_command(struct connection *caller, char *name, bool check)
 
     kick_hash_replace(kick_table_by_user, aconn->username, now);
 
-    connection_close(aconn, _("kicked"));
+    connection_close_server(aconn, _("kicked"));
   } conn_list_iterate_end;
 
   return TRUE;
@@ -4699,13 +5988,15 @@ static void show_help_command(struct connection *caller,
   }
   cmd_reply(help_cmd, caller, C_COMMENT,
             _("Level: %s"), cmdlevel_name(command_level(cmd)));
-  if (command_extra_help(cmd)) {
-    char *help = fc_strdup(command_extra_help(cmd));
+  {
+    char *help = command_extra_help(cmd);
 
-    fc_break_lines(help, LINE_BREAK);
-    cmd_reply(help_cmd, caller, C_COMMENT, _("Description:"));
-    cmd_reply_prefix(help_cmd, caller, C_COMMENT, "  ", "  %s", help);
-    FC_FREE(help);
+    if (help) {
+      fc_break_lines(help, LINE_BREAK);
+      cmd_reply(help_cmd, caller, C_COMMENT, _("Description:"));
+      cmd_reply_prefix(help_cmd, caller, C_COMMENT, "  ", "  %s", help);
+      FC_FREE(help);
+    }
   }
 }
 
@@ -4822,7 +6113,7 @@ static const char *helparg_accessor(int i)
 }
 
 /**************************************************************************
-...
+  Handle help command
 **************************************************************************/
 static bool show_help(struct connection *caller, char *arg)
 {
@@ -4909,6 +6200,39 @@ static void show_connections(struct connection *caller)
   cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
 }
 
+/*****************************************************************************
+  List all delegations of the current game.
+*****************************************************************************/
+static void show_delegations(struct connection *caller)
+{
+  bool empty = TRUE;
+
+  cmd_reply(CMD_LIST, caller, C_COMMENT, _("List of all delegations:"));
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+
+  players_iterate(pplayer) {
+    const char *delegate_to = player_delegation_get(pplayer);
+    if (delegate_to != NULL) {
+      const char *owner =
+        player_delegation_active(pplayer) ? pplayer->server.orig_username
+                                          : pplayer->username;
+      fc_assert(owner);
+      cmd_reply(CMD_LIST, caller, C_COMMENT,
+                /* TRANS: last %s is either " (active)" or empty string */
+                _("%s delegates control over player '%s' to user %s%s."),
+                owner, player_name(pplayer), delegate_to,
+                player_delegation_active(pplayer) ? _(" (active)") : "");
+      empty = FALSE;
+    }
+  } players_iterate_end;
+
+  if (empty) {
+    cmd_reply(CMD_LIST, caller, C_COMMENT, _("No delegations defined."));
+  }
+
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+}
+
 /****************************************************************************
   Show the ignore list of the 
 ****************************************************************************/
@@ -4944,88 +6268,90 @@ static bool show_ignore(struct connection *caller)
 ****************************************************************************/
 void show_players(struct connection *caller)
 {
-  char buf[MAX_LEN_CONSOLE_LINE], buf2[MAX_LEN_CONSOLE_LINE];
-  int n;
-
   cmd_reply(CMD_LIST, caller, C_COMMENT, _("List of players:"));
   cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
 
-
-  if (player_count() == 0)
+  if (player_count() == 0) {
     cmd_reply(CMD_LIST, caller, C_COMMENT, _("<no players>"));
-  else
-  {
+  } else {
     players_iterate(pplayer) {
+      char buf[MAX_LEN_CONSOLE_LINE];
+      int n;
 
       /* Low access level callers don't get to see barbarians in list: */
       if (is_barbarian(pplayer) && caller
-	  && (caller->access_level < ALLOW_CTRL)) {
-	continue;
+          && (caller->access_level < ALLOW_CTRL)) {
+        continue;
       }
 
-      /* buf2 contains stuff in brackets after playername:
-       * [username,] AI/Barbarian/Human [,Dead] [, skill level] [, nation]
+      /* The output for each player looks like:
+       *
+       * <Player name> [color]: Team[, Nation][, Username][, Status]
+       *   AI/Barbarian/Human[, AI type, skill level][, Connections]
+       *     [Details for each connection]
        */
-      buf2[0] = '\0';
+
+      /* '<Player name> [color]: [Nation][, Username][, Status]' */
+      buf[0] = '\0';
+      cat_snprintf(buf, sizeof(buf), "%s [%s]: %s", player_name(pplayer),
+                   player_color_ftstr(pplayer),
+                   team_name_translation(pplayer->team));
+      if (!game.info.is_new_game) {
+        cat_snprintf(buf, sizeof(buf), ", %s",
+                     nation_adjective_for_player(pplayer));
+      }
       if (strlen(pplayer->username) > 0
           && strcmp(pplayer->username, "nouser") != 0) {
-        fc_snprintf(buf2, sizeof(buf2), _("user %s, "), pplayer->username);
+        cat_snprintf(buf, sizeof(buf), _(", user %s"), pplayer->username);
       }
-      
-      if (is_barbarian(pplayer)) {
-	sz_strlcat(buf2, _("Barbarian"));
-      } else if (pplayer->ai_controlled) {
-	sz_strlcat(buf2, _("AI"));
-      } else {
-	sz_strlcat(buf2, _("Human"));
-      }
-      if (!pplayer->is_alive) {
-	sz_strlcat(buf2, _(", Dead"));
-      }
-      if(pplayer->ai_controlled) {
-	cat_snprintf(buf2, sizeof(buf2), _(", difficulty level %s"),
-                     ai_level_name(pplayer->ai_common.skill_level));
-      }
-      if (!game.info.is_new_game) {
-	/* TRANS: continue list, in case comma is not the separator of choice. */
-	cat_snprintf(buf2, sizeof(buf2), Q_("?clistmore:, %s"),
-		     nation_adjective_for_player(pplayer));
-      }
-      /* only one comment to translators needed. */
-      cat_snprintf(buf2, sizeof(buf2), Q_("?clistmore:, %s"),
-		   team_name_translation(pplayer->team));
       if (S_S_INITIAL == server_state() && pplayer->is_connected) {
-	if (pplayer->is_ready) {
-	  cat_snprintf(buf2, sizeof(buf2), _(", ready"));
-	} else {
+        if (pplayer->is_ready) {
+          sz_strlcat(buf, _(", ready"));
+        } else {
           /* Emphasizes this */
-          n = strlen(buf2);
+          n = strlen(buf);
           featured_text_apply_tag(_(", not ready"),
-                                  buf2 + n, sizeof(buf2) - n,
+                                  buf + n, sizeof(buf) - n,
                                   TTT_COLOR, 1, FT_OFFSET_UNSET,
                                   ftc_changed);
-	}
+        }
+      } else if (!pplayer->is_alive) {
+        sz_strlcat(buf, _(", Dead"));
       }
-      fc_snprintf(buf, sizeof(buf), "%s (%s)", player_name(pplayer), buf2);
-      
+      cmd_reply(CMD_LIST, caller, C_COMMENT, "%s", buf);
+
+      /* '  AI/Barbarian/Human[, skill level][, Connections]' */
+      buf[0] = '\0';
+      if (is_barbarian(pplayer)) {
+        sz_strlcat(buf, _("Barbarian"));
+      } else if (pplayer->ai_controlled) {
+        sz_strlcat(buf, _("AI"));
+      } else {
+        sz_strlcat(buf, _("Human"));
+      }
+      if(pplayer->ai_controlled) {
+        cat_snprintf(buf, sizeof(buf), _(", %s"), ai_name(pplayer->ai));
+        cat_snprintf(buf, sizeof(buf), _(", difficulty level %s"),
+                     ai_level_name(pplayer->ai_common.skill_level));
+      }
       n = conn_list_size(pplayer->connections);
       if (n > 0) {
         cat_snprintf(buf, sizeof(buf), 
-                     PL_(" %d connection:", " %d connections:", n), n);
+                     PL_(", %d connection:", ", %d connections:", n), n);
       }
-      cmd_reply(CMD_LIST, caller, C_COMMENT, "%s", buf);
-      
+      cmd_reply(CMD_LIST, caller, C_COMMENT, "  %s", buf);
+
+      /* '    [Details for each connection]' */
       conn_list_iterate(pplayer->connections, pconn) {
         fc_snprintf(buf, sizeof(buf),
-                    _("  %s from %s (command access level %s), "
-                      "bufsize=%dkb"),
-                    pconn->username, pconn->addr, 
+                    _("%s from %s (command access level %s), "
+                      "bufsize=%dkb"), pconn->username, pconn->addr,
                     cmdlevel_name(pconn->access_level),
                     (pconn->send_buffer->nsize >> 10));
-	if (pconn->observer) {
-	  sz_strlcat(buf, _(" (observer mode)"));
-	}
-	cmd_reply(CMD_LIST, caller, C_COMMENT, "%s", buf);
+        if (pconn->observer) {
+          sz_strlcat(buf, _(" (observer mode)"));
+        }
+        cmd_reply(CMD_LIST, caller, C_COMMENT, "    %s", buf);
       } conn_list_iterate_end;
     } players_iterate_end;
   }
@@ -5050,6 +6376,43 @@ static void show_scenarios(struct connection *caller)
     cmd_reply(CMD_LIST, caller, C_COMMENT, "%s", buf);
   } fileinfo_list_iterate_end;
   fileinfo_list_destroy(files);
+
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+}
+
+/****************************************************************************
+  List nation sets in the current ruleset.
+****************************************************************************/
+static void show_nationsets(struct connection *caller)
+{
+  cmd_reply(CMD_LIST, caller, C_COMMENT,
+            /* TRANS: don't translate text between '' */
+            _("List of nation sets available for 'nationset' option:"));
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+
+  nation_sets_iterate(pset) {
+    const char *description = nation_set_description(pset);
+    int num_nations = 0;
+    nations_iterate(pnation) {
+      if (is_nation_playable(pnation) && nation_is_in_set(pnation, pset)) {
+        num_nations++;
+      }
+    } nations_iterate_end;
+    cmd_reply(CMD_LIST, caller, C_COMMENT,
+              /* TRANS: nation set description; %d refers to number of playable
+               * nations in set */
+              PL_(" %-10s  %s (%d playable)",
+                  " %-10s  %s (%d playable)", num_nations),
+              nation_set_rule_name(pset), nation_set_name_translation(pset),
+              num_nations);
+    if (strlen(description) > 0) {
+      static const char prefix[] = "   ";
+      char *translated = fc_strdup(_(description));
+      fc_break_lines(translated, LINE_BREAK);
+      cmd_reply_prefix(CMD_LIST, caller, C_COMMENT, prefix, "%s%s",
+                       prefix, translated);
+    }
+  } nation_sets_iterate_end;
 
   cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
 }
@@ -5085,21 +6448,69 @@ static void show_teams(struct connection *caller)
 }
 
 /****************************************************************************
+  Show a list of all map image definitions on the command line.
+****************************************************************************/
+static void show_mapimg(struct connection *caller, enum command_id cmd)
+{
+  int id;
+
+  if (mapimg_count() == 0) {
+    cmd_reply(cmd, caller, C_OK, _("No map image definitions."));
+  } else {
+    cmd_reply(cmd, caller, C_COMMENT, _("List of map image definitions:"));
+    cmd_reply(cmd, caller, C_COMMENT, horiz_line);
+    for (id = 0; id < mapimg_count(); id++) {
+      char str[MAX_LEN_MAPDEF] = "";
+      mapimg_show(id, str, sizeof(str), FALSE);
+      cmd_reply(cmd, caller, C_COMMENT, _("[%2d] %s"), id, str);
+    }
+    cmd_reply(cmd, caller, C_COMMENT, horiz_line);
+  }
+}
+
+/****************************************************************************
+  Show a list of all players with the assigned color.
+****************************************************************************/
+static void show_colors(struct connection *caller)
+{
+  cmd_reply(CMD_LIST, caller, C_COMMENT, _("List of player colors:"));
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+  if (player_count() == 0) {
+    cmd_reply(CMD_LIST, caller, C_COMMENT, _("<no players>"));
+  } else {
+    players_iterate(pplayer) {
+      cmd_reply(CMD_LIST, caller, C_COMMENT, _("%s (user %s): [%s]"),
+                player_name(pplayer), pplayer->username,
+                player_color_ftstr(pplayer));
+    } players_iterate_end;
+  }
+  cmd_reply(CMD_LIST, caller, C_COMMENT, horiz_line);
+}
+
+/****************************************************************************
   '/list' arguments
 **************************************************************************/
 #define SPECENUM_NAME list_args
-#define SPECENUM_VALUE0     LIST_CONNECTIONS
-#define SPECENUM_VALUE0NAME "connections"
-#define SPECENUM_VALUE1     LIST_IGNORE
-#define SPECENUM_VALUE1NAME "ignored users"
-#define SPECENUM_VALUE2     LIST_PLAYERS
-#define SPECENUM_VALUE2NAME "players"
-#define SPECENUM_VALUE3     LIST_SCENARIOS
-#define SPECENUM_VALUE3NAME "scenarios"
-#define SPECENUM_VALUE4     LIST_TEAMS
-#define SPECENUM_VALUE4NAME "teams"
-#define SPECENUM_VALUE5     LIST_VOTES
-#define SPECENUM_VALUE5NAME "votes"
+#define SPECENUM_VALUE0     LIST_COLORS
+#define SPECENUM_VALUE0NAME "colors"
+#define SPECENUM_VALUE1     LIST_CONNECTIONS
+#define SPECENUM_VALUE1NAME "connections"
+#define SPECENUM_VALUE2     LIST_DELEGATIONS
+#define SPECENUM_VALUE2NAME "delegations"
+#define SPECENUM_VALUE3     LIST_IGNORE
+#define SPECENUM_VALUE3NAME "ignored users"
+#define SPECENUM_VALUE4     LIST_MAPIMG
+#define SPECENUM_VALUE4NAME "map image definitions"
+#define SPECENUM_VALUE5     LIST_PLAYERS
+#define SPECENUM_VALUE5NAME "players"
+#define SPECENUM_VALUE6     LIST_SCENARIOS
+#define SPECENUM_VALUE6NAME "scenarios"
+#define SPECENUM_VALUE7     LIST_NATIONSETS
+#define SPECENUM_VALUE7NAME "nationsets"
+#define SPECENUM_VALUE8     LIST_TEAMS
+#define SPECENUM_VALUE8NAME "teams"
+#define SPECENUM_VALUE9     LIST_VOTES
+#define SPECENUM_VALUE9NAME "votes"
 #include "specenum_gen.h"
 
 /**************************************************************************
@@ -5137,16 +6548,28 @@ static bool show_list(struct connection *caller, char *arg)
   }
 
   switch(ind) {
+  case LIST_COLORS:
+    show_colors(caller);
+    return TRUE;
   case LIST_CONNECTIONS:
     show_connections(caller);
     return TRUE;
+  case LIST_DELEGATIONS:
+    show_delegations(caller);
+    return TRUE;
   case LIST_IGNORE:
     return show_ignore(caller);
+  case LIST_MAPIMG:
+    show_mapimg(caller, CMD_LIST);
+    return TRUE;
   case LIST_PLAYERS:
     show_players(caller);
     return TRUE;
   case LIST_SCENARIOS:
     show_scenarios(caller);
+    return TRUE;
+  case LIST_NATIONSETS:
+    show_nationsets(caller);
     return TRUE;
   case LIST_TEAMS:
     show_teams(caller);
@@ -5172,14 +6595,16 @@ static bool show_list(struct connection *caller, char *arg)
 /**************************************************************************
   A generalised generator function: text and state are "standard"
   parameters to a readline generator function;
-  num is number of possible completions, and index2str is a function
-  which returns each possible completion string by index.
+  num is number of possible completions, or -1 if this is not known and 
+  index2str should be iterated until it returns NULL;
+  index2str is a function which returns each possible completion string
+  by index (it may return NULL).
 **************************************************************************/
 static char *generic_generator(const char *text, int state, int num,
 			       const char*(*index2str)(int))
 {
   static int list_index, len;
-  const char *name;
+  const char *name = ""; /* dummy non-NULL string */
   char *mytext = local_to_internal_string_malloc(text);
 
   /* This function takes a string (text) in the local format and must return
@@ -5198,7 +6623,7 @@ static char *generic_generator(const char *text, int state, int num,
   }
 
   /* Return the next name which partially matches: */
-  while (list_index < num) {
+  while ((num < 0 && name) || (list_index < num)) {
     name = index2str(list_index);
     list_index++;
 
@@ -5234,12 +6659,40 @@ static char *option_generator(const char *text, int state)
 **************************************************************************/
 static char *olevel_generator(const char *text, int state)
 {
-  return generic_generator(text, state, settings_number() + OLEVELS_NUM,
+  return generic_generator(text, state, settings_number() + OLEVELS_NUM + 1,
                            olvlname_accessor);
 }
 
 /**************************************************************************
-  The player names.
+  Accessor for values of the enum/bitwise option defined by
+  'completion_option'.
+**************************************************************************/
+static int completion_option;
+static const char *option_value_accessor(int idx) {
+  const struct setting *pset = setting_by_number(completion_option);
+  switch (setting_type(pset)) {
+  case SSET_ENUM:
+    return setting_enum_val(pset, idx, FALSE);
+    break;
+  case SSET_BITWISE:
+    return setting_bitwise_bit(pset, idx, FALSE);
+    break;
+  default:
+    fc_assert_ret_val(0, NULL);
+  }
+}
+
+/**************************************************************************
+  The valid arguments to "set OPT", where OPT is the enumerated or
+  bitwise option previously defined by completion_option
+**************************************************************************/
+static char *option_value_generator(const char *text, int state)
+{
+  return generic_generator(text, state, -1, option_value_accessor);
+}
+
+/**************************************************************************
+  Access player name.
 **************************************************************************/
 static const char *playername_accessor(int idx)
 {
@@ -5252,6 +6705,9 @@ static const char *playername_accessor(int idx)
   return player_name(player_slot_get_player(pslot));
 }
 
+/**************************************************************************
+  The valid playername arguments.
+**************************************************************************/
 static char *player_generator(const char *text, int state)
 {
   return generic_generator(text, state, player_slot_count(),
@@ -5259,12 +6715,16 @@ static char *player_generator(const char *text, int state)
 }
 
 /**************************************************************************
-The connection user names, from game.all_connections.
+  Access connection user name, from game.all_connections.
 **************************************************************************/
 static const char *connection_name_accessor(int idx)
 {
   return conn_list_get(game.all_connections, idx)->username;
 }
+
+/**************************************************************************
+  The valid connection user name arguments.
+**************************************************************************/
 static char *connection_generator(const char *text, int state)
 {
   return generic_generator(text, state, conn_list_size(game.all_connections),
@@ -5272,13 +6732,16 @@ static char *connection_generator(const char *text, int state)
 }
 
 /**************************************************************************
-The valid arguments for the first argument to "cmdlevel".
-Extra accessor function since cmdlevel_name() takes enum argument, not int.
+  Extra accessor function since cmdlevel_name() takes enum argument, not int.
 **************************************************************************/
 static const char *cmdlevel_arg1_accessor(int idx)
 {
   return cmdlevel_name(idx);
 }
+
+/**************************************************************************
+  The valid first argument to "cmdlevel"
+**************************************************************************/
 static char *cmdlevel_arg1_generator(const char *text, int state)
 {
   return generic_generator(text, state, cmdlevel_max()+1,
@@ -5286,8 +6749,8 @@ static char *cmdlevel_arg1_generator(const char *text, int state)
 }
 
 /**************************************************************************
-The valid arguments for the second argument to "cmdlevel":
-"first" or "new" or a connection name.
+  Accessor for the second argument to "cmdlevel": "first" or "new" or
+  a connection name.
 **************************************************************************/
 static const char *cmdlevel_arg2_accessor(int idx)
 {
@@ -5295,11 +6758,83 @@ static const char *cmdlevel_arg2_accessor(int idx)
 	  (idx==1) ? "new" :
 	  connection_name_accessor(idx-2));
 }
+
+/**************************************************************************
+  The valid arguments for the second argument to "cmdlevel".
+**************************************************************************/
 static char *cmdlevel_arg2_generator(const char *text, int state)
 {
   return generic_generator(text, state,
+                           /* "first", "new", connection names */
 			   2 + conn_list_size(game.all_connections),
 			   cmdlevel_arg2_accessor);
+}
+
+/**************************************************************************
+  Accessor for the second argument to "create": ai type name
+**************************************************************************/
+static const char *aitype_accessor(int idx)
+{
+  return get_ai_type(idx)->name;
+}
+
+/**************************************************************************
+  The valid arguments for the second argument to "create".
+**************************************************************************/
+static char *aitype_generator(const char *text, int state)
+{
+  return generic_generator(text, state, ai_type_get_count(),
+                           aitype_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the argument to "reset".
+**************************************************************************/
+static char *reset_generator(const char *text, int state)
+{
+  return generic_generator(text, state, reset_args_max() + 1, reset_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the argument to "vote".
+**************************************************************************/
+static char *vote_generator(const char *text, int state)
+{
+  return generic_generator(text, state, -1, vote_arg_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the first argument to "delegate".
+**************************************************************************/
+static char *delegate_generator(const char *text, int state)
+{
+  return generic_generator(text, state, delegate_args_max() + 1,
+                           delegate_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the first argument to "mapimg".
+**************************************************************************/
+static char *mapimg_generator(const char *text, int state)
+{
+  return generic_generator(text, state, mapimg_args_max() + 1,
+                           mapimg_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the argument to "fcdb".
+**************************************************************************/
+static char *fcdb_generator(const char *text, int state)
+{
+  return generic_generator(text, state, FCDB_COUNT, fcdb_accessor);
+}
+
+/**************************************************************************
+  The valid arguments for the argument to "lua".
+**************************************************************************/
+static char *lua_generator(const char *text, int state)
+{
+  return generic_generator(text, state, lua_args_max() + 1, lua_accessor);
 }
 
 /**************************************************************************
@@ -5319,23 +6854,34 @@ static char *list_generator(const char *text, int state)
 }
 
 /**************************************************************************
-returns whether the characters before the start position in rl_line_buffer
-is of the form [non-alpha]*cmd[non-alpha]*
-allow_fluff changes the regexp to [non-alpha]*cmd[non-alpha].*
+  Generalised version of contains_str_before_start, which searches the
+  N'th token in rl_line_buffer (0=first).
 **************************************************************************/
-static bool contains_str_before_start(int start, const char *cmd, bool allow_fluff)
+static bool contains_token_before_start(int start, int token, const char *arg,
+                                        bool allow_fluff)
 {
   char *str_itr = rl_line_buffer;
-  int cmd_len = strlen(cmd);
+  int arg_len = strlen(arg);
 
+  /* Swallow unwanted tokens and their preceding delimiters */
+  while (token--) {
+    while (str_itr < rl_line_buffer + start && !fc_isalnum(*str_itr)) {
+      str_itr++;
+    }
+    while (str_itr < rl_line_buffer + start && fc_isalnum(*str_itr)) {
+      str_itr++;
+    }
+  }
+
+  /* Swallow any delimiters before the token we're interested in */
   while (str_itr < rl_line_buffer + start && !fc_isalnum(*str_itr)) {
     str_itr++;
   }
 
-  if (fc_strncasecmp(str_itr, cmd, cmd_len) != 0) {
+  if (fc_strncasecmp(str_itr, arg, arg_len) != 0) {
     return FALSE;
   }
-  str_itr += cmd_len;
+  str_itr += arg_len;
 
   if (fc_isalnum(*str_itr)) {
     /* Not a distinct word. */
@@ -5354,7 +6900,19 @@ static bool contains_str_before_start(int start, const char *cmd, bool allow_flu
 }
 
 /**************************************************************************
-...
+  Returns whether the text between the start of rl_line_buffer and the
+  start position is of the form [non-alpha]*cmd[non-alpha]*
+  allow_fluff changes the regexp to [non-alpha]*cmd[non-alpha].*
+**************************************************************************/
+static bool contains_str_before_start(int start, const char *cmd,
+                                      bool allow_fluff)
+{
+  return contains_token_before_start(start, 0, cmd, allow_fluff);
+}
+
+/**************************************************************************
+  Return whether we are completing command name. This can be either
+  command itself, or argument to 'help'.
 **************************************************************************/
 static bool is_command(int start)
 {
@@ -5373,22 +6931,6 @@ static bool is_command(int start)
   }
   return TRUE;
 }
-
-/**************************************************************************
-Commands that may be followed by a player name
-**************************************************************************/
-static const int player_cmd[] = {
-  CMD_AITOGGLE,
-  CMD_NOVICE,
-  CMD_EASY,
-  CMD_NORMAL,
-  CMD_HARD,
-  CMD_CHEATING,
-  CMD_EXPERIMENTAL,
-  CMD_REMOVE,
-  CMD_TEAM,
-  -1
-};
 
 /**************************************************************************
 number of tokens in rl_line_buffer before start
@@ -5415,7 +6957,24 @@ static int num_tokens(int start)
 }
 
 /**************************************************************************
-...
+Commands that may be followed by a player name
+**************************************************************************/
+static const int player_cmd[] = {
+  CMD_AITOGGLE,
+  CMD_NOVICE,
+  CMD_EASY,
+  CMD_NORMAL,
+  CMD_HARD,
+  CMD_CHEATING,
+  CMD_EXPERIMENTAL,
+  CMD_REMOVE,
+  CMD_TEAM,
+  CMD_PLAYERCOLOR,
+  -1
+};
+
+/**************************************************************************
+  Return whether we are completing player name argument.
 **************************************************************************/
 static bool is_player(int start)
 {
@@ -5432,15 +6991,35 @@ static bool is_player(int start)
 }
 
 /**************************************************************************
-...
+Commands that may be followed by a connection name
+**************************************************************************/
+static const int connection_cmd[] = {
+  CMD_CUT,
+  CMD_KICK,
+  -1
+};
+
+/**************************************************************************
+  Return whether we are completing connection name argument.
 **************************************************************************/
 static bool is_connection(int start)
 {
-  return contains_str_before_start(start, command_name_by_number(CMD_CUT), FALSE);
+  int i = 0;
+
+  while (connection_cmd[i] != -1) {
+    if (contains_str_before_start(start,
+                                  command_name_by_number(connection_cmd[i]),
+                                  FALSE)) {
+      return TRUE;
+    }
+    i++;
+  }
+
+  return FALSE;
 }
 
 /**************************************************************************
-...
+  Return whether we are completing cmdlevel command argument 2.
 **************************************************************************/
 static bool is_cmdlevel_arg2(int start)
 {
@@ -5449,7 +7028,7 @@ static bool is_cmdlevel_arg2(int start)
 }
 
 /**************************************************************************
-...
+  Return whether we are completing cmdlevel command argument.
 **************************************************************************/
 static bool is_cmdlevel_arg1(int start)
 {
@@ -5515,6 +7094,34 @@ static bool is_option_level(int start)
 }
 
 /**************************************************************************
+  Returns TRUE if the readline buffer string is such that we expect an
+  enumerated value at the given position. The option for which values
+  should be completed is written to opt_p.
+**************************************************************************/
+static bool is_enum_option_value(int start, int *opt_p)
+{
+  if (contains_str_before_start(start, command_name_by_number(CMD_SET),
+                                TRUE)) {
+    settings_iterate(SSET_ALL, pset) {
+      if (setting_type(pset) != SSET_ENUM
+          && setting_type(pset) != SSET_BITWISE) {
+        continue;
+      }
+      /* Allow a single token for enum options, multiple for bitwise
+       * (the separator | will separate tokens for these purposes) */
+      if (contains_token_before_start(start, 1, setting_name(pset),
+                                      setting_type(pset) == SSET_BITWISE)) {
+        *opt_p = setting_number(pset);
+        /* Suppress appended space for bitwise options (user may want |) */
+        rl_completion_suppress_append = (setting_type(pset) == SSET_BITWISE);
+        return TRUE;
+      }
+    } settings_iterate_end;
+  }
+  return FALSE;
+}
+
+/**************************************************************************
 Commands that may be followed by a filename
 **************************************************************************/
 static const int filename_cmd[] = {
@@ -5526,7 +7133,7 @@ static const int filename_cmd[] = {
 };
 
 /**************************************************************************
-...
+  Return whether we are completing filename.
 **************************************************************************/
 static bool is_filename(int start)
 {
@@ -5543,7 +7150,76 @@ static bool is_filename(int start)
 }
 
 /**************************************************************************
-...
+  Return whether we are completing second argument for create command
+**************************************************************************/
+static bool is_create_arg2(int start)
+{
+  return (contains_str_before_start(start, command_name_by_number(CMD_CREATE), TRUE)
+	  && num_tokens(start) == 2);
+}
+
+/**************************************************************************
+  Return whether we are completing argument for reset command
+**************************************************************************/
+static bool is_reset(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_RESET),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing argument for vote command
+**************************************************************************/
+static bool is_vote(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_VOTE),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing first argument for delegate command
+**************************************************************************/
+static bool is_delegate_arg1(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_DELEGATE),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing first argument for mapimg command
+**************************************************************************/
+static bool is_mapimg(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_MAPIMG),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing argument for fcdb command
+**************************************************************************/
+static bool is_fcdb(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_FCDB),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing argument for lua command
+**************************************************************************/
+static bool is_lua(int start)
+{
+  return contains_str_before_start(start,
+                                   command_name_by_number(CMD_LUA),
+                                   FALSE);
+}
+
+/**************************************************************************
+  Return whether we are completing help command argument.
 **************************************************************************/
 static bool is_help(int start)
 {
@@ -5551,7 +7227,7 @@ static bool is_help(int start)
 }
 
 /**************************************************************************
-...
+  Return whether we are completing list command argument.
 **************************************************************************/
 static bool is_list(int start)
 {
@@ -5565,37 +7241,51 @@ the word to complete.  We can use the entire contents of rl_line_buffer
 in case we want to do some simple parsing.  Return the array of matches,
 or NULL if there aren't any.
 **************************************************************************/
-#ifdef HAVE_NEWLIBREADLINE
 char **freeciv_completion(const char *text, int start, int end)
-#else
-char **freeciv_completion(char *text, int start, int end)
-#endif
 {
   char **matches = (char **)NULL;
 
   if (is_help(start)) {
-    matches = completion_matches(text, help_generator);
+    matches = rl_completion_matches(text, help_generator);
   } else if (is_command(start)) {
-    matches = completion_matches(text, command_generator);
+    matches = rl_completion_matches(text, command_generator);
   } else if (is_list(start)) {
-    matches = completion_matches(text, list_generator);
+    matches = rl_completion_matches(text, list_generator);
   } else if (is_cmdlevel_arg2(start)) {
-    matches = completion_matches(text, cmdlevel_arg2_generator);
+    matches = rl_completion_matches(text, cmdlevel_arg2_generator);
   } else if (is_cmdlevel_arg1(start)) {
-    matches = completion_matches(text, cmdlevel_arg1_generator);
+    matches = rl_completion_matches(text, cmdlevel_arg1_generator);
   } else if (is_connection(start)) {
-    matches = completion_matches(text, connection_generator);
+    matches = rl_completion_matches(text, connection_generator);
   } else if (is_player(start)) {
-    matches = completion_matches(text, player_generator);
+    matches = rl_completion_matches(text, player_generator);
   } else if (is_server_option(start)) {
-    matches = completion_matches(text, option_generator);
+    matches = rl_completion_matches(text, option_generator);
   } else if (is_option_level(start)) {
-    matches = completion_matches(text, olevel_generator);
+    matches = rl_completion_matches(text, olevel_generator);
+  } else if (is_enum_option_value(start, &completion_option)) {
+    matches = rl_completion_matches(text, option_value_generator);
   } else if (is_filename(start)) {
     /* This function we get from readline */
-    matches = completion_matches(text, filename_completion_function);
-  } else /* We have no idea what to do */
+    matches = rl_completion_matches(text, rl_filename_completion_function);
+  } else if (is_create_arg2(start)) {
+    matches = rl_completion_matches(text, aitype_generator);
+  } else if (is_reset(start)) {
+    matches = rl_completion_matches(text, reset_generator);
+  } else if (is_vote(start)) {
+    matches = rl_completion_matches(text, vote_generator);
+  } else if (is_delegate_arg1(start)) {
+    matches = rl_completion_matches(text, delegate_generator);
+  } else if (is_mapimg(start)) {
+    matches = rl_completion_matches(text, mapimg_generator);
+  } else if (is_fcdb(start)) {
+    matches = rl_completion_matches(text, fcdb_generator);
+  } else if (is_lua(start)) {
+    matches = rl_completion_matches(text, lua_generator);
+  } else {
+    /* We have no idea what to do */
     matches = NULL;
+  }
 
   /* Don't automatically try to complete with filenames */
   rl_attempted_completion_over = 1;

@@ -4,12 +4,12 @@ name=_("Gallic")
 plural=_("?plural:Gauls")
 groups="Ancient", "European"
 legend=_("The Gauls were a Celtic people occupying what is now France and\
- Belgium.  They lived in chiefdom-level societies that grew increasingly\
+ Belgium. They lived in chiefdom-level societies that grew increasingly\
  centralized and stratified under the influence of the Greek and Roman\
- merchants and soldiers who came to Gaul.  Julius Caesar launched his\
- eight year invasion of Gaul in 59 BC.  He claimed to have killed one\
+ merchants and soldiers who came to Gaul. Julius Caesar launched his\
+ eight year invasion of Gaul in 59 BCE. He claimed to have killed one\
  million people and enslaved another million out of an original population\
- of three million.  The Gauls united and rallied under Vercingetorix, who\
+ of three million. The Gauls united and rallied under Vercingetorix, who\
  defeated Caesar at the battle of Gergovia, but was later crushed by him\
  at the battle of Alesia.")
 
@@ -28,6 +28,7 @@ ruler_titles = {
  "government",     "male_title",       "female_title"
  "Despotism",      _("Chieftain %s"),  _("?female:Chieftain %s")
  "Fundamentalism", _("Druid %s"),      _("?female:Druid %s")
+ "Republic",       _("Consul %s"),     _("?female:Consul %s")
 } 
 
 flag="gaul"
@@ -36,11 +37,10 @@ city_style = "Celtic"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with = "french", "belgian"
-civilwar_nations = "french", "belgian", "celtiberian"
+civilwar_nations = "boian", "helvetian", "celtiberian", "belgic"
 
 ; City names from various articles on Wikipedia:
 ; http://en.wikipedia.org/wiki/Category:Ancient_Gauls

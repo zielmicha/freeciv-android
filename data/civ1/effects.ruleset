@@ -11,22 +11,33 @@
 
 [datafile]
 description="Civ1 effects data for Freeciv (approximate)"
-options="+Freeciv-2.3-ruleset"
+options="+Freeciv-2.5-ruleset"
 
 ; /* <-- avoid gettext warnings
+;
+; Effects
+;
+; type                    = What the effect does. Values of multiple active effects
+;                           of the same type get summed for the total.
+;                           See README.effects for list of possible types
+; value                   = Value added for the effect type when this effect is active,
+;                           i.e., all requirements are fulfilled
+; reqs                    = Requirements for the effect to be active.
+;                           See README.effects for help on requirements
+;
 ; */ <-- avoid gettext warnings
 
 ; Cheating AI effects are in separate file
 *include "default/ai_effects.ruleset"
 
 [effect_unhappysize]
-name    = "City_Unhappy_Size"
+type    = "City_Unhappy_Size"
 value   = 4
 
 ; Specialist output bonuses
 
 [effect_gov_tile_bonus_0]
-name    = "Output_Penalty_Tile"
+type    = "Output_Penalty_Tile"
 value   = 2
 reqs  =
     { "type",       "name",      "range"
@@ -34,7 +45,7 @@ reqs  =
     }
 
 [effect_gov_tile_bonus_1]
-name    = "Output_Penalty_Tile"
+type    = "Output_Penalty_Tile"
 value   = 2
 reqs  =
     { "type",       "name",      "range"
@@ -42,7 +53,7 @@ reqs  =
     }
 
 [effect_gov_tile_bonus_2]
-name    = "Output_Inc_Tile_Celebrate"
+type    = "Output_Inc_Tile_Celebrate"
 value   = 1
 reqs  =
     { "type",       "name",      "range"
@@ -51,7 +62,7 @@ reqs  =
     }
 
 [effect_gov_tile_bonus_3]
-name    = "Output_Inc_Tile_Celebrate"
+type    = "Output_Inc_Tile_Celebrate"
 value   = 1
 reqs  =
     { "type",       "name",      "range"
@@ -60,7 +71,7 @@ reqs  =
     }
 
 [effect_gov_tile_bonus_4]
-name    = "Output_Inc_Tile"
+type    = "Output_Inc_Tile"
 value   = 1
 reqs  =
     { "type",       "name",      "range"
@@ -69,7 +80,7 @@ reqs  =
     }
 
 [effect_gov_tile_bonus_5]
-name    = "Output_Inc_Tile"
+type    = "Output_Inc_Tile"
 value   = 1
 reqs  =
     { "type",       "name",      "range"
@@ -159,7 +170,7 @@ reqs  =
     }
 
 [effect_elvis]
-name    = "Specialist_Output"
+type    = "Specialist_Output"
 value   = 2
 reqs    =
     { "type", "name", "range"
@@ -168,7 +179,7 @@ reqs    =
     }
 
 [effect_scientist]
-name    = "Specialist_Output"
+type    = "Specialist_Output"
 value   = 2
 reqs    =
     { "type", "name", "range"
@@ -177,7 +188,7 @@ reqs    =
     }
 
 [effect_taxman]
-name    = "Specialist_Output"
+type    = "Specialist_Output"
 value   = 2
 reqs    =
     { "type", "name", "range"
@@ -188,17 +199,29 @@ reqs    =
 ; Barbarian effects
 
 [effect_barb1]
-name    = "No_Diplomacy"
+type    = "No_Diplomacy"
 value   = 1
 reqs    =
     { "type",   "name", "range"
       "Nation", "Barbarian", "Player"
     }
 
+[effect_pirate]
+type    = "No_Diplomacy"
+value   = 1
+reqs    =
+    { "type",   "name", "range"
+      "Nation", "Pirate", "Player"
+    }
+
 ; Base vision range - radius of vision is sqrt(5) = 2.24
 [effect_city_vision]
-name    = "City_Vision_Radius_Sq"
+type    = "City_Vision_Radius_Sq"
 value   = 5
+
+[effect_trade_routes]
+type    = "Max_Trade_Routes"
+value   = 3
 
 [effect_base_unit_upkeep]
 name  = "Upkeep_Factor"
@@ -257,7 +280,7 @@ reqs   =
     }
 
 [effect_civil_war_0]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 90
 reqs    =
     { "type",       "name",      "range"
@@ -265,7 +288,7 @@ reqs    =
     }
 
 [effect_civil_war_1]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 80
 reqs    =
     { "type",       "name",      "range"
@@ -273,7 +296,7 @@ reqs    =
     }
 
 [effect_civil_war_2]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 70
 reqs    =
     { "type",       "name",      "range"
@@ -281,7 +304,7 @@ reqs    =
     }
 
 [effect_civil_war_3]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 50
 reqs    =
     { "type",       "name",      "range"
@@ -289,7 +312,7 @@ reqs    =
     }
 
 [effect_civil_war_4]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 40
 reqs    =
     { "type",       "name",      "range"
@@ -297,7 +320,7 @@ reqs    =
     }
 
 [effect_civil_war_5]
-name    = "Civil_War_Chance"
+type    = "Civil_War_Chance"
 value   = 30
 reqs    =
     { "type",       "name",      "range"
@@ -305,7 +328,7 @@ reqs    =
     }
 
 [effect_empire_size_base_0]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 9
 reqs    =
     { "type",       "name",      "range"
@@ -313,7 +336,7 @@ reqs    =
     }
 
 [effect_empire_size_base_1]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 10
 reqs    =
     { "type",       "name",      "range"
@@ -321,7 +344,7 @@ reqs    =
     }
 
 [effect_empire_size_base_2]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 11
 reqs    =
     { "type",       "name",      "range"
@@ -329,7 +352,7 @@ reqs    =
     }
 
 [effect_empire_size_base_3]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 12
 reqs    =
     { "type",       "name",      "range"
@@ -337,7 +360,7 @@ reqs    =
     }
 
 [effect_empire_size_base_4]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 13
 reqs    =
     { "type",       "name",      "range"
@@ -345,7 +368,7 @@ reqs    =
     }
 
 [effect_empire_size_base_5]
-name    = "Empire_Size_Base"
+type    = "Empire_Size_Base"
 value   = 14
 reqs    =
     { "type",       "name",      "range"
@@ -355,11 +378,11 @@ reqs    =
 ; FIXME: How this should work in Civ1?
 ;        This just makes it playable.
 [effect_empire_size_step]
-name    = "Empire_Size_Step"
+type    = "Empire_Size_Step"
 value   = 10
 
 [effect_max_rates_0]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 100
 reqs    =
     { "type",       "name",      "range"
@@ -367,7 +390,7 @@ reqs    =
     }
 
 [effect_max_rates_1]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 60
 reqs    =
     { "type",       "name",      "range"
@@ -375,7 +398,7 @@ reqs    =
     }
 
 [effect_max_rates_2]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 70
 reqs    =
     { "type",       "name",      "range"
@@ -383,7 +406,7 @@ reqs    =
     }
 
 [effect_max_rates_3]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 80
 reqs    =
     { "type",       "name",      "range"
@@ -391,7 +414,7 @@ reqs    =
     }
 
 [effect_max_rates_4]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 80
 reqs    =
     { "type",       "name",      "range"
@@ -399,7 +422,7 @@ reqs    =
     }
 
 [effect_max_rates_5]
-name    = "Max_Rates"
+type    = "Max_Rates"
 value   = 100
 reqs    =
     { "type",       "name",      "range"
@@ -407,7 +430,7 @@ reqs    =
     }
 
 [effect_martial_law_each_0]
-name    = "Martial_Law_Each"
+type    = "Martial_Law_Each"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -415,7 +438,7 @@ reqs    =
     }
 
 [effect_martial_law_each_1]
-name    = "Martial_Law_Each"
+type    = "Martial_Law_Each"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -423,7 +446,7 @@ reqs    =
     }
 
 [effect_martial_law_each_2]
-name    = "Martial_Law_Each"
+type    = "Martial_Law_Each"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -431,7 +454,7 @@ reqs    =
     }
 
 [effect_martial_law_each_3]
-name    = "Martial_Law_Each"
+type    = "Martial_Law_Each"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -439,7 +462,7 @@ reqs    =
     }
 
 [effect_martial_law_max_0]
-name    = "Martial_Law_Max"
+type    = "Martial_Law_Max"
 value   = 100
 reqs    =
     { "type",       "name",      "range"
@@ -447,7 +470,7 @@ reqs    =
     }
 
 [effect_martial_law_max_1]
-name    = "Martial_Law_Max"
+type    = "Martial_Law_Max"
 value   = 100
 reqs    =
     { "type",       "name",      "range"
@@ -455,7 +478,7 @@ reqs    =
     }
 
 [effect_martial_law_max_2]
-name    = "Martial_Law_Max"
+type    = "Martial_Law_Max"
 value   = 3
 reqs    =
 
@@ -464,7 +487,7 @@ reqs    =
     }
 
 [effect_martial_law_max_3]
-name    = "Martial_Law_Max"
+type    = "Martial_Law_Max"
 value   = 100
 reqs    =
     { "type",       "name",      "range"
@@ -472,7 +495,7 @@ reqs    =
     }
 
 [effect_rapture_grow_0]
-name    = "Rapture_Grow"
+type    = "Rapture_Grow"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -480,7 +503,7 @@ reqs    =
     }
 
 [effect_rapture_grow_1]
-name    = "Rapture_Grow"
+type    = "Rapture_Grow"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -488,7 +511,7 @@ reqs    =
     }
 
 [effect_democracy_0]
-name    = "Unbribable_Units"
+type    = "Unbribable_Units"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -496,24 +519,15 @@ reqs    =
     }
 
 [effect_democracy_1]
-name    = "No_Incite"
+type    = "No_Incite"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
       "Gov", "Democracy", "Player"
     }
 
-[effect_communism_0]
-name    = "Veteran_Build"
-value   = 1
-reqs    =
-    { "type",       "name",      "range"
-      "Gov", "Communism", "Player"
-      "UnitFlag", "Diplomat", "Local"
-    }
-
 [effect_revolution_0]
-name    = "Revolution_When_Unhappy"
+type    = "Revolution_When_Unhappy"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -521,7 +535,7 @@ reqs    =
     }
 
 [effect_senate_0]
-name    = "Has_Senate"
+type    = "Has_Senate"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -529,7 +543,7 @@ reqs    =
     }
 
 [effect_senate_1]
-name    = "Has_Senate"
+type    = "Has_Senate"
 value   = 1
 reqs    =
     { "type",       "name",      "range"
@@ -538,11 +552,11 @@ reqs    =
 
 ; Base max city size of 10
 [effect_aqueduct_size]
-name    = "Size_Adj"
+type    = "Size_Adj"
 value   = 10
 
 [effect_aqueduct]
-name	= "Size_Unlimit"
+type    = "Size_Unlimit"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -550,7 +564,7 @@ reqs	=
     }
 
 [effect_bank]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -560,7 +574,7 @@ reqs	=
     }
 
 [effect_bank_1]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -570,23 +584,32 @@ reqs	=
     }
 
 [effect_barracks]
-name	= "Veteran_Build"
+type    = "Veteran_Build"
 value	= 1
 reqs	=
     { "type", "name", "range"
       "Building", "Barracks", "City"
     }
+nreqs   =
+    { "type", "name", "range"
+      "Building", "Barracks II", "City"
+      "Building", "Barracks III", "City"
+    }
 
 [effect_barracks_ii]
-name	= "Veteran_Build"
+type    = "Veteran_Build"
 value	= 1
 reqs	=
     { "type", "name", "range"
       "Building", "Barracks II", "City"
     }
+nreqs   =
+    { "type", "name", "range"
+      "Building", "Barracks III", "City"
+    }
 
 [effect_barracks_iii]
-name	= "Veteran_Build"
+type    = "Veteran_Build"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -594,7 +617,7 @@ reqs	=
     }
 
 [effect_cathedral]
-name	= "Make_Content"
+type    = "Make_Content"
 value	= 4
 reqs	=
     { "type", "name", "range"
@@ -602,7 +625,7 @@ reqs	=
     }
 
 [effect_city_walls]
-name	= "Defend_Bonus"
+type    = "Defend_Bonus"
 value	= 200
 reqs	=
     { "type", "name", "range"
@@ -615,7 +638,7 @@ nreqs	=
     }
 
 [effect_city_walls_1]
-name	= "Defend_Bonus"
+type    = "Defend_Bonus"
 value	= 200
 reqs	=
     { "type", "name", "range"
@@ -628,7 +651,7 @@ nreqs	=
     }
 
 [effect_city_walls_2]
-name	= "Unit_No_Lose_Pop"
+type    = "Unit_No_Lose_Pop"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -636,7 +659,7 @@ reqs	=
     }
 
 [effect_city_walls_visible]
-name	= "Visible_Walls"
+type    = "Visible_Walls"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -644,7 +667,7 @@ reqs	=
     }
 
 [effect_colosseum]
-name	= "Make_Content"
+type    = "Make_Content"
 value	= 3
 reqs	=
     { "type", "name", "range"
@@ -652,7 +675,7 @@ reqs	=
     }
 
 [effect_courthouse]
-name	= "Output_Waste_Pct"
+type    = "Output_Waste_Pct"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -665,7 +688,7 @@ nreqs	=
     }
 
 ;[effect_courthouse_1]
-;name	= "Output_Waste_Pct"
+;type    = "Output_Waste_Pct"
 ;value	= 50
 ;reqs	=
 ;    { "type", "name", "range"
@@ -678,7 +701,7 @@ nreqs	=
 ;    }
 
 [effect_factory]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -691,7 +714,7 @@ nreqs	=
     }
 
 [effect_granary]
-name	= "Growth_Food"
+type    = "Growth_Food"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -699,7 +722,7 @@ reqs	=
     }
 
 [effect_hydro_plant]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -713,7 +736,7 @@ nreqs	=
     }
 
 [effect_hydro_plant_1]
-name	= "Pollu_Prod_Pct"
+type    = "Pollu_Prod_Pct"
 value	= -50
 reqs	=
     { "type", "name", "range"
@@ -727,7 +750,7 @@ nreqs	=
     }
 
 [effect_library]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -736,7 +759,7 @@ reqs	=
     }
 
 [effect_marketplace]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -745,7 +768,7 @@ reqs	=
     }
 
 [effect_marketplace_1]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -754,7 +777,7 @@ reqs	=
     }
 
 [effect_mass_transit]
-name	= "Pollu_Pop_Pct"
+type    = "Pollu_Pop_Pct"
 value	= -100
 reqs	=
     { "type", "name", "range"
@@ -762,7 +785,7 @@ reqs	=
     }
 
 [effect_mfg_plant]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 100
 reqs	=
     { "type", "name", "range"
@@ -771,7 +794,7 @@ reqs	=
     }
 
 [effect_nuclear_plant]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -784,7 +807,7 @@ nreqs	=
     }
 
 [effect_nuclear_plant_1]
-name	= "Pollu_Prod_Pct"
+type    = "Pollu_Prod_Pct"
 value	= -50
 reqs	=
     { "type", "name", "range"
@@ -797,7 +820,7 @@ nreqs	=
     }
 
 [effect_palace]
-name	= "Output_Waste_Pct"
+type    = "Output_Waste_Pct"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -806,7 +829,7 @@ reqs	=
     }
 
 [effect_palace_1]
-name	= "Output_Waste_Pct"
+type    = "Output_Waste_Pct"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -815,7 +838,7 @@ reqs	=
     }
 
 [effect_palace_2]
-name	= "Spy_Resistant"
+type    = "Spy_Resistant"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -823,7 +846,7 @@ reqs	=
     }
 
 [effect_palace_3]
-name	= "No_Incite"
+type    = "No_Incite"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -831,7 +854,15 @@ reqs	=
     }
 
 [effect_palace_4]
-name	= "Capital_City"
+type    = "Capital_City"
+value	= 1
+reqs	=
+    { "type", "name", "range"
+      "Building", "Palace", "City"
+    }
+
+[effect_palace_gov_center]
+type    = "Gov_Center"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -839,7 +870,7 @@ reqs	=
     }
 
 [effect_power_plant]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -854,7 +885,7 @@ nreqs	=
     }
 
 [effect_recycling_center]
-name	= "Pollu_Prod_Pct"
+type    = "Pollu_Prod_Pct"
 value	= -66
 reqs	=
     { "type", "name", "range"
@@ -862,7 +893,7 @@ reqs	=
     }
 
 [effect_sdi_defense]
-name	= "Nuke_Proof"
+type    = "Nuke_Proof"
 value	= 100
 reqs	=
     { "type", "name", "range"
@@ -870,7 +901,7 @@ reqs	=
     }
 
 [effect_space_component]
-name	= "SS_Component"
+type    = "SS_Component"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -878,7 +909,7 @@ reqs	=
     }
 
 [effect_space_module]
-name	= "SS_Module"
+type    = "SS_Module"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -886,7 +917,7 @@ reqs	=
     }
 
 [effect_space_structural]
-name	= "SS_Structural"
+type    = "SS_Structural"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -894,7 +925,7 @@ reqs	=
     }
 
 [effect_temple]
-name	= "Make_Content"
+type    = "Make_Content"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -902,7 +933,7 @@ reqs	=
     }
 
 [effect_temple_1]
-name	= "Make_Content"
+type    = "Make_Content"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -911,7 +942,7 @@ reqs	=
     }
 
 [effect_university]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -921,7 +952,7 @@ reqs	=
     }
 
 [effect_apollo_program]
-name	= "Reveal_Cities"
+type    = "Reveal_Cities"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -929,15 +960,15 @@ reqs	=
     }
 
 [effect_apollo_program_1]
-name	= "Enable_Space"
+type    = "Enable_Space"
 value	= 1
 reqs	=
     { "type", "name", "range", "survives"
-      "Building", "Apollo Program", "World", 1
+      "Building", "Apollo Program", "World", TRUE
     }
 
 [effect_colossus]
-name	= "Output_Inc_Tile"
+type    = "Output_Inc_Tile"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -946,7 +977,7 @@ reqs	=
     }
 
 [effect_copernicus_observatory]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -956,7 +987,7 @@ reqs	=
     }
 
 [effect_copernicus_observatory_1]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -966,7 +997,7 @@ reqs	=
     }
 
 [effect_copernicus_observatory_2]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 100
 reqs	=
     { "type", "name", "range"
@@ -975,7 +1006,7 @@ reqs	=
     }
 
 [effect_cure_for_cancer]
-name	= "Force_Content"
+type    = "Force_Content"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -983,7 +1014,7 @@ reqs	=
     }
 
 [effect_darwins_voyage]
-name	= "Give_Imm_Tech"
+type    = "Give_Imm_Tech"
 value	= 2
 reqs	=
     { "type", "name", "range"
@@ -991,7 +1022,7 @@ reqs	=
     }
 
 [effect_great_library]
-name	= "Tech_Parasite"
+type    = "Tech_Parasite"
 value	= 2
 reqs	=
     { "type", "name", "range"
@@ -999,7 +1030,7 @@ reqs	=
     }
 
 [effect_great_wall]
-name	= "Defend_Bonus"
+type    = "Defend_Bonus"
 value	= 200
 reqs	=
     { "type", "name", "range"
@@ -1009,7 +1040,7 @@ reqs	=
     }
 
 [effect_great_wall_1]
-name	= "Defend_Bonus"
+type    = "Defend_Bonus"
 value	= 200
 reqs	=
     { "type", "name", "range"
@@ -1019,7 +1050,7 @@ reqs	=
     }
 
 [effect_great_wall_visible]
-name	= "Visible_Walls"
+type    = "Visible_Walls"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1027,7 +1058,7 @@ reqs	=
     }
 
 [effect_hanging_gardens]
-name	= "Make_Happy"
+type    = "Make_Happy"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1035,7 +1066,7 @@ reqs	=
     }
 
 [effect_hoover_dam]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -1044,7 +1075,7 @@ reqs	=
     }
 
 [effect_hoover_dam_1]
-name	= "Pollu_Prod_Pct"
+type    = "Pollu_Prod_Pct"
 value	= -50
 reqs	=
     { "type", "name", "range"
@@ -1056,7 +1087,7 @@ nreqs	=
     }
 
 [effect_isaac_newtons_college]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -1066,7 +1097,7 @@ reqs	=
     }
 
 [effect_isaac_newtons_college_1]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -1076,7 +1107,7 @@ reqs	=
     }
 
 [effect_js_bachs_cathedral]
-name	= "Force_Content"
+type    = "Force_Content"
 value	= 2
 reqs	=
     { "type", "name", "range"
@@ -1084,7 +1115,7 @@ reqs	=
     }
 
 [effect_lighthouse]
-name	= "Move_Bonus"
+type    = "Move_Bonus"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1093,7 +1124,7 @@ reqs	=
     }
 
 [effect_magellans_expedition]
-name	= "Move_Bonus"
+type    = "Move_Bonus"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1102,15 +1133,15 @@ reqs	=
     }
 
 [effect_manhattan_project]
-name	= "Enable_Nuke"
+type    = "Enable_Nuke"
 value	= 1
 reqs	=
     { "type", "name", "range", "survives"
-      "Building", "Manhattan Project", "World", 1
+      "Building", "Manhattan Project", "World", TRUE
     }
 
 [effect_michelangelos_chapel]
-name	= "Make_Content"
+type    = "Make_Content"
 value	= 4
 reqs	=
     { "type", "name", "range"
@@ -1119,16 +1150,26 @@ reqs	=
     }
 
 [effect_oracle]
-name	= "Make_Content"
-value	= 2
+type    = "Make_Content"
+value	= 1
 reqs	=
     { "type", "name", "range"
       "Building", "Temple", "City"
       "Building", "Oracle", "Player"
     }
 
+[effect_oracle_mysticism]
+type    = "Make_Content"
+value	= 1
+reqs	=
+    { "type", "name", "range"
+      "Building", "Temple", "City"
+      "Building", "Oracle", "Player"
+      "Tech", "Mysticism", "Player"
+    }
+
 [effect_pyramids]
-name	= "Any_Government"
+type    = "Any_Government"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1136,7 +1177,7 @@ reqs	=
     }
 
 [effect_pyramids_1]
-name	= "No_Anarchy"
+type    = "No_Anarchy"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1144,7 +1185,7 @@ reqs	=
     }
 
 [effect_seti_program]
-name	= "Output_Bonus"
+type    = "Output_Bonus"
 value	= 50
 reqs	=
     { "type", "name", "range"
@@ -1153,7 +1194,7 @@ reqs	=
     }
 
 [effect_shakespeares_theatre]
-name	= "No_Unhappy"
+type    = "No_Unhappy"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1161,7 +1202,7 @@ reqs	=
     }
 
 [effect_united_nations]
-name	= "Any_Government"
+type    = "Any_Government"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1169,7 +1210,7 @@ reqs	=
     }
 
 [effect_united_nations_1]
-name	= "No_Anarchy"
+type    = "No_Anarchy"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1177,7 +1218,7 @@ reqs	=
     }
 
 [effect_womens_suffrage]
-name	= "Make_Content_Mil_Per"
+type    = "Make_Content_Mil_Per"
 value	= 1
 reqs	=
     { "type", "name", "range"
@@ -1185,7 +1226,7 @@ reqs	=
     }
 
 [effect_flight_trade_revenue_reduce]
-name    = "Trade_Revenue_Bonus"
+type    = "Trade_Revenue_Bonus"
 value   = -585
 reqs    =
     { "type", "name", "range"
@@ -1193,7 +1234,7 @@ reqs    =
     }
     
 [effect_railroad_trade_revenue_reduce]
-name    = "Trade_Revenue_Bonus"
+type    = "Trade_Revenue_Bonus"
 value   = -585
 reqs    =
     { "type", "name", "range"
@@ -1203,12 +1244,12 @@ reqs    =
 ; FIXME: Calendar effects are copied from default rulesets and are
 ; probably wrong for civ1 ruleset.
 [effect_calendar_base]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = 50
 
 ; 50 - 25 = 25
 [effect_calendar_1]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -25
 reqs    =
     { "type", "name", "range"
@@ -1217,7 +1258,7 @@ reqs    =
 
 ; 25 - 5 = 20
 [effect_calendar_2]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -5
 reqs    =
     { "type", "name", "range"
@@ -1226,7 +1267,7 @@ reqs    =
 
 ; 20 - 10 = 10
 [effect_calendar_3]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -10
 reqs    =
     { "type", "name", "range"
@@ -1235,7 +1276,7 @@ reqs    =
 
 ; 10 - 5 = 5
 [effect_calendar_4]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -5
 reqs    =
     { "type", "name", "range"
@@ -1244,7 +1285,7 @@ reqs    =
 
 ; 5 - 3 = 2
 [effect_calendar_5]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -3
 reqs    =
     { "type", "name", "range"
@@ -1253,7 +1294,7 @@ reqs    =
 
 ; 2 - 1 = 1
 [effect_calendar_6]
-name    = "Turn_Years"
+type    = "Turn_Years"
 value   = -1
 reqs    =
     { "type", "name", "range"
@@ -1261,11 +1302,11 @@ reqs    =
     }
 
 [effect_tech_cost_base]
-name    = "Tech_Cost_Factor"
+type    = "Tech_Cost_Factor"
 value   = 1
 
 [effect_tech_cost_double]
-name    = "Tech_Cost_Factor"
+type    = "Tech_Cost_Factor"
 value   = 1
 reqs    =
     { "type", "name", "range"
@@ -1274,10 +1315,78 @@ reqs    =
 
 ; Cities can always work tiles
 [effect_tile_workable]
-name    = "Tile_Workable"
+type    = "Tile_Workable"
 value   = 1
 
 ; each city has at least one slot to build units
 [effect_city_build_slots_basic]
-name    = "City_Build_Slots"
+type    = "City_Build_Slots"
+value   = 1
+
+[effect_city_image_1]
+type    = "City_Image"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "MinSize", "4", "City"
+    }
+
+[effect_city_image_2]
+type    = "City_Image"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "MinSize", "8", "City"
+    }
+
+[effect_city_image_3]
+type    = "City_Image"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "MinSize", "12", "City"
+    }
+
+[effect_city_image_4]
+type    = "City_Image"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "MinSize", "16", "City"
+    }
+
+[effect_irrigate_src_ocean]
+type    = "Irrig_Possible"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "TerrainClass", "Oceanic", "CAdjacent"
+    }
+
+[effect_irrigate_src_river]
+type    = "Irrig_Possible"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "Road", "River", "CAdjacent"
+    }
+
+[effect_irrigate_src_irrigation]
+type    = "Irrig_Possible"
+value   = 1
+reqs    =
+    { "type", "name", "range"
+      "Special", "Irrigation", "CAdjacent"
+    }
+
+[effect_mining]
+type    = "Mining_Possible"
+value   = 1
+
+[effect_irrig_tf]
+type    = "Irrig_TF_Possible"
+value   = 1
+
+[effect_mining_tf]
+type    = "Mining_TF_Possible"
 value   = 1

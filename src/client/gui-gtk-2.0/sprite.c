@@ -12,13 +12,16 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
 #include "log.h"
 #include "mem.h"
 #include "shared.h"
+
+/* client/gtk-2.0 */
+#include "colors.h"
 
 #include "sprite.h"
 
@@ -111,6 +114,27 @@ struct sprite *crop_sprite(struct sprite *source,
 }
 
 /****************************************************************************
+  Create a sprite with the given height, width and color.
+****************************************************************************/
+struct sprite *create_sprite(int width, int height, struct color *pcolor)
+{
+  GdkPixbuf *mypixbuf = NULL;
+  GdkColor *color = NULL;
+
+  fc_assert_ret_val(width > 0, NULL);
+  fc_assert_ret_val(height > 0, NULL);
+  fc_assert_ret_val(pcolor != NULL, NULL);
+
+  color = &pcolor->color;
+  mypixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, width, height);
+  gdk_pixbuf_fill(mypixbuf, ((guint32)(color->red & 0xff00) << 16)
+                            | ((color->green & 0xff00) << 8)
+                            | (color->blue & 0xff00) | 0xff);
+
+  return ctor_sprite(mypixbuf);
+}
+
+/****************************************************************************
   Find the dimensions of the sprite.
 ****************************************************************************/
 void get_sprite_dimensions(struct sprite *sprite, int *width, int *height)
@@ -196,9 +220,10 @@ const char **gfx_fileextensions(void)
 struct sprite *load_gfxfile(const char *filename)
 {
   GdkPixbuf *im;
+  GError *err = NULL;
 
-  if (!(im = gdk_pixbuf_new_from_file(filename, NULL))) {
-    log_fatal("Failed reading graphics file: \"%s\"", filename);
+  if (!(im = gdk_pixbuf_new_from_file(filename, &err))) {
+    log_fatal("Failed reading graphics file \"%s\": \"%s\"", filename, err->message);
     exit(EXIT_FAILURE);
   }
 

@@ -1,8 +1,8 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = ftwl
-
 noinst_LTLIBRARIES = libcivutility.la
+
+AM_CFLAGS = $(UTILITY_CFLAGS)
 
 libcivutility_la_SOURCES = \
 		astring.c       \
@@ -15,11 +15,14 @@ libcivutility_la_SOURCES = \
 		distribute.h	\
 		fc_utf8.c	\
 		fc_utf8.h	\
+		fcbacktrace.c	\
+		fcbacktrace.h	\
 		fciconv.c	\
 		fciconv.h	\
 		fcintl.c	\
 		fcintl.h	\
-		generate_specenum.py	\
+		fcthread.c	\
+		fcthread.h	\
 		genhash.c	\
 		genhash.h	\
 		genlist.c	\
@@ -32,21 +35,26 @@ libcivutility_la_SOURCES = \
 		iterator.h	\
 		log.c		\
 		log.h		\
+		netfile.c	\
+		netfile.h	\
 		netintf.c	\
 		netintf.h	\
-		pqueue.c	\
-		pqueue.h	\
 		mem.c           \
 		mem.h		\
 		rand.c		\
 		rand.h		\
 		registry.c	\
 		registry.h	\
+		registry_ini.c	\
+		registry_ini.h	\
+		section_file.c	\
+		section_file.h	\
 		shared.c	\
 		shared.h	\
 		specenum_gen.h	\
 		spechash.h	\
 		speclist.h	\
+		specpq.h	\
 		specvec.h	\
 		string_vector.c	\
 		string_vector.h	\
@@ -57,12 +65,12 @@ libcivutility_la_SOURCES = \
 		md5.c		\
 		md5.h
 
+EXTRA_DIST = \
+		generate_specenum.py
+
 libcivutility_la_LIBADD = $(UTILITY_LIBS)
 
 BUILT_SOURCES = specenum_gen.h
-
-# specenum.h must be generated before it can be included.
-%.o : specenum_gen.h
 
 specenum_gen.h: specenum_generate
 .INTERMEDIATE: specenum_generate

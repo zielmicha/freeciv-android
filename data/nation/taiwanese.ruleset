@@ -22,7 +22,7 @@ leaders = {
 ruler_titles = {
  "government",      "male_title",      "female_title"
  "Monarchy",        _("Emperor %s"),      _("Empress Dowager %s")
- "Communism",       _("Chairman %s"),     _("Chairperson %s")
+ "Communism",       _("Chairman %s"),     _("Chairwoman %s")
 }
 
 flag="taiwan"
@@ -31,9 +31,8 @@ city_style = "Asian"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
-civilwar_nations="chinese"
+civilwar_nations="chinese", "formosan"
 
 ; These names used to be spelled differently (Taipeh instead of Taipei).
 ; The new names are better but may not be canonical.

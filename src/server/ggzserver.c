@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #ifdef GGZ_SERVER
@@ -21,14 +21,17 @@
 
 #include <ggzdmod.h>
 
+/* utility */
 #include "fciconv.h"
 #include "fcintl.h"
 #include "log.h"
 #include "support.h"
 
+/* common */
 #include "game.h"
 #include "player.h"
 
+/* server */
 #include "connecthand.h"
 #include "ggzserver.h"
 #include "score.h"
@@ -410,4 +413,4 @@ void ggz_game_saved(const char *filename)
   }
 }
 
-#endif
+#endif /* GGZ_SERVER */

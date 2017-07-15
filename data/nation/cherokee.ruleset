@@ -1,8 +1,10 @@
 [nation_cherokee]
 
+translation_domain="freeciv"
+
 name=_("Cherokee")
 plural=_("?plural:Cherokees")
-groups="American"
+groups="American", "Core"
 legend=_("The Cherokee nation is the largest Native American\
  nation in North America today.")
 
@@ -30,10 +32,9 @@ city_style = "Celtic"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
-civilwar_nations="sioux", "iroquois", "nuu-chah-nulth"
+civilwar_nations="choctaw", "iroquois", "chickasaw"
 
 ; names of early Cherokee settlements in no particular order
 cities =

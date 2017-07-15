@@ -1,4 +1,4 @@
-/**********************************************************************
+/********************************************************************** 
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -30,6 +30,7 @@
 #include "base.h"
 #include "city.h"
 #include "connection.h"
+#include "disaster.h"
 #include "government.h"
 #include "idex.h"
 #include "map.h"
@@ -40,6 +41,8 @@
 #include "spaceship.h"
 #include "specialist.h"
 #include "tech.h"
+#include "terrain.h"
+#include "traderoutes.h"
 #include "unit.h"
 #include "unitlist.h"
 
@@ -113,7 +116,7 @@ int civ_population(const struct player *pplayer)
 
 
 /**************************************************************************
-...
+  Find city with given name from any player.
 **************************************************************************/
 struct city *game_city_by_name(const char *name)
 {
@@ -156,14 +159,20 @@ void game_remove_unit(struct unit *punit)
 {
   struct city *pcity;
 
-  pcity = player_city_by_number(unit_owner(punit), punit->homecity);
+  /* It's possible that during city transfer homecity/unit owner
+   * information is inconsistent, and client then tries to remove
+   * now unseen unit so that homecity is not in the list of cities
+   * of the player (seemingly) owning the unit.
+   * Thus cannot use player_city_by_number() here, but have to
+   * consider cities of all players. */
+  pcity = game_city_by_number(punit->homecity);
   if (pcity) {
     unit_list_remove(pcity->units_supported, punit);
 
     log_debug("game_remove_unit()"
               " at (%d,%d) unit %d, %s %s home (%d,%d) city %d, %s %s",
-              TILE_XY(punit->tile),
-              punit->id,
+              TILE_XY(unit_tile(punit)),
+              punit->id, 
               nation_rule_name(nation_of_unit(punit)),
               unit_rule_name(punit),
               TILE_XY(pcity->tile),
@@ -172,21 +181,21 @@ void game_remove_unit(struct unit *punit)
               city_name(pcity));
   } else if (IDENTITY_NUMBER_ZERO == punit->homecity) {
     log_debug("game_remove_unit() at (%d,%d) unit %d, %s %s home %d",
-              TILE_XY(punit->tile),
-              punit->id,
+              TILE_XY(unit_tile(punit)),
+              punit->id, 
               nation_rule_name(nation_of_unit(punit)),
               unit_rule_name(punit),
               punit->homecity);
   } else {
     log_error("game_remove_unit() at (%d,%d) unit %d, %s %s home %d invalid",
-              TILE_XY(punit->tile),
-              punit->id,
+              TILE_XY(unit_tile(punit)),
+              punit->id, 
               nation_rule_name(nation_of_unit(punit)),
               unit_rule_name(punit),
               punit->homecity);
   }
 
-  unit_list_remove(punit->tile->units, punit);
+  unit_list_remove(unit_tile(punit)->units, punit);
   unit_list_remove(unit_owner(punit)->units, punit);
 
   idex_unregister_unit(punit);
@@ -194,11 +203,11 @@ void game_remove_unit(struct unit *punit)
   if (game.callbacks.unit_deallocate) {
     (game.callbacks.unit_deallocate)(punit->id);
   }
-  destroy_unit_virtual(punit);
+  unit_virtual_destroy(punit);
 }
 
 /**************************************************************************
-...
+  Remove city from game.
 **************************************************************************/
 void game_remove_city(struct city *pcity)
 {
@@ -243,12 +252,15 @@ static void game_defaults(void)
   game.control.government_count        = 0;
   game.control.nation_count            = 0;
   game.control.num_base_types          = 0;
+  game.control.num_road_types          = 0;
   game.control.num_impr_types          = 0;
   game.control.num_specialist_types    = 0;
   game.control.num_tech_types          = 0;
   game.control.num_unit_classes        = 0;
   game.control.num_unit_types          = 0;
+  game.control.num_disaster_types      = 0;
   game.control.prefered_tileset[0]     = '\0';
+  game.control.prefered_soundset[0]    = '\0';
   game.control.resource_count          = 0;
   game.control.styles_count            = 0;
   game.control.terrain_count           = 0;
@@ -283,6 +295,7 @@ static void game_defaults(void)
   game.info.heating          = 0;
   game.info.is_edit_mode     = FALSE;
   game.info.is_new_game      = TRUE;
+  game.info.killstack        = GAME_DEFAULT_KILLSTACK;
   game.info.killcitizen      = GAME_DEFAULT_KILLCITIZEN;
   game.info.negative_year_label[0] = '\0';
   game.info.notradesize      = GAME_DEFAULT_NOTRADESIZE;
@@ -290,6 +303,7 @@ static void game_defaults(void)
   game.info.nuclear_winter   = GAME_DEFAULT_NUCLEAR_WINTER;
   game.info.positive_year_label[0] = '\0';
   game.info.rapturedelay     = GAME_DEFAULT_RAPTUREDELAY;
+  game.info.disasters        = GAME_DEFAULT_DISASTERS;
   game.info.restrictinfra    = GAME_DEFAULT_RESTRICTINFRA;
   game.info.sciencebox       = GAME_DEFAULT_SCIENCEBOX;
   game.info.shieldbox        = GAME_DEFAULT_SHIELDBOX;
@@ -313,6 +327,13 @@ static void game_defaults(void)
   game.scenario.is_scenario = FALSE;
   game.scenario.name[0] = '\0';
   game.scenario.players = TRUE;
+  game.scenario.startpos_nations = FALSE;
+
+  /* Veteran system. */
+  game.veteran = NULL;
+
+  /* player colors */
+  game.plr_bg_color = NULL;
 
   if (is_server()) {
     /* All settings only used by the server (./server/ and ./ai/ */
@@ -359,6 +380,7 @@ static void game_defaults(void)
     game.server.migration         = GAME_DEFAULT_MIGRATION;
     game.server.min_players       = GAME_DEFAULT_MIN_PLAYERS;
     game.server.natural_city_names = GAME_DEFAULT_NATURALCITYNAMES;
+    game.server.plrcolormode      = GAME_DEFAULT_PLRCOLORMODE;
     game.server.netwait           = GAME_DEFAULT_NETWAIT;
     game.server.occupychance      = GAME_DEFAULT_OCCUPYCHANCE;
     game.server.onsetbarbarian    = GAME_DEFAULT_ONSETBARBARIAN;
@@ -366,12 +388,12 @@ static void game_defaults(void)
     game.server.pingtime          = GAME_DEFAULT_PINGTIME;
     game.server.pingtimeout       = GAME_DEFAULT_PINGTIMEOUT;
     game.server.razechance        = GAME_DEFAULT_RAZECHANCE;
+    game.server.revealmap         = GAME_DEFAULT_REVEALMAP;
     game.server.revolution_length = GAME_DEFAULT_REVOLUTION_LENGTH;
     sz_strlcpy(game.server.rulesetdir, GAME_DEFAULT_RULESETDIR);
     game.server.save_compress_level = GAME_DEFAULT_COMPRESS_LEVEL;
     game.server.save_compress_type = GAME_DEFAULT_COMPRESS_TYPE;
     sz_strlcpy(game.server.save_name, GAME_DEFAULT_SAVE_NAME);
-    game.server.saveversion       = GAME_DEFAULT_SAVEVERSION;
     game.server.save_nturns       = GAME_DEFAULT_SAVETURNS;
     game.server.save_options.save_known = TRUE;
     game.server.save_options.save_private_map = TRUE;
@@ -379,7 +401,7 @@ static void game_defaults(void)
     game.server.save_options.save_starts = TRUE;
     game.server.savepalace        = GAME_DEFAULT_SAVEPALACE;
     game.server.scorelog          = GAME_DEFAULT_SCORELOG;
-    game.server.scoreturn         = GAME_DEFAULT_SCORETURN;
+    game.server.scoreturn         = GAME_DEFAULT_SCORETURN - 1;
     game.server.seed              = GAME_DEFAULT_SEED;
     sz_strlcpy(game.server.start_units, GAME_DEFAULT_START_UNITS);
     game.server.start_year        = GAME_START_YEAR;
@@ -395,9 +417,10 @@ static void game_defaults(void)
     game.server.timeoutintinc     = GAME_DEFAULT_TIMEOUTINTINC;
     game.server.turnblock         = GAME_DEFAULT_TURNBLOCK;
     game.server.unitwaittime      = GAME_DEFAULT_UNITWAITTIME;
+    game.server.plr_colors        = NULL;
+  } else {
+    /* Client side takes care of itself in client_main() */
   }
-
-  terrain_control.river_help_text[0] = '\0';
 }
 
 /****************************************************************************
@@ -472,15 +495,21 @@ void game_reset(void)
 ***************************************************************/
 void game_ruleset_init(void)
 {
-  nation_groups_init();
+  nation_sets_groups_init();
   ruleset_cache_init();
+  disaster_types_init();
+  trade_route_types_init();
   terrains_init();
   base_types_init();
+  road_types_init();
   improvements_init();
   techs_init();
   unit_classes_init();
   unit_types_init();
   specialists_init();
+  user_unit_type_flags_init();
+  user_terrain_flags_init();
+  user_tech_flags_init();
 }
 
 /***************************************************************
@@ -488,24 +517,47 @@ void game_ruleset_init(void)
 ***************************************************************/
 void game_ruleset_free(void)
 {
+  CALL_FUNC_EACH_AI(units_ruleset_close);
+
+  /* Clear main structures which can points to the ruleset dependent
+   * structures. */
+  players_iterate(pplayer) {
+    player_ruleset_close(pplayer);
+  } players_iterate_end;
+  game.government_during_revolution = NULL;
+
   specialists_free();
+  unit_classes_free();
   techs_free();
   governments_free();
   nations_free();
   unit_types_free();
-  unit_flags_free();
+  unit_type_flags_free();
   role_unit_precalcs_free();
   improvements_free();
   base_types_free();
+  road_types_free();
   city_styles_free();
+  disaster_types_free();
   terrains_free();
+  user_tech_flags_free();
+  user_terrain_flags_free();
   ruleset_cache_free();
-  nation_groups_free();
+  nation_sets_groups_free();
+
+  /* Destroy the default veteran system. */
+  veteran_system_destroy(game.veteran);
+  game.veteran = NULL;
+
+  /* Player colors. */
+  if (game.plr_bg_color != NULL) {
+    rgbcolor_destroy(game.plr_bg_color);
+    game.plr_bg_color = NULL;
+  }
 }
 
-
 /***************************************************************
-...
+  Initialize wonder information.
 ***************************************************************/
 void initialize_globals(void)
 {
@@ -539,11 +591,11 @@ int game_next_year(int year)
     game.info.year_0_hack = FALSE;
   }
 
-    /* !McFred:
+    /* !McFred: 
        - want year += 1 for spaceship.
     */
 
-  /* test game with 7 normal AI's, gen 4 map, foodbox 10, foodbase 0:
+  /* test game with 7 normal AI's, gen 4 map, foodbox 10, foodbase 0: 
    * Gunpowder about 0 AD
    * Railroad  about 500 AD
    * Electricity about 1000 AD
@@ -618,30 +670,15 @@ bool is_player_phase(const struct player *pplayer, int phase)
 
 /****************************************************************************
   Return a prettily formatted string containing the population text.  The
-  population is passed in as the number of citizens, in thousands.
+  population is passed in as the number of citizens, in unit
+  (tens/hundreds/thousands...) defined in cities.ruleset.
 ****************************************************************************/
 const char *population_to_text(int thousand_citizen)
 {
   /* big_int_to_text can't handle negative values, and in any case we'd
    * better not have a negative population. */
   fc_assert_ret_val(thousand_citizen >= 0, NULL);
-  return big_int_to_text(thousand_citizen, 3);
-}
-
-/****************************************************************************
-  Returns gui name string
-****************************************************************************/
-const char *gui_name(enum gui_type gui)
-{
-  /* This must be in same order as enum gui_type in fc_types.h */
-  const char *gui_names[] = {
-    "stub", "gtk2", "sdl", "xaw", "win32", "ftwl" };
-
-  if (gui < GUI_LAST) {
-    return gui_names[gui];
-  } else {
-    return "Unknown";
-  }
+  return big_int_to_text(thousand_citizen, game.info.pop_report_zeroes - 1);
 }
 
 /****************************************************************************
@@ -716,12 +753,14 @@ int generate_save_name(const char *format, char *buf, int buflen,
                        const char *reason)
 {
   struct cf_sequence sequences[] = {
-    CF_STR_SEQ('R', (reason == NULL) ? "auto" : reason),
-    CF_STR_SEQ('S', year_suffix()),
-    CF_INT_SEQ('T', game.info.turn),
-    CF_INT_SEQ('Y', game.info.year),
-    CF_END
+    cf_str_seq('R', (reason == NULL) ? "auto" : reason),
+    cf_str_seq('S', year_suffix()),
+    { 0 }, { 0 }, /* Works for both gcc and tcc */
+    cf_end()
   };
+
+  cf_int_seq('T', game.info.turn, &sequences[2]);
+  cf_int_seq('Y', game.info.year, &sequences[3]);
 
   fc_vsnprintcf(buf, buflen, format, sequences, -1);
 
@@ -738,4 +777,28 @@ int generate_save_name(const char *format, char *buf, int buflen,
   log_debug("save name generated from '%s': %s", format, buf);
 
   return strlen(buf);
+}
+
+/**************************************************************************
+  Initialize user flag.
+**************************************************************************/
+void user_flag_init(struct user_flag *flag)
+{
+  flag->name = NULL;
+  flag->helptxt = NULL;
+}
+
+/**************************************************************************
+  Free user flag.
+**************************************************************************/
+void user_flag_free(struct user_flag *flag)
+{
+  if (flag->name != NULL) {
+    FC_FREE(flag->name);
+    flag->name = NULL;
+  }
+  if (flag->helptxt != NULL) {
+    FC_FREE(flag->helptxt);
+    flag->helptxt = NULL;
+  }
 }

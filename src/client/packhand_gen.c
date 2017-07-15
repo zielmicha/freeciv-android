@@ -9,7 +9,7 @@
 
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* common */
@@ -49,6 +49,10 @@ bool client_handle_packet(enum packet_type type, const void *packet)
 
   case PACKET_ENDGAME_REPORT:
     handle_endgame_report(packet);
+    return TRUE;
+
+  case PACKET_ENDGAME_PLAYER:
+    handle_endgame_player(packet);
     return TRUE;
 
   case PACKET_TILE_INFO:
@@ -125,6 +129,11 @@ bool client_handle_packet(enum packet_type type, const void *packet)
     handle_player_info(packet);
     return TRUE;
 
+  case PACKET_TECH_GAINED:
+    handle_tech_gained(
+      ((const struct packet_tech_gained *)packet)->tech);
+    return TRUE;
+
   case PACKET_PLAYER_ATTRIBUTE_CHUNK:
     handle_player_attribute_chunk(packet);
     return TRUE;
@@ -198,12 +207,26 @@ bool client_handle_packet(enum packet_type type, const void *packet)
       ((const struct packet_diplomacy_accept_treaty *)packet)->other_accepted);
     return TRUE;
 
-  case PACKET_PAGE_MSG:
-    handle_page_msg(
-      ((const struct packet_page_msg *)packet)->caption,
-      ((const struct packet_page_msg *)packet)->headline,
-      ((const struct packet_page_msg *)packet)->lines,
-      ((const struct packet_page_msg *)packet)->event);
+  case PACKET_PAGE_MSG_OLD:
+    handle_page_msg_old(
+      ((const struct packet_page_msg_old *)packet)->caption,
+      ((const struct packet_page_msg_old *)packet)->headline,
+      ((const struct packet_page_msg_old *)packet)->lines,
+      ((const struct packet_page_msg_old *)packet)->event);
+    return TRUE;
+
+  case PACKET_PAGE_MSG_NEW:
+    handle_page_msg_new(
+      ((const struct packet_page_msg_new *)packet)->caption,
+      ((const struct packet_page_msg_new *)packet)->headline,
+      ((const struct packet_page_msg_new *)packet)->event,
+      ((const struct packet_page_msg_new *)packet)->len,
+      ((const struct packet_page_msg_new *)packet)->parts);
+    return TRUE;
+
+  case PACKET_PAGE_MSG_PART:
+    handle_page_msg_part(
+      ((const struct packet_page_msg_part *)packet)->lines);
     return TRUE;
 
   case PACKET_CONN_INFO:
@@ -260,6 +283,14 @@ bool client_handle_packet(enum packet_type type, const void *packet)
     handle_ruleset_unit(packet);
     return TRUE;
 
+  case PACKET_RULESET_UNIT_BONUS:
+    handle_ruleset_unit_bonus(packet);
+    return TRUE;
+
+  case PACKET_RULESET_UNIT_FLAG:
+    handle_ruleset_unit_flag(packet);
+    return TRUE;
+
   case PACKET_RULESET_GAME:
     handle_ruleset_game(packet);
     return TRUE;
@@ -276,6 +307,10 @@ bool client_handle_packet(enum packet_type type, const void *packet)
     handle_ruleset_tech(packet);
     return TRUE;
 
+  case PACKET_RULESET_TECH_FLAG:
+    handle_ruleset_tech_flag(packet);
+    return TRUE;
+
   case PACKET_RULESET_GOVERNMENT:
     handle_ruleset_government(packet);
     return TRUE;
@@ -284,12 +319,27 @@ bool client_handle_packet(enum packet_type type, const void *packet)
     handle_ruleset_terrain_control(packet);
     return TRUE;
 
+  case PACKET_RULESETS_READY:
+    handle_rulesets_ready();
+    return TRUE;
+
+  case PACKET_RULESET_NATION_SETS:
+    handle_ruleset_nation_sets(packet);
+    return TRUE;
+
   case PACKET_RULESET_NATION_GROUPS:
     handle_ruleset_nation_groups(packet);
     return TRUE;
 
   case PACKET_RULESET_NATION:
     handle_ruleset_nation(packet);
+    return TRUE;
+
+  case PACKET_NATION_AVAILABILITY:
+    handle_nation_availability(
+      ((const struct packet_nation_availability *)packet)->ncount,
+      ((const struct packet_nation_availability *)packet)->is_pickable,
+      ((const struct packet_nation_availability *)packet)->nationset_change);
     return TRUE;
 
   case PACKET_RULESET_CITY:
@@ -304,12 +354,28 @@ bool client_handle_packet(enum packet_type type, const void *packet)
     handle_ruleset_terrain(packet);
     return TRUE;
 
+  case PACKET_RULESET_TERRAIN_FLAG:
+    handle_ruleset_terrain_flag(packet);
+    return TRUE;
+
   case PACKET_RULESET_UNIT_CLASS:
     handle_ruleset_unit_class(packet);
     return TRUE;
 
   case PACKET_RULESET_BASE:
     handle_ruleset_base(packet);
+    return TRUE;
+
+  case PACKET_RULESET_ROAD:
+    handle_ruleset_road(packet);
+    return TRUE;
+
+  case PACKET_RULESET_DISASTER:
+    handle_ruleset_disaster(packet);
+    return TRUE;
+
+  case PACKET_RULESET_TRADE:
+    handle_ruleset_trade(packet);
     return TRUE;
 
   case PACKET_RULESET_CONTROL:

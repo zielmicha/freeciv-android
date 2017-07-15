@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2005 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,6 +14,10 @@
 #ifndef FC__TILE_H
 #define FC__TILE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "bitvector.h"
 
@@ -21,6 +25,7 @@
 #include "base.h"
 #include "fc_types.h"
 #include "player.h"
+#include "road.h"
 #include "terrain.h"
 #include "unitlist.h"
 
@@ -33,22 +38,29 @@ enum known_type {
 
 /* Convenience macro for accessing tile coordinates.  This should only be
  * used for debugging. */
-#define TILE_XY(ptile) ((ptile) ? (ptile)->x : -1), \
-                       ((ptile) ? (ptile)->y : -1)
+#define TILE_XY(ptile) ((ptile) ? index_to_map_pos_x(tile_index(ptile))      \
+                                : -1),                                       \
+                       ((ptile) ? index_to_map_pos_y(tile_index(ptile))      \
+                                : -1)
 
 struct tile {
-  int x, y; /* Cartesian (map) coordinates of the tile. */
-  int nat_x, nat_y; /* Native coordinates of the tile. */
-  int index; /* Index coordinate of the tile. */
+  int index; /* Index coordinate of the tile. Used to calculate (x, y) pairs
+              * (index_to_map_pos()) and (nat_x, nat_y) pairs
+              * (index_to_native_pos()). */
   Continent_id continent;
   bv_special special;
   bv_bases bases;
+  /* We're in transition from storing roads in specials to storing roads
+   * in roads vector. Roads vector does not yet always contain correct
+   * information. */
+  bv_roads roads;
   struct resource *resource;		/* NULL for no resource */
   struct terrain *terrain;		/* NULL for unknown tiles */
   struct unit_list *units;
   struct city *worked;			/* NULL for not worked */
   struct player *owner;			/* NULL for not owned */
   struct tile *claimer;
+  char *label;                          /* NULL for no label */
   char *spec_sprite;
 };
 
@@ -71,7 +83,7 @@ struct tile {
 
 
 /* Tile accessor functions. */
-int tile_index(const struct tile *ptile);
+#define tile_index(_pt_) (_pt_)->index
 
 struct city *tile_city(const struct tile *ptile);
 
@@ -108,9 +120,11 @@ void tile_set_special(struct tile *ptile, enum tile_special_type spe);
 void tile_clear_special(struct tile *ptile, enum tile_special_type spe);
 void tile_clear_all_specials(struct tile *ptile);
 
-bv_bases tile_bases(const struct tile *ptile);
+const bv_bases *tile_bases(const struct tile *ptile);
+const bv_roads *tile_roads(const struct tile *ptile);
 void tile_set_bases(struct tile *ptile, bv_bases bases);
 bool tile_has_base(const struct tile *ptile, const struct base_type *pbase);
+bool tile_has_conflicting_base(const struct tile *ptile, const struct base_type *pbase);
 bool tile_has_any_bases(const struct tile *ptile);
 void tile_add_base(struct tile *ptile, const struct base_type *pbase);
 void tile_remove_base(struct tile *ptile, const struct base_type *pbase);
@@ -122,14 +136,31 @@ bool tile_has_native_base(const struct tile *ptile,
                           const struct unit_type *punittype);
 bool tile_has_claimable_base(const struct tile *ptile,
                              const struct unit_type *punittype);
-int tile_bases_defense_bonus(const struct tile *ptile,
-                             const struct unit_type *punittype);
+int tile_extras_defense_bonus(const struct tile *ptile,
+                              const struct unit_type *punittype);
+int tile_extras_class_defense_bonus(const struct tile *ptile,
+                                    const struct unit_class *pclass);
+
+/****************************************************************************
+  Returns TRUE if the given tile has a road of given type on it.
+****************************************************************************/
+static inline bool tile_has_road(const struct tile *ptile,
+                                 const struct road_type *proad)
+{
+  return BV_ISSET(ptile->roads, road_index(proad));
+}
+
+void tile_add_road(struct tile *ptile, const struct road_type *proad);
+void tile_remove_road(struct tile *ptile, const struct road_type *proad);
+int tile_roads_output_incr(const struct tile *ptile, enum output_type_id o);
+int tile_roads_output_bonus(const struct tile *ptile, enum output_type_id o);
+bool tile_has_river(const struct tile *tile);
 
 /* Vision related */
 enum known_type tile_get_known(const struct tile *ptile,
 			      const struct player *pplayer);
 
-/* An arbitrary somewhat integer value.  Activity times are multiplied by
+/* A somewhat arbitrary integer value.  Activity times are multiplied by
  * this amount, and divided by them later before being used.  This may
  * help to avoid rounding errors; however it should probably be removed. */
 #define ACTIVITY_FACTOR 10
@@ -137,6 +168,8 @@ int tile_activity_time(enum unit_activity activity,
 		       const struct tile *ptile);
 int tile_activity_base_time(const struct tile *ptile,
                             Base_type_id base);
+int tile_activity_road_time(const struct tile *ptile,
+                            Road_type_id road);
 
 /* These are higher-level functions that handle side effects on the tile. */
 void tile_change_terrain(struct tile *ptile, struct terrain *pterrain);
@@ -147,7 +180,8 @@ bool tile_apply_activity(struct tile *ptile, Activity_type_id act);
 #define TILE_LB_TERRAIN_RIVER    (1 << 0)
 #define TILE_LB_RIVER_RESOURCE   (1 << 1)
 #define TILE_LB_RESOURCE_POLL    (1 << 2)
-const char *tile_get_info_text(const struct tile *ptile, int linebreaks);
+const char *tile_get_info_text(const struct tile *ptile,
+                               bool include_nuisances, int linebreaks);
 
 /* Virtual tiles are tiles that do not exist on the game map. */
 struct tile *tile_virtual_new(const struct tile *ptile);
@@ -155,5 +189,11 @@ void tile_virtual_destroy(struct tile *vtile);
 bool tile_virtual_check(struct tile *vtile);
 
 void *tile_hash_key(const struct tile *ptile);
+
+bool tile_set_label(struct tile *ptile, const char *label);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__TILE_H */

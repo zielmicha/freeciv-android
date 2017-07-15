@@ -9,7 +9,17 @@
 
 [datafile]
 description="Civ2 technology data for Freeciv (incomplete)"
-options="+Freeciv-2.3-ruleset"
+options="+Freeciv-2.5-ruleset"
+
+[control]
+; Names for custom tech flags. There can be up to 8 of these.
+; name          = rule name; In some circumstances user may see this
+;                 as part of some sentences, so try to make it descriptive
+;                 and sensible.
+; helptxt       = displayed in the help for advances with this flag (optional)
+;flags =
+;  { "name", "helptxt"
+;  }
 
 ; /* <-- avoid gettext warnings
 ;
@@ -31,7 +41,7 @@ options="+Freeciv-2.3-ruleset"
 ; root_req      = advance required before acquiring this one, inherited
 ;                 by all techs that require this tech in turn unless
 ;                 "None" is given explicitly
-; flags         = special flag strings (see default/techs.ruleset)
+; flags         = special flag strings (see classic/techs.ruleset)
 ; graphic       = icon for technology
 ; graphic_alt   = alternate icon
 ; helptext	= optional help text string (set units ruleset for examples)
@@ -109,6 +119,7 @@ req2     = "Construction"
 flags    = "Bridge"
 graphic     = "a.bridge_building"
 graphic_alt = "-"
+helptext = _("Allows roads to be built on river tiles.")
 
 [advance_bronze_working]
 name     = _("Bronze Working")
@@ -576,13 +587,17 @@ graphic_alt = "-"
 helptext = _("Allows Settlers and Engineers to build airbases.")
 
 [advance_railroad]
-name     = _("Railroad")
+name     = _("?tech:Railroad")
 req1     = "Steam Engine"
 req2     = "Bridge Building"
-flags    = "Railroad"
+flags    = ""
 graphic     = "a.railroad"
 graphic_alt = "-"
-helptext = _("Decreases one-time revenue from new trade routes.")
+helptext = _("\
+Allows Settlers and Engineers to upgrade roads to railroads.\
+"), _("\
+Decreases one-time revenue from new trade routes.\
+")
 
 [advance_recycling]
 name     = _("Recycling")

@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
@@ -61,7 +61,7 @@ static struct intel_dialog *create_intel_dialog(struct player *p);
 /****************************************************************
 ...
 *****************************************************************/
-void intel_dialog_init()
+void intel_dialog_init(void)
 {
   dialog_list = dialog_list_new();
 }
@@ -69,7 +69,7 @@ void intel_dialog_init()
 /****************************************************************
 ...
 *****************************************************************/
-void intel_dialog_done()
+void intel_dialog_done(void)
 {
   dialog_list_destroy(dialog_list);
 }
@@ -192,7 +192,8 @@ void popdown_intel_dialog(struct player *p)
 /**************************************************************************
   Popdown all intelligence dialogs
 **************************************************************************/
-void popdown_intel_dialogs() {
+void popdown_intel_dialogs(void)
+{
   dialog_list_iterate(dialog_list, pdialog) {
     popdown_intel_dialog(pdialog->pplayer);
   } dialog_list_iterate_end;
@@ -259,7 +260,10 @@ void update_intel_dialog(struct player *p)
     /* ---------- */
     
     pLogo = get_nation_flag_surface(nation_of_player(p));
-    pText1 = zoomSurface(pLogo, DEFAULT_ZOOM * 4.0 , DEFAULT_ZOOM * 4.0, 1);
+    {
+      double zoom = DEFAULT_ZOOM * 60.0 / pLogo->h;
+      pText1 = zoomSurface(pLogo, zoom, zoom, 1);
+    }
     pLogo = pText1;
           
     pBuf = create_icon2(pLogo, pWindow->dst,
@@ -290,7 +294,7 @@ void update_intel_dialog(struct player *p)
       
     /* ---------- */
     
-    pCapital = player_palace(p);
+    pCapital = player_capital(p);
     research = player_research_get(p);
     change_ptsize16(pStr, adj_font(10));
     pStr->style &= ~TTF_STYLE_BOLD;
@@ -323,7 +327,8 @@ void update_intel_dialog(struct player *p)
                   NULL != pCapital ? city_name(pCapital) : _("(unknown)"),
                   p->economic.gold, p->economic.tax, p->economic.science,
                   p->economic.luxury, advance_name_researching(p),
-                  research->bulbs_researched, total_bulbs_required(p));
+                  research->bulbs_researched,
+                  research->client.researching_cost);
       break;
     };
     

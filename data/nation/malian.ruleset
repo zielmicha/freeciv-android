@@ -15,17 +15,21 @@ leaders = {
  "Ahmed Baba",          "Male"
 }
 
+ruler_titles = {
+ "government",      "male_title",      "female_title"
+ "Monarchy",        _("Mansa %s"),        _("?female:Mansa %s")
+}
+
 flag="mali"
 flag_alt = "-"
 city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with="Mali"
-civilwar_nations="Burkinabe", "Senegalese", "Ivoirian"
+civilwar_nations="Burkinabe", "Senegalese", "tuareg"
 
 ; City list based on http://de.wikipedia.org/wiki/Liste_der_Städte_in_Mali
 cities =

@@ -1,7 +1,7 @@
 #include <Python.h>
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include "game.h"
@@ -53,3 +53,12 @@ void* py_alloc_struct(PyObject* stru);
 void py_setup_callglue();
 
 PyObject* py_get_pyobject(void* stru);
+
+int civserver_main(int argc, char *argv[]);
+int test_glue(int val);
+const char *get_science_target_text(double *percent);
+void base_set_mapview_origin(int gui_x0, int gui_y0);
+void key_unit_move_direction(int gui_dir);
+void cancel_city_at_unit(long unit);
+void base_canvas_to_map_pos(int *map_x, int *map_y, int canvas_x, int canvas_y);
+

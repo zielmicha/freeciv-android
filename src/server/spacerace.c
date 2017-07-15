@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <string.h>
@@ -60,27 +60,37 @@ void spaceship_calc_derived(struct player_spaceship *ship)
   ship->support_rate = ship->energy_rate =
     ship->success_rate = ship->travel_time = 0.0;
 
-  for(i=0; i<NUM_SS_STRUCTURALS; i++) {
-    if (ship->structure[i]) {
-      ship->mass += (i<6) ? 200 : 100;
+  for (i = 0; i < NUM_SS_STRUCTURALS; i++) {
+    if (BV_ISSET(ship->structure, i)) {
+      ship->mass += (i < 6) ? 200 : 100;
       /* s0 to s3 are heavier; actually in Civ1 its a bit stranger
 	 than this, but not worth figuring out --dwp */
     }
   }
-  for(i=0; i<ship->fuel; i++) {
-    if (ship->structure[components_info[i*2].required]) fuel++;
+  for (i = 0; i < ship->fuel; i++) {
+    if (BV_ISSET(ship->structure, components_info[i * 2].required)) {
+      fuel++;
+    }
   }
-  for(i=0; i<ship->propulsion; i++) {
-    if (ship->structure[components_info[i*2+1].required]) propulsion++;
+  for (i = 0; i < ship->propulsion; i++) {
+    if (BV_ISSET(ship->structure, components_info[i * 2 + 1].required)) {
+      propulsion++;
+    }
   }
-  for(i=0; i<ship->habitation; i++) {
-    if (ship->structure[modules_info[i*3].required]) habitation++;
+  for (i = 0; i < ship->habitation; i++) {
+    if (BV_ISSET(ship->structure, modules_info[i * 3].required)) {
+      habitation++;
+    }
   }
-  for(i=0; i<ship->life_support; i++) {
-    if (ship->structure[modules_info[i*3+1].required]) life_support++;
+  for (i = 0; i < ship->life_support; i++) {
+    if (BV_ISSET(ship->structure, modules_info[i * 3 + 1].required)) {
+      life_support++;
+    }
   }
-  for(i=0; i<ship->solar_panels; i++) {
-    if (ship->structure[modules_info[i*3+2].required]) solar_panels++;
+  for (i = 0; i < ship->solar_panels; i++) {
+    if (BV_ISSET(ship->structure, modules_info[i * 3 + 2].required)) {
+      solar_panels++;
+    }
   }
 
   ship->mass += 1600 * (habitation + life_support)
@@ -117,8 +127,6 @@ void spaceship_calc_derived(struct player_spaceship *ship)
 **************************************************************************/
 void send_spaceship_info(struct player *src, struct conn_list *dest)
 {
-  int j;
-
   if (!dest) {
     dest = game.est_connections;
   }
@@ -145,11 +153,7 @@ void send_spaceship_info(struct player *src, struct conn_list *dest)
       info.energy_rate = ship->energy_rate;
       info.success_rate = ship->success_rate;
       info.travel_time = ship->travel_time;
-      
-      for(j=0; j<NUM_SS_STRUCTURALS; j++) {
-	info.structure[j] = ship->structure[j] ? '1' : '0';
-      }
-      info.structure[j] = '\0';
+      info.structure = ship->structure;
 	  
       lsend_packet_spaceship_info(dest, &info);
     }
@@ -157,14 +161,14 @@ void send_spaceship_info(struct player *src, struct conn_list *dest)
 }
 
 /**************************************************************************
-...
+  Handle spaceship launch request.
 **************************************************************************/
 void handle_spaceship_launch(struct player *pplayer)
 {
   struct player_spaceship *ship = &pplayer->spaceship;
   int arrival;
 
-  if (!player_palace(pplayer)) {
+  if (!player_capital(pplayer)) {
     notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
                   _("You need to have a capital in order to launch "
                     "your spaceship."));
@@ -196,153 +200,221 @@ void handle_spaceship_launch(struct player *pplayer)
 }
 
 /**************************************************************************
-...
+  Handle spaceship part placement request
 **************************************************************************/
 void handle_spaceship_place(struct player *pplayer,
-			    enum spaceship_place_type type, int num)
+                            enum spaceship_place_type type, int num)
+{
+  (void) do_spaceship_place(pplayer, TRUE, type, num);
+}
+
+/**************************************************************************
+  Place a spaceship part
+**************************************************************************/
+bool do_spaceship_place(struct player *pplayer, bool user_initiated,
+                        enum spaceship_place_type type, int num)
 {
   struct player_spaceship *ship = &pplayer->spaceship;
   
   if (ship->state == SSHIP_NONE) {
-    notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                  _("Spaceship action received,"
-                    " but you don't have a spaceship!"));
-    return;
+    if (user_initiated) {
+      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                    _("Spaceship action received,"
+                      " but you don't have a spaceship!"));
+    }
+
+    return FALSE;
   }
+
   if (ship->state >= SSHIP_LAUNCHED) {
-    notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                  _("You can't modify your spaceship after launch!"));
-    return;
+    if (user_initiated) {
+      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                    _("You can't modify your spaceship after launch!"));
+    }
+
+    return FALSE;
   }
+
   if (type == SSHIP_PLACE_STRUCTURAL) {
-    if (num<0 || num>=NUM_SS_STRUCTURALS || ship->structure[num]) {
-      return;
+    if (num < 0 || num >= NUM_SS_STRUCTURALS
+        || BV_ISSET(ship->structure, num)) {
+      return FALSE;
     }
     if (num_spaceship_structurals_placed(ship) >= ship->structurals) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced Space Structurals!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced Space Structurals!"));
+      }
+
+      return FALSE;
     }
-    if (num!=0 && !ship->structure[structurals_info[num].required]) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("That Space Structural would not be connected!"));
-      return;
+    if (num != 0
+        && !BV_ISSET(ship->structure, structurals_info[num].required)) {
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("That Space Structural would not be connected!"));
+      }
+
+      return FALSE;
     }
-    ship->structure[num] = TRUE;
+
+    BV_SET(ship->structure, num);
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   if (type == SSHIP_PLACE_FUEL) {
-    if (ship->fuel != num-1) {
-      return;
+    if (ship->fuel != num - 1) {
+      return FALSE;
     }
     if (ship->fuel + ship->propulsion >= ship->components) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced Space Components!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced Space Components!"));
+      }
+
+      return FALSE;
     }
     if (num > NUM_SS_COMPONENTS/2) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("Your spaceship already has"
-                      " the maximum number of Fuel Components!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("Your spaceship already has"
+                        " the maximum number of Fuel Components!"));
+      }
+
+      return FALSE;
     }
+
     ship->fuel++;
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   if (type == SSHIP_PLACE_PROPULSION) {
-    if (ship->propulsion != num-1) {
-      return;
+    if (ship->propulsion != num - 1) {
+      return FALSE;
     }
     if (ship->fuel + ship->propulsion >= ship->components) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced"
-                      " Space Components!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced"
+                        " Space Components!"));
+      }
+
+      return FALSE;
     }
     if (num > NUM_SS_COMPONENTS/2) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("Your spaceship already has the"
-                      " maximum number of Propulsion Components!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("Your spaceship already has the"
+                        " maximum number of Propulsion Components!"));
+      }
+
+      return FALSE;
     }
+
     ship->propulsion++;
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   if (type == SSHIP_PLACE_HABITATION) {
-    if (ship->habitation != num-1) {
-      return;
+    if (ship->habitation != num - 1) {
+      return FALSE;
     }
     if (ship->habitation + ship->life_support + ship->solar_panels
         >= ship->modules) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced Space Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced Space Modules!"));
+      }
+
+      return FALSE;
     }
     if (num > NUM_SS_MODULES / 3) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("Your spaceship already has the"
-                      " maximum number of Habitation Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("Your spaceship already has the"
+                        " maximum number of Habitation Modules!"));
+      }
+
+      return FALSE;
     }
+
     ship->habitation++;
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   if (type == SSHIP_PLACE_LIFE_SUPPORT) {
-    if (ship->life_support != num-1) {
-      return;
+    if (ship->life_support != num - 1) {
+      return FALSE;
     }
     if (ship->habitation + ship->life_support + ship->solar_panels
         >= ship->modules) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced Space Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced Space Modules!"));
+      }
+
+      return FALSE;
     }
     if (num > NUM_SS_MODULES / 3) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("Your spaceship already has the"
-                      " maximum number of Life Support Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("Your spaceship already has the"
+                        " maximum number of Life Support Modules!"));
+      }
+
+      return FALSE;
     }
+
     ship->life_support++;
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   if (type == SSHIP_PLACE_SOLAR_PANELS) {
-    if (ship->solar_panels != num-1) {
-      return;
+    if (ship->solar_panels != num - 1) {
+      return FALSE;
     }
     if (ship->habitation + ship->life_support + ship->solar_panels
         >= ship->modules) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("You don't have any unplaced Space Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("You don't have any unplaced Space Modules!"));
+      }
+
+      return FALSE;
     }
     if (num > NUM_SS_MODULES / 3) {
-      notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
-                    _("Your spaceship already has the"
-                      " maximum number of Solar Panel Modules!"));
-      return;
+      if (user_initiated) {
+        notify_player(pplayer, NULL, E_SPACESHIP, ftc_server,
+                      _("Your spaceship already has the"
+                        " maximum number of Solar Panel Modules!"));
+      }
+
+      return FALSE;
     }
+
     ship->solar_panels++;
     spaceship_calc_derived(ship);
     send_spaceship_info(pplayer, NULL);
-    return;
+    return TRUE;
   }
+
   log_error("Received unknown spaceship place type %d from %s",
             type, player_name(pplayer));
+  return FALSE;
 }
 
 /**************************************************************************
-...
+  Handle spaceship loss.
 **************************************************************************/
 void spaceship_lost(struct player *pplayer)
 {

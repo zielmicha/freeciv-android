@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -30,6 +30,7 @@
 #include "support.h"
 
 /* common */
+#include "chat.h"
 #include "featured_text.h"
 #include "game.h"
 #include "packets.h"
@@ -81,22 +82,25 @@ void inputline_grab_focus(void)
 }
 
 /**************************************************************************
+  Returns TRUE iff the input line is currently visible.
+**************************************************************************/
+bool inputline_is_visible(void)
+{
+  return GTK_WIDGET_MAPPED(toolkit.entry);
+}
+
+/**************************************************************************
   Helper function to determine if a given client input line is intended as
   a "plain" public message. Note that messages prefixed with : are a
   special case (explicit public messages), and will return FALSE.
 **************************************************************************/
 static bool is_plain_public_message(const char *s)
 {
-  /* FIXME: These prefix definitions are duplicated in the server. */
-  const char ALLIES_CHAT_PREFIX = '.';
-  const char SERVER_COMMAND_PREFIX = '/';
-  const char MESSAGE_PREFIX = ':';
-
   const char *p;
 
   /* If it is a server command or an explicit ally
    * message, then it is not a public message. */
-  if (s[0] == SERVER_COMMAND_PREFIX || s[0] == ALLIES_CHAT_PREFIX) {
+  if (s[0] == SERVER_COMMAND_PREFIX || s[0] == CHAT_ALLIES_PREFIX) {
     return FALSE;
   }
 
@@ -121,7 +125,7 @@ static bool is_plain_public_message(const char *s)
   while (p != NULL && *p != '\0') {
     if (fc_isspace(*p)) {
       return TRUE;
-    } else if (*p == MESSAGE_PREFIX) {
+    } else if (*p == CHAT_DIRECT_PREFIX) {
       return FALSE;
     }
     p++;
@@ -171,8 +175,18 @@ static const char *get_player_or_user_name(int id)
 {
   size_t size = conn_list_size(game.all_connections);
 
-  return (id >= size ? player_by_number(id - size)->name
-          : conn_list_get(game.all_connections, id)->username);
+  if (id < size) {
+    return conn_list_get(game.all_connections, id)->username;
+  } else {
+    struct player *pplayer = player_by_number(id - size);
+    if (pplayer) {
+      return pplayer->name;
+    } else {
+      /* Empty slot. Relies on being used with comparison function
+       * which can cope with NULL. */
+      return NULL;
+    }
+  }
 }
 
 /**************************************************************************
@@ -192,7 +206,7 @@ static int check_player_or_user_name(const char *prefix,
   int matches_id[max_matches * 2], ind, num;
 
   switch (match_prefix_full(get_player_or_user_name,
-                            player_count()
+                            player_slot_count()
                             + conn_list_size(game.all_connections),
                             MAX_LEN_NAME, fc_strncasecmp, strlen,
                             prefix, &ind, matches_id,
@@ -238,7 +252,7 @@ static int check_player_or_user_name(const char *prefix,
   buf - The buffer to set.
   buf_len - The maximal size of the buffer.
 
-  Returns the lenght of the common prefix (in bytes).
+  Returns the length of the common prefix (in characters).
 **************************************************************************/
 static size_t get_common_prefix(const char *const *prefixes,
                                 size_t num_prefixes,
@@ -260,12 +274,12 @@ static size_t get_common_prefix(const char *const *prefixes,
     }
   }
 
- return strlen(buf);
+ return g_utf8_strlen(buf, -1);
 }
 
 /**************************************************************************
   Autocompletes the input line with a player or user name.
-  Returns FALSE if there is not string to complete.
+  Returns FALSE if there is no string to complete.
 **************************************************************************/
 static bool chatline_autocomplete(GtkEditable *editable)
 {
@@ -273,21 +287,24 @@ static bool chatline_autocomplete(GtkEditable *editable)
   const char *name[MAX_MATCHES];
   char buf[MAX_LEN_NAME * MAX_MATCHES];
   gint pos;
-  gchar *chars, *p;
+  gchar *chars, *p, *prev;
   int num, i;
   size_t prefix_len;
 
   /* Part 1: get the string to complete. */
   pos = gtk_editable_get_position(editable);
   chars = gtk_editable_get_chars(editable, 0, pos);
-  for (p = chars + strlen(chars) - 1; p >= chars; p = g_utf8_prev_char(p)) {
-    if (!g_unichar_isalnum(g_utf8_get_char(p))) {
+
+  p = chars + strlen(chars);
+  while ((prev = g_utf8_find_prev_char(chars, p))) {
+    if (!g_unichar_isalnum(g_utf8_get_char(prev))) {
       break;
     }
+    p = prev;
   }
-  p = g_utf8_next_char(p);
+  /* p points to the start of the last word, or the start of the string. */
 
-  prefix_len = strlen(p);
+  prefix_len = g_utf8_strlen(p, -1);
   if (0 == prefix_len) {
     /* Empty: nothing to complete, propagate the event. */
     g_free(chars);
@@ -314,6 +331,7 @@ static bool chatline_autocomplete(GtkEditable *editable)
     for (i = 1; i < num; i++) {
       cat_snprintf(buf, sizeof(buf), ", %s", name[i]);
     }
+    /* TRANS: comma-separated list of player/user names for completion */
     output_window_printf(ftc_client, _("Suggestions: %s."), buf);
   }
 
@@ -529,8 +547,7 @@ void inputline_make_chat_link(struct tile *ptile, bool unit)
   text mark 'scroll_target' should probably be the first character of the
   last line in the text buffer.
 **************************************************************************/
-static void scroll_if_necessary(GtkTextView *textview,
-                                GtkTextMark *scroll_target)
+void scroll_if_necessary(GtkTextView *textview, GtkTextMark *scroll_target)
 {
   GtkWidget *sw;
   GtkAdjustment *vadj;
@@ -749,8 +766,8 @@ void set_message_buffer_view_link_handlers(GtkWidget *view)
 /**************************************************************************
   Convert a struct text_tag to a GtkTextTag.
 **************************************************************************/
-static void apply_text_tag(const struct text_tag *ptag, GtkTextBuffer *buf,
-                           ft_offset_t text_start_offset, const char *text)
+void apply_text_tag(const struct text_tag *ptag, GtkTextBuffer *buf,
+                    ft_offset_t text_start_offset, const char *text)
 {
   static bool initalized = FALSE;
   GtkTextIter start, stop;
@@ -882,6 +899,13 @@ void real_output_window_append(const char *astring,
   ft_offset_t text_start_offset;
 
   buf = message_buffer;
+
+  if (buf == NULL) {
+    log_error("Output when no message buffer: %s", astring);
+
+    return;
+  }
+
   gtk_text_buffer_get_end_iter(buf, &iter);
   gtk_text_buffer_insert(buf, &iter, "\n", -1);
   mark = gtk_text_buffer_create_mark(buf, NULL, &iter, TRUE);
@@ -932,7 +956,7 @@ void log_output_window(void)
 }
 
 /**************************************************************************
-...
+  Clear output window. This does *not* destroy it, or free its resources
 **************************************************************************/
 void clear_output_window(void)
 {
@@ -940,7 +964,7 @@ void clear_output_window(void)
 }
 
 /**************************************************************************
-...
+  Set given text to output window
 **************************************************************************/
 void set_output_window_text(const char *text)
 {
@@ -1071,7 +1095,7 @@ static void color_set(GObject *object, const gchar *color_target,
       pixmap = gdk_pixmap_new(root_window, 16, 16, -1);
       gdk_gc_set_foreground(fill_bg_gc, current_color);
       gdk_draw_rectangle(pixmap, fill_bg_gc, TRUE, 0, 0, 16, 16);
-      image = gtk_pixmap_new(pixmap, NULL);
+      image = gtk_image_new_from_pixmap(pixmap, NULL);
       gtk_tool_button_set_icon_widget(button, image);
       gtk_widget_show(image);
       g_object_unref(G_OBJECT(pixmap));
@@ -1110,7 +1134,6 @@ static void color_selected(GtkDialog *dialog, gint res, gpointer data)
 **************************************************************************/
 static void select_color_callback(GtkToolButton *button, gpointer data)
 {
-  char buf[64];
   GtkWidget *dialog, *selection;
   /* "fg_color" or "bg_color". */
   const gchar *color_target = g_object_get_data(G_OBJECT(button),
@@ -1118,7 +1141,7 @@ static void select_color_callback(GtkToolButton *button, gpointer data)
   GdkColor *current_color = g_object_get_data(G_OBJECT(data), color_target);
 
   /* TRANS: "text" or "background". */
-  fc_snprintf(buf, sizeof(buf), _("Select the %s color"),
+  gchar *buf = g_strdup_printf(_("Select the %s color"),
               (const char *) g_object_get_data(G_OBJECT(button),
                                                "color_info"));
   dialog = gtk_dialog_new_with_buttons(buf, NULL, GTK_DIALOG_MODAL,
@@ -1139,6 +1162,7 @@ static void select_color_callback(GtkToolButton *button, gpointer data)
   }
 
   gtk_widget_show_all(dialog);
+  g_free(buf);
 }
 
 /**************************************************************************
@@ -1289,7 +1313,6 @@ void chatline_init(void)
 {
   GtkWidget *vbox, *toolbar, *hbox, *button, *entry, *bbox;
   GtkToolItem *item;
-  GtkTooltips *tooltips;
   GdkColor color;
 
   /* Chatline history. */
@@ -1300,9 +1323,6 @@ void chatline_init(void)
 
   /* Inputline toolkit. */
   memset(&toolkit, 0, sizeof(toolkit));
-
-  tooltips = gtk_tooltips_new();
-  gtk_tooltips_enable(tooltips);
 
   vbox = gtk_vbox_new(FALSE, 2);
   toolkit.main_widget = vbox;
@@ -1328,8 +1348,7 @@ void chatline_init(void)
   g_object_set_data(G_OBJECT(item), "text_tag_type",
                     GINT_TO_POINTER(TTT_BOLD));
   g_signal_connect(item, "clicked", G_CALLBACK(make_tag_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Bold (Ctrl-B)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Bold (Ctrl-B)"));
 
   /* Italic button. */
   item = gtk_tool_button_new_from_stock(GTK_STOCK_ITALIC);
@@ -1337,8 +1356,7 @@ void chatline_init(void)
   g_object_set_data(G_OBJECT(item), "text_tag_type",
                     GINT_TO_POINTER(TTT_ITALIC));
   g_signal_connect(item, "clicked", G_CALLBACK(make_tag_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Italic (Ctrl-I)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Italic (Ctrl-I)"));
 
   /* Strike button. */
   item = gtk_tool_button_new_from_stock(GTK_STOCK_STRIKETHROUGH);
@@ -1346,8 +1364,7 @@ void chatline_init(void)
   g_object_set_data(G_OBJECT(item), "text_tag_type",
                     GINT_TO_POINTER(TTT_STRIKE));
   g_signal_connect(item, "clicked", G_CALLBACK(make_tag_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Strikethrough (Ctrl-S)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Strikethrough (Ctrl-S)"));
 
   /* Underline button. */
   item = gtk_tool_button_new_from_stock(GTK_STOCK_UNDERLINE);
@@ -1355,8 +1372,7 @@ void chatline_init(void)
   g_object_set_data(G_OBJECT(item), "text_tag_type",
                     GINT_TO_POINTER(TTT_UNDERLINE));
   g_signal_connect(item, "clicked", G_CALLBACK(make_tag_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Underline (Ctrl-U)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Underline (Ctrl-U)"));
 
   /* Color button. */
   item = gtk_tool_button_new_from_stock(GTK_STOCK_SELECT_COLOR);
@@ -1364,8 +1380,7 @@ void chatline_init(void)
   g_object_set_data(G_OBJECT(item), "text_tag_type",
                     GINT_TO_POINTER(TTT_COLOR));
   g_signal_connect(item, "clicked", G_CALLBACK(make_tag_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Color (Ctrl-C)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Color (Ctrl-C)"));
 
   gtk_toolbar_insert(GTK_TOOLBAR(toolbar),
                      gtk_separator_tool_item_new(), -1);
@@ -1378,8 +1393,7 @@ void chatline_init(void)
                     fc_strdup(_("foreground")));
   g_signal_connect(item, "clicked",
                    G_CALLBACK(select_color_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Select the text color"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item), _("Select the text color"));
   if (gdk_color_parse("#000000", &color)) {
     /* Set default foreground color. */
     color_set(G_OBJECT(entry), "fg_color", &color, GTK_TOOL_BUTTON(item));
@@ -1395,8 +1409,8 @@ void chatline_init(void)
                     fc_strdup(_("background")));
   g_signal_connect(item, "clicked",
                    G_CALLBACK(select_color_callback), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       _("Select the background color"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item),
+                              _("Select the background color"));
   if (gdk_color_parse("#ffffff", &color)) {
     /* Set default background color. */
     color_set(G_OBJECT(entry), "bg_color", &color, GTK_TOOL_BUTTON(item));
@@ -1412,9 +1426,9 @@ void chatline_init(void)
   gtk_toolbar_insert(GTK_TOOLBAR(toolbar), item, -1);
   g_signal_connect_swapped(item, "clicked",
                            G_CALLBACK(inputline_return), entry);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(item),
-                       /* TRANS: "Return" means the return key. */
-                       _("Send the chat (Return)"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(item),
+                              /* TRANS: "Return" means the return key. */
+                              _("Send the chat (Return)"));
 
   /* Second line */
   hbox = gtk_hbox_new(FALSE, 4);
@@ -1431,7 +1445,7 @@ void chatline_init(void)
 #endif
                                              GTK_ICON_SIZE_MENU));
   g_signal_connect(button, "toggled", G_CALLBACK(button_toggled), &toolkit);
-  gtk_tooltips_set_tip(tooltips, GTK_WIDGET(button), _("Chat tools"), NULL);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(button), _("Chat tools"));
   toolkit.toggle_button = button;
 
   /* Entry. */
@@ -1444,4 +1458,31 @@ void chatline_init(void)
   bbox = gtk_hbox_new(FALSE, 0);
   gtk_box_pack_end(GTK_BOX(hbox), bbox, FALSE, FALSE, 0);
   toolkit.button_box = bbox;
+}
+
+/**************************************************************************
+  Main thread side callback to print version message
+**************************************************************************/
+static gboolean version_message_main_thread(gpointer user_data)
+{
+  char *vertext = (char *)user_data;
+
+  output_window_append(ftc_client, vertext);
+
+  FC_FREE(vertext);
+
+  return FALSE;
+}
+
+/**************************************************************************
+  Got version message from metaserver thread.
+**************************************************************************/
+void version_message(char *vertext)
+{
+  int len = strlen(vertext) + 1;
+  char *persistent = fc_malloc(len);
+
+  strncpy(persistent, vertext, len);
+
+  gdk_threads_add_idle(version_message_main_thread, persistent);
 }

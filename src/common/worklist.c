@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdarg.h>
@@ -61,7 +61,7 @@ int worklist_length(const struct worklist *pwl)
 }
 
 /****************************************************************
-...
+  Returns whether worklist has no elements.
 ****************************************************************/
 bool worklist_is_empty(const struct worklist *pwl)
 {
@@ -99,7 +99,7 @@ bool worklist_peek_ith(const struct worklist *pwl,
 }
 
 /****************************************************************
-...
+  Remove first element from worklist.
 ****************************************************************/
 void worklist_advance(struct worklist *pwl)
 {
@@ -107,16 +107,17 @@ void worklist_advance(struct worklist *pwl)
 }  
 
 /****************************************************************
-...
+  Copy contents from worklist src to worklist dst.
 ****************************************************************/
 void worklist_copy(struct worklist *dst, const struct worklist *src)
 {
-  fc_assert_ret(sizeof(*dst) == sizeof(*src));
-  memcpy(dst, src, sizeof(*dst));
+  dst->length = src->length;
+
+  memcpy(dst->entries, src->entries, sizeof(struct universal) * src->length);
 }
 
 /****************************************************************
-...
+  Remove element from position idx.
 ****************************************************************/
 void worklist_remove(struct worklist *pwl, int idx)
 {

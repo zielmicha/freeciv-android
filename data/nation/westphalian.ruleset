@@ -18,7 +18,6 @@ leaders = {
  "Jan van Leiden",              "Male"
  "Franz von Waldeck",           "Male"
  "Bernhard von Galen",		"Male"
- "Pauline zur Lippe",		"Female"
  "Hieronymus Napoleon",		"Male"
  "Annette von Droste Hülshoff", "Female"
 }
@@ -29,19 +28,18 @@ city_style = "European"
 
 ruler_titles = {
  "government",     "male_title",            "female_title"
- "Despotism",      _("Count %s"),           _("Countess %s")
+ "Despotism",      _("Duke %s"),            _("Duchess %s")
  "Fundamentalism", _("Prince-Bishop %s"),   _("Princess-Bishop %s")
- "Monarchy",       _("Duke %s"),            _("Duchess %s")
+ "Monarchy",       _("Grand Duke %s"),      _("Grand Duchess %s")
  "Republic",       _("Burgomaster %s"),     _("?female:Burgomaster %s") 
 }
 
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
-civilwar_nations="Hanoverian", "Hessian", "Saxon"
+civilwar_nations="Hanoverian", "Lippian", "Saxon", "Rhenish"
 
 cities =
  "Münster",
@@ -84,4 +82,12 @@ cities =
  "Bad Laasphe",
  "Tecklenburg",
  "Castrop-Rauxel",
- "Gladbeck"
+ "Gladbeck",
+ "Witten",
+ "Dorsten",
+ "Herten",
+ "Marl",
+ "Bad Oeynhausen",
+ "Winterberg",
+ "Warstein"
+

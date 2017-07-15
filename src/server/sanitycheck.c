@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -35,6 +35,7 @@
 #include "citytools.h"
 #include "cityturn.h"           /* city_repair_size() */
 #include "maphand.h"
+#include "plrhand.h"
 #include "srv_main.h"
 #include "unittools.h"
 
@@ -43,16 +44,16 @@
 
 #ifdef SANITY_CHECKING
 
-#define SANITY_(format, ...) \
+#define SANITY_FAIL(format, ...) \
   fc_assert_fail(file, function, line, NULL, format, ## __VA_ARGS__)
 
 #define SANITY_CHECK(check) \
-  fc_assert_full(file, function, line, check, , NULL)
+  fc_assert_full(file, function, line, check, , NOLOGMSG, NOLOGMSG)
 
 #define SANITY_CITY(_city, check)                                           \
   fc_assert_full(file, function, line, check, ,                             \
                  "(%4d, %4d) in \"%s\"[%d]", TILE_XY((_city)->tile),        \
-                 city_name(_city), (_city)->size)
+                 city_name(_city), city_size_get(_city))
 
 #define SANITY_TERRAIN(_tile, check)                                        \
   fc_assert_full(file, function, line, check, ,                             \
@@ -69,6 +70,8 @@
     }                                                                       \
   } while(0)
 
+static void check_city_feelings(const struct city *pcity, const char *file,
+                                const char *function, int line);
 
 /**************************************************************************
   Sanity checking on map (tile) specials.
@@ -79,10 +82,9 @@ static void check_specials(const char *file, const char *function, int line)
     const struct terrain *pterrain = tile_terrain(ptile);
     bv_special special = tile_specials(ptile);
 
-    if (contains_special(special, S_RAILROAD))
-      SANITY_TILE(ptile, contains_special(special, S_ROAD));
-    if (contains_special(special, S_FARMLAND))
+    if (contains_special(special, S_FARMLAND)) {
       SANITY_TILE(ptile, contains_special(special, S_IRRIGATION));
+    }
 
     if (contains_special(special, S_MINE)) {
       SANITY_TILE(ptile, pterrain->mining_result == pterrain);
@@ -152,6 +154,7 @@ static void check_misc(const char *file, const char *function, int line)
 
   SANITY_CHECK(player_count() <= player_slot_count());
   SANITY_CHECK(team_count() <= MAX_NUM_TEAM_SLOTS);
+  SANITY_CHECK(normal_player_count() <= game.server.max_players);
 }
 
 /**************************************************************************
@@ -161,11 +164,9 @@ static void check_map(const char *file, const char *function, int line)
 {
   whole_map_iterate(ptile) {
     struct city *pcity = tile_city(ptile);
-    int cont = tile_continent(ptile), x, y;
+    int cont = tile_continent(ptile);
 
     CHECK_INDEX(tile_index(ptile));
-    CHECK_MAP_POS(ptile->x, ptile->y);
-    CHECK_NATIVE_POS(ptile->nat_x, ptile->nat_y);
 
     if (NULL != pcity) {
       SANITY_TILE(ptile, same_pos(pcity->tile, ptile));
@@ -173,12 +174,6 @@ static void check_map(const char *file, const char *function, int line)
         SANITY_TILE(ptile, tile_owner(ptile) != NULL);
       }
     }
-
-    index_to_map_pos(&x, &y, tile_index(ptile));
-    SANITY_TILE(ptile, x == ptile->x && y == ptile->y);
-
-    index_to_native_pos(&x, &y, tile_index(ptile));
-    SANITY_TILE(ptile, x == ptile->nat_x && y == ptile->nat_y);
 
     if (is_ocean_tile(ptile)) {
       SANITY_TILE(ptile, cont < 0);
@@ -197,7 +192,7 @@ static void check_map(const char *file, const char *function, int line)
     }
 
     unit_list_iterate(ptile->units, punit) {
-      SANITY_TILE(ptile, same_pos(punit->tile, ptile));
+      SANITY_TILE(ptile, same_pos(unit_tile(punit), ptile));
 
       /* Check diplomatic status of stacked units. */
       unit_list_iterate(ptile->units, punit2) {
@@ -223,11 +218,11 @@ static bool check_city_good(struct city *pcity, const char *file,
 
   if (NULL == pcenter) {
     /* Editor! */
-    SANITY_("(----,----) city has no tile (skipping remaining tests), "
-            "at %s \"%s\"[%d]%s",
-            nation_rule_name(nation_of_player(pplayer)),
-            city_name(pcity), pcity->size,
-            "{city center}");
+    SANITY_FAIL("(----,----) city has no tile (skipping remaining tests), "
+                "at %s \"%s\"[%d]%s",
+                nation_rule_name(nation_of_player(pplayer)),
+                city_name(pcity), city_size_get(pcity),
+                "{city center}");
     return FALSE;
   }
 
@@ -239,13 +234,12 @@ static bool check_city_good(struct city *pcity, const char *file,
 
   if (NULL != tile_owner(pcenter)) {
     if (tile_owner(pcenter) != pplayer) {
-      SANITY_("(%4d,%4d) tile owned by %s, "
-              "at %s \"%s\"[%d]%s",
-              TILE_XY(pcenter),
-              nation_rule_name(nation_of_player(tile_owner(pcenter))),
-              nation_rule_name(nation_of_player(pplayer)),
-              city_name(pcity), pcity->size,
-              "{city center}");
+      SANITY_FAIL("(%4d,%4d) tile owned by %s, at %s \"%s\"[%d]%s",
+                  TILE_XY(pcenter),
+                  nation_rule_name(nation_of_player(tile_owner(pcenter))),
+                  nation_rule_name(nation_of_player(pplayer)),
+                  city_name(pcity), city_size_get(pcity),
+                  "{city center}");
     }
   }
 
@@ -275,7 +269,7 @@ static void check_city_size(struct city *pcity, const char *file,
   int citizens = 0;
   struct tile *pcenter = city_tile(pcity);
 
-  SANITY_CITY(pcity, pcity->size >= 1);
+  SANITY_CITY(pcity, city_size_get(pcity) >= 1);
 
   city_tile_iterate_skip_free_worked(city_map_radius_sq_get(pcity), pcenter,
                                   ptile, _index, _x, _y) {
@@ -285,13 +279,11 @@ static void check_city_size(struct city *pcity, const char *file,
   } city_tile_iterate_skip_free_worked_end;
 
   citizens += city_specialists(pcity);
-  delta = pcity->size - citizens;
+  delta = city_size_get(pcity) - citizens;
   if (0 != delta) {
-    SANITY_("(%4d,%4d) %d citizens not equal [size], "
-            "repairing \"%s\"[%d]",
-            TILE_XY(pcity->tile),
-            citizens,
-            city_name(pcity), pcity->size);
+    SANITY_FAIL("(%4d,%4d) %d citizens not equal [size], "
+                "repairing \"%s\"[%d]", TILE_XY(pcity->tile),
+                citizens, city_name(pcity), city_size_get(pcity));
 
     citylog_map_workers(LOG_DEBUG, pcity);
     log_debug("[%s (%d)] specialists: %d", city_name(pcity), pcity->id,
@@ -306,34 +298,21 @@ static void check_city_size(struct city *pcity, const char *file,
   Verify that the number of people with feelings + specialists equal
   city size.
 **************************************************************************/
-void real_sanity_check_feelings(const struct city *pcity,
-                                const char *file,
+static void check_city_feelings(const struct city *pcity, const char *file,
                                 const char *function, int line)
 {
-  int ccategory;
+  int feel;
   int spe = city_specialists(pcity);
 
-  for (ccategory = CITIZEN_HAPPY; ccategory < CITIZEN_LAST; ccategory++) {
+  for (feel = FEELING_BASE; feel < FEELING_LAST; feel++) {
     int sum = 0;
-    int feel;
+    int ccategory;
 
-    for (feel = FEELING_BASE; feel < FEELING_LAST; feel++) {
+    for (ccategory = CITIZEN_HAPPY; ccategory < CITIZEN_LAST; ccategory++) {
       sum += pcity->feel[ccategory][feel];
     }
 
-    SANITY_CITY(pcity, pcity->size - spe == sum);
-  }
-}
-
-/**************************************************************************
-  Verify that the city has sane values.
-**************************************************************************/
-void real_sanity_check_city_all(struct city *pcity, const char *file,
-                                const char *function, int line)
-{
-  if (check_city_good(pcity, file, function, line)) {
-    check_city_size(pcity, file, function, line);
-    /* TODO: check_feelings. Currently fails far too often to be included. */
+    SANITY_CITY(pcity, city_size_get(pcity) - spe == sum);
   }
 }
 
@@ -345,6 +324,7 @@ void real_sanity_check_city(struct city *pcity, const char *file,
 {
   if (check_city_good(pcity, file, function, line)) {
     check_city_size(pcity, file, function, line);
+    check_city_feelings(pcity, file, function, line);
   }
 }
 
@@ -369,28 +349,31 @@ static void check_units(const char *file, const char *function, int line)
 {
   players_iterate(pplayer) {
     unit_list_iterate(pplayer->units, punit) {
-      struct tile *ptile = punit->tile;
+      struct tile *ptile = unit_tile(punit);
       struct city *pcity;
       struct city *phome;
-      struct unit *transporter = NULL, *transporter2 = NULL;
+      struct unit *ptrans = unit_transport_get(punit);
 
       SANITY_CHECK(unit_owner(punit) == pplayer);
 
       if (IDENTITY_NUMBER_ZERO != punit->homecity) {
         SANITY_CHECK(phome = player_city_by_number(pplayer,
                                                    punit->homecity));
-	if (phome) {
-	  SANITY_CHECK(city_owner(phome) == pplayer);
-	}
+        if (phome) {
+          SANITY_CHECK(city_owner(phome) == pplayer);
+        }
       }
 
+      /* Unit in the correct player list? */
+      SANITY_CHECK(player_unit_by_number(unit_owner(punit),
+                                         punit->id) != NULL);
+
       if (!can_unit_continue_current_activity(punit)) {
-	SANITY_("(%4d,%4d) %s has activity %s, "
-		"but it can't continue at %s",
-		TILE_XY(ptile),
-		unit_rule_name(punit),
-		get_activity_text(punit->activity),
-		tile_get_info_text(ptile, 0));
+        SANITY_FAIL("(%4d,%4d) %s has activity %s, "
+                    "but it can't continue at %s",
+                    TILE_XY(ptile), unit_rule_name(punit),
+                    get_activity_text(punit->activity),
+                    tile_get_info_text(ptile, TRUE, 0));
       }
 
       pcity = tile_city(ptile);
@@ -401,39 +384,50 @@ static void check_units(const char *file, const char *function, int line)
       SANITY_CHECK(punit->moves_left >= 0);
       SANITY_CHECK(punit->hp > 0);
 
-      if (punit->transported_by != -1) {
-        transporter = game_unit_by_number(punit->transported_by);
-        SANITY_CHECK(transporter != NULL);
-
-	/* Make sure the transporter is on the tile. */
-	unit_list_iterate(punit->tile->units, tile_unit) {
-	  if (tile_unit == transporter) {
-	    transporter2 = tile_unit;
-	  }
-	} unit_list_iterate_end;
-	SANITY_CHECK(transporter2 != NULL);
-
-        /* Also in the list of owner? */
-        if (NULL != transporter) {
-          SANITY_CHECK(player_unit_by_number(unit_owner(transporter),
-                                             punit->transported_by) != NULL);
-          SANITY_CHECK(same_pos(ptile, transporter->tile));
-        }
-
-        /* Transporter capacity will be checked when transporter itself
-	 * is checked */
-      }
-
       /* Check for ground units in the ocean. */
-      if (!can_unit_exist_at_tile(punit, ptile)) {
-        SANITY_CHECK(punit->transported_by != -1);
-        SANITY_CHECK(transporter != NULL
-                     && can_unit_transport(transporter, punit));
-      }
+      SANITY_CHECK(can_unit_exist_at_tile(punit, ptile) || ptrans != NULL);
 
       /* Check for over-full transports. */
       SANITY_CHECK(get_transporter_occupancy(punit)
-	     <= get_transporter_capacity(punit));
+                   <= get_transporter_capacity(punit));
+
+      /* Check transporter. This should be last as the pointer ptrans will
+       * be modified. */
+      if (ptrans != NULL) {
+        struct unit *plevel = punit;
+        int level = 0;
+
+        /* Make sure the transporter is on the tile. */
+        SANITY_CHECK(same_pos(unit_tile(punit), unit_tile(ptrans)));
+
+        /* Can punit be cargo for its transporter? */
+        SANITY_CHECK(unit_transport_check(punit, ptrans));
+
+        /* Check that the unit is listed as transported. */
+        SANITY_CHECK(unit_list_search(unit_transport_cargo(ptrans),
+                                      punit) != NULL);
+
+        /* Check the depth of the transportation. */
+        while (ptrans) {
+          struct unit_list *pcargos = unit_transport_cargo(ptrans);
+
+          SANITY_CHECK(pcargos != NULL);
+          SANITY_CHECK(level < GAME_TRANSPORT_MAX_RECURSIVE);
+
+          /* Check for next level. */
+          plevel = ptrans;
+          ptrans = unit_transport_get(plevel);
+          level++;
+        }
+
+        /* Transporter capacity will be checked when transporter itself
+         * is checked */
+      }
+
+      /* Check that cargo is marked as transported with this unit */
+      unit_list_iterate(unit_transport_cargo(punit), pcargo) {
+        SANITY_CHECK(unit_transport_get(pcargo) == punit);
+      } unit_list_iterate_end;
     } unit_list_iterate_end;
   } players_iterate_end;
 }
@@ -454,9 +448,12 @@ static void check_players(const char *file, const char *function, int line)
       continue;
     }
 
-    SANITY_CHECK(pplayer->server.aidata != NULL);
+    SANITY_CHECK(pplayer->server.adv != NULL);
     SANITY_CHECK(!pplayer->nation || pplayer->nation->player == pplayer);
     SANITY_CHECK(player_list_search(team_members(pplayer->team), pplayer));
+
+    SANITY_CHECK(!(city_list_size(pplayer->cities) > 0
+                   && !pplayer->server.got_first_city));
 
     city_list_iterate(pplayer->cities, pcity) {
       if (is_capital(pcity)) {
@@ -466,11 +463,24 @@ static void check_players(const char *file, const char *function, int line)
     } city_list_iterate_end;
 
     players_iterate(pplayer2) {
-      SANITY_CHECK(player_diplstate_get(pplayer, pplayer2)->type
-                   == player_diplstate_get(pplayer2, pplayer)->type);
-      if (player_diplstate_get(pplayer, pplayer2)->type == DS_CEASEFIRE) {
-        SANITY_CHECK(player_diplstate_get(pplayer, pplayer2)->turns_left
-                     == player_diplstate_get(pplayer2, pplayer)->turns_left);
+      struct player_diplstate *state1, *state2;
+
+      if (pplayer2 == pplayer) {
+        break; /* Do diplomatic sanity check only once per player couple. */
+      }
+
+      state1 = player_diplstate_get(pplayer, pplayer2);
+      state2 = player_diplstate_get(pplayer2, pplayer);
+      SANITY_CHECK(state1->type == state2->type);
+      if (state1->type == DS_CEASEFIRE) {
+        SANITY_CHECK(state1->turns_left == state2->turns_left);
+      }
+      if (state1->type == DS_TEAM) {
+        SANITY_CHECK(players_on_same_team(pplayer, pplayer2));
+        SANITY_CHECK(player_has_real_embassy(pplayer, pplayer2));
+        SANITY_CHECK(player_has_real_embassy(pplayer2, pplayer));
+        SANITY_CHECK(really_gives_vision(pplayer, pplayer2));
+        SANITY_CHECK(really_gives_vision(pplayer2, pplayer));
       }
       if (pplayer->is_alive
           && pplayer2->is_alive
@@ -486,8 +496,8 @@ static void check_players(const char *file, const char *function, int line)
 
     if (pplayer->revolution_finishes == -1) {
       if (government_of_player(pplayer) == game.government_during_revolution) {
-        SANITY_("%s government is anarchy, but does not finish!",
-                nation_rule_name(nation_of_player(pplayer)));
+        SANITY_FAIL("%s government is anarchy, but does not finish!",
+                    nation_rule_name(nation_of_player(pplayer)));
       }
       SANITY_CHECK(government_of_player(pplayer) != game.government_during_revolution);
     } else if (pplayer->revolution_finishes > game.info.turn) {
@@ -590,9 +600,9 @@ void real_sanity_check_tile(struct tile *ptile, const char *file,
      * 'easy' test if the unit is transported is done. A complete check is
      * done by check_units() in real_sanity_check(). */
     if (!can_unit_exist_at_tile(punit, ptile)
-        && punit->transported_by != -1) {
-      SANITY_("(%4d,%4d) %s can't survive on %s", TILE_XY(ptile),
-              unit_rule_name(punit), tile_get_info_text(ptile, 0));
+        && !unit_transported(punit)) {
+      SANITY_FAIL("(%4d,%4d) %s can't survive on %s", TILE_XY(ptile),
+                  unit_rule_name(punit), tile_get_info_text(ptile, TRUE, 0));
     }
   } unit_list_iterate_end;
 }

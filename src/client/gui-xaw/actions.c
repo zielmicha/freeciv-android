@@ -13,7 +13,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -152,7 +152,7 @@ static void xaw_key_end_turn(Widget w, XEvent *event, String *argv, Cardinal *ar
 
 static void xaw_key_focus_to_next_unit(Widget w, XEvent *event, String *argv, Cardinal *argc)
 {
-  advance_unit_focus();
+  unit_focus_advance();
 }
 
 static void xaw_key_map_grid_toggle(Widget w, XEvent *event, String *argv, Cardinal *argc)
@@ -167,6 +167,15 @@ static void xaw_key_map_borders_toggle(Widget w, XEvent *event,
 				       String *argv, Cardinal *argc)
 {
   key_map_borders_toggle();
+}
+
+/*************************************************************************
+  Called when the key to toggle native tile display is pressed.
+**************************************************************************/
+static void xaw_key_map_native_toggle(Widget w, XEvent *event,
+                                      String *argv, Cardinal *argc)
+{
+  key_map_native_toggle();
 }
 
 static void xaw_key_move_north(Widget w, XEvent *event, String *argv, Cardinal *argc)
@@ -421,20 +430,37 @@ static void xaw_key_unit_build_wonder(Widget w, XEvent *event, String *argv, Car
 
 static void xaw_key_unit_connect_road(Widget w, XEvent *event, String *argv, Cardinal *argc)
 {
-  if(is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_ROAD))
-    key_unit_connect(ACTIVITY_ROAD);
+  if (is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_ROAD)) {
+    struct road_type *proad = road_by_compat_special(ROCO_ROAD);
+
+    if (proad != NULL) {
+      struct act_tgt tgt = { .type = ATT_ROAD,
+                             .obj.road = road_number(proad) };
+
+      key_unit_connect(ACTIVITY_GEN_ROAD, &tgt);
+    }
+  }
 }
 
 static void xaw_key_unit_connect_rail(Widget w, XEvent *event, String *argv, Cardinal *argc)
 {
-  if(is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_RAIL))
-    key_unit_connect(ACTIVITY_RAILROAD);
+  if (is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_RAIL)) {
+    struct road_type *prail = road_by_compat_special(ROCO_RAILROAD);
+
+    if (prail != NULL) {
+      struct act_tgt tgt = { .type = ATT_ROAD,
+                             .obj.road = road_number(prail) };
+
+      key_unit_connect(ACTIVITY_GEN_ROAD, &tgt);
+    }
+  }
 }
 
 static void xaw_key_unit_connect_irrigate(Widget w, XEvent *event, String *argv, Cardinal *argc)
 {
-  if(is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_IRRIGATE))
-    key_unit_connect(ACTIVITY_IRRIGATE);
+  if (is_menu_item_active(MENU_ORDER, MENU_ORDER_CONNECT_IRRIGATE)) {
+    key_unit_connect(ACTIVITY_IRRIGATE, NULL);
+  }
 }
 
 static void xaw_key_unit_diplomat_spy_action(Widget w, XEvent *event, String *argv, Cardinal *argc)
@@ -452,7 +478,7 @@ static void xaw_key_unit_convert(Widget w, XEvent *event, String *argv, Cardinal
 static void xaw_key_unit_disband(Widget w, XEvent *event, String *argv, Cardinal *argc)
 {
   if(is_menu_item_active(MENU_ORDER, MENU_ORDER_DISBAND))
-    key_unit_disband();
+    popup_disband_dialog(get_units_in_focus());
 }
 
 static void xaw_key_unit_done(Widget w, XEvent *event, String *argv, Cardinal *argc)
@@ -477,7 +503,7 @@ static void xaw_key_unit_fortify_or_fortress(Widget w, XEvent *event, String *ar
 {
   unit_list_iterate(get_units_in_focus(), punit) {
     struct base_type *pbase = get_base_by_gui_type(BASE_GUI_FORTRESS,
-                                                   punit, punit->tile);
+                                                   punit, unit_tile(punit));
     if (pbase != NULL) {
       key_unit_fortress();
     } else {
@@ -866,6 +892,7 @@ static XtActionsRec Actions[] = {
   { "key-focus-to-next-unit", xaw_key_focus_to_next_unit },
   { "key-map-grid-toggle", xaw_key_map_grid_toggle },
   { "key-map-borders-toggle", xaw_key_map_borders_toggle },
+  { "key-map-native-toggle", xaw_key_map_native_toggle },
   { "key-move-north", xaw_key_move_north },
   { "key-move-north-east", xaw_key_move_north_east },
   { "key-move-east", xaw_key_move_east },

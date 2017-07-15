@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -20,11 +20,13 @@
 #include "fcintl.h"
 #include "rand.h"
 
-/* client */
+/* client/include */
 #include "gui_main_g.h"
 #include "ggz_g.h"
 
+/* client */
 #include "clinet.h"
+
 #include "ggzclient.h"
 
 #ifdef GGZ_CLIENT
@@ -164,4 +166,4 @@ bool user_get_record(const char *name,
 
 }
 
-#endif
+#endif /* GGZ_CLIENT */

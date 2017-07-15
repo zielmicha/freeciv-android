@@ -28,9 +28,8 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",            "female_title"
- ; /* TRANS: Voievod = Prince */
- "Republic",        _("Voivode %s"),         _("?female:Voivode %s")
- "Fundamentalism",_("Director-President %s"),_("?female:Director-President %s")
+ "Despotism",       _("Prince %s"),            _("Princess %s")
+ "Fundamentalism",  _("Director-President %s"),_("?female:Director-President %s")
 }
 
 flag="romania"
@@ -40,7 +39,6 @@ city_style = "Classical"
 init_techs=""
 init_buildings=""
 init_units=""
-init_government="Despotism"
 
 conflicts_with = "roman"
 civilwar_nations = "transylvanian", "moldovan"

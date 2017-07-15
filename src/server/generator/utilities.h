@@ -15,6 +15,8 @@
 
 typedef void (*tile_knowledge_cb)(struct tile *ptile);
 
+void generator_free(void);
+
 void regenerate_lakes(tile_knowledge_cb knowledge_cb);
 void smooth_water_depth(void);
 void assign_continent_numbers(void);
@@ -57,8 +59,10 @@ struct terrain *pick_ocean(int depth);
   int _index = -(_index##_d);						\
 									\
   for (; _index <= _index##_d; _index++) {				\
-    _tile##_x = _tile##_center->nat_x + (_index##_axis ? _index : 0);	\
-    _tile##_y = _tile##_center->nat_y + (_index##_axis ? 0 : _index);	\
+    int _nat##_x, _nat##_y;                                                    \
+    index_to_native_pos(&_nat##_x, &_nat##_y, tile_index(_tile##_center));     \
+    _tile##_x = _nat##_x + (_index##_axis ? _index : 0);                       \
+    _tile##_y = _nat##_y + (_index##_axis ? 0 : _index);                       \
     _tile = native_pos_to_tile(_tile##_x, _tile##_y);			\
     if (NULL != _tile) {
 

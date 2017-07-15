@@ -12,13 +12,27 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_WINSOCK
+#ifdef HAVE_WINSOCK2
+#include <winsock2.h>
+#else  /* HAVE_WINSOCK2 */
+#include <winsock.h>
+#endif /* HAVE_WINSOCK2 */
+#endif /* HAVE_WINSOCK */
 
 /* utility */
 #include "capability.h"
@@ -48,7 +62,7 @@
 #define COMPRESSION_BORDER	(16*1024+1)
 
 /*
- * All compressed packets over this size are sent as a jumbo packet.
+ * All compressed packets this size or greater are sent as a jumbo packet.
  */
 #define JUMBO_BORDER 		(64*1024-COMPRESSION_BORDER-1)
 #endif
@@ -61,24 +75,6 @@
  * to 1 in generate_packets.py.
  */
 #define PACKET_SIZE_STATISTICS 0
-
-/********************************************************************** 
- The current packet functions don't handle signed values
- correct. This will probably lead to problems when compiling
- freeciv for a platform which has 64 bit ints. Also 16 and 8
- bits values cannot be signed without using tricks (look in e.g
- receive_packet_city_info() )
-
-  TODO to solve these problems:
-    o use the new signed functions where they are necessary
-    o change the prototypes of the unsigned functions
-       to unsigned int instead of int (but only on the 32
-       bit functions, because otherwhere it's not necessary)
-
-  Possibe enhancements:
-    o check in configure for ints with size others than 4
-    o write real put functions and check for the limit
-***********************************************************************/
 
 #ifdef USE_COMPRESSION
 static int stat_size_alone = 0;
@@ -113,13 +109,24 @@ static bool conn_compression_flush(struct connection *pconn)
   uLongf compressed_size = 12 + 1.001 * pconn->compression.queue.size;
   int error;
   Bytef compressed[compressed_size];
+  bool jumbo;
+  unsigned long compressed_packet_len;
 
   error = compress2(compressed, &compressed_size,
                     pconn->compression.queue.p,
                     pconn->compression.queue.size,
                     compression_level);
   fc_assert_ret_val(error == Z_OK, FALSE);
-  if (compressed_size + 2 < pconn->compression.queue.size) {
+
+  /* Compression signalling currently assumes a 2-byte packet length; if that
+   * changes, the protocol should probably be changed */
+  fc_assert_ret_val(data_type_size(pconn->packet_header.length) == 2, FALSE);
+
+  /* Include normal length field in decision */
+  jumbo = (compressed_size+2 >= JUMBO_BORDER);
+
+  compressed_packet_len = compressed_size + (jumbo ? 6 : 2);
+  if (compressed_packet_len < pconn->compression.queue.size) {
     struct data_out dout;
 
     log_compress("COMPRESS: compressed %lu bytes to %ld (level %d)",
@@ -128,8 +135,10 @@ static bool conn_compression_flush(struct connection *pconn)
     stat_size_uncompressed += pconn->compression.queue.size;
     stat_size_compressed += compressed_size;
 
-    if (compressed_size <= JUMBO_BORDER) {
+    if (!jumbo) {
       unsigned char header[2];
+      FC_STATIC_ASSERT(COMPRESSION_BORDER > MAX_LEN_PACKET,
+                       uncompressed_compressed_packet_len_overlap);
 
       log_compress("COMPRESS: sending %ld as normal", compressed_size);
 
@@ -139,6 +148,8 @@ static bool conn_compression_flush(struct connection *pconn)
       connection_send_data(pconn, compressed, compressed_size);
     } else {
       unsigned char header[6];
+      FC_STATIC_ASSERT(JUMBO_SIZE >= JUMBO_BORDER+COMPRESSION_BORDER,
+                       compressed_normal_jumbo_packet_len_overlap);
 
       log_compress("COMPRESS: sending %ld as jumbo", compressed_size);
       dio_output_init(&dout, header, sizeof(header));
@@ -148,10 +159,10 @@ static bool conn_compression_flush(struct connection *pconn)
       connection_send_data(pconn, compressed, compressed_size);
     }
   } else {
-    log_compress("COMPRESS: would enlarging %lu bytes to %ld; "
+    log_compress("COMPRESS: would enlarge %lu bytes to %ld; "
                  "sending uncompressed",
                  (unsigned long) pconn->compression.queue.size,
-                 compressed_size);
+                 compressed_packet_len);
     connection_send_data(pconn, pconn->compression.queue.p,
                          pconn->compression.queue.size);
     stat_size_no_compression += pconn->compression.queue.size;
@@ -169,6 +180,10 @@ bool conn_compression_thaw(struct connection *pconn)
 {
 #ifdef USE_COMPRESSION
   pconn->compression.frozen_level--;
+  fc_assert_action_msg(pconn->compression.frozen_level >= 0,
+                       pconn->compression.frozen_level = 0,
+                       "Too many calls to conn_compression_thaw on %s!",
+                       conn_description(pconn));
   if (0 == pconn->compression.frozen_level) {
     return conn_compression_flush(pconn);
   }
@@ -180,13 +195,15 @@ bool conn_compression_thaw(struct connection *pconn)
 /**************************************************************************
   It returns the request id of the outgoing packet (or 0 if is_server()).
 **************************************************************************/
-int send_packet_data(struct connection *pc, unsigned char *data, int len)
+int send_packet_data(struct connection *pc, unsigned char *data, int len,
+                     enum packet_type packet_type)
 {
   /* default for the server */
   int result = 0;
 
+
   log_packet("sending packet type=%s(%d) len=%d to %s",
-             packet_name(data[2]), data[2], len,
+             packet_name(packet_type), packet_type, len,
              is_server() ? pc->username : "server");
 
   if (!is_server()) {
@@ -197,32 +214,42 @@ int send_packet_data(struct connection *pc, unsigned char *data, int len)
   }
 
   if (pc->outgoing_packet_notify) {
-    pc->outgoing_packet_notify(pc, data[2], len, result);
+    pc->outgoing_packet_notify(pc, packet_type, len, result);
   }
 
 #ifdef USE_COMPRESSION
   if (TRUE) {
-    int packet_type;
     int size = len;
 
-    packet_type = data[2];
     if (conn_compression_frozen(pc)) {
-      size_t old_size = pc->compression.queue.size;
+      size_t old_size;
 
-      byte_vector_reserve(&pc->compression.queue, old_size + len);
-      memcpy(pc->compression.queue.p + old_size, data, len);
-      log_compress2("COMPRESS: putting %s into the queue",
-                    packet_name(packet_type));
-      if (MAX_LEN_BUFFER < byte_vector_size(&pc->compression.queue)) {
+      /* Keep this a decent amount less than MAX_LEN_BUFFER to avoid the
+       * (remote) possibility of trying to dump MAX_LEN_BUFFER to the
+       * network in one go */
+#define MAX_LEN_COMPRESS_QUEUE (MAX_LEN_BUFFER/2)
+      FC_STATIC_ASSERT(MAX_LEN_COMPRESS_QUEUE < MAX_LEN_BUFFER,
+                       compress_queue_maxlen_too_big);
+
+      /* If this packet would cause us to overfill the queue, flush
+       * everything that's in there already before queuing this one */
+      if (MAX_LEN_COMPRESS_QUEUE
+          < byte_vector_size(&pc->compression.queue) + len) {
         log_compress2("COMPRESS: huge queue, forcing to flush (%lu/%lu)",
                       (long unsigned)
                       byte_vector_size(&pc->compression.queue),
-                      (long unsigned) MAX_LEN_BUFFER);
+                      (long unsigned) MAX_LEN_COMPRESS_QUEUE);
         if (!conn_compression_flush(pc)) {
           return -1;
         }
         byte_vector_reserve(&pc->compression.queue, 0);
       }
+
+      old_size = byte_vector_size(&pc->compression.queue);
+      byte_vector_reserve(&pc->compression.queue, old_size + len);
+      memcpy(pc->compression.queue.p + old_size, data, len);
+      log_compress2("COMPRESS: putting %s into the queue",
+                    packet_name(packet_type));
     } else {
       stat_size_alone += size;
       log_compress("COMPRESS: sending %s alone (%d bytes total)",
@@ -235,9 +262,9 @@ int send_packet_data(struct connection *pc, unsigned char *data, int len)
                   stat_size_alone, stat_size_no_compression,
                   stat_size_uncompressed, stat_size_compressed);
   }
-#else
+#else  /* USE_COMPRESSION */
   connection_send_data(pc, data, len);
-#endif
+#endif /* USE_COMPRESSION */
 
 #if PACKET_SIZE_STATISTICS
   {
@@ -249,7 +276,6 @@ int send_packet_data(struct connection *pc, unsigned char *data, int len)
     static int last_start_turn_seen = -1;
     static bool start_turn_seen = FALSE;
 
-    int packet_type = data[2];
     int size = len;
     bool print = FALSE;
     bool clear = FALSE;
@@ -326,12 +352,12 @@ int send_packet_data(struct connection *pc, unsigned char *data, int len)
 }
 
 /**************************************************************************
-presult indicates if there is more packets in the cache. We return result
-instead of just testing if the returning package is NULL as we sometimes
-return a NULL packet even if everything is OK (receive_packet_goto_route).
+  Read and return a packet from the connection 'pc'. The type of the
+  packet is written in 'ptype'. On error, the connection is closed and
+  the function returns NULL.
 **************************************************************************/
 void *get_packet_from_connection(struct connection *pc,
-				 enum packet_type *ptype, bool * presult)
+                                 enum packet_type *ptype)
 {
   int len_read;
   int whole_packet_len;
@@ -344,24 +370,27 @@ void *get_packet_from_connection(struct connection *pc,
   bool compressed_packet = FALSE;
   int header_size = 0;
 #endif
-
-  *presult = FALSE;
+  void *data;
 
   if (!pc->used) {
     return NULL;		/* connection was closed, stop reading */
   }
   
-  if (pc->buffer->ndata < 3) {
-    return NULL;           /* length and type not read */
+  if (pc->buffer->ndata < data_type_size(pc->packet_header.length)) {
+    /* Not got enough for a length field yet */
+    return NULL;
   }
 
   dio_input_init(&din, pc->buffer->data, pc->buffer->ndata);
-  dio_get_uint16(&din, &len_read);
+  dio_get_type(&din, pc->packet_header.length, &len_read);
 
   /* The non-compressed case */
   whole_packet_len = len_read;
 
 #ifdef USE_COMPRESSION
+  /* Compression signalling currently assumes a 2-byte packet length; if that
+   * changes, the protocol should probably be changed */
+  fc_assert(data_type_size(pc->packet_header.length) == 2);
   if (len_read == JUMBO_SIZE) {
     compressed_packet = TRUE;
     header_size = 6;
@@ -380,13 +409,21 @@ void *get_packet_from_connection(struct connection *pc,
     log_compress("COMPRESS: got a normal packet of size %d",
                  whole_packet_len);
   }
-#endif
+#endif /* USE_COMPRESSION */
 
   if ((unsigned)whole_packet_len > pc->buffer->ndata) {
     return NULL;		/* not all data has been read */
   }
 
 #ifdef USE_COMPRESSION
+  if (whole_packet_len < header_size) {
+    log_verbose("The packet size is reported to be less than header alone. "
+                "The connection will be closed now.");
+    connection_close(pc, _("illegal packet size"));
+
+    return NULL;
+  }
+
   if (compressed_packet) {
     uLong compressed_size = whole_packet_len - header_size;
     /* 
@@ -439,23 +476,23 @@ void *get_packet_from_connection(struct connection *pc,
     log_compress("COMPRESS: decompressed %ld into %ld",
                  compressed_size, decompressed_size);
 
-    return get_packet_from_connection(pc, ptype, presult);
+    return get_packet_from_connection(pc, ptype);
   }
-#endif
+#endif /* USE_COMPRESSION */
 
   /*
    * At this point the packet is a plain uncompressed one. These have
-   * to have to be at least 3 bytes in size.
+   * to have to be at least the header bytes in size.
    */
-  if (whole_packet_len < 3) {
+  if (whole_packet_len < (data_type_size(pc->packet_header.length)
+                          + data_type_size(pc->packet_header.type))) {
     log_verbose("The packet stream is corrupt. The connection "
                 "will be closed now.");
     connection_close(pc, _("decoding error"));
     return NULL;
   }
 
-  dio_get_uint8(&din, &utype.itype);
-
+  dio_get_type(&din, pc->packet_header.type, &utype.itype);
   utype.type = utype.itype;
 
   log_packet("got packet type=(%s)%d len=%d from %s",
@@ -463,7 +500,6 @@ void *get_packet_from_connection(struct connection *pc,
              is_server() ? pc->username : "server");
 
   *ptype = utype.type;
-  *presult = TRUE;
 
   if (pc->incoming_packet_notify) {
     pc->incoming_packet_notify(pc, utype.type, whole_packet_len);
@@ -512,8 +548,14 @@ void *get_packet_from_connection(struct connection *pc,
                sum, packet_counter, sum / packet_counter);
     }
   }
-#endif
-  return get_packet_from_connection_helper(pc, utype.type);
+#endif /* PACKET_SIZE_STATISTICS */
+  data = get_packet_from_connection_helper(pc, utype.type);
+  if (!data) {
+    connection_close(pc, _("incompatible packet contents"));
+    return NULL;
+  } else {
+    return data;
+  }
 }
 
 /**************************************************************************
@@ -532,46 +574,79 @@ void remove_packet_from_buffer(struct socket_packet_buffer *buffer)
             len, buffer->ndata);
 }
 
+/****************************************************************************
+  Set the packet header field lengths used for the login protocol,
+  before the capability of the connection could be checked.
+
+  NB: These values cannot be changed for backward compatibility reasons.
+****************************************************************************/
+void packet_header_init(struct packet_header *packet_header)
+{
+  packet_header->length = DIOT_UINT16;
+  packet_header->type = DIOT_UINT8;
+}
+
+/****************************************************************************
+  Set the packet header field lengths used after the login protocol,
+  after the capability of the connection could be checked.
+****************************************************************************/
+static inline void packet_header_set(struct packet_header *packet_header)
+{
+  /* Ensure we have values initialized in packet_header_init(). */
+  fc_assert(packet_header->length == DIOT_UINT16);
+  fc_assert(packet_header->type == DIOT_UINT8);
+
+  packet_header->length = DIOT_UINT16;
+  packet_header->type = DIOT_UINT8;
+}
+
+/****************************************************************************
+  Modify if needed the packet header field lengths.
+****************************************************************************/
+void post_send_packet_server_join_reply(struct connection *pconn,
+                                        const struct packet_server_join_reply
+                                        *packet)
+{
+  if (packet->you_can_join) {
+    packet_header_set(&pconn->packet_header);
+  }
+}
+
+/****************************************************************************
+  Modify if needed the packet header field lengths.
+****************************************************************************/
+void post_receive_packet_server_join_reply(struct connection *pconn,
+                                           const struct
+                                           packet_server_join_reply *packet)
+{
+  if (packet->you_can_join) {
+    packet_header_set(&pconn->packet_header);
+  }
+}
+
+
 /**************************************************************************
-  ...
+  Sanity check packet
 **************************************************************************/
-void check_packet(struct data_in *din, struct connection *pc)
+bool packet_check(struct data_in *din, struct connection *pc)
 {
   size_t rem = dio_input_remaining(din);
 
-  if (din->bad_string || din->bad_bit_string || rem != 0) {
-    char from[MAX_LEN_ADDR + MAX_LEN_NAME + 128];
+  if (rem > 0) {
     int type, len;
 
-    fc_assert_ret(pc != NULL);
-    fc_snprintf(from, sizeof(from), " from %s", conn_description(pc));
-
     dio_input_rewind(din);
-    dio_get_uint16(din, &len);
-    dio_get_uint8(din, &type);
+    dio_get_type(din, pc->packet_header.length, &len);
+    dio_get_type(din, pc->packet_header.type, &type);
 
-    if (din->bad_string) {
-      log_error("received bad string in packet (type %d, len %d)%s",
-                type, len, from);
-    }
-
-    if (din->bad_bit_string) {
-      log_error("received bad bit string in packet (type %d, len %d)%s",
-                type, len, from);
-    }
-
-    if (din->too_short) {
-      log_error("received short packet (type %d, len %d)%s",
-                type, len, from);
-    }
-
-    if (rem > 0) {
-      /* This may be ok, eg a packet from a newer version with extra info
-       * which we should just ignore */
-      log_verbose("received long packet (type %d, len %d, rem %lu)%s", type,
-                  len, (unsigned long)rem, from);
-    }
+    log_packet("received long packet (type %d, len %d, rem %lu) from %s",
+               type,
+               len,
+               (unsigned long) rem,
+               conn_description (pc));
+    return FALSE;
   }
+  return TRUE;
 }
 
 /**************************************************************************

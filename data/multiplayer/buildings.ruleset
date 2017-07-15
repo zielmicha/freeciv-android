@@ -11,7 +11,7 @@
 
 [datafile]
 description="Multiplayer buildings data for Freeciv"
-options="+Freeciv-2.3-ruleset"
+options="+Freeciv-2.5-ruleset"
 
 ; /* <-- avoid gettext warnings
 ;
@@ -41,6 +41,18 @@ options="+Freeciv-2.3-ruleset"
 ; upkeep	= monetary upkeep value
 ; sabotage	= percent chance of diplomat sabotage being successful
 ; flags         = special flag strings
+;
+; ** Building flags **
+; "VisibleByOthers"  = Anyone who can see your city knows whether it has
+;                      this improvement. (Great and small wonders are
+;                      always visible.)
+; "SaveSmallWonder"  = If you lose the city with this building in, and the
+;                      "savepalace" server setting is enabled, another will
+;                      be built for free in a random city.
+;                      Should only be used with genus "SmallWonder".
+; "Gold"             = Not a real building; production turned into gold
+;                      indefinitely (capitalization/coinage).
+;                      Genus should be "Special".
 ;
 ; */ <-- avoid gettext warnings
 
@@ -111,11 +123,11 @@ sabotage	= 100
 sound		= "b_aqueduct"
 sound_alt	= "b_generic"
 helptext	= _("\
-Allows a city to grow larger than size 8 and reduces the chance of plague\
- within the city. A Sewer System is required for a city to grow larger\
- than size 12.\
+Allows a city to grow larger than size 8.  A Sewer System is also\
+ required for a city to grow larger than size 12.\
 ")
-; NB: plague (illness) has to be activated in the ruleset
+; There is also an effect to reduce the chance of plague, but you have to
+; enable illness in game.ruleset for that to be relevant.
 
 [building_bank]
 name		= _("Bank")
@@ -301,10 +313,12 @@ sound		= "b_courthouse"
 sound_alt	= "b_generic"
 ; /* xgettext:no-c-format */
 helptext	= _("\
-Reduces the corruption in a city by 50%.  Under a Democracy, a\
- Courthouse also makes 1 unhappy citizen content (unless that citizen is\
- unhappy about military activity). \
- Also makes the revolt cost of the city 4 times bigger.\
+Reduces the corruption and waste in a city by 50%, and makes the\
+ revolt cost of the city 4 times bigger. (These effects are redundant\
+ in your capital city.)\
+"), _("\
+Under a Democracy, a Courthouse also makes 1 unhappy citizen content\
+ (unless that citizen is unhappy about military activity).\
 ")
 
 [building_factory]
@@ -378,7 +392,7 @@ reqs	=
     { "type", "name", "range"
       "Tech", "Electronics", "Player"
       "Building", "Factory", "City"
-      "Special", "River", "Adjacent"
+      "Road", "River", "Adjacent"
     }
 graphic	= "b.hydro_plant"
 graphic_alt	= "-"
@@ -558,16 +572,27 @@ sabotage	= 0
 sound		= "b_palace"
 sound_alt	= "b_generic"
 helptext	= _("\
-Makes a city the capital and the center of your government. \
- Corruption in other cities is related to how far away from the\
- capital they are, except when the government is Democracy or\
- Communism.  The cost of inciting a revolt in a city also depends\
- upon the city's distance from the capital (under all forms of\
- government).\
+Makes a city the capital and the center of your government.\
+ Corruption and waste in other cities is related to how far away\
+ from the capital they are, except when the government is Democracy or\
+ Communism. On top of this, corruption and waste in your capital\
+ itself is half of what it would otherwise be (as if it had a\
+ Courthouse).\
+"), _("\
+The cost to enemy Diplomats and Spies of inciting a revolt in a\
+ city also depends upon the city's distance from the capital\
+ (under all forms of government). Your capital city itself cannot\
+ be incited to revolt, and enjoys a bonus when enemy agents try\
+ to evade your own agents stationed in the city, or sabotage your\
+ buildings.\
 "), _("\
 Take good care of your capital, as its loss may result in your\
  empire plunging into civil war. Losing your current palace also\
  results in losing whatever spaceship you might have.\
+"), _("\
+If the capital is in a dangerous location, or a more central capital\
+ would give a better corruption distribution, you can move your palace\
+ by rebuilding it in another city.\
 "),
 ; /* xgettext:no-c-format */
 _("\
@@ -731,10 +756,10 @@ sound		= "b_sdi_defense"
 sound_alt	= "b_generic"
 helptext	= _("\
 Protects a city and its environs (up to 2 tiles away) from attacks\
- by Nuclear units. A Nuclear unit attacking a city with SDI Defense,\
- or attacking a unit (or deliberately exploded) within range, is shot\
- down and simply has no effect. Also, doubles defense for units in\
- the city against non-nuclear missiles.\
+ by enemy Nuclear units. A Nuclear unit not owned by you or an ally\
+ which attacks a city with SDI Defense, or attacks a unit (or is\
+ deliberately exploded) within range, is shot down and simply has no effect.\
+ Also, doubles defense for units in the city against non-nuclear missiles.\
 ")
 
 [building_sewer_system]
@@ -754,11 +779,11 @@ sabotage	= 100
 sound		= "b_sewer_system"
 sound_alt	= "b_generic"
 helptext	= _("\
-Allows a city to grow larger than size 12. Pre-requirement is an Aqueduct\
- for a city to grow larger than size 8. The Sewer System further reduces\
- the chance of a plague.\
+Allows a city to grow larger than size 12.  An Aqueduct is first\
+ required for a city to grow larger than size 8.\
 ")
-; NB: plague (illness) has to be activated in the ruleset
+; There is also an effect to reduce the chance of plague, but you have to
+; enable illness in game.ruleset for that to be relevant.
 
 [building_solar_plant]
 name		= _("Solar Plant")
@@ -990,7 +1015,6 @@ Together with a Library, a University increases the science\
 [building_apollo_program]
 name		= _("Apollo Program")
 genus		= "SmallWonder"
-flags		= "SaveSmallWonder"
 reqs	=
     { "type", "name", "range"
       "Tech", "Space Flight", "Player"
@@ -1202,7 +1226,7 @@ genus		= "SmallWonder"
 reqs	=
     { "type", "name", "range"
       "Tech", "Electronics", "Player"
-      "Special", "River", "Adjacent"
+      "Road", "River", "Adjacent"
     }
 graphic	= "b.hoover_dam"
 graphic_alt	= "-"
@@ -1335,8 +1359,9 @@ sabotage	= 0
 sound		= "w_magellans_expedition"
 sound_alt	= "w_generic"
 helptext	= _("\
-All your new sea units built in cities on the same continent start at\
- the first veteran level.\
+All your new sea units built in cities on the same continent start with\
+ an additional veteran level (this is cumulative with any Port Facility\
+ in a city; with both, units are created as Hardened).\
 ")
 
 [building_manhattan_project]
@@ -1524,8 +1549,9 @@ sabotage	= 0
 sound		= "w_sun_tzus_war_academy"
 sound_alt	= "w_generic"
 helptext	= _("\
-All your new military land units produced in cities on the same\
- continent start at the first veteran level.\
+All your new military land units produced in cities on the same continent\
+ start with an additional veteran level (this is cumulative with any\
+ Barracks building in a city; with both, units are created as Hardened).\
 ")
 
 [building_united_nations]

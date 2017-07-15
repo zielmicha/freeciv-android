@@ -5,7 +5,7 @@ plural=_("?plural:Tunisians")
 groups="Modern", "African"
 legend=_("The Phoenicians founded Carthage in the area where Tunisia is\
  today. Carthage later became a major power in the Mediterranean region\
- until it was defeated by the Romans in 146 BC. Later the Arab Muslim\
+ until it was defeated by the Romans in 146 BCE. Later the Arab Muslim\
  conquest in the 7th century led to migration from the Arab and Ottoman\
  countries. But there were also a lot of Jews and Spanish Moors who moved\
  there at the end of the 16th century. Tunisia became mostly autonomous from\
@@ -25,9 +25,8 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",      "female_title"
- "Monarchy",        _("%s Bey"),       _("?female:%s Bey")
- "Republic",        _("%s Dey"),       _("?female:%s Dey")
- "Communism",       _("Caliph %s"),    _("Calipha %s")
+ "Despotism",       _("%s Bey"),       _("?female:%s Bey")
+ "Fundamentalism",  _("Caliph %s"),    _("Calipha %s")
 }
 
 flag="tunisia"
@@ -36,7 +35,6 @@ city_style = "Classical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with="Carthaginian"

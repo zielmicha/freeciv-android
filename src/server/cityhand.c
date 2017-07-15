@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -98,7 +98,7 @@ void handle_city_name_suggestion_req(struct player *pplayer, int unit_id)
 }
 
 /**************************************************************************
-...
+  Handle request to change specialist type
 **************************************************************************/
 void handle_city_change_specialist(struct player *pplayer, int city_id,
 				   Specialist_type_id from,
@@ -123,13 +123,13 @@ void handle_city_change_specialist(struct player *pplayer, int city_id,
   pcity->specialists[from]--;
   pcity->specialists[to]++;
 
-  sanity_check_city(pcity);
   city_refresh(pcity);
+  sanity_check_city(pcity);
   send_city_info(pplayer, pcity);
 }
 
 /**************************************************************************
-...
+  Handle request to change city worker in to specialist.
 **************************************************************************/
 void handle_city_make_specialist(struct player *pplayer, int city_id,
                                  int worker_x, int worker_y)
@@ -163,25 +163,23 @@ void handle_city_make_specialist(struct player *pplayer, int city_id,
 
   if (is_free_worked(pcity, ptile)) {
     auto_arrange_workers(pcity);
-    sync_cities();
-    return;
-  }
-
-  if (tile_worked(ptile) == pcity) {
+  } else if (tile_worked(ptile) == pcity) {
     city_map_update_empty(pcity, ptile);
     pcity->specialists[DEFAULT_SPECIALIST]++;
-    city_refresh(pcity);
-    sync_cities();
   } else {
     log_verbose("handle_city_make_specialist() not working {%d,%d} \"%s\".",
                 worker_x, worker_y, city_name(pcity));
   }
 
+  city_refresh(pcity);
   sanity_check_city(pcity);
+  sync_cities();
 }
 
 /**************************************************************************
-...
+  Handle request to turn specialist in to city worker. Client cannot
+  tell which kind of specialist is to be taken, but this just makes worker
+  from first available specialist.
 **************************************************************************/
 void handle_city_make_worker(struct player *pplayer, int city_id,
 			     int worker_x, int worker_y)
@@ -244,26 +242,32 @@ void handle_city_make_worker(struct player *pplayer, int city_id,
     }
   } specialist_type_iterate_end;
 
-  sanity_check_city(pcity);
   city_refresh(pcity);
+  sanity_check_city(pcity);
   sync_cities();
 }
 
 /**************************************************************************
-...
+  Handle improvement selling request. Caller is responsible to validate
+  input before passing to this function if it comes from untrusted source.
 **************************************************************************/
 void really_handle_city_sell(struct player *pplayer, struct city *pcity,
 			     struct impr_type *pimprove)
 {
+  enum test_result sell_result;
   int price;
-  if (pcity->did_sell) {
+
+  sell_result = test_player_sell_building_now(pplayer, pcity, pimprove);
+
+  if (sell_result == TR_ALREADY_SOLD) {
     notify_player(pplayer, pcity->tile, E_BAD_COMMAND, ftc_server,
 		  _("You have already sold something here this turn."));
     return;
   }
 
-  if (!can_city_sell_building(pcity, pimprove))
+  if (sell_result != TR_SUCCESS) {
     return;
+  }
 
   pcity->did_sell=TRUE;
   price = impr_sell_gold(pimprove);
@@ -282,7 +286,8 @@ void really_handle_city_sell(struct player *pplayer, struct city *pcity,
 }
 
 /**************************************************************************
-...
+  Handle improvement selling request. This function does check its
+  parameters as they may come from untrusted source over the network.
 **************************************************************************/
 void handle_city_sell(struct player *pplayer, int city_id, int build_id)
 {
@@ -296,7 +301,8 @@ void handle_city_sell(struct player *pplayer, int city_id, int build_id)
 }
 
 /**************************************************************************
-...
+  Handle buying request. Caller is responsible to validate input before
+  passing to this function if it comes from untrusted source.
 **************************************************************************/
 void really_handle_city_buy(struct player *pplayer, struct city *pcity)
 {
@@ -368,15 +374,15 @@ void really_handle_city_buy(struct player *pplayer, struct city *pcity)
   if (VUT_UTYPE == pcity->production.kind) {
     notify_player(pplayer, pcity->tile, E_UNIT_BUY, ftc_server,
                   /* TRANS: bought an unit. */
-                  _("You bought %s in %s."),
-                  utype_rule_name(pcity->production.value.utype),
+                  Q_("?unit:You bought %s in %s."),
+                  utype_name_translation(pcity->production.value.utype),
                   city_name(pcity));
   } else if (VUT_IMPROVEMENT == pcity->production.kind) {
     notify_player(pplayer, pcity->tile, E_IMP_BUY, ftc_server,
                   /* TRANS: bought an improvement .*/
-                  _("You bought %s in %s."),
-                  improvement_name_translation(
-                    pcity->production.value.building), city_name(pcity));
+                  Q_("?improvement:You bought %s in %s."),
+                  improvement_name_translation(pcity->production.value.building),
+                  city_name(pcity));
   }
 
   conn_list_do_buffer(pplayer->connections);
@@ -386,7 +392,7 @@ void really_handle_city_buy(struct player *pplayer, struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Handle city worklist update request
 **************************************************************************/
 void handle_city_worklist(struct player *pplayer, int city_id,
                           const struct worklist *worklist)
@@ -403,7 +409,8 @@ void handle_city_worklist(struct player *pplayer, int city_id,
 }
 
 /**************************************************************************
-...
+  Handle buying request. This function does properly check its input as
+  it may come from untrusted source over the network.
 **************************************************************************/
 void handle_city_buy(struct player *pplayer, int city_id)
 {
@@ -417,7 +424,7 @@ void handle_city_buy(struct player *pplayer, int city_id)
 }
 
 /**************************************************************************
-...
+  Handle city refresh request
 **************************************************************************/
 void handle_city_refresh(struct player *pplayer, int city_id)
 {
@@ -436,7 +443,7 @@ void handle_city_refresh(struct player *pplayer, int city_id)
 }
 
 /**************************************************************************
-...
+  Handle request to change current production.
 **************************************************************************/
 void handle_city_change(struct player *pplayer, int city_id,
 			int production_kind, int production_value)
@@ -479,8 +486,8 @@ void handle_city_change(struct player *pplayer, int city_id,
 
   change_build_target(pplayer, pcity, prod, E_CITY_PRODUCTION_CHANGED);
 
-  sanity_check_city(pcity);
   city_refresh(pcity);
+  sanity_check_city(pcity);
   send_city_info(pplayer, pcity);
 }
 

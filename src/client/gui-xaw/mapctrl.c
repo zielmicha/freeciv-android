@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 1996 - A Kjeldberg, L Gregersen, P Unold
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -89,9 +89,9 @@ void popup_newcity_dialog(struct unit *punit, const char *suggestname)
   input_dialog_create(toplevel, "shellnewcityname",
 		      _("What should we call our new city?"), suggestname,
 		      name_new_city_callback,
-                      INT_TO_XTPOINTER(tile_index(punit->tile)),
-		      name_new_city_callback,
-                      INT_TO_XTPOINTER(-tile_index(punit->tile)-1));
+                      INT_TO_XTPOINTER(tile_index(unit_tile(punit))),
+                      name_new_city_callback,
+                      INT_TO_XTPOINTER(-tile_index(unit_tile(punit)) - 1));
 }
 
 /**************************************************************************
@@ -222,7 +222,7 @@ void mapctrl_btn_mapcanvas(XEvent *event)
 }
 
 /**************************************************************************
-...
+  Update goto line so that destination is at current mouse pointer location.
 **************************************************************************/
 void create_line_at_mouse_pos(void)
 {
@@ -233,10 +233,10 @@ void create_line_at_mouse_pos(void)
 
   on_same_screen =
     XQueryPointer(display, XtWindow(map_canvas),
-		  &root, &child,
-		  &rx, &ry,
-		  &x, &y,
-		  &mask);
+                  &root, &child,
+                  &rx, &ry,
+                  &x, &y,
+                  &mask);
 
   if (on_same_screen) {
     update_line(x, y);

@@ -19,10 +19,10 @@
     email                : Rafał Bursig <bursig@poczta.fm>
  **********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* utility */
 #include "fcintl.h"
@@ -64,7 +64,7 @@ static int msg_callback(struct widget *pWidget)
   if (Main.event.button.button == SDL_BUTTON_LEFT) {
     int message_index = *(int*)pWidget->data.ptr;
       
-    pWidget->string16->fgcol = *get_game_colorRGB(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
+    pWidget->string16->fgcol = *get_theme_color(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
     unsellect_widget_action();
 
     meswin_double_click(message_index);
@@ -102,6 +102,10 @@ void real_meswin_dialog_update(void)
   SDL_Rect area = {0, 0, 0, 0};
   bool create;
   int label_width;
+
+  if (pMsg_Dlg == NULL) {
+    meswin_dialog_popup(TRUE);
+  }
 
   msg_count = meswin_get_num_messages();
   current_count = pMsg_Dlg->pScroll->count;
@@ -156,9 +160,9 @@ void real_meswin_dialog_update(void)
             if(pMsg->tile) {
               set_wstate(pBuf, FC_WS_NORMAL);
               if (pMsg->visited) {
-                pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
+                pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
               } else {
-                pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_MESWIN_ACTIVE_TEXT);
+                pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_MESWIN_ACTIVE_TEXT);
               }
             }
             
@@ -196,9 +200,9 @@ void real_meswin_dialog_update(void)
           if(pMsg->tile) {
             set_wstate(pBuf, FC_WS_NORMAL);
             if (pMsg->visited) {
-              pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
+              pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_MESWIN_ACTIVE_TEXT2);
             } else {
-              pBuf->string16->fgcol = *get_game_colorRGB(COLOR_THEME_MESWIN_ACTIVE_TEXT);
+              pBuf->string16->fgcol = *get_theme_color(COLOR_THEME_MESWIN_ACTIVE_TEXT);
             }
           }
           
@@ -232,7 +236,6 @@ void real_meswin_dialog_update(void)
 void meswin_dialog_popup(bool raise)
 {
   SDL_String16 *pStr;
-  int scrollbar_width;
   struct widget *pWindow = NULL;
   SDL_Surface *pBackground;
   SDL_Rect area;
@@ -259,7 +262,7 @@ void meswin_dialog_popup(bool raise)
 /*  area = pWindow->area;*/
   
   /* create scrollbar */
-  scrollbar_width = create_vertical_scrollbar(pMsg_Dlg, 1, N_MSG_VIEW, TRUE, TRUE);
+  create_vertical_scrollbar(pMsg_Dlg, 1, N_MSG_VIEW, TRUE, TRUE);
 
   pStr = create_str16_from_char("sample text", PTSIZE_LOG_FONT);
   

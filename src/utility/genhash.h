@@ -13,6 +13,10 @@
 #ifndef FC__GENHASH_H
 #define FC__GENHASH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /****************************************************************************
    A general-purpose generic hash table implementation.
    See comments in "genhash.c".
@@ -28,7 +32,7 @@ struct genhash;                 /* opaque */
 typedef unsigned int genhash_val_t;
 
 /* Function typedefs: */
-typedef genhash_val_t (*genhash_val_fn_t) (const void *, size_t);
+typedef genhash_val_t (*genhash_val_fn_t) (const void *);
 typedef bool (*genhash_comp_fn_t) (const void *, const void *);
 typedef void * (*genhash_copy_fn_t) (const void *);
 typedef void (*genhash_free_fn_t) (void *);
@@ -36,16 +40,11 @@ typedef void (*genhash_free_fn_t) (void *);
 
 /* Supplied functions (matching above typedefs) appropriate for
  * keys being normal nul-terminated strings: */
-genhash_val_t genhash_str_val_func(const void *vkey, size_t num_buckets);
+genhash_val_t genhash_str_val_func(const void *vkey);
 bool genhash_str_comp_func(const void *vkey1, const void *vkey2);
 /* and malloc'ed strings: */
 void *genhash_str_copy_func(const void *vkey);
 void genhash_str_free_func(void *vkey);
-
-/* Appropriate for void pointers, integers or casted longs, used as keys
- * directly instead of by reference. */
-genhash_val_t genhash_ptr_val_func(const void *vkey, size_t num_buckets);
-bool genhash_ptr_comp_func(const void *vkey1, const void *vkey2);
 
 
 /* General functions: */
@@ -130,5 +129,9 @@ void *genhash_iter_value(const struct iterator *genhash_iter);
   generic_iterate(struct genhash_iter, struct iterator *, NAME_iter,        \
                   genhash_iter_sizeof, genhash_iter_init, (ARG_ht))
 #define genhash_iterate_end generic_iterate_end
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__GENHASH_H */

@@ -12,13 +12,16 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
+/* utility */
 #include "fcintl.h"
-#include "fc_types.h"
 #include "shared.h"
 #include "support.h"
+
+/* common */
+#include "fc_types.h"
 
 #include "version.h"
 
@@ -26,13 +29,16 @@
 #include "fc_svnrev_gen.h"
 #endif /* SVNREV */
 
+#ifdef GITREV
+#include "fc_gitrev_gen.h"
+#endif /* GITREV */
 
 /**********************************************************************
-  ...
+  Return string containing both name of Freeciv and version.
 ***********************************************************************/
 const char *freeciv_name_version(void)
 {
-  static char msgbuf[128];
+  static char msgbuf[256];
 
 #if IS_BETA_VERSION
   fc_snprintf(msgbuf, sizeof (msgbuf), _("Freeciv version %s %s"),
@@ -40,6 +46,9 @@ const char *freeciv_name_version(void)
 #elif defined(SVNREV) && !defined(FC_SVNREV_OFF)
   fc_snprintf(msgbuf, sizeof (msgbuf), _("Freeciv version %s (%s)"),
               VERSION_STRING, fc_svn_revision());
+#elif defined(GITREV) && !defined(FC_GITREV_OFF)
+  fc_snprintf(msgbuf, sizeof (msgbuf), _("Freeciv version %s (%s)"),
+              VERSION_STRING, fc_git_revision());
 #else
   fc_snprintf(msgbuf, sizeof (msgbuf), _("Freeciv version %s"),
               VERSION_STRING);
@@ -49,7 +58,7 @@ const char *freeciv_name_version(void)
 }
 
 /**********************************************************************
-  ...
+  Return string describing version type.
 ***********************************************************************/
 const char *word_version(void)
 {
@@ -67,10 +76,50 @@ const char *word_version(void)
 const char *fc_svn_revision(void)
 {
 #if defined(SVNREV) && !defined(FC_SVNREV_OFF)
-  return FC_SVNREV; /* Either revision, or modified revision */
+  static char buf[100];
+  bool translate = FC_SVNREV1[0] != '\0';
+
+  fc_snprintf(buf, sizeof(buf), "%s%s",
+              translate ? _(FC_SVNREV1) : FC_SVNREV1, FC_SVNREV2);
+
+  return buf; /* Either revision, or modified revision */
 #else  /* FC_SVNREV_OFF */
   return NULL;
 #endif /* FC_SVNREV_OFF */
+}
+
+/**********************************************************************
+  Returns string with git revision information if it is possible to
+  determine. Can return also some fallback string or even NULL.
+***********************************************************************/
+const char *fc_git_revision(void)
+{
+#if defined(GITREV) && !defined(FC_GITREV_OFF)
+  static char buf[100];
+  bool translate = FC_GITREV1[0] != '\0';
+
+  fc_snprintf(buf, sizeof(buf), "%s%s",
+              translate ? _(FC_GITREV1) : FC_GITREV1, FC_GITREV2);
+
+  return buf; /* Either revision, or modified revision */
+#else  /* FC_GITREV_OFF */
+  return NULL;
+#endif /* FC_GITREV_OFF */
+}
+
+/**********************************************************************
+  Returns version string that can be used to compare two freeciv builds.
+  This does not handle git revisions, as there's no way to compare
+  which of the two commits is "higher".
+***********************************************************************/
+const char *fc_comparable_version(void)
+{
+#ifdef FC_SVNREV_ON
+  /* Sane revision number in FC_SVNREV2 */
+  return VERSION_STRING "-" FC_SVNREV2;
+#else  /* FC_SVNREV_ON */
+  return VERSION_STRING;
+#endif
 }
 
 /**********************************************************************
@@ -97,11 +146,19 @@ const char *beta_message(void)
     N_("November"),
     N_("December")
   };
-  fc_snprintf (msgbuf, sizeof (msgbuf),
-               /* TRANS: No full stop after the URL, could cause confusion. */
-               _("THIS IS A BETA VERSION\n"
-                 "Freeciv %s will be released in %s, at %s"),
-               NEXT_STABLE_VERSION, _(NEXT_RELEASE_MONTH), WIKI_URL);
+
+  if (RELEASE_MONTH > 0) {
+    fc_snprintf(msgbuf, sizeof(msgbuf),
+                /* TRANS: No full stop after the URL, could cause confusion. */
+                _("THIS IS A BETA VERSION\n"
+                  "Freeciv %s will be released in %s, at %s"),
+                NEXT_STABLE_VERSION, _(NEXT_RELEASE_MONTH), WIKI_URL);
+  } else {
+    fc_snprintf(msgbuf, sizeof(msgbuf),
+                _("THIS IS A BETA VERSION\n"
+                  "Freeciv %s will be released at %s"),
+                NEXT_STABLE_VERSION, WIKI_URL);
+  }
   return msgbuf;
 #else
   return NULL;
@@ -117,4 +174,29 @@ const char *beta_message(void)
 const char *freeciv_motto(void)
 {
   return _("'Cause civilization should be free!");
+}
+
+/***************************************************************************
+  Return version string in a format suitable to be written to created
+  datafiles as human readable information.
+***************************************************************************/
+const char *freeciv_datafile_version(void)
+{
+  static char buf[500] = { '\0' };
+
+  if (buf[0] == '\0') {
+    const char *ver_rev;
+
+    ver_rev = fc_svn_revision();
+    if (ver_rev == NULL) {
+      ver_rev = fc_git_revision();
+    }
+    if (ver_rev != NULL) {
+      fc_snprintf(buf, sizeof(buf), "%s (%s)", VERSION_STRING, ver_rev);
+    } else {
+      fc_snprintf(buf, sizeof(buf), "%s", VERSION_STRING);
+    }
+  }
+
+  return buf;
 }

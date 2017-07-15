@@ -1,5 +1,5 @@
 /**********************************************************************
- Freeciv - Copyright (C) 2004 - The Freeciv Poject
+ Freeciv - Copyright (C) 2004 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2, or (at your option)
@@ -13,6 +13,10 @@
 
 #ifndef FC__TEXT_H
 #define FC__TEXT_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 #include "fc_types.h"
 #include "unitlist.h"
@@ -42,6 +46,8 @@ const char *get_unit_info_label_text1(struct unit_list *punits);
 const char *get_unit_info_label_text2(struct unit_list *punits, int linebreaks);
 bool get_units_upgrade_info(char *buf, size_t bufsz,
 			    struct unit_list *punits);
+bool get_units_disband_info(char *buf, size_t bufsz,
+			    struct unit_list *punits);
 const char *get_spaceship_descr(struct player_spaceship *pship);
 const char *get_timeout_label_text(void);
 const char *format_duration(int duration);
@@ -50,9 +56,14 @@ const char *get_score_text(const struct player *pplayer);
 const char *get_report_title(const char *report_name);
 
 const char *text_happiness_buildings(const struct city *pcity);
+const char *text_happiness_nationality(const struct city *pcity);
 const char *text_happiness_cities(const struct city *pcity);
 const char *text_happiness_luxuries(const struct city *pcity);
 const char *text_happiness_units(const struct city *pcity);
 const char *text_happiness_wonders(const struct city *pcity);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* FC__TEXT_H */

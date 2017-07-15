@@ -12,18 +12,24 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <gtk/gtk.h>
 
-#include "events.h"
+/* utility */
 #include "fcintl.h"
 
+/* common */
+#include "events.h"
+
+/* client */
+#include "options.h"
+
+/* client/gui-gtk-2.0 */
 #include "colors.h"
 #include "gui_main.h"
 #include "gui_stuff.h"
-#include "options.h"
 
 #include "messagedlg.h"
 
@@ -40,7 +46,7 @@ static void item_toggled(GtkCellRendererToggle *cell,
 			 gchar *spath, gpointer data);
 
 /**************************************************************************
-... 
+  Open messageoptions dialog
 **************************************************************************/
 void popup_messageopt_dialog(void)
 {
@@ -51,14 +57,14 @@ void popup_messageopt_dialog(void)
 }
 
 /**************************************************************************
-...
+  Create messageoptions dialog
 **************************************************************************/
 static void create_messageopt_dialog(void)
 {
   GtkWidget *form, *explanation;
-  int n, i, j;
+  int n, i = 0, j;
   
-  gui_dialog_new(&shell, GTK_NOTEBOOK(top_notebook), NULL);
+  gui_dialog_new(&shell, GTK_NOTEBOOK(top_notebook), NULL, TRUE);
   gui_dialog_set_title(shell, _("Message Options"));
 
   gui_dialog_set_default_size(shell, -1, 450);
@@ -88,7 +94,7 @@ static void create_messageopt_dialog(void)
     GtkTreeIter it;
     GValue value = { 0, };
 
-    n = (i % NUM_LISTS);
+    n = (i++ % NUM_LISTS);
 
     gtk_list_store_append(model[n], &it);
 
@@ -107,7 +113,6 @@ static void create_messageopt_dialog(void)
   for (n=0; n<NUM_LISTS; n++) {
     GtkWidget *view, *sw;
     GtkCellRenderer *renderer;
-    gint col;
     GtkTreeViewColumn *column;
 
     view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(model[n]));
@@ -123,22 +128,25 @@ static void create_messageopt_dialog(void)
     g_object_set_data(G_OBJECT(renderer), "column", GINT_TO_POINTER(0));
     g_signal_connect(renderer, "toggled", G_CALLBACK(item_toggled), model[n]);
 
-    col = gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
-	-1, _("Out"), renderer, "active", 0, NULL);
+    gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
+                                                -1, _("Out"), renderer,
+                                                "active", 0, NULL);
 
     renderer = gtk_cell_renderer_toggle_new();
     g_object_set_data(G_OBJECT(renderer), "column", GINT_TO_POINTER(1));
     g_signal_connect(renderer, "toggled", G_CALLBACK(item_toggled), model[n]);
 
-    col = gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
-  	-1, _("Mes"), renderer, "active", 1, NULL);
+    gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
+                                                -1, _("Mes"), renderer,
+                                                "active", 1, NULL);
 
     renderer = gtk_cell_renderer_toggle_new();
     g_object_set_data(G_OBJECT(renderer), "column", GINT_TO_POINTER(2));
     g_signal_connect(renderer, "toggled", G_CALLBACK(item_toggled), model[n]);
 
-    col = gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
-  	-1, _("Pop"), renderer, "active", 2, NULL);
+    gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(view),
+                                                -1, _("Pop"), renderer,
+                                                "active", 2, NULL);
 
     sw = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(sw),
@@ -157,7 +165,7 @@ static void create_messageopt_dialog(void)
 }
 
 /**************************************************************************
-...
+  Use responded to messageoptions dialog
 **************************************************************************/
 static void messageopt_response(struct gui_dialog *dlg, int response,
                                 gpointer data)
@@ -167,7 +175,8 @@ static void messageopt_response(struct gui_dialog *dlg, int response,
     gint n, j, i;
     gboolean toggle;
 
-    for (i=0; i<E_LAST; i++) {
+    for (i = 0; i <= event_type_max(); i++) {
+      /* Include possible undefined messages. */
       messages_where[i] = 0;
     }
 
@@ -188,7 +197,7 @@ static void messageopt_response(struct gui_dialog *dlg, int response,
 }
 
 /**************************************************************************
-...
+  User toggled item
 **************************************************************************/
 static void item_toggled(GtkCellRendererToggle *cell,
 			 gchar *spath, gpointer data)

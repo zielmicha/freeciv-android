@@ -20,11 +20,10 @@ city_style = "Tropical"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 
 conflicts_with="Kanem-Bornu"
-civilwar_nations="Biafran", "Togolese"
+civilwar_nations="Biafran", "Fulani"
 
 cities =
  "Abuja",

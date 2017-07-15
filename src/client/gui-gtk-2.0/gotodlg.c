@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -83,16 +83,8 @@ enum {
   GD_COL_NUM
 };
 
-/****************************************************************
-...
-*****************************************************************/
-void popup_goto_dialog_action(void)
-{
-  popup_goto_dialog();
-}
-
 /**************************************************************************
-...
+  User has responded to goto dialog
 **************************************************************************/
 static void goto_cmd_callback(GtkWidget *dlg, gint arg)
 {
@@ -137,7 +129,7 @@ static void goto_cmd_callback(GtkWidget *dlg, gint arg)
 
 
 /**************************************************************************
-...
+  Create goto -dialog for gotoing or airlifting unit
 **************************************************************************/
 static void create_goto_dialog(void)
 {
@@ -204,7 +196,7 @@ static void create_goto_dialog(void)
     "text", GD_COL_CITY_ID, NULL);
   gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
   gtk_tree_view_column_set_sort_column_id(col, GD_COL_CITY_ID);
-#endif
+#endif /* DEBUG */
 
   rend = gtk_cell_renderer_text_new();
   col = gtk_tree_view_column_new_with_attributes(_("City"), rend,
@@ -273,7 +265,7 @@ void popup_goto_dialog(void)
 }
 
 /**************************************************************************
-...
+  Return currently selected city
 **************************************************************************/
 static struct city *get_selected_city(void)
 {
@@ -294,13 +286,19 @@ static struct city *get_selected_city(void)
 /**************************************************************************
   Appends the list of the city owned by the player in the goto dialog.
 **************************************************************************/
-static void list_store_append_player_cities(GtkListStore *store,
+static bool list_store_append_player_cities(GtkListStore *store,
                                             const struct player *pplayer)
 {
   GtkTreeIter it;
   struct nation_type *pnation = nation_of_player(pplayer);
   const char *nation = nation_adjective_translation(pnation);
-  GdkPixbuf *pixbuf = get_flag(pnation);
+  GdkPixbuf *pixbuf;
+
+  if (city_list_size(pplayer->cities) == 0) {
+    return FALSE;
+  }
+
+  pixbuf = get_flag(pnation);
 
   city_list_iterate(pplayer->cities, pcity) {
     gtk_list_store_append(store, &it);
@@ -313,6 +311,8 @@ static void list_store_append_player_cities(GtkListStore *store,
                        -1);
   } city_list_iterate_end;
   g_object_unref(pixbuf);
+
+  return TRUE;
 }
 
 /**************************************************************************
@@ -372,12 +372,17 @@ static void update_source_label(void)
   /* Describe the individual cities. */
   for (i = 0; i < ncities; i++) {
     const char *air_text = get_airlift_text(cities[i].units, NULL);
+
     astr_init(&strs[i]);
-    astr_add(&strs[i], 
-             /* TRANS: goto/airlift dialog. "Paris (airlift: 2/4)".
-              * A set of these appear in an "and"-separated list. */
-             air_text ? _("%s (airlift: %s)") : "%s",
-             city_name(cities[i].city), air_text);
+    if (air_text != NULL) {
+      astr_add(&strs[i], 
+               /* TRANS: goto/airlift dialog. "Paris (airlift: 2/4)".
+                * A set of these appear in an "and"-separated list. */
+               _("%s (airlift: %s)"),
+               city_name(cities[i].city), air_text);
+    } else {
+      astr_add(&strs[i], "%s", city_name(cities[i].city));
+    }
     descriptions[i] = astr_str(&strs[i]);
     unit_list_destroy(cities[i].units);
   }
@@ -421,6 +426,8 @@ static void update_source_label(void)
 **************************************************************************/
 static void update_goto_dialog(GtkToggleButton *button)
 {
+  bool nonempty = FALSE;
+
   gtk_list_store_clear(store);
 
   if (!client_has_player()) {
@@ -430,12 +437,18 @@ static void update_goto_dialog(GtkToggleButton *button)
 
   if (gtk_toggle_button_get_active(button)) {
     players_iterate(pplayer) {
-      list_store_append_player_cities(store, pplayer);
+      nonempty |= list_store_append_player_cities(store, pplayer);
     } players_iterate_end;
   } else {
-    list_store_append_player_cities(store, client_player());
+    nonempty |= list_store_append_player_cities(store, client_player());
   }
   refresh_airlift_column();
+
+  if (!nonempty) {
+    /* No selection causes callbacks to fire, causing also Airlift button
+     * to update. Do it here. */
+    refresh_airlift_button();
+  }
 }
 
 /**************************************************************************
@@ -490,12 +503,14 @@ static void refresh_airlift_button(void)
 }
 
 /**************************************************************************
-...
+  Update goto dialog. button tells if cities of all players or just
+  client's player should be listed.
 **************************************************************************/
 static void goto_selection_callback(GtkTreeSelection *selection,
                                     gpointer data)
 {
   struct city *pdestcity = get_selected_city();
+
   if (NULL != pdestcity) {
     center_tile_mapcanvas(city_tile(pdestcity));
   }

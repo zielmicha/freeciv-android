@@ -22,7 +22,7 @@
 #ifndef FC__GUI_MAIN_H
 #define FC__GUI_MAIN_H
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 #include "gui_main_g.h"
 
@@ -37,7 +37,7 @@
 #define CF_MAP_UNIT_W_CREATED		(1<<1)
 #define CF_UNITINFO_SHOWN		(1<<2)
 #define CF_OVERVIEW_SHOWN		(1<<3)
-#define CF_GANE_JUST_STARTED		(1<<6)
+#define CF_GAME_JUST_STARTED		(1<<6)
 
 #define CF_FOCUS_ANIMATION		(1<<9)
 #define CF_CHANGED_PROD			(1<<10)

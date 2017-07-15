@@ -6,6 +6,14 @@
  *                       DO NOT CHANGE THIS FILE                             *
  ****************************************************************************/
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/* common */
+#include "disaster.h"
+
 struct packet_processing_started {
   char __dummy;			/* to avoid malloc(0); */
 };
@@ -61,9 +69,13 @@ struct packet_endgame_report {
   int category_num;
   char category_name[32][MAX_LEN_NAME];
   int player_num;
-  int player_id[MAX_NUM_PLAYERS];
-  int score[MAX_NUM_PLAYERS];
-  int category_score[32][MAX_NUM_PLAYERS];
+};
+
+struct packet_endgame_player {
+  int category_num;
+  int player_id;
+  int score;
+  int category_score[32];
 };
 
 struct packet_tile_info {
@@ -76,7 +88,9 @@ struct packet_tile_info {
   Resource_type_id resource;
   bool special[S_LAST];
   bv_bases bases;
+  bv_roads roads;
   char spec_sprite[MAX_LEN_NAME];
+  char label[MAX_LEN_NAME];
 };
 
 struct packet_game_info {
@@ -89,9 +103,14 @@ struct packet_game_info {
   int border_city_radius_sq;
   int border_size_effect;
   enum borders_mode borders;
+  int base_bribe_cost;
   bool calendar_skip_0;
   int celebratesize;
   bool changable_tax;
+  int pop_report_zeroes;
+  bool citizen_nationality;
+  int citizen_convert_speed;
+  int citizen_partisans_pct;
   int citymindist;
   int cooling;
   int coolinglevel;
@@ -116,18 +135,20 @@ struct packet_game_info {
   int happy_cost;
   bool happyborders;
   int heating;
+  int illness_base_factor_old;
   int illness_base_factor;
   int illness_min_size;
   bool illness_on;
+  int illness_pollution_factor_old;
   int illness_pollution_factor;
+  int illness_trade_infection_old;
   int illness_trade_infection;
   int init_city_radius_sq;
   bool is_edit_mode;
   bool is_new_game;
-  int killcitizen;
+  bool killcitizen;
   bool killstack;
   int min_city_center_output[O_LAST];
-  int min_dist_bw_cities;
   char negative_year_label[MAX_LEN_NAME];
   int notradesize;
   bool nuclear_winter;
@@ -137,11 +158,11 @@ struct packet_game_info {
   bool pillage_select;
   char positive_year_label[MAX_LEN_NAME];
   int rapturedelay;
+  int disasters;
   bool restrictinfra;
   bool unreachable_protects;
   int sciencebox;
   float seconds_to_phasedone;
-  float seconds_to_phasedone2;
   int shieldbox;
   int skill_level;
   bool slow_invasions;
@@ -151,7 +172,9 @@ struct packet_game_info {
   int tech_cost_style;
   int tech_leakage;
   int tech_upkeep_divider;
-  int tech_upkeep_style;
+  enum tech_upkeep_style tech_upkeep_style;
+  enum free_tech_method free_tech_method;
+  enum gameloss_style gameloss_style;
   int timeout;
   bool tired_attack;
   int trademindist;
@@ -162,6 +185,8 @@ struct packet_game_info {
   int warminglevel;
   int year;
   bool year_0_hack;
+  bool civil_war_enabled;
+  bool paradrop_to_transport;
 };
 
 struct packet_map_info {
@@ -204,12 +229,15 @@ struct packet_city_info {
   int owner;
   int size;
   int city_radius_sq;
-  int ppl_happy[5];
-  int ppl_content[5];
-  int ppl_unhappy[5];
-  int ppl_angry[5];
+  int ppl_happy[FEELING_LAST];
+  int ppl_content[FEELING_LAST];
+  int ppl_unhappy[FEELING_LAST];
+  int ppl_angry[FEELING_LAST];
   int specialists_size;
   int specialists[SP_MAX];
+  int nationalities_count;
+  int nation_id[MAX_NUM_PLAYER_SLOTS];
+  int nation_citizens[MAX_NUM_PLAYER_SLOTS];
   int surplus[O_LAST];
   int waste[O_LAST];
   int unhappy_penalty[O_LAST];
@@ -218,8 +246,8 @@ struct packet_city_info {
   int usage[O_LAST];
   int food_stock;
   int shield_stock;
-  int trade[NUM_TRADE_ROUTES];
-  int trade_value[NUM_TRADE_ROUTES];
+  int trade[MAX_TRADE_ROUTES];
+  int trade_value[MAX_TRADE_ROUTES];
   int pollution;
   int illness_trade;
   int production_kind;
@@ -238,6 +266,7 @@ struct packet_city_info {
   bool was_happy;
   bool diplomat_investigate;
   bool walls;
+  int city_image;
   struct worklist worklist;
   bv_imprs improvements;
   bv_city_options city_options;
@@ -253,6 +282,7 @@ struct packet_city_short_info {
   bool walls;
   bool happy;
   bool unhappy;
+  int city_image;
   bv_imprs improvements;
   char name[MAX_LEN_NAME];
 };
@@ -349,13 +379,15 @@ struct packet_player_info {
   int tax;
   int science;
   int luxury;
-  int bulbs_last_turn;
+  int bulbs_prod;
   int bulbs_researched;
   int techs_researched;
   int researching;
+  int researching_cost;
   int science_cost;
   int future_tech;
   int tech_goal;
+  int tech_upkeep;
   bool is_connected;
   int revolution_finishes;
   bool ai;
@@ -364,6 +396,9 @@ struct packet_player_info {
   bv_player gives_shared_vision;
   char inventions[A_LAST+1];
   int love[MAX_NUM_PLAYER_SLOTS];
+  int color_red;
+  int color_green;
+  int color_blue;
   int wonders[B_LAST];
 };
 
@@ -386,6 +421,10 @@ struct packet_player_research {
 };
 
 struct packet_player_tech_goal {
+  int tech;
+};
+
+struct packet_tech_gained {
   int tech;
 };
 
@@ -417,29 +456,34 @@ struct packet_unit_remove {
 struct packet_unit_info {
   int id;
   int owner;
+  int nationality;
   int tile;
+  enum direction8 facing;
   int homecity;
   int upkeep[O_LAST];
   int veteran;
   bool ai;
   bool paradropped;
+  bool occupied;
   bool transported;
   bool done_moving;
   Unit_type_id type;
   int transported_by;
-  int movesleft;
+  int movesleft_old;
+  int movesleft_new;
   int hp;
   int fuel;
   int activity_count;
   int changed_from_count;
-  int occupy;
   int goto_tile;
   enum unit_activity activity;
-  enum tile_special_type activity_target;
-  Base_type_id activity_base;
+  enum tile_special_type activity_tgt_spe;
+  Base_type_id activity_tgt_base;
+  Road_type_id activity_tgt_road;
   enum unit_activity changed_from;
-  enum tile_special_type changed_from_target;
-  Base_type_id changed_from_base;
+  enum tile_special_type changed_from_tgt_spe;
+  Base_type_id changed_from_tgt_base;
+  Road_type_id changed_from_tgt_road;
   int battlegroup;
   bool has_orders;
   int orders_length;
@@ -450,12 +494,14 @@ struct packet_unit_info {
   enum direction8 orders_dirs[MAX_LEN_ROUTE];
   enum unit_activity orders_activities[MAX_LEN_ROUTE];
   Base_type_id orders_bases[MAX_LEN_ROUTE];
+  Road_type_id orders_roads[MAX_LEN_ROUTE];
 };
 
 struct packet_unit_short_info {
   int id;
   int owner;
   int tile;
+  enum direction8 facing;
   Unit_type_id type;
   int veteran;
   bool occupied;
@@ -463,7 +509,8 @@ struct packet_unit_short_info {
   bool transported;
   int hp;
   int activity;
-  Base_type_id activity_base;
+  Base_type_id activity_tgt_base;
+  Road_type_id activity_tgt_road;
   int transported_by;
   int packet_use;
   int info_city_id;
@@ -520,6 +567,7 @@ struct packet_unit_orders {
   enum direction8 dir[MAX_LEN_ROUTE];
   enum unit_activity activity[MAX_LEN_ROUTE];
   Base_type_id base[MAX_LEN_ROUTE];
+  Road_type_id road[MAX_LEN_ROUTE];
   int dest_tile;
 };
 
@@ -538,10 +586,6 @@ struct packet_unit_unload {
 };
 
 struct packet_unit_upgrade {
-  int unit_id;
-};
-
-struct packet_unit_convert {
   int unit_id;
 };
 
@@ -588,7 +632,18 @@ struct packet_unit_change_activity {
   int unit_id;
   enum unit_activity activity;
   enum tile_special_type activity_target;
+};
+
+struct packet_unit_change_activity_base {
+  int unit_id;
+  enum unit_activity activity;
   Base_type_id activity_base;
+};
+
+struct packet_unit_change_activity_road {
+  int unit_id;
+  enum unit_activity activity;
+  Road_type_id activity_road;
 };
 
 struct packet_diplomacy_init_meeting_req {
@@ -652,11 +707,23 @@ struct packet_diplomacy_cancel_pact {
   enum clause_type clause;
 };
 
-struct packet_page_msg {
+struct packet_page_msg_old {
   char caption[MAX_LEN_MSG];
   char headline[MAX_LEN_MSG];
   char lines[MAX_LEN_PACKET];
   enum event_type event;
+};
+
+struct packet_page_msg_new {
+  char caption[MAX_LEN_MSG];
+  char headline[MAX_LEN_MSG];
+  enum event_type event;
+  int len;
+  int parts;
+};
+
+struct packet_page_msg_part {
+  char lines[MAX_LEN_MSG];
 };
 
 struct packet_report_req {
@@ -691,6 +758,7 @@ struct packet_conn_pong {
 
 struct packet_client_info {
   enum gui_type gui;
+  char distribution[MAX_LEN_NAME];
 };
 
 struct packet_end_phase {
@@ -745,7 +813,7 @@ struct packet_spaceship_info {
   int launch_year;
   int population;
   int mass;
-  char structure[NUM_SS_STRUCTURALS+1];
+  bv_spaceship_structure structure;
   float support_rate;
   float energy_rate;
   float success_rate;
@@ -767,7 +835,8 @@ struct packet_ruleset_unit {
   int pop_cost;
   int attack_strength;
   int defense_strength;
-  int move_rate;
+  int move_rate_old;
+  int move_rate_new;
   int tech_requirement;
   int impr_requirement;
   int gov_requirement;
@@ -777,29 +846,54 @@ struct packet_ruleset_unit {
   int firepower;
   int obsoleted_by;
   int converted_to;
+  int convert_time;
   int fuel;
   int happy_cost;
   int upkeep[O_LAST];
   int paratroopers_range;
   int paratroopers_mr_req;
   int paratroopers_mr_sub;
+  int veteran_levels;
   char veteran_name[MAX_VET_LEVELS][MAX_LEN_NAME];
-  float power_fact[MAX_VET_LEVELS];
-  int move_bonus[MAX_VET_LEVELS];
+  int power_fact[MAX_VET_LEVELS];
+  int move_bonus_old[MAX_VET_LEVELS];
+  int move_bonus_new[MAX_VET_LEVELS];
   int bombard_rate;
   int city_size;
   bv_unit_classes cargo;
   bv_unit_classes targets;
+  bv_unit_classes embarks;
+  bv_unit_classes disembarks;
   char helptext[MAX_LEN_PACKET];
   bv_unit_type_flags flags;
   bv_unit_type_roles roles;
 };
 
+struct packet_ruleset_unit_bonus {
+  Unit_type_id unit;
+  enum unit_type_flag_id flag;
+  enum combat_bonus_type type;
+  int value;
+};
+
+struct packet_ruleset_unit_flag {
+  int id;
+  char name[MAX_LEN_NAME];
+  char helptxt[MAX_LEN_PACKET];
+};
+
 struct packet_ruleset_game {
   int default_specialist;
   int global_init_techs[MAX_NUM_TECH_LIST];
-  int work_veteran_chance[MAX_VET_LEVELS];
-  int veteran_chance[MAX_VET_LEVELS];
+  int global_init_buildings[MAX_NUM_BUILDING_LIST];
+  int veteran_levels;
+  char veteran_name[MAX_VET_LEVELS][MAX_LEN_NAME];
+  int power_fact[MAX_VET_LEVELS];
+  int move_bonus_old[MAX_VET_LEVELS];
+  int move_bonus_new[MAX_VET_LEVELS];
+  int background_red;
+  int background_green;
+  int background_blue;
 };
 
 struct packet_ruleset_specialist {
@@ -807,6 +901,7 @@ struct packet_ruleset_specialist {
   char plural_name[MAX_LEN_NAME];
   char rule_name[MAX_LEN_NAME];
   char short_name[MAX_LEN_NAME];
+  char graphic_alt[MAX_LEN_NAME];
   int reqs_count;
   struct requirement reqs[MAX_NUM_REQS];
   char helptext[MAX_LEN_PACKET];
@@ -833,6 +928,12 @@ struct packet_ruleset_tech {
   char graphic_alt[MAX_LEN_NAME];
 };
 
+struct packet_ruleset_tech_flag {
+  int id;
+  char name[MAX_LEN_NAME];
+  char helptxt[MAX_LEN_PACKET];
+};
+
 struct packet_ruleset_government {
   int id;
   int reqs_count;
@@ -845,21 +946,25 @@ struct packet_ruleset_government {
 };
 
 struct packet_ruleset_terrain_control {
-  bool may_road;
-  bool may_irrigate;
-  bool may_mine;
-  bool may_transform;
   int ocean_reclaim_requirement_pct;
   int land_channel_requirement_pct;
   int lake_max_size;
-  enum special_river_move river_move_mode;
-  int river_defense_bonus;
-  int river_trade_incr;
-  char river_help_text[MAX_LEN_PACKET];
-  int road_superhighway_trade_bonus;
-  int rail_tile_bonus[O_LAST];
+  int min_start_native_area;
+  int move_fragments;
+  int igter_cost;
   int pollution_tile_penalty[O_LAST];
   int fallout_tile_penalty[O_LAST];
+};
+
+struct packet_rulesets_ready {
+  char __dummy;			/* to avoid malloc(0); */
+};
+
+struct packet_ruleset_nation_sets {
+  int nsets;
+  char names[MAX_NUM_NATION_SETS][MAX_LEN_NAME];
+  char rule_names[MAX_NUM_NATION_SETS][MAX_LEN_NAME];
+  char descriptions[MAX_NUM_NATION_SETS][MAX_LEN_MSG];
 };
 
 struct packet_ruleset_nation_groups {
@@ -869,6 +974,7 @@ struct packet_ruleset_nation_groups {
 
 struct packet_ruleset_nation {
   Nation_type_id id;
+  char translation_domain[MAX_LEN_NAME];
   char adjective[MAX_LEN_NAME];
   char rule_name[MAX_LEN_NAME];
   char noun_plural[MAX_LEN_NAME];
@@ -879,11 +985,22 @@ struct packet_ruleset_nation {
   int leader_count;
   char leader_name[MAX_NUM_LEADERS][MAX_LEN_NAME];
   bool leader_is_male[MAX_NUM_LEADERS];
-  bool is_available;
   bool is_playable;
   int barbarian_type;
+  int nsets;
+  int sets[MAX_NUM_NATION_SETS];
   int ngroups;
   int groups[MAX_NUM_NATION_GROUPS];
+  int init_government_id;
+  int init_techs[MAX_NUM_TECH_LIST];
+  int init_units[MAX_NUM_UNIT_LIST];
+  int init_buildings[MAX_NUM_BUILDING_LIST];
+};
+
+struct packet_nation_availability {
+  int ncount;
+  bool is_pickable[MAX_NUM_NATIONS];
+  bool nationset_change;
 };
 
 struct packet_ruleset_city {
@@ -923,6 +1040,7 @@ struct packet_ruleset_building {
 
 struct packet_ruleset_terrain {
   Terrain_type_id id;
+  int tclass;
   bv_terrain_flags flags;
   bv_unit_classes native_to;
   char name[MAX_LEN_NAME];
@@ -934,7 +1052,8 @@ struct packet_ruleset_terrain {
   int output[O_LAST];
   int num_resources;
   Resource_type_id resources[MAX_NUM_RESOURCES];
-  int road_trade_incr;
+  int road_output_incr_pct[O_LAST];
+  int base_time;
   int road_time;
   Terrain_type_id irrigation_result;
   int irrigation_food_incr;
@@ -944,10 +1063,18 @@ struct packet_ruleset_terrain {
   int mining_time;
   Terrain_type_id transform_result;
   int transform_time;
-  int rail_time;
   int clean_pollution_time;
   int clean_fallout_time;
+  int color_red;
+  int color_green;
+  int color_blue;
   char helptext[MAX_LEN_PACKET];
+};
+
+struct packet_ruleset_terrain_flag {
+  int id;
+  char name[MAX_LEN_NAME];
+  char helptxt[MAX_LEN_PACKET];
 };
 
 struct packet_ruleset_unit_class {
@@ -955,9 +1082,11 @@ struct packet_ruleset_unit_class {
   char name[MAX_LEN_NAME];
   char rule_name[MAX_LEN_NAME];
   int move_type;
-  int min_speed;
+  int min_speed_old;
+  int min_speed_new;
   int hp_loss_pct;
   int hut_behavior;
+  int non_native_def_pct;
   bv_unit_class_flags flags;
 };
 
@@ -970,6 +1099,7 @@ struct packet_ruleset_base {
   char graphic_str[MAX_LEN_NAME];
   char graphic_alt[MAX_LEN_NAME];
   char activity_gfx[MAX_LEN_NAME];
+  char act_gfx_alt[MAX_LEN_NAME];
   int reqs_count;
   struct requirement reqs[MAX_NUM_REQS];
   enum base_gui_type gui_type;
@@ -984,12 +1114,57 @@ struct packet_ruleset_base {
   char helptext[MAX_LEN_PACKET];
 };
 
+struct packet_ruleset_road {
+  int id;
+  char name[MAX_LEN_NAME];
+  char rule_name[MAX_LEN_NAME];
+  char graphic_str[MAX_LEN_NAME];
+  char graphic_alt[MAX_LEN_NAME];
+  char activity_gfx[MAX_LEN_NAME];
+  char act_gfx_alt[MAX_LEN_NAME];
+  int move_cost_old;
+  int move_cost_new;
+  enum road_move_mode move_mode;
+  int build_time;
+  int defense_bonus;
+  bool buildable;
+  bool pillageable;
+  int tile_incr_const[O_LAST];
+  int tile_incr[O_LAST];
+  int tile_bonus[O_LAST];
+  int reqs_count;
+  struct requirement reqs[MAX_NUM_REQS];
+  enum road_compat compat;
+  bv_unit_classes native_to;
+  bv_roads hidden_by;
+  bv_road_flags flags;
+  char helptext[MAX_LEN_PACKET];
+};
+
+struct packet_ruleset_disaster {
+  int id;
+  char name[MAX_LEN_NAME];
+  char rule_name[MAX_LEN_NAME];
+  int reqs_count;
+  struct requirement reqs[MAX_NUM_REQS];
+  int frequency;
+  bv_disaster_effects effects;
+};
+
+struct packet_ruleset_trade {
+  int id;
+  int trade_pct;
+  enum traderoute_illegal_cancelling cancelling;
+};
+
 struct packet_ruleset_control {
   int num_unit_classes;
   int num_unit_types;
   int num_impr_types;
   int num_tech_types;
   int num_base_types;
+  int num_road_types;
+  int num_disaster_types;
   int government_count;
   int nation_count;
   int styles_count;
@@ -997,6 +1172,8 @@ struct packet_ruleset_control {
   int resource_count;
   int num_specialist_types;
   char prefered_tileset[MAX_LEN_NAME];
+  char prefered_soundset[MAX_LEN_NAME];
+  bool popup_tech_help;
   char name[MAX_LEN_NAME];
   char description[MAX_LEN_PACKET];
 };
@@ -1115,6 +1292,7 @@ struct packet_scenario_info {
   char name[256];
   char description[MAX_LEN_PACKET];
   bool players;
+  bool startpos_nations;
 };
 
 struct packet_save_scenario {
@@ -1193,6 +1371,13 @@ struct packet_edit_tile_base {
   int size;
 };
 
+struct packet_edit_tile_road {
+  int tile;
+  Road_type_id road_type_id;
+  bool remove;
+  int size;
+};
+
 struct packet_edit_startpos {
   int id;
   bool remove;
@@ -1208,10 +1393,12 @@ struct packet_edit_startpos_full {
 struct packet_edit_tile {
   int tile;
   bv_special specials;
+  bv_roads roads;
   bv_bases bases;
   Resource_type_id resource;
   Terrain_type_id terrain;
   Nation_type_id startpos_nation;
+  char label[MAX_LEN_NAME];
 };
 
 struct packet_edit_unit_create {
@@ -1238,7 +1425,8 @@ struct packet_edit_unit {
   Unit_type_id utype;
   int owner;
   int homecity;
-  int moves_left;
+  int moves_left_old;
+  int moves_left_new;
   int hp;
   int veteran;
   int fuel;
@@ -1275,7 +1463,7 @@ struct packet_edit_city {
   int ppl_angry[5];
   int specialists_size;
   int specialists[SP_MAX];
-  int trade[NUM_TRADE_ROUTES];
+  int trade[MAX_TRADE_ROUTES];
   int food_stock;
   int shield_stock;
   bool airlift;
@@ -1345,6 +1533,7 @@ struct packet_edit_game {
   char scenario_name[256];
   char scenario_desc[MAX_LEN_PACKET];
   bool scenario_players;
+  bool startpos_nations;
 };
 
 struct packet_edit_object_created {
@@ -1413,15 +1602,14 @@ enum packet_type {
   PACKET_UNIT_LOAD,
   PACKET_UNIT_UNLOAD,
   PACKET_UNIT_UPGRADE,
-  PACKET_UNIT_CONVERT,
-  PACKET_UNIT_NUKE,
+  PACKET_UNIT_NUKE = 79,
   PACKET_UNIT_PARADROP_TO,               /* 80 */
   PACKET_UNIT_AIRLIFT,
   PACKET_UNIT_DIPLOMAT_QUERY,
   PACKET_UNIT_TYPE_UPGRADE,
   PACKET_UNIT_DIPLOMAT_ACTION,
   PACKET_UNIT_DIPLOMAT_ANSWER,
-  PACKET_UNIT_CHANGE_ACTIVITY,
+  PACKET_UNIT_CHANGE_ACTIVITY_BASE,
   PACKET_CONN_PING = 88,
   PACKET_CONN_PONG,
   PACKET_DIPLOMACY_INIT_MEETING_REQ = 95,
@@ -1435,7 +1623,7 @@ enum packet_type {
   PACKET_DIPLOMACY_ACCEPT_TREATY_REQ,
   PACKET_DIPLOMACY_ACCEPT_TREATY,
   PACKET_DIPLOMACY_CANCEL_PACT,
-  PACKET_PAGE_MSG = 110,                 /* 110 */
+  PACKET_PAGE_MSG_OLD = 110,             /* 110 */
   PACKET_REPORT_REQ,
   PACKET_CONN_INFO = 115,
   PACKET_CONN_PING_INFO,
@@ -1487,7 +1675,8 @@ enum packet_type {
   PACKET_VOTE_RESOLVE,
   PACKET_VOTE_SUBMIT,
   PACKET_EDIT_MODE,                      /* 190 */
-  PACKET_EDIT_RECALCULATE_BORDERS = 197,
+  PACKET_EDIT_TILE_ROAD = 196,
+  PACKET_EDIT_RECALCULATE_BORDERS,
   PACKET_EDIT_CHECK_TILES,
   PACKET_EDIT_TOGGLE_FOGOFWAR,
   PACKET_EDIT_TILE_TERRAIN,              /* 200 */
@@ -1510,623 +1699,703 @@ enum packet_type {
   PACKET_EDIT_PLAYER_VISION,
   PACKET_EDIT_GAME,
   PACKET_EDIT_OBJECT_CREATED,
+  PACKET_RULESET_ROAD,                   /* 220 */
+  PACKET_UNIT_CHANGE_ACTIVITY_ROAD,
+  PACKET_UNIT_CHANGE_ACTIVITY,
+  PACKET_ENDGAME_PLAYER,
+  PACKET_RULESET_DISASTER,
+  PACKET_RULESETS_READY,
+  PACKET_RULESET_TRADE = 227,
+  PACKET_RULESET_UNIT_BONUS,
+  PACKET_RULESET_UNIT_FLAG,
+  PACKET_TECH_GAINED,                    /* 230 */
+  PACKET_RULESET_TERRAIN_FLAG,
+  PACKET_RULESET_TECH_FLAG,
+  PACKET_RULESET_NATION_SETS,
+  PACKET_NATION_AVAILABILITY,
+  PACKET_PAGE_MSG_NEW,
+  PACKET_PAGE_MSG_PART,
 
   PACKET_LAST  /* leave this last */
 };
 
-struct packet_processing_started *receive_packet_processing_started(struct connection *pc, enum packet_type type);
+struct packet_processing_started *receive_packet_processing_started(struct connection *pc);
 int send_packet_processing_started(struct connection *pc);
 
-struct packet_processing_finished *receive_packet_processing_finished(struct connection *pc, enum packet_type type);
+struct packet_processing_finished *receive_packet_processing_finished(struct connection *pc);
 int send_packet_processing_finished(struct connection *pc);
 
-struct packet_server_join_req *receive_packet_server_join_req(struct connection *pc, enum packet_type type);
+struct packet_server_join_req *receive_packet_server_join_req(struct connection *pc);
 int send_packet_server_join_req(struct connection *pc, const struct packet_server_join_req *packet);
 int dsend_packet_server_join_req(struct connection *pc, const char *username, const char *capability, const char *version_label, int major_version, int minor_version, int patch_version);
 
-struct packet_server_join_reply *receive_packet_server_join_reply(struct connection *pc, enum packet_type type);
+struct packet_server_join_reply *receive_packet_server_join_reply(struct connection *pc);
 int send_packet_server_join_reply(struct connection *pc, const struct packet_server_join_reply *packet);
 
-struct packet_authentication_req *receive_packet_authentication_req(struct connection *pc, enum packet_type type);
+struct packet_authentication_req *receive_packet_authentication_req(struct connection *pc);
 int send_packet_authentication_req(struct connection *pc, const struct packet_authentication_req *packet);
 int dsend_packet_authentication_req(struct connection *pc, enum authentication_type type, const char *message);
 
-struct packet_authentication_reply *receive_packet_authentication_reply(struct connection *pc, enum packet_type type);
+struct packet_authentication_reply *receive_packet_authentication_reply(struct connection *pc);
 int send_packet_authentication_reply(struct connection *pc, const struct packet_authentication_reply *packet);
 
-struct packet_server_shutdown *receive_packet_server_shutdown(struct connection *pc, enum packet_type type);
+struct packet_server_shutdown *receive_packet_server_shutdown(struct connection *pc);
 int send_packet_server_shutdown(struct connection *pc);
 void lsend_packet_server_shutdown(struct conn_list *dest);
 
-struct packet_nation_select_req *receive_packet_nation_select_req(struct connection *pc, enum packet_type type);
+struct packet_nation_select_req *receive_packet_nation_select_req(struct connection *pc);
 int send_packet_nation_select_req(struct connection *pc, const struct packet_nation_select_req *packet);
 int dsend_packet_nation_select_req(struct connection *pc, int player_no, Nation_type_id nation_no, bool is_male, const char *name, int city_style);
 
-struct packet_player_ready *receive_packet_player_ready(struct connection *pc, enum packet_type type);
+struct packet_player_ready *receive_packet_player_ready(struct connection *pc);
 int send_packet_player_ready(struct connection *pc, const struct packet_player_ready *packet);
 int dsend_packet_player_ready(struct connection *pc, int player_no, bool is_ready);
 
-struct packet_endgame_report *receive_packet_endgame_report(struct connection *pc, enum packet_type type);
+struct packet_endgame_report *receive_packet_endgame_report(struct connection *pc);
 int send_packet_endgame_report(struct connection *pc, const struct packet_endgame_report *packet);
 void lsend_packet_endgame_report(struct conn_list *dest, const struct packet_endgame_report *packet);
 
-struct packet_tile_info *receive_packet_tile_info(struct connection *pc, enum packet_type type);
+struct packet_endgame_player *receive_packet_endgame_player(struct connection *pc);
+int send_packet_endgame_player(struct connection *pc, const struct packet_endgame_player *packet);
+void lsend_packet_endgame_player(struct conn_list *dest, const struct packet_endgame_player *packet);
+
+struct packet_tile_info *receive_packet_tile_info(struct connection *pc);
 int send_packet_tile_info(struct connection *pc, const struct packet_tile_info *packet);
 void lsend_packet_tile_info(struct conn_list *dest, const struct packet_tile_info *packet);
 
-struct packet_game_info *receive_packet_game_info(struct connection *pc, enum packet_type type);
+struct packet_game_info *receive_packet_game_info(struct connection *pc);
 int send_packet_game_info(struct connection *pc, const struct packet_game_info *packet);
 
-struct packet_map_info *receive_packet_map_info(struct connection *pc, enum packet_type type);
+struct packet_map_info *receive_packet_map_info(struct connection *pc);
 int send_packet_map_info(struct connection *pc, const struct packet_map_info *packet);
 void lsend_packet_map_info(struct conn_list *dest, const struct packet_map_info *packet);
 
-struct packet_nuke_tile_info *receive_packet_nuke_tile_info(struct connection *pc, enum packet_type type);
+struct packet_nuke_tile_info *receive_packet_nuke_tile_info(struct connection *pc);
 int send_packet_nuke_tile_info(struct connection *pc, const struct packet_nuke_tile_info *packet);
 void lsend_packet_nuke_tile_info(struct conn_list *dest, const struct packet_nuke_tile_info *packet);
 int dsend_packet_nuke_tile_info(struct connection *pc, int tile);
 void dlsend_packet_nuke_tile_info(struct conn_list *dest, int tile);
 
-struct packet_team_name_info *receive_packet_team_name_info(struct connection *pc, enum packet_type type);
+struct packet_team_name_info *receive_packet_team_name_info(struct connection *pc);
 int send_packet_team_name_info(struct connection *pc, const struct packet_team_name_info *packet);
 void lsend_packet_team_name_info(struct conn_list *dest, const struct packet_team_name_info *packet);
 
-struct packet_chat_msg *receive_packet_chat_msg(struct connection *pc, enum packet_type type);
+struct packet_chat_msg *receive_packet_chat_msg(struct connection *pc);
 int send_packet_chat_msg(struct connection *pc, const struct packet_chat_msg *packet);
 void lsend_packet_chat_msg(struct conn_list *dest, const struct packet_chat_msg *packet);
 
-struct packet_chat_msg_req *receive_packet_chat_msg_req(struct connection *pc, enum packet_type type);
+struct packet_chat_msg_req *receive_packet_chat_msg_req(struct connection *pc);
 int send_packet_chat_msg_req(struct connection *pc, const struct packet_chat_msg_req *packet);
 int dsend_packet_chat_msg_req(struct connection *pc, const char *message);
 
-struct packet_connect_msg *receive_packet_connect_msg(struct connection *pc, enum packet_type type);
+struct packet_connect_msg *receive_packet_connect_msg(struct connection *pc);
 int send_packet_connect_msg(struct connection *pc, const struct packet_connect_msg *packet);
 int dsend_packet_connect_msg(struct connection *pc, const char *message);
 
-struct packet_city_remove *receive_packet_city_remove(struct connection *pc, enum packet_type type);
+struct packet_city_remove *receive_packet_city_remove(struct connection *pc);
 int send_packet_city_remove(struct connection *pc, const struct packet_city_remove *packet);
 void lsend_packet_city_remove(struct conn_list *dest, const struct packet_city_remove *packet);
 int dsend_packet_city_remove(struct connection *pc, int city_id);
 void dlsend_packet_city_remove(struct conn_list *dest, int city_id);
 
-struct packet_city_info *receive_packet_city_info(struct connection *pc, enum packet_type type);
+struct packet_city_info *receive_packet_city_info(struct connection *pc);
 int send_packet_city_info(struct connection *pc, const struct packet_city_info *packet, bool force_to_send);
 void lsend_packet_city_info(struct conn_list *dest, const struct packet_city_info *packet, bool force_to_send);
 
-struct packet_city_short_info *receive_packet_city_short_info(struct connection *pc, enum packet_type type);
+struct packet_city_short_info *receive_packet_city_short_info(struct connection *pc);
 int send_packet_city_short_info(struct connection *pc, const struct packet_city_short_info *packet);
 void lsend_packet_city_short_info(struct conn_list *dest, const struct packet_city_short_info *packet);
 
-struct packet_city_sell *receive_packet_city_sell(struct connection *pc, enum packet_type type);
+struct packet_city_sell *receive_packet_city_sell(struct connection *pc);
 int send_packet_city_sell(struct connection *pc, const struct packet_city_sell *packet);
 int dsend_packet_city_sell(struct connection *pc, int city_id, int build_id);
 
-struct packet_city_buy *receive_packet_city_buy(struct connection *pc, enum packet_type type);
+struct packet_city_buy *receive_packet_city_buy(struct connection *pc);
 int send_packet_city_buy(struct connection *pc, const struct packet_city_buy *packet);
 int dsend_packet_city_buy(struct connection *pc, int city_id);
 
-struct packet_city_change *receive_packet_city_change(struct connection *pc, enum packet_type type);
+struct packet_city_change *receive_packet_city_change(struct connection *pc);
 int send_packet_city_change(struct connection *pc, const struct packet_city_change *packet);
 int dsend_packet_city_change(struct connection *pc, int city_id, int production_kind, int production_value);
 
-struct packet_city_worklist *receive_packet_city_worklist(struct connection *pc, enum packet_type type);
+struct packet_city_worklist *receive_packet_city_worklist(struct connection *pc);
 int send_packet_city_worklist(struct connection *pc, const struct packet_city_worklist *packet);
 int dsend_packet_city_worklist(struct connection *pc, int city_id, const struct worklist *worklist);
 
-struct packet_city_make_specialist *receive_packet_city_make_specialist(struct connection *pc, enum packet_type type);
+struct packet_city_make_specialist *receive_packet_city_make_specialist(struct connection *pc);
 int send_packet_city_make_specialist(struct connection *pc, const struct packet_city_make_specialist *packet);
 int dsend_packet_city_make_specialist(struct connection *pc, int city_id, int worker_x, int worker_y);
 
-struct packet_city_make_worker *receive_packet_city_make_worker(struct connection *pc, enum packet_type type);
+struct packet_city_make_worker *receive_packet_city_make_worker(struct connection *pc);
 int send_packet_city_make_worker(struct connection *pc, const struct packet_city_make_worker *packet);
 int dsend_packet_city_make_worker(struct connection *pc, int city_id, int worker_x, int worker_y);
 
-struct packet_city_change_specialist *receive_packet_city_change_specialist(struct connection *pc, enum packet_type type);
+struct packet_city_change_specialist *receive_packet_city_change_specialist(struct connection *pc);
 int send_packet_city_change_specialist(struct connection *pc, const struct packet_city_change_specialist *packet);
 int dsend_packet_city_change_specialist(struct connection *pc, int city_id, Specialist_type_id from, Specialist_type_id to);
 
-struct packet_city_rename *receive_packet_city_rename(struct connection *pc, enum packet_type type);
+struct packet_city_rename *receive_packet_city_rename(struct connection *pc);
 int send_packet_city_rename(struct connection *pc, const struct packet_city_rename *packet);
 int dsend_packet_city_rename(struct connection *pc, int city_id, const char *name);
 
-struct packet_city_options_req *receive_packet_city_options_req(struct connection *pc, enum packet_type type);
+struct packet_city_options_req *receive_packet_city_options_req(struct connection *pc);
 int send_packet_city_options_req(struct connection *pc, const struct packet_city_options_req *packet);
 int dsend_packet_city_options_req(struct connection *pc, int city_id, bv_city_options options);
 
-struct packet_city_refresh *receive_packet_city_refresh(struct connection *pc, enum packet_type type);
+struct packet_city_refresh *receive_packet_city_refresh(struct connection *pc);
 int send_packet_city_refresh(struct connection *pc, const struct packet_city_refresh *packet);
 int dsend_packet_city_refresh(struct connection *pc, int city_id);
 
-struct packet_city_name_suggestion_req *receive_packet_city_name_suggestion_req(struct connection *pc, enum packet_type type);
+struct packet_city_name_suggestion_req *receive_packet_city_name_suggestion_req(struct connection *pc);
 int send_packet_city_name_suggestion_req(struct connection *pc, const struct packet_city_name_suggestion_req *packet);
 int dsend_packet_city_name_suggestion_req(struct connection *pc, int unit_id);
 
-struct packet_city_name_suggestion_info *receive_packet_city_name_suggestion_info(struct connection *pc, enum packet_type type);
+struct packet_city_name_suggestion_info *receive_packet_city_name_suggestion_info(struct connection *pc);
 int send_packet_city_name_suggestion_info(struct connection *pc, const struct packet_city_name_suggestion_info *packet);
 void lsend_packet_city_name_suggestion_info(struct conn_list *dest, const struct packet_city_name_suggestion_info *packet);
 int dsend_packet_city_name_suggestion_info(struct connection *pc, int unit_id, const char *name);
 void dlsend_packet_city_name_suggestion_info(struct conn_list *dest, int unit_id, const char *name);
 
-struct packet_city_sabotage_list *receive_packet_city_sabotage_list(struct connection *pc, enum packet_type type);
+struct packet_city_sabotage_list *receive_packet_city_sabotage_list(struct connection *pc);
 int send_packet_city_sabotage_list(struct connection *pc, const struct packet_city_sabotage_list *packet);
 void lsend_packet_city_sabotage_list(struct conn_list *dest, const struct packet_city_sabotage_list *packet);
 
-struct packet_player_remove *receive_packet_player_remove(struct connection *pc, enum packet_type type);
+struct packet_player_remove *receive_packet_player_remove(struct connection *pc);
 int send_packet_player_remove(struct connection *pc, const struct packet_player_remove *packet);
 int dsend_packet_player_remove(struct connection *pc, int playerno);
 
-struct packet_player_info *receive_packet_player_info(struct connection *pc, enum packet_type type);
+struct packet_player_info *receive_packet_player_info(struct connection *pc);
 int send_packet_player_info(struct connection *pc, const struct packet_player_info *packet);
 
-struct packet_player_phase_done *receive_packet_player_phase_done(struct connection *pc, enum packet_type type);
+struct packet_player_phase_done *receive_packet_player_phase_done(struct connection *pc);
 int send_packet_player_phase_done(struct connection *pc, const struct packet_player_phase_done *packet);
 int dsend_packet_player_phase_done(struct connection *pc, int turn);
 
-struct packet_player_rates *receive_packet_player_rates(struct connection *pc, enum packet_type type);
+struct packet_player_rates *receive_packet_player_rates(struct connection *pc);
 int send_packet_player_rates(struct connection *pc, const struct packet_player_rates *packet);
 int dsend_packet_player_rates(struct connection *pc, int tax, int luxury, int science);
 
-struct packet_player_change_government *receive_packet_player_change_government(struct connection *pc, enum packet_type type);
+struct packet_player_change_government *receive_packet_player_change_government(struct connection *pc);
 int send_packet_player_change_government(struct connection *pc, const struct packet_player_change_government *packet);
 int dsend_packet_player_change_government(struct connection *pc, int government);
 
-struct packet_player_research *receive_packet_player_research(struct connection *pc, enum packet_type type);
+struct packet_player_research *receive_packet_player_research(struct connection *pc);
 int send_packet_player_research(struct connection *pc, const struct packet_player_research *packet);
 int dsend_packet_player_research(struct connection *pc, int tech);
 
-struct packet_player_tech_goal *receive_packet_player_tech_goal(struct connection *pc, enum packet_type type);
+struct packet_player_tech_goal *receive_packet_player_tech_goal(struct connection *pc);
 int send_packet_player_tech_goal(struct connection *pc, const struct packet_player_tech_goal *packet);
 int dsend_packet_player_tech_goal(struct connection *pc, int tech);
 
-struct packet_player_attribute_block *receive_packet_player_attribute_block(struct connection *pc, enum packet_type type);
+struct packet_tech_gained *receive_packet_tech_gained(struct connection *pc);
+int send_packet_tech_gained(struct connection *pc, const struct packet_tech_gained *packet);
+int dsend_packet_tech_gained(struct connection *pc, int tech);
+
+struct packet_player_attribute_block *receive_packet_player_attribute_block(struct connection *pc);
 int send_packet_player_attribute_block(struct connection *pc);
 
-struct packet_player_attribute_chunk *receive_packet_player_attribute_chunk(struct connection *pc, enum packet_type type);
+struct packet_player_attribute_chunk *receive_packet_player_attribute_chunk(struct connection *pc);
 int send_packet_player_attribute_chunk(struct connection *pc, const struct packet_player_attribute_chunk *packet);
 
-struct packet_player_diplstate *receive_packet_player_diplstate(struct connection *pc, enum packet_type type);
+struct packet_player_diplstate *receive_packet_player_diplstate(struct connection *pc);
 int send_packet_player_diplstate(struct connection *pc, const struct packet_player_diplstate *packet);
 
-struct packet_unit_remove *receive_packet_unit_remove(struct connection *pc, enum packet_type type);
+struct packet_unit_remove *receive_packet_unit_remove(struct connection *pc);
 int send_packet_unit_remove(struct connection *pc, const struct packet_unit_remove *packet);
 void lsend_packet_unit_remove(struct conn_list *dest, const struct packet_unit_remove *packet);
 int dsend_packet_unit_remove(struct connection *pc, int unit_id);
 void dlsend_packet_unit_remove(struct conn_list *dest, int unit_id);
 
-struct packet_unit_info *receive_packet_unit_info(struct connection *pc, enum packet_type type);
+struct packet_unit_info *receive_packet_unit_info(struct connection *pc);
 int send_packet_unit_info(struct connection *pc, const struct packet_unit_info *packet);
 void lsend_packet_unit_info(struct conn_list *dest, const struct packet_unit_info *packet);
 
-struct packet_unit_short_info *receive_packet_unit_short_info(struct connection *pc, enum packet_type type);
+struct packet_unit_short_info *receive_packet_unit_short_info(struct connection *pc);
 int send_packet_unit_short_info(struct connection *pc, const struct packet_unit_short_info *packet);
 void lsend_packet_unit_short_info(struct conn_list *dest, const struct packet_unit_short_info *packet);
 
-struct packet_unit_combat_info *receive_packet_unit_combat_info(struct connection *pc, enum packet_type type);
+struct packet_unit_combat_info *receive_packet_unit_combat_info(struct connection *pc);
 int send_packet_unit_combat_info(struct connection *pc, const struct packet_unit_combat_info *packet);
 void lsend_packet_unit_combat_info(struct conn_list *dest, const struct packet_unit_combat_info *packet);
 
-struct packet_unit_move *receive_packet_unit_move(struct connection *pc, enum packet_type type);
+struct packet_unit_move *receive_packet_unit_move(struct connection *pc);
 int send_packet_unit_move(struct connection *pc, const struct packet_unit_move *packet);
 int dsend_packet_unit_move(struct connection *pc, int unit_id, int tile);
 
-struct packet_unit_build_city *receive_packet_unit_build_city(struct connection *pc, enum packet_type type);
+struct packet_unit_build_city *receive_packet_unit_build_city(struct connection *pc);
 int send_packet_unit_build_city(struct connection *pc, const struct packet_unit_build_city *packet);
 int dsend_packet_unit_build_city(struct connection *pc, int unit_id, const char *name);
 
-struct packet_unit_disband *receive_packet_unit_disband(struct connection *pc, enum packet_type type);
+struct packet_unit_disband *receive_packet_unit_disband(struct connection *pc);
 int send_packet_unit_disband(struct connection *pc, const struct packet_unit_disband *packet);
 int dsend_packet_unit_disband(struct connection *pc, int unit_id);
 
-struct packet_unit_change_homecity *receive_packet_unit_change_homecity(struct connection *pc, enum packet_type type);
+struct packet_unit_change_homecity *receive_packet_unit_change_homecity(struct connection *pc);
 int send_packet_unit_change_homecity(struct connection *pc, const struct packet_unit_change_homecity *packet);
 int dsend_packet_unit_change_homecity(struct connection *pc, int unit_id, int city_id);
 
-struct packet_unit_establish_trade *receive_packet_unit_establish_trade(struct connection *pc, enum packet_type type);
+struct packet_unit_establish_trade *receive_packet_unit_establish_trade(struct connection *pc);
 int send_packet_unit_establish_trade(struct connection *pc, const struct packet_unit_establish_trade *packet);
 int dsend_packet_unit_establish_trade(struct connection *pc, int unit_id);
 
-struct packet_unit_battlegroup *receive_packet_unit_battlegroup(struct connection *pc, enum packet_type type);
+struct packet_unit_battlegroup *receive_packet_unit_battlegroup(struct connection *pc);
 int send_packet_unit_battlegroup(struct connection *pc, const struct packet_unit_battlegroup *packet);
 int dsend_packet_unit_battlegroup(struct connection *pc, int unit_id, int battlegroup);
 
-struct packet_unit_help_build_wonder *receive_packet_unit_help_build_wonder(struct connection *pc, enum packet_type type);
+struct packet_unit_help_build_wonder *receive_packet_unit_help_build_wonder(struct connection *pc);
 int send_packet_unit_help_build_wonder(struct connection *pc, const struct packet_unit_help_build_wonder *packet);
 int dsend_packet_unit_help_build_wonder(struct connection *pc, int unit_id);
 
-struct packet_unit_orders *receive_packet_unit_orders(struct connection *pc, enum packet_type type);
+struct packet_unit_orders *receive_packet_unit_orders(struct connection *pc);
 int send_packet_unit_orders(struct connection *pc, const struct packet_unit_orders *packet);
 
-struct packet_unit_autosettlers *receive_packet_unit_autosettlers(struct connection *pc, enum packet_type type);
+struct packet_unit_autosettlers *receive_packet_unit_autosettlers(struct connection *pc);
 int send_packet_unit_autosettlers(struct connection *pc, const struct packet_unit_autosettlers *packet);
 int dsend_packet_unit_autosettlers(struct connection *pc, int unit_id);
 
-struct packet_unit_load *receive_packet_unit_load(struct connection *pc, enum packet_type type);
+struct packet_unit_load *receive_packet_unit_load(struct connection *pc);
 int send_packet_unit_load(struct connection *pc, const struct packet_unit_load *packet);
 int dsend_packet_unit_load(struct connection *pc, int cargo_id, int transporter_id);
 
-struct packet_unit_unload *receive_packet_unit_unload(struct connection *pc, enum packet_type type);
+struct packet_unit_unload *receive_packet_unit_unload(struct connection *pc);
 int send_packet_unit_unload(struct connection *pc, const struct packet_unit_unload *packet);
 int dsend_packet_unit_unload(struct connection *pc, int cargo_id, int transporter_id);
 
-struct packet_unit_upgrade *receive_packet_unit_upgrade(struct connection *pc, enum packet_type type);
+struct packet_unit_upgrade *receive_packet_unit_upgrade(struct connection *pc);
 int send_packet_unit_upgrade(struct connection *pc, const struct packet_unit_upgrade *packet);
 int dsend_packet_unit_upgrade(struct connection *pc, int unit_id);
 
-struct packet_unit_convert *receive_packet_unit_convert(struct connection *pc, enum packet_type type);
-int send_packet_unit_convert(struct connection *pc, const struct packet_unit_convert *packet);
-int dsend_packet_unit_convert(struct connection *pc, int unit_id);
-
-struct packet_unit_nuke *receive_packet_unit_nuke(struct connection *pc, enum packet_type type);
+struct packet_unit_nuke *receive_packet_unit_nuke(struct connection *pc);
 int send_packet_unit_nuke(struct connection *pc, const struct packet_unit_nuke *packet);
 int dsend_packet_unit_nuke(struct connection *pc, int unit_id);
 
-struct packet_unit_paradrop_to *receive_packet_unit_paradrop_to(struct connection *pc, enum packet_type type);
+struct packet_unit_paradrop_to *receive_packet_unit_paradrop_to(struct connection *pc);
 int send_packet_unit_paradrop_to(struct connection *pc, const struct packet_unit_paradrop_to *packet);
 int dsend_packet_unit_paradrop_to(struct connection *pc, int unit_id, int tile);
 
-struct packet_unit_airlift *receive_packet_unit_airlift(struct connection *pc, enum packet_type type);
+struct packet_unit_airlift *receive_packet_unit_airlift(struct connection *pc);
 int send_packet_unit_airlift(struct connection *pc, const struct packet_unit_airlift *packet);
 int dsend_packet_unit_airlift(struct connection *pc, int unit_id, int city_id);
 
-struct packet_unit_diplomat_query *receive_packet_unit_diplomat_query(struct connection *pc, enum packet_type type);
+struct packet_unit_diplomat_query *receive_packet_unit_diplomat_query(struct connection *pc);
 int send_packet_unit_diplomat_query(struct connection *pc, const struct packet_unit_diplomat_query *packet);
 int dsend_packet_unit_diplomat_query(struct connection *pc, int diplomat_id, int target_id, int value, enum diplomat_actions action_type);
 
-struct packet_unit_type_upgrade *receive_packet_unit_type_upgrade(struct connection *pc, enum packet_type type);
+struct packet_unit_type_upgrade *receive_packet_unit_type_upgrade(struct connection *pc);
 int send_packet_unit_type_upgrade(struct connection *pc, const struct packet_unit_type_upgrade *packet);
 int dsend_packet_unit_type_upgrade(struct connection *pc, Unit_type_id type);
 
-struct packet_unit_diplomat_action *receive_packet_unit_diplomat_action(struct connection *pc, enum packet_type type);
+struct packet_unit_diplomat_action *receive_packet_unit_diplomat_action(struct connection *pc);
 int send_packet_unit_diplomat_action(struct connection *pc, const struct packet_unit_diplomat_action *packet);
 int dsend_packet_unit_diplomat_action(struct connection *pc, int diplomat_id, int target_id, int value, enum diplomat_actions action_type);
 
-struct packet_unit_diplomat_answer *receive_packet_unit_diplomat_answer(struct connection *pc, enum packet_type type);
+struct packet_unit_diplomat_answer *receive_packet_unit_diplomat_answer(struct connection *pc);
 int send_packet_unit_diplomat_answer(struct connection *pc, const struct packet_unit_diplomat_answer *packet);
 void lsend_packet_unit_diplomat_answer(struct conn_list *dest, const struct packet_unit_diplomat_answer *packet);
 int dsend_packet_unit_diplomat_answer(struct connection *pc, int diplomat_id, int target_id, int cost, enum diplomat_actions action_type);
 void dlsend_packet_unit_diplomat_answer(struct conn_list *dest, int diplomat_id, int target_id, int cost, enum diplomat_actions action_type);
 
-struct packet_unit_change_activity *receive_packet_unit_change_activity(struct connection *pc, enum packet_type type);
+struct packet_unit_change_activity *receive_packet_unit_change_activity(struct connection *pc);
 int send_packet_unit_change_activity(struct connection *pc, const struct packet_unit_change_activity *packet);
-int dsend_packet_unit_change_activity(struct connection *pc, int unit_id, enum unit_activity activity, enum tile_special_type activity_target, Base_type_id activity_base);
+int dsend_packet_unit_change_activity(struct connection *pc, int unit_id, enum unit_activity activity, enum tile_special_type activity_target);
 
-struct packet_diplomacy_init_meeting_req *receive_packet_diplomacy_init_meeting_req(struct connection *pc, enum packet_type type);
+struct packet_unit_change_activity_base *receive_packet_unit_change_activity_base(struct connection *pc);
+int send_packet_unit_change_activity_base(struct connection *pc, const struct packet_unit_change_activity_base *packet);
+int dsend_packet_unit_change_activity_base(struct connection *pc, int unit_id, enum unit_activity activity, Base_type_id activity_base);
+
+struct packet_unit_change_activity_road *receive_packet_unit_change_activity_road(struct connection *pc);
+int send_packet_unit_change_activity_road(struct connection *pc, const struct packet_unit_change_activity_road *packet);
+int dsend_packet_unit_change_activity_road(struct connection *pc, int unit_id, enum unit_activity activity, Road_type_id activity_road);
+
+struct packet_diplomacy_init_meeting_req *receive_packet_diplomacy_init_meeting_req(struct connection *pc);
 int send_packet_diplomacy_init_meeting_req(struct connection *pc, const struct packet_diplomacy_init_meeting_req *packet);
 int dsend_packet_diplomacy_init_meeting_req(struct connection *pc, int counterpart);
 
-struct packet_diplomacy_init_meeting *receive_packet_diplomacy_init_meeting(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_init_meeting *receive_packet_diplomacy_init_meeting(struct connection *pc);
 int send_packet_diplomacy_init_meeting(struct connection *pc, const struct packet_diplomacy_init_meeting *packet);
 void lsend_packet_diplomacy_init_meeting(struct conn_list *dest, const struct packet_diplomacy_init_meeting *packet);
 int dsend_packet_diplomacy_init_meeting(struct connection *pc, int counterpart, int initiated_from);
 void dlsend_packet_diplomacy_init_meeting(struct conn_list *dest, int counterpart, int initiated_from);
 
-struct packet_diplomacy_cancel_meeting_req *receive_packet_diplomacy_cancel_meeting_req(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_cancel_meeting_req *receive_packet_diplomacy_cancel_meeting_req(struct connection *pc);
 int send_packet_diplomacy_cancel_meeting_req(struct connection *pc, const struct packet_diplomacy_cancel_meeting_req *packet);
 int dsend_packet_diplomacy_cancel_meeting_req(struct connection *pc, int counterpart);
 
-struct packet_diplomacy_cancel_meeting *receive_packet_diplomacy_cancel_meeting(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_cancel_meeting *receive_packet_diplomacy_cancel_meeting(struct connection *pc);
 int send_packet_diplomacy_cancel_meeting(struct connection *pc, const struct packet_diplomacy_cancel_meeting *packet);
 void lsend_packet_diplomacy_cancel_meeting(struct conn_list *dest, const struct packet_diplomacy_cancel_meeting *packet);
 int dsend_packet_diplomacy_cancel_meeting(struct connection *pc, int counterpart, int initiated_from);
 void dlsend_packet_diplomacy_cancel_meeting(struct conn_list *dest, int counterpart, int initiated_from);
 
-struct packet_diplomacy_create_clause_req *receive_packet_diplomacy_create_clause_req(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_create_clause_req *receive_packet_diplomacy_create_clause_req(struct connection *pc);
 int send_packet_diplomacy_create_clause_req(struct connection *pc, const struct packet_diplomacy_create_clause_req *packet);
 int dsend_packet_diplomacy_create_clause_req(struct connection *pc, int counterpart, int giver, enum clause_type type, int value);
 
-struct packet_diplomacy_create_clause *receive_packet_diplomacy_create_clause(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_create_clause *receive_packet_diplomacy_create_clause(struct connection *pc);
 int send_packet_diplomacy_create_clause(struct connection *pc, const struct packet_diplomacy_create_clause *packet);
 void lsend_packet_diplomacy_create_clause(struct conn_list *dest, const struct packet_diplomacy_create_clause *packet);
 int dsend_packet_diplomacy_create_clause(struct connection *pc, int counterpart, int giver, enum clause_type type, int value);
 void dlsend_packet_diplomacy_create_clause(struct conn_list *dest, int counterpart, int giver, enum clause_type type, int value);
 
-struct packet_diplomacy_remove_clause_req *receive_packet_diplomacy_remove_clause_req(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_remove_clause_req *receive_packet_diplomacy_remove_clause_req(struct connection *pc);
 int send_packet_diplomacy_remove_clause_req(struct connection *pc, const struct packet_diplomacy_remove_clause_req *packet);
 int dsend_packet_diplomacy_remove_clause_req(struct connection *pc, int counterpart, int giver, enum clause_type type, int value);
 
-struct packet_diplomacy_remove_clause *receive_packet_diplomacy_remove_clause(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_remove_clause *receive_packet_diplomacy_remove_clause(struct connection *pc);
 int send_packet_diplomacy_remove_clause(struct connection *pc, const struct packet_diplomacy_remove_clause *packet);
 void lsend_packet_diplomacy_remove_clause(struct conn_list *dest, const struct packet_diplomacy_remove_clause *packet);
 int dsend_packet_diplomacy_remove_clause(struct connection *pc, int counterpart, int giver, enum clause_type type, int value);
 void dlsend_packet_diplomacy_remove_clause(struct conn_list *dest, int counterpart, int giver, enum clause_type type, int value);
 
-struct packet_diplomacy_accept_treaty_req *receive_packet_diplomacy_accept_treaty_req(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_accept_treaty_req *receive_packet_diplomacy_accept_treaty_req(struct connection *pc);
 int send_packet_diplomacy_accept_treaty_req(struct connection *pc, const struct packet_diplomacy_accept_treaty_req *packet);
 int dsend_packet_diplomacy_accept_treaty_req(struct connection *pc, int counterpart);
 
-struct packet_diplomacy_accept_treaty *receive_packet_diplomacy_accept_treaty(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_accept_treaty *receive_packet_diplomacy_accept_treaty(struct connection *pc);
 int send_packet_diplomacy_accept_treaty(struct connection *pc, const struct packet_diplomacy_accept_treaty *packet);
 void lsend_packet_diplomacy_accept_treaty(struct conn_list *dest, const struct packet_diplomacy_accept_treaty *packet);
 int dsend_packet_diplomacy_accept_treaty(struct connection *pc, int counterpart, bool I_accepted, bool other_accepted);
 void dlsend_packet_diplomacy_accept_treaty(struct conn_list *dest, int counterpart, bool I_accepted, bool other_accepted);
 
-struct packet_diplomacy_cancel_pact *receive_packet_diplomacy_cancel_pact(struct connection *pc, enum packet_type type);
+struct packet_diplomacy_cancel_pact *receive_packet_diplomacy_cancel_pact(struct connection *pc);
 int send_packet_diplomacy_cancel_pact(struct connection *pc, const struct packet_diplomacy_cancel_pact *packet);
 int dsend_packet_diplomacy_cancel_pact(struct connection *pc, int other_player_id, enum clause_type clause);
 
-struct packet_page_msg *receive_packet_page_msg(struct connection *pc, enum packet_type type);
-int send_packet_page_msg(struct connection *pc, const struct packet_page_msg *packet);
-void lsend_packet_page_msg(struct conn_list *dest, const struct packet_page_msg *packet);
+struct packet_page_msg_old *receive_packet_page_msg_old(struct connection *pc);
+int send_packet_page_msg_old(struct connection *pc, const struct packet_page_msg_old *packet);
+void lsend_packet_page_msg_old(struct conn_list *dest, const struct packet_page_msg_old *packet);
 
-struct packet_report_req *receive_packet_report_req(struct connection *pc, enum packet_type type);
+struct packet_page_msg_new *receive_packet_page_msg_new(struct connection *pc);
+int send_packet_page_msg_new(struct connection *pc, const struct packet_page_msg_new *packet);
+void lsend_packet_page_msg_new(struct conn_list *dest, const struct packet_page_msg_new *packet);
+
+struct packet_page_msg_part *receive_packet_page_msg_part(struct connection *pc);
+int send_packet_page_msg_part(struct connection *pc, const struct packet_page_msg_part *packet);
+void lsend_packet_page_msg_part(struct conn_list *dest, const struct packet_page_msg_part *packet);
+
+struct packet_report_req *receive_packet_report_req(struct connection *pc);
 int send_packet_report_req(struct connection *pc, const struct packet_report_req *packet);
 int dsend_packet_report_req(struct connection *pc, enum report_type type);
 
-struct packet_conn_info *receive_packet_conn_info(struct connection *pc, enum packet_type type);
+struct packet_conn_info *receive_packet_conn_info(struct connection *pc);
 int send_packet_conn_info(struct connection *pc, const struct packet_conn_info *packet);
 void lsend_packet_conn_info(struct conn_list *dest, const struct packet_conn_info *packet);
 
-struct packet_conn_ping_info *receive_packet_conn_ping_info(struct connection *pc, enum packet_type type);
+struct packet_conn_ping_info *receive_packet_conn_ping_info(struct connection *pc);
 int send_packet_conn_ping_info(struct connection *pc, const struct packet_conn_ping_info *packet);
 void lsend_packet_conn_ping_info(struct conn_list *dest, const struct packet_conn_ping_info *packet);
 
-struct packet_conn_ping *receive_packet_conn_ping(struct connection *pc, enum packet_type type);
+struct packet_conn_ping *receive_packet_conn_ping(struct connection *pc);
 int send_packet_conn_ping(struct connection *pc);
 
-struct packet_conn_pong *receive_packet_conn_pong(struct connection *pc, enum packet_type type);
+struct packet_conn_pong *receive_packet_conn_pong(struct connection *pc);
 int send_packet_conn_pong(struct connection *pc);
 
-struct packet_client_info *receive_packet_client_info(struct connection *pc, enum packet_type type);
+struct packet_client_info *receive_packet_client_info(struct connection *pc);
 int send_packet_client_info(struct connection *pc, const struct packet_client_info *packet);
 
-struct packet_end_phase *receive_packet_end_phase(struct connection *pc, enum packet_type type);
+struct packet_end_phase *receive_packet_end_phase(struct connection *pc);
 int send_packet_end_phase(struct connection *pc);
 void lsend_packet_end_phase(struct conn_list *dest);
 
-struct packet_start_phase *receive_packet_start_phase(struct connection *pc, enum packet_type type);
+struct packet_start_phase *receive_packet_start_phase(struct connection *pc);
 int send_packet_start_phase(struct connection *pc, const struct packet_start_phase *packet);
 void lsend_packet_start_phase(struct conn_list *dest, const struct packet_start_phase *packet);
 int dsend_packet_start_phase(struct connection *pc, int phase);
 void dlsend_packet_start_phase(struct conn_list *dest, int phase);
 
-struct packet_new_year *receive_packet_new_year(struct connection *pc, enum packet_type type);
+struct packet_new_year *receive_packet_new_year(struct connection *pc);
 int send_packet_new_year(struct connection *pc, const struct packet_new_year *packet);
 void lsend_packet_new_year(struct conn_list *dest, const struct packet_new_year *packet);
 
-struct packet_begin_turn *receive_packet_begin_turn(struct connection *pc, enum packet_type type);
+struct packet_begin_turn *receive_packet_begin_turn(struct connection *pc);
 int send_packet_begin_turn(struct connection *pc);
 void lsend_packet_begin_turn(struct conn_list *dest);
 
-struct packet_end_turn *receive_packet_end_turn(struct connection *pc, enum packet_type type);
+struct packet_end_turn *receive_packet_end_turn(struct connection *pc);
 int send_packet_end_turn(struct connection *pc);
 void lsend_packet_end_turn(struct conn_list *dest);
 
-struct packet_freeze_client *receive_packet_freeze_client(struct connection *pc, enum packet_type type);
+struct packet_freeze_client *receive_packet_freeze_client(struct connection *pc);
 int send_packet_freeze_client(struct connection *pc);
 void lsend_packet_freeze_client(struct conn_list *dest);
 
-struct packet_thaw_client *receive_packet_thaw_client(struct connection *pc, enum packet_type type);
+struct packet_thaw_client *receive_packet_thaw_client(struct connection *pc);
 int send_packet_thaw_client(struct connection *pc);
 void lsend_packet_thaw_client(struct conn_list *dest);
 
-struct packet_spaceship_launch *receive_packet_spaceship_launch(struct connection *pc, enum packet_type type);
+struct packet_spaceship_launch *receive_packet_spaceship_launch(struct connection *pc);
 int send_packet_spaceship_launch(struct connection *pc);
 
-struct packet_spaceship_place *receive_packet_spaceship_place(struct connection *pc, enum packet_type type);
+struct packet_spaceship_place *receive_packet_spaceship_place(struct connection *pc);
 int send_packet_spaceship_place(struct connection *pc, const struct packet_spaceship_place *packet);
 int dsend_packet_spaceship_place(struct connection *pc, enum spaceship_place_type type, int num);
 
-struct packet_spaceship_info *receive_packet_spaceship_info(struct connection *pc, enum packet_type type);
+struct packet_spaceship_info *receive_packet_spaceship_info(struct connection *pc);
 int send_packet_spaceship_info(struct connection *pc, const struct packet_spaceship_info *packet);
 void lsend_packet_spaceship_info(struct conn_list *dest, const struct packet_spaceship_info *packet);
 
-struct packet_ruleset_unit *receive_packet_ruleset_unit(struct connection *pc, enum packet_type type);
+struct packet_ruleset_unit *receive_packet_ruleset_unit(struct connection *pc);
 int send_packet_ruleset_unit(struct connection *pc, const struct packet_ruleset_unit *packet);
 void lsend_packet_ruleset_unit(struct conn_list *dest, const struct packet_ruleset_unit *packet);
 
-struct packet_ruleset_game *receive_packet_ruleset_game(struct connection *pc, enum packet_type type);
+struct packet_ruleset_unit_bonus *receive_packet_ruleset_unit_bonus(struct connection *pc);
+int send_packet_ruleset_unit_bonus(struct connection *pc, const struct packet_ruleset_unit_bonus *packet);
+void lsend_packet_ruleset_unit_bonus(struct conn_list *dest, const struct packet_ruleset_unit_bonus *packet);
+
+struct packet_ruleset_unit_flag *receive_packet_ruleset_unit_flag(struct connection *pc);
+int send_packet_ruleset_unit_flag(struct connection *pc, const struct packet_ruleset_unit_flag *packet);
+void lsend_packet_ruleset_unit_flag(struct conn_list *dest, const struct packet_ruleset_unit_flag *packet);
+
+struct packet_ruleset_game *receive_packet_ruleset_game(struct connection *pc);
 int send_packet_ruleset_game(struct connection *pc, const struct packet_ruleset_game *packet);
 void lsend_packet_ruleset_game(struct conn_list *dest, const struct packet_ruleset_game *packet);
 
-struct packet_ruleset_specialist *receive_packet_ruleset_specialist(struct connection *pc, enum packet_type type);
+struct packet_ruleset_specialist *receive_packet_ruleset_specialist(struct connection *pc);
 int send_packet_ruleset_specialist(struct connection *pc, const struct packet_ruleset_specialist *packet);
 void lsend_packet_ruleset_specialist(struct conn_list *dest, const struct packet_ruleset_specialist *packet);
 
-struct packet_ruleset_government_ruler_title *receive_packet_ruleset_government_ruler_title(struct connection *pc, enum packet_type type);
+struct packet_ruleset_government_ruler_title *receive_packet_ruleset_government_ruler_title(struct connection *pc);
 int send_packet_ruleset_government_ruler_title(struct connection *pc, const struct packet_ruleset_government_ruler_title *packet);
 void lsend_packet_ruleset_government_ruler_title(struct conn_list *dest, const struct packet_ruleset_government_ruler_title *packet);
 
-struct packet_ruleset_tech *receive_packet_ruleset_tech(struct connection *pc, enum packet_type type);
+struct packet_ruleset_tech *receive_packet_ruleset_tech(struct connection *pc);
 int send_packet_ruleset_tech(struct connection *pc, const struct packet_ruleset_tech *packet);
 void lsend_packet_ruleset_tech(struct conn_list *dest, const struct packet_ruleset_tech *packet);
 
-struct packet_ruleset_government *receive_packet_ruleset_government(struct connection *pc, enum packet_type type);
+struct packet_ruleset_tech_flag *receive_packet_ruleset_tech_flag(struct connection *pc);
+int send_packet_ruleset_tech_flag(struct connection *pc, const struct packet_ruleset_tech_flag *packet);
+void lsend_packet_ruleset_tech_flag(struct conn_list *dest, const struct packet_ruleset_tech_flag *packet);
+
+struct packet_ruleset_government *receive_packet_ruleset_government(struct connection *pc);
 int send_packet_ruleset_government(struct connection *pc, const struct packet_ruleset_government *packet);
 void lsend_packet_ruleset_government(struct conn_list *dest, const struct packet_ruleset_government *packet);
 
-struct packet_ruleset_terrain_control *receive_packet_ruleset_terrain_control(struct connection *pc, enum packet_type type);
+struct packet_ruleset_terrain_control *receive_packet_ruleset_terrain_control(struct connection *pc);
 int send_packet_ruleset_terrain_control(struct connection *pc, const struct packet_ruleset_terrain_control *packet);
 void lsend_packet_ruleset_terrain_control(struct conn_list *dest, const struct packet_ruleset_terrain_control *packet);
 
-struct packet_ruleset_nation_groups *receive_packet_ruleset_nation_groups(struct connection *pc, enum packet_type type);
+struct packet_rulesets_ready *receive_packet_rulesets_ready(struct connection *pc);
+int send_packet_rulesets_ready(struct connection *pc);
+void lsend_packet_rulesets_ready(struct conn_list *dest);
+
+struct packet_ruleset_nation_sets *receive_packet_ruleset_nation_sets(struct connection *pc);
+int send_packet_ruleset_nation_sets(struct connection *pc, const struct packet_ruleset_nation_sets *packet);
+void lsend_packet_ruleset_nation_sets(struct conn_list *dest, const struct packet_ruleset_nation_sets *packet);
+
+struct packet_ruleset_nation_groups *receive_packet_ruleset_nation_groups(struct connection *pc);
 int send_packet_ruleset_nation_groups(struct connection *pc, const struct packet_ruleset_nation_groups *packet);
 void lsend_packet_ruleset_nation_groups(struct conn_list *dest, const struct packet_ruleset_nation_groups *packet);
 
-struct packet_ruleset_nation *receive_packet_ruleset_nation(struct connection *pc, enum packet_type type);
+struct packet_ruleset_nation *receive_packet_ruleset_nation(struct connection *pc);
 int send_packet_ruleset_nation(struct connection *pc, const struct packet_ruleset_nation *packet);
 void lsend_packet_ruleset_nation(struct conn_list *dest, const struct packet_ruleset_nation *packet);
 
-struct packet_ruleset_city *receive_packet_ruleset_city(struct connection *pc, enum packet_type type);
+struct packet_nation_availability *receive_packet_nation_availability(struct connection *pc);
+int send_packet_nation_availability(struct connection *pc, const struct packet_nation_availability *packet);
+void lsend_packet_nation_availability(struct conn_list *dest, const struct packet_nation_availability *packet);
+
+struct packet_ruleset_city *receive_packet_ruleset_city(struct connection *pc);
 int send_packet_ruleset_city(struct connection *pc, const struct packet_ruleset_city *packet);
 void lsend_packet_ruleset_city(struct conn_list *dest, const struct packet_ruleset_city *packet);
 
-struct packet_ruleset_building *receive_packet_ruleset_building(struct connection *pc, enum packet_type type);
+struct packet_ruleset_building *receive_packet_ruleset_building(struct connection *pc);
 int send_packet_ruleset_building(struct connection *pc, const struct packet_ruleset_building *packet);
 void lsend_packet_ruleset_building(struct conn_list *dest, const struct packet_ruleset_building *packet);
 
-struct packet_ruleset_terrain *receive_packet_ruleset_terrain(struct connection *pc, enum packet_type type);
+struct packet_ruleset_terrain *receive_packet_ruleset_terrain(struct connection *pc);
 int send_packet_ruleset_terrain(struct connection *pc, const struct packet_ruleset_terrain *packet);
 void lsend_packet_ruleset_terrain(struct conn_list *dest, const struct packet_ruleset_terrain *packet);
 
-struct packet_ruleset_unit_class *receive_packet_ruleset_unit_class(struct connection *pc, enum packet_type type);
+struct packet_ruleset_terrain_flag *receive_packet_ruleset_terrain_flag(struct connection *pc);
+int send_packet_ruleset_terrain_flag(struct connection *pc, const struct packet_ruleset_terrain_flag *packet);
+void lsend_packet_ruleset_terrain_flag(struct conn_list *dest, const struct packet_ruleset_terrain_flag *packet);
+
+struct packet_ruleset_unit_class *receive_packet_ruleset_unit_class(struct connection *pc);
 int send_packet_ruleset_unit_class(struct connection *pc, const struct packet_ruleset_unit_class *packet);
 void lsend_packet_ruleset_unit_class(struct conn_list *dest, const struct packet_ruleset_unit_class *packet);
 
-struct packet_ruleset_base *receive_packet_ruleset_base(struct connection *pc, enum packet_type type);
+struct packet_ruleset_base *receive_packet_ruleset_base(struct connection *pc);
 int send_packet_ruleset_base(struct connection *pc, const struct packet_ruleset_base *packet);
 void lsend_packet_ruleset_base(struct conn_list *dest, const struct packet_ruleset_base *packet);
 
-struct packet_ruleset_control *receive_packet_ruleset_control(struct connection *pc, enum packet_type type);
+struct packet_ruleset_road *receive_packet_ruleset_road(struct connection *pc);
+int send_packet_ruleset_road(struct connection *pc, const struct packet_ruleset_road *packet);
+void lsend_packet_ruleset_road(struct conn_list *dest, const struct packet_ruleset_road *packet);
+
+struct packet_ruleset_disaster *receive_packet_ruleset_disaster(struct connection *pc);
+int send_packet_ruleset_disaster(struct connection *pc, const struct packet_ruleset_disaster *packet);
+void lsend_packet_ruleset_disaster(struct conn_list *dest, const struct packet_ruleset_disaster *packet);
+
+struct packet_ruleset_trade *receive_packet_ruleset_trade(struct connection *pc);
+int send_packet_ruleset_trade(struct connection *pc, const struct packet_ruleset_trade *packet);
+void lsend_packet_ruleset_trade(struct conn_list *dest, const struct packet_ruleset_trade *packet);
+
+struct packet_ruleset_control *receive_packet_ruleset_control(struct connection *pc);
 int send_packet_ruleset_control(struct connection *pc, const struct packet_ruleset_control *packet);
 void lsend_packet_ruleset_control(struct conn_list *dest, const struct packet_ruleset_control *packet);
 
-struct packet_single_want_hack_req *receive_packet_single_want_hack_req(struct connection *pc, enum packet_type type);
+struct packet_single_want_hack_req *receive_packet_single_want_hack_req(struct connection *pc);
 int send_packet_single_want_hack_req(struct connection *pc, const struct packet_single_want_hack_req *packet);
 
-struct packet_single_want_hack_reply *receive_packet_single_want_hack_reply(struct connection *pc, enum packet_type type);
+struct packet_single_want_hack_reply *receive_packet_single_want_hack_reply(struct connection *pc);
 int send_packet_single_want_hack_reply(struct connection *pc, const struct packet_single_want_hack_reply *packet);
 int dsend_packet_single_want_hack_reply(struct connection *pc, bool you_have_hack);
 
-struct packet_ruleset_choices *receive_packet_ruleset_choices(struct connection *pc, enum packet_type type);
+struct packet_ruleset_choices *receive_packet_ruleset_choices(struct connection *pc);
 int send_packet_ruleset_choices(struct connection *pc, const struct packet_ruleset_choices *packet);
 
-struct packet_game_load *receive_packet_game_load(struct connection *pc, enum packet_type type);
+struct packet_game_load *receive_packet_game_load(struct connection *pc);
 int send_packet_game_load(struct connection *pc, const struct packet_game_load *packet);
 void lsend_packet_game_load(struct conn_list *dest, const struct packet_game_load *packet);
 int dsend_packet_game_load(struct connection *pc, bool load_successful, const char *load_filename);
 void dlsend_packet_game_load(struct conn_list *dest, bool load_successful, const char *load_filename);
 
-struct packet_server_setting_control *receive_packet_server_setting_control(struct connection *pc, enum packet_type type);
+struct packet_server_setting_control *receive_packet_server_setting_control(struct connection *pc);
 int send_packet_server_setting_control(struct connection *pc, const struct packet_server_setting_control *packet);
 
-struct packet_server_setting_const *receive_packet_server_setting_const(struct connection *pc, enum packet_type type);
+struct packet_server_setting_const *receive_packet_server_setting_const(struct connection *pc);
 int send_packet_server_setting_const(struct connection *pc, const struct packet_server_setting_const *packet);
 
-struct packet_server_setting_bool *receive_packet_server_setting_bool(struct connection *pc, enum packet_type type);
+struct packet_server_setting_bool *receive_packet_server_setting_bool(struct connection *pc);
 int send_packet_server_setting_bool(struct connection *pc, const struct packet_server_setting_bool *packet);
 
-struct packet_server_setting_int *receive_packet_server_setting_int(struct connection *pc, enum packet_type type);
+struct packet_server_setting_int *receive_packet_server_setting_int(struct connection *pc);
 int send_packet_server_setting_int(struct connection *pc, const struct packet_server_setting_int *packet);
 
-struct packet_server_setting_str *receive_packet_server_setting_str(struct connection *pc, enum packet_type type);
+struct packet_server_setting_str *receive_packet_server_setting_str(struct connection *pc);
 int send_packet_server_setting_str(struct connection *pc, const struct packet_server_setting_str *packet);
 
-struct packet_server_setting_enum *receive_packet_server_setting_enum(struct connection *pc, enum packet_type type);
+struct packet_server_setting_enum *receive_packet_server_setting_enum(struct connection *pc);
 int send_packet_server_setting_enum(struct connection *pc, const struct packet_server_setting_enum *packet);
 
-struct packet_server_setting_bitwise *receive_packet_server_setting_bitwise(struct connection *pc, enum packet_type type);
+struct packet_server_setting_bitwise *receive_packet_server_setting_bitwise(struct connection *pc);
 int send_packet_server_setting_bitwise(struct connection *pc, const struct packet_server_setting_bitwise *packet);
 
-struct packet_ruleset_effect *receive_packet_ruleset_effect(struct connection *pc, enum packet_type type);
+struct packet_ruleset_effect *receive_packet_ruleset_effect(struct connection *pc);
 int send_packet_ruleset_effect(struct connection *pc, const struct packet_ruleset_effect *packet);
 void lsend_packet_ruleset_effect(struct conn_list *dest, const struct packet_ruleset_effect *packet);
 
-struct packet_ruleset_effect_req *receive_packet_ruleset_effect_req(struct connection *pc, enum packet_type type);
+struct packet_ruleset_effect_req *receive_packet_ruleset_effect_req(struct connection *pc);
 int send_packet_ruleset_effect_req(struct connection *pc, const struct packet_ruleset_effect_req *packet);
 void lsend_packet_ruleset_effect_req(struct conn_list *dest, const struct packet_ruleset_effect_req *packet);
 
-struct packet_ruleset_resource *receive_packet_ruleset_resource(struct connection *pc, enum packet_type type);
+struct packet_ruleset_resource *receive_packet_ruleset_resource(struct connection *pc);
 int send_packet_ruleset_resource(struct connection *pc, const struct packet_ruleset_resource *packet);
 void lsend_packet_ruleset_resource(struct conn_list *dest, const struct packet_ruleset_resource *packet);
 
-struct packet_scenario_info *receive_packet_scenario_info(struct connection *pc, enum packet_type type);
+struct packet_scenario_info *receive_packet_scenario_info(struct connection *pc);
 int send_packet_scenario_info(struct connection *pc, const struct packet_scenario_info *packet);
 
-struct packet_save_scenario *receive_packet_save_scenario(struct connection *pc, enum packet_type type);
+struct packet_save_scenario *receive_packet_save_scenario(struct connection *pc);
 int send_packet_save_scenario(struct connection *pc, const struct packet_save_scenario *packet);
 int dsend_packet_save_scenario(struct connection *pc, const char *name);
 
-struct packet_vote_new *receive_packet_vote_new(struct connection *pc, enum packet_type type);
+struct packet_vote_new *receive_packet_vote_new(struct connection *pc);
 int send_packet_vote_new(struct connection *pc, const struct packet_vote_new *packet);
 
-struct packet_vote_update *receive_packet_vote_update(struct connection *pc, enum packet_type type);
+struct packet_vote_update *receive_packet_vote_update(struct connection *pc);
 int send_packet_vote_update(struct connection *pc, const struct packet_vote_update *packet);
 
-struct packet_vote_remove *receive_packet_vote_remove(struct connection *pc, enum packet_type type);
+struct packet_vote_remove *receive_packet_vote_remove(struct connection *pc);
 int send_packet_vote_remove(struct connection *pc, const struct packet_vote_remove *packet);
 
-struct packet_vote_resolve *receive_packet_vote_resolve(struct connection *pc, enum packet_type type);
+struct packet_vote_resolve *receive_packet_vote_resolve(struct connection *pc);
 int send_packet_vote_resolve(struct connection *pc, const struct packet_vote_resolve *packet);
 
-struct packet_vote_submit *receive_packet_vote_submit(struct connection *pc, enum packet_type type);
+struct packet_vote_submit *receive_packet_vote_submit(struct connection *pc);
 int send_packet_vote_submit(struct connection *pc, const struct packet_vote_submit *packet);
 
-struct packet_edit_mode *receive_packet_edit_mode(struct connection *pc, enum packet_type type);
+struct packet_edit_mode *receive_packet_edit_mode(struct connection *pc);
 int send_packet_edit_mode(struct connection *pc, const struct packet_edit_mode *packet);
 int dsend_packet_edit_mode(struct connection *pc, bool state);
 
-struct packet_edit_recalculate_borders *receive_packet_edit_recalculate_borders(struct connection *pc, enum packet_type type);
+struct packet_edit_recalculate_borders *receive_packet_edit_recalculate_borders(struct connection *pc);
 int send_packet_edit_recalculate_borders(struct connection *pc);
 
-struct packet_edit_check_tiles *receive_packet_edit_check_tiles(struct connection *pc, enum packet_type type);
+struct packet_edit_check_tiles *receive_packet_edit_check_tiles(struct connection *pc);
 int send_packet_edit_check_tiles(struct connection *pc);
 
-struct packet_edit_toggle_fogofwar *receive_packet_edit_toggle_fogofwar(struct connection *pc, enum packet_type type);
+struct packet_edit_toggle_fogofwar *receive_packet_edit_toggle_fogofwar(struct connection *pc);
 int send_packet_edit_toggle_fogofwar(struct connection *pc, const struct packet_edit_toggle_fogofwar *packet);
 int dsend_packet_edit_toggle_fogofwar(struct connection *pc, int player);
 
-struct packet_edit_tile_terrain *receive_packet_edit_tile_terrain(struct connection *pc, enum packet_type type);
+struct packet_edit_tile_terrain *receive_packet_edit_tile_terrain(struct connection *pc);
 int send_packet_edit_tile_terrain(struct connection *pc, const struct packet_edit_tile_terrain *packet);
 int dsend_packet_edit_tile_terrain(struct connection *pc, int tile, Terrain_type_id terrain, int size);
 
-struct packet_edit_tile_resource *receive_packet_edit_tile_resource(struct connection *pc, enum packet_type type);
+struct packet_edit_tile_resource *receive_packet_edit_tile_resource(struct connection *pc);
 int send_packet_edit_tile_resource(struct connection *pc, const struct packet_edit_tile_resource *packet);
 int dsend_packet_edit_tile_resource(struct connection *pc, int tile, Resource_type_id resource, int size);
 
-struct packet_edit_tile_special *receive_packet_edit_tile_special(struct connection *pc, enum packet_type type);
+struct packet_edit_tile_special *receive_packet_edit_tile_special(struct connection *pc);
 int send_packet_edit_tile_special(struct connection *pc, const struct packet_edit_tile_special *packet);
 int dsend_packet_edit_tile_special(struct connection *pc, int tile, enum tile_special_type special, bool remove, int size);
 
-struct packet_edit_tile_base *receive_packet_edit_tile_base(struct connection *pc, enum packet_type type);
+struct packet_edit_tile_base *receive_packet_edit_tile_base(struct connection *pc);
 int send_packet_edit_tile_base(struct connection *pc, const struct packet_edit_tile_base *packet);
 int dsend_packet_edit_tile_base(struct connection *pc, int tile, Base_type_id base_type_id, bool remove, int size);
 
-struct packet_edit_startpos *receive_packet_edit_startpos(struct connection *pc, enum packet_type type);
+struct packet_edit_tile_road *receive_packet_edit_tile_road(struct connection *pc);
+int send_packet_edit_tile_road(struct connection *pc, const struct packet_edit_tile_road *packet);
+int dsend_packet_edit_tile_road(struct connection *pc, int tile, Road_type_id road_type_id, bool remove, int size);
+
+struct packet_edit_startpos *receive_packet_edit_startpos(struct connection *pc);
 int send_packet_edit_startpos(struct connection *pc, const struct packet_edit_startpos *packet);
 int dsend_packet_edit_startpos(struct connection *pc, int id, bool remove, int tag);
 
-struct packet_edit_startpos_full *receive_packet_edit_startpos_full(struct connection *pc, enum packet_type type);
+struct packet_edit_startpos_full *receive_packet_edit_startpos_full(struct connection *pc);
 int send_packet_edit_startpos_full(struct connection *pc, const struct packet_edit_startpos_full *packet);
 
-struct packet_edit_tile *receive_packet_edit_tile(struct connection *pc, enum packet_type type);
+struct packet_edit_tile *receive_packet_edit_tile(struct connection *pc);
 int send_packet_edit_tile(struct connection *pc, const struct packet_edit_tile *packet);
 
-struct packet_edit_unit_create *receive_packet_edit_unit_create(struct connection *pc, enum packet_type type);
+struct packet_edit_unit_create *receive_packet_edit_unit_create(struct connection *pc);
 int send_packet_edit_unit_create(struct connection *pc, const struct packet_edit_unit_create *packet);
 int dsend_packet_edit_unit_create(struct connection *pc, int owner, int tile, Unit_type_id type, int count, int tag);
 
-struct packet_edit_unit_remove *receive_packet_edit_unit_remove(struct connection *pc, enum packet_type type);
+struct packet_edit_unit_remove *receive_packet_edit_unit_remove(struct connection *pc);
 int send_packet_edit_unit_remove(struct connection *pc, const struct packet_edit_unit_remove *packet);
 int dsend_packet_edit_unit_remove(struct connection *pc, int owner, int tile, Unit_type_id type, int count);
 
-struct packet_edit_unit_remove_by_id *receive_packet_edit_unit_remove_by_id(struct connection *pc, enum packet_type type);
+struct packet_edit_unit_remove_by_id *receive_packet_edit_unit_remove_by_id(struct connection *pc);
 int send_packet_edit_unit_remove_by_id(struct connection *pc, const struct packet_edit_unit_remove_by_id *packet);
 int dsend_packet_edit_unit_remove_by_id(struct connection *pc, int id);
 
-struct packet_edit_unit *receive_packet_edit_unit(struct connection *pc, enum packet_type type);
+struct packet_edit_unit *receive_packet_edit_unit(struct connection *pc);
 int send_packet_edit_unit(struct connection *pc, const struct packet_edit_unit *packet);
 
-struct packet_edit_city_create *receive_packet_edit_city_create(struct connection *pc, enum packet_type type);
+struct packet_edit_city_create *receive_packet_edit_city_create(struct connection *pc);
 int send_packet_edit_city_create(struct connection *pc, const struct packet_edit_city_create *packet);
 int dsend_packet_edit_city_create(struct connection *pc, int owner, int tile, int size, int tag);
 
-struct packet_edit_city_remove *receive_packet_edit_city_remove(struct connection *pc, enum packet_type type);
+struct packet_edit_city_remove *receive_packet_edit_city_remove(struct connection *pc);
 int send_packet_edit_city_remove(struct connection *pc, const struct packet_edit_city_remove *packet);
 int dsend_packet_edit_city_remove(struct connection *pc, int id);
 
-struct packet_edit_city *receive_packet_edit_city(struct connection *pc, enum packet_type type);
+struct packet_edit_city *receive_packet_edit_city(struct connection *pc);
 int send_packet_edit_city(struct connection *pc, const struct packet_edit_city *packet);
 
-struct packet_edit_player_create *receive_packet_edit_player_create(struct connection *pc, enum packet_type type);
+struct packet_edit_player_create *receive_packet_edit_player_create(struct connection *pc);
 int send_packet_edit_player_create(struct connection *pc, const struct packet_edit_player_create *packet);
 int dsend_packet_edit_player_create(struct connection *pc, int tag);
 
-struct packet_edit_player_remove *receive_packet_edit_player_remove(struct connection *pc, enum packet_type type);
+struct packet_edit_player_remove *receive_packet_edit_player_remove(struct connection *pc);
 int send_packet_edit_player_remove(struct connection *pc, const struct packet_edit_player_remove *packet);
 int dsend_packet_edit_player_remove(struct connection *pc, int id);
 
-struct packet_edit_player *receive_packet_edit_player(struct connection *pc, enum packet_type type);
+struct packet_edit_player *receive_packet_edit_player(struct connection *pc);
 int send_packet_edit_player(struct connection *pc, const struct packet_edit_player *packet);
 void lsend_packet_edit_player(struct conn_list *dest, const struct packet_edit_player *packet);
 
-struct packet_edit_player_vision *receive_packet_edit_player_vision(struct connection *pc, enum packet_type type);
+struct packet_edit_player_vision *receive_packet_edit_player_vision(struct connection *pc);
 int send_packet_edit_player_vision(struct connection *pc, const struct packet_edit_player_vision *packet);
 int dsend_packet_edit_player_vision(struct connection *pc, int player, int tile, bool known, int size);
 
-struct packet_edit_game *receive_packet_edit_game(struct connection *pc, enum packet_type type);
+struct packet_edit_game *receive_packet_edit_game(struct connection *pc);
 int send_packet_edit_game(struct connection *pc, const struct packet_edit_game *packet);
 
-struct packet_edit_object_created *receive_packet_edit_object_created(struct connection *pc, enum packet_type type);
+struct packet_edit_object_created *receive_packet_edit_object_created(struct connection *pc);
 int send_packet_edit_object_created(struct connection *pc, const struct packet_edit_object_created *packet);
 int dsend_packet_edit_object_created(struct connection *pc, int tag, int id);
 
@@ -2134,3 +2403,7 @@ int dsend_packet_edit_object_created(struct connection *pc, int tag, int id);
 void delta_stats_report(void);
 void delta_stats_reset(void);
 void *get_packet_from_connection_helper(struct connection *pc, enum packet_type type);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

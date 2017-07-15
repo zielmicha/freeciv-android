@@ -12,7 +12,7 @@
 ****************************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -28,16 +28,6 @@
 #include "base.h"
 
 static struct base_type base_types[MAX_BASE_TYPES];
-
-static const char *base_type_flag_names[] = {
-  "NoAggressive", "NoStackDeath",
-  "DiplomatDefense", "ParadropFrom", "NativeTile"
-};
-
-/* This must correspond to enum base_gui_type in base.h */
-static const char *base_gui_type_names[] = {
-  "Fortress", "Airbase", "Other"
-};
 
 /****************************************************************************
   Check if base provides effect
@@ -71,11 +61,12 @@ bool is_native_base_to_utype(const struct base_type *pbase,
 bool is_native_tile_to_base(const struct base_type *pbase,
                             const struct tile *ptile)
 {
-  /* FIXME: Bases cannot be built in a city currently?  It should be a
-   * a negative requirement in the ruleset. */
-  return (!tile_city(ptile)
-          && are_reqs_active(NULL, NULL, NULL, ptile,
-                             NULL, NULL, NULL, &pbase->reqs, RPT_POSSIBLE));
+  if (tile_city(ptile) != NULL && pbase->border_sq >= 0) {
+    return FALSE;
+  }
+
+  return are_reqs_active(NULL, NULL, NULL, ptile,
+                         NULL, NULL, NULL, &pbase->reqs, RPT_POSSIBLE);
 }
 
 /****************************************************************************
@@ -140,7 +131,23 @@ struct base_type *base_type_by_translated_name(const char *name)
 }
 
 /****************************************************************************
+  Is there base of the given type cardinally near tile?
+  (Does not check ptile itself.)
+****************************************************************************/
+bool is_base_card_near(const struct tile *ptile, const struct base_type *pbase)
+{
+  cardinal_adjc_iterate(ptile, adjc_tile) {
+    if (tile_has_base(adjc_tile, pbase)) {
+      return TRUE;
+    }
+  } cardinal_adjc_iterate_end;
+
+  return FALSE;
+}
+
+/****************************************************************************
   Is there base of the given type near tile?
+  (Does not check ptile itself.)
 ****************************************************************************/
 bool is_base_near_tile(const struct tile *ptile, const struct base_type *pbase)
 {
@@ -156,11 +163,11 @@ bool is_base_near_tile(const struct tile *ptile, const struct base_type *pbase)
 /**************************************************************************
   Can unit build base to given tile?
 **************************************************************************/
-bool can_build_base(const struct unit *punit, const struct base_type *pbase,
-                    const struct tile *ptile)
+static bool base_can_be_built(const struct base_type *pbase,
+                              const struct tile *ptile)
 {
-  if (tile_city(ptile)) {
-    /* Bases cannot be built inside cities */
+  if (tile_terrain(ptile)->base_time == 0) {
+    /* Bases cannot be built on this terrain. */
     return FALSE;
   }
 
@@ -174,29 +181,41 @@ bool can_build_base(const struct unit *punit, const struct base_type *pbase,
     return FALSE;
   }
 
+  if (tile_city(ptile) != NULL && pbase->border_sq >= 0) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/****************************************************************************
+  Tells if player can build base to tile with suitable unit.
+****************************************************************************/
+bool player_can_build_base(const struct base_type *pbase,
+                           const struct player *pplayer,
+                           const struct tile *ptile)
+{
+  if (!base_can_be_built(pbase, ptile)) {
+    return FALSE;
+  }
+  return are_reqs_active(pplayer, NULL, NULL, ptile,
+                         NULL, NULL, NULL, &pbase->reqs, RPT_POSSIBLE);
+}
+
+/**************************************************************************
+  Can unit build base to given tile?
+**************************************************************************/
+bool can_build_base(const struct unit *punit, const struct base_type *pbase,
+                    const struct tile *ptile)
+{
+  if (!base_can_be_built(pbase, ptile)) {
+    return FALSE;
+  }
   return are_reqs_active(unit_owner(punit), NULL, NULL, ptile,
                          unit_type(punit), NULL, NULL, &pbase->reqs,
                          RPT_CERTAIN);
 }
 
-/**************************************************************************
-  Convert base flag names to enum; case insensitive;
-  returns BF_LAST if can't match.
-**************************************************************************/
-enum base_flag_id base_flag_from_str(const char *s)
-{
-  enum base_flag_id i;
-
-  fc_assert_ret_val(ARRAY_SIZE(base_type_flag_names) == BF_LAST, BF_LAST);
-
-  for(i = 0; i < BF_LAST; i++) {
-    if (fc_strcasecmp(base_type_flag_names[i], s)==0) {
-      return i;
-    }
-  }
-  return BF_LAST;
-}
-  
 /****************************************************************************
   Returns base_type entry for an ID value.
 ****************************************************************************/
@@ -287,25 +306,6 @@ void base_types_free(void)
 }
 
 /**************************************************************************
-  Convert base gui type names to enum; case insensitive;
-  returns BASE_GUI_LAST if can't match.
-**************************************************************************/
-enum base_gui_type base_gui_type_from_str(const char *s)
-{
-  enum base_gui_type i;
-
-  fc_assert_ret_val(ARRAY_SIZE(base_gui_type_names) == BASE_GUI_LAST,
-                    BASE_GUI_LAST);
-
-  for(i = 0; i < BASE_GUI_LAST; i++) {
-    if (fc_strcasecmp(base_gui_type_names[i], s)==0) {
-      return i;
-    }
-  }
-  return BASE_GUI_LAST;
-}
-
-/**************************************************************************
   Get best gui_type base for given parameters
 **************************************************************************/
 struct base_type *get_base_by_gui_type(enum base_gui_type type,
@@ -340,4 +340,12 @@ bool can_bases_coexist(const struct base_type *base1, const struct base_type *ba
 bool territory_claiming_base(const struct base_type *pbase)
 {
   return pbase->border_sq >= 0;
+}
+
+/**************************************************************************
+  Who owns bases on tile
+**************************************************************************/
+struct player *base_owner(const struct tile *ptile)
+{
+  return tile_owner(ptile);
 }

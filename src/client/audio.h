@@ -13,6 +13,10 @@
 #ifndef FC__AUDIO_H
 #define FC__AUDIO_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include "support.h"            /* bool type */
 
 #define MAX_AUDIO_NAME_LEN		20
@@ -40,6 +44,7 @@ void audio_real_init(const char *const spec_name,
 void audio_add_plugin(struct audio_plugin *p);
 void audio_shutdown(void);
 void audio_stop(void);
+void audio_restart(const char *soundset_name);
 
 void audio_play_sound(const char *const tag, char *const alt_tag);
 void audio_play_music(const char *const tag, char *const alt_tag);
@@ -50,4 +55,8 @@ void audio_set_volume(double volume);
 bool audio_select_plugin(const char *const name);
 const char *audio_get_all_plugin_names(void);
 
-#endif				/* FC__AUDIO_H */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* FC__AUDIO_H */

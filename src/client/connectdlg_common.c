@@ -1,17 +1,17 @@
-/********************************************************************** 
+/***********************************************************************
 Freeciv - Copyright (C) 2004 - The Freeciv Project
    This program is free software; you can redistribute it and / or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2, or (at your option)
    any later version.
 
-   This program is distributed in the hope that it will be useful, 
+   This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-***********************************************************************/ 
+***********************************************************************/
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <fcntl.h>
@@ -19,6 +19,15 @@ Freeciv - Copyright (C) 2004 - The Freeciv Project
 #include <signal.h>             /* SIGTERM and kill */
 #include <string.h>
 #include <time.h>
+
+/* Must be before <windows.h> */
+#ifdef HAVE_WINSOCK
+#ifdef HAVE_WINSOCK2
+#include <winsock2.h>
+#else  /* HAVE_WINSOCK2 */
+#include <winsock.h>
+#endif /* HAVE_WINSOCK2 */
+#endif /* HAVE_WINSOCK */
 
 #ifdef WIN32_NATIVE
 #include <windows.h>
@@ -36,7 +45,8 @@ Freeciv - Copyright (C) 2004 - The Freeciv Project
 #include <sys/wait.h>
 #endif
 
-/* common & utility */
+/* utility */
+#include "astring.h"
 #include "capability.h"
 #include "fciconv.h"
 #include "fcintl.h"
@@ -46,6 +56,7 @@ Freeciv - Copyright (C) 2004 - The Freeciv Project
 #include "netintf.h"
 #include "rand.h"
 #include "registry.h"
+#include "shared.h"
 #include "support.h"
 
 /* client */
@@ -61,14 +72,20 @@ Freeciv - Copyright (C) 2004 - The Freeciv Project
 
 #define WAIT_BETWEEN_TRIES 100000 /* usecs */ 
 #define NUMBER_OF_TRIES 500
-  
-#ifdef WIN32_NATIVE
-/* FIXME: this is referenced directly in gui-win32/connectdlg.c. */
+
+#if defined(HAVE_WORKING_FORK) && !defined(WIN32_NATIVE)
+/* We are yet to see WIN32_NATIVE setup where even HAVE_WORKING_FORK would
+ * mean fork() that actually works for us. */
+#define HAVE_USABLE_FORK
+#endif
+
+#ifdef HAVE_USABLE_FORK
+static pid_t server_pid = -1;
+#elif WIN32_NATIVE
 HANDLE server_process = INVALID_HANDLE_VALUE;
 HANDLE loghandle = INVALID_HANDLE_VALUE;
-#else
-static pid_t server_pid = - 1;
 #endif
+bool server_quitting = FALSE;
 
 static char challenge_fullname[MAX_LEN_PATH];
 static bool client_has_hack = FALSE;
@@ -80,11 +97,11 @@ The general chain of events:
 
 Two distinct paths are taken depending on the choice of mode: 
 
-if the user selects the multi- player mode, then a packet_req_join_game 
+if the user selects the multi- player mode, then a packet_req_join_game
 packet is sent to the server. It is either successful or not. The end.
 
-If the user selects a single- player mode (either a new game or a save game) 
-then: 
+If the user selects a single- player mode (either a new game or a save game)
+then:
    1. the packet_req_join_game is sent.
    2. on receipt, if we can join, then a challenge packet is sent to the
       server, so we can get hack level control.
@@ -92,27 +109,32 @@ then:
       we can, then:
       a. for a new game, we send a series of packet_generic_message packets
          with commands to start the game.
-      b. for a saved game, we send the load command with a 
+      b. for a saved game, we send the load command with a
          packet_generic_message, then we send a PACKET_PLAYER_LIST_REQUEST.
          the response to this request will tell us if the game was loaded or
          not. if not, then we send another load command. if so, then we send
-         a series of packet_generic_message packets with commands to start 
+         a series of packet_generic_message packets with commands to start
          the game.
-**************************************************************************/ 
+**************************************************************************/
 
-/************************************************************************** 
-Tests if the client has started the server.
-**************************************************************************/ 
-bool is_server_running()
-{ 
-#ifdef WIN32_NATIVE
-  return (server_process != INVALID_HANDLE_VALUE);
-#else    
+/**************************************************************************
+  Tests if the client has started the server.
+**************************************************************************/
+bool is_server_running(void)
+{
+  if (server_quitting) {
+    return FALSE;
+  }
+#ifdef HAVE_USABLE_FORK
   return (server_pid > 0);
+#elif WIN32_NATIVE
+  return (server_process != INVALID_HANDLE_VALUE);
+#else
+  return FALSE; /* We've been unable to start one! */
 #endif
-} 
+}
 
-/************************************************************************** 
+/**************************************************************************
   Returns TRUE if the client has hack access.
 **************************************************************************/
 bool can_client_access_hack(void)
@@ -129,13 +151,39 @@ bool can_client_access_hack(void)
 ****************************************************************************/
 void client_kill_server(bool force)
 {
+#ifdef HAVE_USABLE_FORK
+  if (server_quitting && server_pid > 0) {
+    /* Already asked to /quit.
+     * If it didn't do that, kill it. */
+    if (waitpid(server_pid, NULL, WUNTRACED) <= 0) {
+      kill(server_pid, SIGTERM);
+      waitpid(server_pid, NULL, WUNTRACED);
+    }
+    server_pid = -1;
+    server_quitting = FALSE;
+  }
+#elif WIN32_NATIVE
+  if (server_quitting && server_process != INVALID_HANDLE_VALUE) {
+    /* Already asked to /quit.
+     * If it didn't do that, kill it. */
+    TerminateProcess(server_process, 0);
+    CloseHandle(server_process);
+    if (loghandle != INVALID_HANDLE_VALUE) {
+      CloseHandle(loghandle);
+    }
+    server_process = INVALID_HANDLE_VALUE;
+    loghandle = INVALID_HANDLE_VALUE;
+    server_quitting = FALSE;
+  }
+#endif /* WIN32_NATIVE || HAVE_USABLE_FORK */
+
   if (is_server_running()) {
-    if (client.conn.used) {
+    if (client.conn.used && client_has_hack) {
       /* This does a "soft" shutdown of the server by sending a /quit.
        *
        * This is useful when closing the client or disconnecting because it
        * doesn't kill the server prematurely.  In particular, killing the
-       * server in the middle of a save can have disasterous results.  This
+       * server in the middle of a save can have disastrous results.  This
        * method tells the server to quit on its own.  This is safer from a
        * game perspective, but more dangerous because if the kill fails the
        * server will be left running.
@@ -144,16 +192,16 @@ void client_kill_server(bool force)
        * it could potentially be called when we're connected to an unowned
        * server.  In this case we don't want to kill it. */
       send_chat("/quit");
-#ifdef WIN32_NATIVE
-      server_process = INVALID_HANDLE_VALUE;
-      loghandle = INVALID_HANDLE_VALUE;
-#else
-      server_pid = -1;
-#endif
+      server_quitting = TRUE;
     } else if (force) {
-      /* Looks like we've already disconnected.  So the only thing to do
-       * is a "hard" kill of the server. */
-#ifdef WIN32_NATIVE
+      /* Either we already disconnected, or we didn't get control of the
+       * server. In either case, the only thing to do is a "hard" kill of
+       * the server. */
+#ifdef HAVE_USABLE_FORK
+      kill(server_pid, SIGTERM);
+      waitpid(server_pid, NULL, WUNTRACED);
+      server_pid = -1;
+#elif WIN32_NATIVE
       TerminateProcess(server_process, 0);
       CloseHandle(server_process);
       if (loghandle != INVALID_HANDLE_VALUE) {
@@ -161,69 +209,91 @@ void client_kill_server(bool force)
       }
       server_process = INVALID_HANDLE_VALUE;
       loghandle = INVALID_HANDLE_VALUE;
-#elif HAVE_WORKING_FORK
-      kill(server_pid, SIGTERM);
-      waitpid(server_pid, NULL, WUNTRACED);
-      server_pid = -1;
-#endif
+#endif /* WIN32_NATIVE || HAVE_USABLE_FORK */
+      server_quitting = FALSE;
     }
   }
   client_has_hack = FALSE;
 }   
 
-/**************************************************************** 
-forks a server if it can. returns FALSE is we find we couldn't start
-the server.
-*****************************************************************/ 
+/****************************************************************
+  Forks a server if it can. Returns FALSE if we find we
+  couldn't start the server.
+*****************************************************************/
 bool client_start_server(void)
 {
-#if !defined(HAVE_WORKING_FORK) && !defined(WIN32_NATIVE)
+#if !defined(HAVE_USABLE_FORK) && !defined(WIN32_NATIVE)
   /* Can't do much without fork */
   return FALSE;
-#else /* HAVE_WORKING_FORK || WIN32_NATIVE */
+#else /* HAVE_USABLE_FORK || WIN32_NATIVE */
   char buf[512];
   int connect_tries = 0;
-# ifdef WIN32_NATIVE
+#if !defined(HAVE_USABLE_FORK)
+  /* Above also implies that this is WIN32_NATIVE ->
+   * Win32 that can't use fork() */
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
 
   char savesdir[MAX_LEN_PATH];
   char scensdir[MAX_LEN_PATH];
   char options[512];
+#ifdef DEBUG
   char cmdline1[512];
   char cmdline2[512];
+#endif /* DEBUG */
   char cmdline3[512];
   char cmdline4[512];
   char logcmdline[512];
   char scriptcmdline[512];
+  char savefilecmdline[512];
   char savescmdline[512];
   char scenscmdline[512];
-# endif /* WIN32_NATIVE */
+#endif /* !HAVE_USABLE_FORK -> WIN32_NATIVE */
+
+#ifdef IPV6_SUPPORT
+  enum fc_addr_family family = FC_ADDR_ANY;
+#else
+  enum fc_addr_family family = FC_ADDR_IPV4;
+#endif /* IPV6_SUPPORT */
 
   /* only one server (forked from this client) shall be running at a time */
   /* This also resets client_has_hack. */
   client_kill_server(TRUE);
-  
-  output_window_append(ftc_client, _("Starting server..."));
 
-  /* find a free port */ 
-  internal_server_port = find_next_free_port(DEFAULT_SOCK_PORT);
+  output_window_append(ftc_client, _("Starting local server..."));
 
-# ifdef HAVE_WORKING_FORK
-  server_pid = fork();
-  
-  if (server_pid == 0) {
-    int fd, argc = 0;
-    const int max_nargs = 16;
-    char *argv[max_nargs + 1], port_buf[32];
+  /* find a free port */
+  /* Mitigate the risk of ending up with the port already
+   * used by standalone server on Windows where this is known to be buggy
+   * by not starting from DEFAULT_SOCK_PORT but from one higher. */
+  internal_server_port = find_next_free_port(DEFAULT_SOCK_PORT + 1,
+                                             DEFAULT_SOCK_PORT + 1 + 10000,
+                                             family, "localhost", TRUE);
 
-    /* inside the child */
+  if (internal_server_port < 0) {
+    output_window_append(ftc_client, _("Couldn't start the server."));
+    output_window_append(ftc_client,
+                         _("You'll have to start one manually. Sorry..."));
+    return FALSE;
+  }
+
+#ifdef HAVE_USABLE_FORK
+  {
+    int argc = 0;
+    const int max_nargs = 22;
+    char *argv[max_nargs + 1];
+    char port_buf[32];
+    char dbg_lvl_buf[32]; /* Do not move this inside the block where it gets filled,
+                           * it's needed via the argv[x] pointer later on, so must
+                           * remain in scope. */
 
     /* Set up the command-line parameters. */
     fc_snprintf(port_buf, sizeof(port_buf), "%d", internal_server_port);
     argv[argc++] = "freeciv-server";
     argv[argc++] = "-p";
     argv[argc++] = port_buf;
+    argv[argc++] = "--bind";
+    argv[argc++] = "localhost";
     argv[argc++] = "-q";
     argv[argc++] = "1";
     argv[argc++] = "-e";
@@ -231,9 +301,15 @@ bool client_start_server(void)
     argv[argc++] = "~/.freeciv/saves";
     argv[argc++] = "--scenarios";
     argv[argc++] = "~/.freeciv/scenarios";
+    argv[argc++] = "-A";
+    argv[argc++] = "none";
     if (logfile) {
+      enum log_level llvl = log_get_level();
+
       argv[argc++] = "--debug";
-      argv[argc++] = "3";
+      /* Use of LOG_DEBUG would require limiting also the logged files. */
+      fc_snprintf(dbg_lvl_buf, sizeof(dbg_lvl_buf), "%d", llvl < LOG_DEBUG ? llvl : LOG_DEBUG - 1);
+      argv[argc++] = dbg_lvl_buf;
       argv[argc++] = "--log";
       argv[argc++] = logfile;
     }
@@ -241,52 +317,76 @@ bool client_start_server(void)
       argv[argc++] = "--read";
       argv[argc++] = scriptfile;
     }
+    if (savefile) {
+      argv[argc++] = "--file";
+      argv[argc++] = savefile;
+    }
     argv[argc] = NULL;
     fc_assert(argc <= max_nargs);
 
-    /* avoid terminal spam, but still make server output available */ 
-    fclose(stdout);
-    fclose(stderr);
-
-    /* FIXME: include the port to avoid duplication? */
-    if (logfile) {
-      fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
-
-      if (fd != 1) {
-        dup2(fd, 1);
+    {
+      struct astring options = ASTRING_INIT;
+      int i;
+      for (i = 1; i < argc; i++) {
+        astr_add(&options, i == 1 ? "%s" : " %s", argv[i]);
       }
-      if (fd != 2) {
-        dup2(fd, 2);
-      }
-      fchmod(1, 0644);
+      log_verbose("Arguments to spawned server: %s",
+                  astr_str(&options));
+      astr_free(&options);
     }
 
-    /* If it's still attatched to our terminal, things get messed up, 
-      but freeciv-server needs *something* */ 
-    fclose(stdin);
-    fd = open("/dev/null", O_RDONLY);
-    if (fd != 0) {
-      dup2(fd, 0);
-    }
+    server_pid = fork();
+    server_quitting = FALSE;
 
-    /* these won't return on success */
+    if (server_pid == 0) {
+      int fd;
+
+      /* inside the child */
+
+      /* avoid terminal spam, but still make server output available */ 
+      fclose(stdout);
+      fclose(stderr);
+
+      /* FIXME: include the port to avoid duplication? */
+      if (logfile) {
+        fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+
+        if (fd != 1) {
+          dup2(fd, 1);
+        }
+        if (fd != 2) {
+          dup2(fd, 2);
+        }
+        fchmod(1, 0644);
+      }
+
+      /* If it's still attatched to our terminal, things get messed up, 
+        but freeciv-server needs *something* */ 
+      fclose(stdin);
+      fd = open("/dev/null", O_RDONLY);
+      if (fd != 0) {
+        dup2(fd, 0);
+      }
+
+      /* these won't return on success */
 #ifdef DEBUG
-    /* Search under current directory (what ever that happens to be)
-     * only in debug builds. This allows running freeciv directly from build
-     * tree, but could be considered security risk in release builds. */
-    execvp("./ser", argv);
-    execvp("./server/freeciv-server", argv);
+      /* Search under current directory (what ever that happens to be)
+       * only in debug builds. This allows running freeciv directly from build
+       * tree, but could be considered security risk in release builds. */
+      execvp("./fcser", argv);
+      execvp("./server/freeciv-server", argv);
 #endif /* DEBUG */
-    execvp(BINDIR "/freeciv-server", argv);
-    execvp("freeciv-server", argv);
+      execvp(BINDIR "/freeciv-server", argv);
+      execvp("freeciv-server", argv);
 
-    /* This line is only reached if freeciv-server cannot be started, 
-     * so we kill the forked process.
-     * Calling exit here is dangerous due to X11 problems (async replies) */ 
-    _exit(1);
-  } 
-# else /* HAVE_WORKING_FORK */
-#  ifdef WIN32_NATIVE
+      /* This line is only reached if freeciv-server cannot be started, 
+       * so we kill the forked process.
+       * Calling exit here is dangerous due to X11 problems (async replies) */ 
+      _exit(1);
+    } 
+  }
+#else /* HAVE_USABLE_FORK */
+#ifdef WIN32_NATIVE
   if (logfile) {
     loghandle = CreateFile(logfile, GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -304,13 +404,17 @@ bool client_start_server(void)
   /* Set up the command-line parameters. */
   logcmdline[0] = 0;
   scriptcmdline[0] = 0;
+  savefilecmdline[0] = 0;
 
   /* the server expects command line arguments to be in local encoding */ 
   if (logfile) {
     char *logfile_in_local_encoding =
         internal_to_local_string_malloc(logfile);
+    enum log_level llvl = log_get_level();
 
-    fc_snprintf(logcmdline, sizeof(logcmdline), " --debug 3 --log %s",
+    fc_snprintf(logcmdline, sizeof(logcmdline), " --debug %d --log %s",
+                /* Use of LOG_DEBUG would require limiting also the logged files. */
+                llvl < LOG_DEBUG ? llvl : LOG_DEBUG - 1,
                 logfile_in_local_encoding);
     free(logfile_in_local_encoding);
   }
@@ -322,6 +426,14 @@ bool client_start_server(void)
                 scriptfile_in_local_encoding);
     free(scriptfile_in_local_encoding);
   }
+  if (savefile) {
+    char *savefile_in_local_encoding =
+        internal_to_local_string_malloc(savefile);
+
+    fc_snprintf(savefilecmdline, sizeof(savefilecmdline),  " --file %s",
+                savefile_in_local_encoding);
+    free(savefile_in_local_encoding);
+  }
 
   interpret_tilde(savesdir, sizeof(savesdir), "~/.freeciv/saves");
   internal_to_local_string_buffer(savesdir, savescmdline, sizeof(savescmdline));
@@ -330,12 +442,15 @@ bool client_start_server(void)
   internal_to_local_string_buffer(scensdir, scenscmdline, sizeof(scenscmdline));
 
   fc_snprintf(options, sizeof(options),
-              "-p %d -q 1 -e%s%s --saves \"%s\" --scenarios \"%s\"",
-              internal_server_port, logcmdline, scriptcmdline, savescmdline,
-              scenscmdline);
-  fc_snprintf(cmdline1, sizeof(cmdline1), "./ser %s", options);
+              "-p %d --bind localhost -q 1 -e%s%s%s --saves \"%s\" "
+              "--scenarios \"%s\" -A none",
+              internal_server_port, logcmdline, scriptcmdline, savefilecmdline,
+              savescmdline, scenscmdline);
+#ifdef DEBUG
+  fc_snprintf(cmdline1, sizeof(cmdline1), "./fcser %s", options);
   fc_snprintf(cmdline2, sizeof(cmdline2),
               "./server/freeciv-server %s", options);
+#endif /* DEBUG */
   fc_snprintf(cmdline3, sizeof(cmdline3),
               BINDIR "/freeciv-server %s", options);
   fc_snprintf(cmdline4, sizeof(cmdline4),
@@ -357,29 +472,39 @@ bool client_start_server(void)
       && !CreateProcess(NULL, cmdline4, NULL, NULL, TRUE,
                         DETACHED_PROCESS | NORMAL_PRIORITY_CLASS,
                         NULL, NULL, &si, &pi)) {
+    log_error("Failed to start server process.");
+#ifdef DEBUG
+    log_verbose("Tried with commandline: '%s'", cmdline1);
+    log_verbose("Tried with commandline: '%s'", cmdline2);
+#endif /* DEBUG */
+    log_verbose("Tried with commandline: '%s'", cmdline3);
+    log_verbose("Tried with commandline: '%s'", cmdline4);
     output_window_append(ftc_client, _("Couldn't start the server."));
     output_window_append(ftc_client,
                          _("You'll have to start one manually. Sorry..."));
     return FALSE;
   }
 
+  log_verbose("Arguments to spawned server: %s", options);
+
   server_process = pi.hProcess;
 
-#  endif /* WIN32_NATIVE */
-# endif /* HAVE_WORKING_FORK */
- 
+#endif /* WIN32_NATIVE */
+#endif /* HAVE_USABLE_FORK */
+
   /* a reasonable number of tries */ 
   while (connect_to_server(user_name, "localhost", internal_server_port, 
                            buf, sizeof(buf)) == -1) {
     fc_usleep(WAIT_BETWEEN_TRIES);
-#ifdef HAVE_WORKING_FORK
+#ifdef HAVE_USABLE_FORK
 #ifndef WIN32_NATIVE
     if (waitpid(server_pid, NULL, WNOHANG) != 0) {
       break;
     }
 #endif /* WIN32_NATIVE */
-#endif /* HAVE_WORKING_FORK */
+#endif /* HAVE_USABLE_FORK */
     if (connect_tries++ > NUMBER_OF_TRIES) {
+      log_error("Last error from connect attempts: '%s'", buf);
       break;
     }
   }
@@ -390,11 +515,13 @@ bool client_start_server(void)
     /* possible that server is still running. kill it */ 
     client_kill_server(TRUE);
 
+    log_error("Failed to connect to spawned server!");
     output_window_append(ftc_client, _("Couldn't connect to the server."));
     output_window_append(ftc_client,
                          _("We probably couldn't start it from here."));
     output_window_append(ftc_client,
                          _("You'll have to start one manually. Sorry..."));
+
     return FALSE;
   }
 
@@ -431,7 +558,7 @@ bool client_start_server(void)
   }
 
   return TRUE;
-#endif /* HAVE_WORKING_FORK || WIN32_NATIVE */
+#endif /* HAVE_USABLE_FORK || WIN32_NATIVE */
 }
 
 /*************************************************************************
@@ -449,22 +576,6 @@ static void randomize_string(char *str, size_t n)
   str[i] = '\0';
 }
 
-/*************************************************************************
-  returns TRUE if a filename is safe (i.e. doesn't have path components).
-*************************************************************************/
-static bool is_filename_safe(const char *filename)
-{
-  const char *unsafe = "/\\";
-  const char *s;
-
-  for (s = filename; *s != '\0'; s++) {
-    if (strchr(unsafe, *s)) {
-      return FALSE;
-    }
-  }
-  return TRUE;
-}
-
 /**************************************************************** 
 if the client is capable of 'wanting hack', then the server will 
 send the client a filename in the packet_join_game_reply packet.
@@ -479,7 +590,7 @@ void send_client_wants_hack(const char *filename)
     struct packet_single_want_hack_req req;
     struct section_file *file;
 
-    if (!is_filename_safe(filename)) {
+    if (!is_safe_filename(filename)) {
       return;
     }
 
@@ -529,7 +640,7 @@ void handle_single_want_hack_reply(bool you_have_hack)
     output_window_append(ftc_client,
                          _("Failed to obtain the required access "
                            "level to take control of the server. "
-                           "The server will now be shutdown."));
+                           "Attempting to shut down server."));
     client_kill_server(TRUE);
   }
 }
@@ -537,7 +648,7 @@ void handle_single_want_hack_reply(bool you_have_hack)
 /**************************************************************** 
 send server command to save game.
 *****************************************************************/ 
-void send_save_game(char *filename)
+void send_save_game(const char *filename)
 {   
   if (filename) {
     send_chat_printf("/save %s", filename);

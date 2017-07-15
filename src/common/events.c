@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -66,11 +66,11 @@ static const char *event_sections[] = {
 };
 
 #define GEN_EV(event, section, descr) { #event, NULL, section, descr, NULL, event }
-#define GEN_EV_TERMINATOR { NULL, NULL, E_S_XYZZY, NULL, NULL, 0 }
 
 /*
  * Holds information about all event types. The entries don't have
  * to be sorted.
+ * Every E_* event defined in common/events.h should have an entry here.
  */
 static struct {
   const char *enum_name;
@@ -112,6 +112,7 @@ static struct {
   GEN_EV(E_CITY_RADIUS_SQ,	E_S_CITY,	N_("City Map changed")),
   GEN_EV(E_WORKLIST,		E_S_CITY,	N_("Worklist Events")),
   GEN_EV(E_CITY_PRODUCTION_CHANGED, E_S_CITY,	N_("Production changed")),
+  GEN_EV(E_DISASTER,            E_S_CITY,       N_("Disaster")),
   GEN_EV(E_MY_DIPLOMAT_BRIBE,		E_S_D_ME,	N_("Bribe")),
   GEN_EV(E_DIPLOMATIC_INCIDENT,		E_S_D_ME,	N_("Caused Incident")),
   GEN_EV(E_MY_DIPLOMAT_ESCAPE,		E_S_D_ME,	N_("Escape")),
@@ -198,7 +199,8 @@ static struct {
   GEN_EV(E_SCRIPT,		E_S_XYZZY,	N_("Scenario/ruleset script message")),
   /* TRANS: Event name for when the game year changes. */
   GEN_EV(E_NEXT_YEAR,		E_S_XYZZY,	N_("Year Advance")),
-  GEN_EV_TERMINATOR
+  /* The sound system also generates "e_game_quit", although there's no
+   * corresponding identifier E_GAME_QUIT. */
 };
 
 
@@ -206,9 +208,9 @@ static struct {
  * Maps from enum event_type to indexes of events[]. Set by
  * events_init. 
  */
-static int event_to_index[E_LAST];
+static int event_to_index[E_COUNT];
 
-enum event_type sorted_events[E_LAST];
+enum event_type sorted_events[E_COUNT];
 
 
 /**************************************************************************
@@ -216,7 +218,7 @@ enum event_type sorted_events[E_LAST];
 **************************************************************************/
 const char *get_event_message_text(enum event_type event)
 {
-  fc_assert_ret_val(event >= 0 && event < E_LAST, NULL);
+  fc_assert_ret_val(event_type_is_valid(event), NULL);
 
   if (events[event_to_index[event]].event == event) {
     return events[event_to_index[event]].full_descr;
@@ -245,11 +247,7 @@ static int compar_event_message_texts(const void *i1, const void *i2)
 ****************************************************************************/
 const char *get_event_sound_tag(enum event_type event)
 {
-  if (event < 0 || event >= E_LAST) {
-    return NULL;
-  }
-
-  fc_assert_ret_val(event >= 0 && event < E_LAST, NULL);
+  fc_assert_ret_val(event_type_is_valid(event), NULL);
 
   if (events[event_to_index[event]].event == event) {
     return events[event_to_index[event]].tag_name;
@@ -304,12 +302,12 @@ bool is_city_event(enum event_type event)
 void events_init(void)
 {
   int i;
-  
+
   for (i = 0; i < ARRAY_SIZE(event_to_index); i++) {
     event_to_index[i] = 0;
   }
 
-  for (i = 0; events[i].enum_name; i++) {
+  for (i = 0; i < E_COUNT; i++) {
     int j;
 
     if (E_S_XYZZY > events[i].esn) {
@@ -336,11 +334,12 @@ void events_init(void)
               events[i].descr_orig, events[i].full_descr);
   }
 
-  for (i = 0; i < E_LAST; i++)  {
+  for (i = 0; i <= event_type_max(); i++) {
+    /* Initialise sorted list of all (even possble missing) events. */
     sorted_events[i] = i;
   }
-  qsort(sorted_events, E_LAST, sizeof(*sorted_events),
-	compar_event_message_texts);
+  qsort(sorted_events, event_type_max() + 1, sizeof(*sorted_events),
+        compar_event_message_texts);
 }
 
 /****************************************************************************
@@ -350,7 +349,7 @@ void events_free(void)
 {
   int i;
 
-  for (i = 0; events[i].enum_name; i++) {
+  for (i = 0; i <= event_type_max(); i++) {
     if (E_S_XYZZY > events[i].esn) {
       /* We have allocated memory for this event */
       free(events[i].full_descr);

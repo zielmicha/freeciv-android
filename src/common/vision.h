@@ -13,6 +13,10 @@
 #ifndef FC__VISION_H
 #define FC__VISION_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include "fc_types.h"
 
 #include "improvement.h"		/* bv_imprs */
@@ -110,26 +114,34 @@ bool vision_reveal_tiles(struct vision *vision, bool reveal_tiles);
  */
 struct vision_site {
   char name[MAX_LEN_NAME];
-  struct tile *location;		/* Cannot be NULL */
-  struct player *owner;			/* May be NULL, always check! */
+  struct tile *location; /* Cannot be NULL */
+  struct player *owner;  /* May be NULL, always check! */
 
-  int identity;				/* city > IDENTITY_NUMBER_ZERO */
-  int size;				/* city size */
+  int identity;          /* city > IDENTITY_NUMBER_ZERO */
+  citizens size;         /* city size (0 <= size <= MAX_CITY_SIZE) */
 
   bool occupied;
   bool walls;
   bool happy;
   bool unhappy;
+  int city_image;
 
   bv_imprs improvements;
 };
 
-#define vision_owner(v) ((v)->owner)
-void free_vision_site(struct vision_site *psite);
-struct vision_site *create_vision_site(int identity, struct tile *location,
-				       struct player *owner);
-struct vision_site *create_vision_site_from_city(const struct city *pcity);
-void update_vision_site_from_city(struct vision_site *psite,
-				  const struct city *pcity);
+#define vision_site_owner(v) ((v)->owner)
+void vision_site_destroy(struct vision_site *psite);
+struct vision_site *vision_site_new(int identity, struct tile *location,
+                                    struct player *owner);
+struct vision_site *vision_site_new_from_city(const struct city *pcity);
+void vision_site_update_from_city(struct vision_site *psite,
+                                  const struct city *pcity);
+
+citizens vision_site_size_get(const struct vision_site *psite);
+void vision_site_size_set(struct vision_site *psite, citizens size);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__VISION_H */

@@ -12,10 +12,13 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdlib.h>
+
+/* gui main header */
+#include "gui_stub.h"
 
 #include "cityrep.h"
 

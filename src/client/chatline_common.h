@@ -13,6 +13,10 @@
 #ifndef FC__CHATLINE_COMMON_H
 #define FC__CHATLINE_COMMON_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "support.h"            /* bool type */
 
@@ -33,7 +37,16 @@ void output_window_printf(const struct ft_color color,
 void output_window_event(const char *plain_text,
                          const struct text_tag_list *tags, int conn_id);
 
-void chat_welcome_message(void);
+void chat_welcome_message(bool gui_has_copying_mitem);
 void write_chatline_content(const char *txt);
+
+void fc_allocate_ow_mutex(void);
+void fc_release_ow_mutex(void);
+void fc_init_ow_mutex(void);
+void fc_destroy_ow_mutex(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__CHATLINE_COMMON_H */

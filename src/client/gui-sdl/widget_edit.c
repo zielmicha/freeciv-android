@@ -12,10 +12,10 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 
 /* gui-sdl */
 #include "colors.h"
@@ -108,7 +108,7 @@ static int redraw_edit_chain(struct EDIT *pEdt)
       putline(pEdt->pWidget->dst->surface,
               Dest.x - 1, Dest.y + (pEdt->pBg->h / 8),
               Dest.x - 1, Dest.y + pEdt->pBg->h - (pEdt->pBg->h / 4),
-              get_game_colorRGB(COLOR_THEME_EDITFIELD_CARET));
+              get_theme_color(COLOR_THEME_EDITFIELD_CARET));
       /* save active element position */
       pEdt->InputChain_X = Dest_Copy.x;
     }
@@ -558,22 +558,20 @@ INPUT:/* add new element of chain (and move cursor right) */
         pEdt->pInputChain->prev->chr[0] = Key.unicode;        
 	pEdt->pInputChain->prev->chr[1] = '\0';
 
-	if (pEdt->pInputChain->prev->chr) {
-	  if (get_wflags(pEdt->pWidget) & WF_PASSWD_EDIT) {
-	    Uint16 passwd_chr[2] = {'*', '\0'};
-	    
-	    pEdt->pInputChain->prev->pTsurf =
-	      TTF_RenderUNICODE_Blended(pEdt->pWidget->string16->font,
-					  passwd_chr,
-					  pEdt->pWidget->string16->fgcol);
-	  } else {
-	    pEdt->pInputChain->prev->pTsurf =
-	      TTF_RenderUNICODE_Blended(pEdt->pWidget->string16->font,
-					  pEdt->pInputChain->prev->chr,
-					  pEdt->pWidget->string16->fgcol);
-	  }
-	  pEdt->Truelength += pEdt->pInputChain->prev->pTsurf->w;
-	}
+        if (get_wflags(pEdt->pWidget) & WF_PASSWD_EDIT) {
+          Uint16 passwd_chr[2] = {'*', '\0'};
+
+          pEdt->pInputChain->prev->pTsurf =
+            TTF_RenderUNICODE_Blended(pEdt->pWidget->string16->font,
+                                      passwd_chr,
+                                      pEdt->pWidget->string16->fgcol);
+        } else {
+          pEdt->pInputChain->prev->pTsurf =
+            TTF_RenderUNICODE_Blended(pEdt->pWidget->string16->font,
+                                      pEdt->pInputChain->prev->chr,
+                                      pEdt->pWidget->string16->fgcol);
+        }
+        pEdt->Truelength += pEdt->pInputChain->prev->pTsurf->w;
 
 	if (pEdt->InputChain_X >= pEdt->pWidget->size.x + pEdt->pBg->w - adj_size(10)) {
 	  if (pEdt->pInputChain == pEdt->pEndTextChain) {
@@ -640,7 +638,6 @@ enum Edit_Return_Codes edit_field(struct widget *pEdit_Widget)
   /* Creating Chain */
   pEdt.pBeginTextChain = text2chain(pEdit_Widget->string16->text);
 
-
   /* Creating Empty (Last) pice of Chain */
   pEdt.pInputChain = &___last;
   pEdt.pEndTextChain = pEdt.pInputChain;
@@ -667,10 +664,18 @@ enum Edit_Return_Codes edit_field(struct widget *pEdit_Widget)
     while (TRUE) {
       pEdt.ChainLen++;
 
-      pInputChain_TMP->pTsurf =
-	  TTF_RenderUNICODE_Blended(pEdit_Widget->string16->font,
-				    pInputChain_TMP->chr,
-				    pEdit_Widget->string16->fgcol);
+      if (get_wflags(pEdit_Widget) & WF_PASSWD_EDIT) {
+        const Uint16 passwd_chr[2] = {'*', '\0'};
+        pInputChain_TMP->pTsurf =
+            TTF_RenderUNICODE_Blended(pEdit_Widget->string16->font,
+                                      passwd_chr,
+                                      pEdit_Widget->string16->fgcol);
+      } else {
+        pInputChain_TMP->pTsurf =
+            TTF_RenderUNICODE_Blended(pEdit_Widget->string16->font,
+                                      pInputChain_TMP->chr,
+                                      pEdit_Widget->string16->fgcol);
+      }
 
       pEdt.Truelength += pInputChain_TMP->pTsurf->w;
 

@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -32,6 +32,7 @@
 #include "timing.h"
 
 /* common */
+#include "game.h"
 #include "government.h"		/* government_graphic() */
 #include "map.h"
 #include "player.h"
@@ -92,15 +93,21 @@ void update_turn_done_button(bool do_restore)
 }
 
 /**************************************************************************
-...
+  Timeout label requires refreshing
 **************************************************************************/
 void update_timeout_label(void)
 {
   gtk_label_set_text(GTK_LABEL(timeout_label), get_timeout_label_text());
+
+  if (client_current_turn_timeout() > 0) {
+    gtk_widget_set_tooltip_text(timeout_label, _("Time to forced turn change"));
+  } else {
+    gtk_widget_set_tooltip_text(timeout_label, _("Turn timeout disabled"));
+  }
 }
 
 /**************************************************************************
-...
+  Refresh info label
 **************************************************************************/
 void update_info_label(void)
 {
@@ -172,23 +179,20 @@ void update_info_label(void)
   update_timeout_label();
 
   /* update tooltips. */
-  gtk_tooltips_set_tip(main_tips, econ_ebox,
+  gtk_widget_set_tooltip_text(econ_ebox,
 		       _("Shows your current luxury/science/tax rates; "
-			 "click to toggle them."), "");
+			 "click to toggle them."));
 
-  gtk_tooltips_set_tip(main_tips, bulb_ebox, get_bulb_tooltip(), "");
-  gtk_tooltips_set_tip(main_tips, sun_ebox, get_global_warming_tooltip(),
-		       "");
-  gtk_tooltips_set_tip(main_tips, flake_ebox, get_nuclear_winter_tooltip(),
-		       "");
-  gtk_tooltips_set_tip(main_tips, government_ebox, get_government_tooltip(),
-		       "");
+  gtk_widget_set_tooltip_text(bulb_ebox, get_bulb_tooltip());
+  gtk_widget_set_tooltip_text(sun_ebox, get_global_warming_tooltip());
+  gtk_widget_set_tooltip_text(flake_ebox, get_nuclear_winter_tooltip());
+  gtk_widget_set_tooltip_text(government_ebox, get_government_tooltip());
 }
 
 /**************************************************************************
   This function is used to animate the mouse cursor. 
 **************************************************************************/
-static gint anim_cursor_cb(gpointer data)
+static gboolean anim_cursor_cb(gpointer data)
 {
   if (!cursor_timer_id) {
     return FALSE;
@@ -218,7 +222,7 @@ void update_mouse_cursor(enum cursor_type new_cursor_type)
 {
   cursor_type = new_cursor_type;
   if (!cursor_timer_id) {
-    cursor_timer_id = gtk_timeout_add(CURSOR_INTERVAL, anim_cursor_cb, NULL);
+    cursor_timer_id = g_timeout_add(CURSOR_INTERVAL, anim_cursor_cb, NULL);
   }
 }
 
@@ -248,7 +252,7 @@ void update_unit_info_label(struct unit_list *punits)
 
 
 /**************************************************************************
-...
+  Get sprite for treaty acceptance or rejection.
 **************************************************************************/
 GdkPixbuf *get_thumb_pixbuf(int onoff)
 {
@@ -286,7 +290,7 @@ void get_overview_area_dimensions(int *width, int *height)
 }
 
 /**************************************************************************
-...
+  Size of overview changed
 **************************************************************************/
 void overview_size_changed(void)
 {
@@ -308,7 +312,7 @@ struct canvas *get_overview_window(void)
 }
 
 /**************************************************************************
-...
+  Overview canvas exposed
 **************************************************************************/
 gboolean overview_canvas_expose(GtkWidget *w, GdkEventExpose *ev, gpointer data)
 {
@@ -367,7 +371,7 @@ gboolean map_canvas_configure(GtkWidget *w, GdkEventConfigure *ev,
 }
 
 /**************************************************************************
-...
+  Map canvas exposed
 **************************************************************************/
 gboolean map_canvas_expose(GtkWidget *w, GdkEventExpose *ev, gpointer data)
 {
@@ -404,14 +408,15 @@ static GdkRectangle dirty_rects[MAX_DIRTY_RECTS];
 static bool is_flush_queued = FALSE;
 
 /**************************************************************************
-  A callback invoked as a result of gtk_idle_add, this function simply
+  A callback invoked as a result of g_idle_add, this function simply
   flushes the mapview canvas.
 **************************************************************************/
-static gint unqueue_flush(gpointer data)
+static gboolean unqueue_flush(gpointer data)
 {
   flush_dirty();
   is_flush_queued = FALSE;
-  return 0;
+
+  return FALSE;
 }
 
 /**************************************************************************
@@ -422,7 +427,7 @@ static gint unqueue_flush(gpointer data)
 static void queue_flush(void)
 {
   if (!is_flush_queued) {
-    gtk_idle_add(unqueue_flush, NULL);
+    g_idle_add(unqueue_flush, NULL);
     is_flush_queued = TRUE;
   }
 }
@@ -502,7 +507,7 @@ void update_city_descriptions(void)
 }
 
 /**************************************************************************
-...
+  Fill pixcomm with unit gfx
 **************************************************************************/
 void put_unit_gpixmap(struct unit *punit, GtkPixcomm *p)
 {
@@ -536,14 +541,15 @@ void put_unit_gpixmap_city_overlays(struct unit *punit, GtkPixcomm *p,
 
   gtk_pixcomm_freeze(p);
 
-  put_unit_city_overlays(punit, &store, 0, tileset_tile_height(tileset),
+  put_unit_city_overlays(punit, &store, 0,
+                         tileset_unit_layout_offset_y(tileset),
                          upkeep_cost, happy_cost);
 
   gtk_pixcomm_thaw(p);
 }
 
 /**************************************************************************
-...
+  Put overlay tile to pixmap
 **************************************************************************/
 void pixmap_put_overlay_tile(GdkDrawable *pixmap,
 			     int canvas_x, int canvas_y,
@@ -615,7 +621,7 @@ static void pixmap_put_sprite(GdkDrawable *pixmap,
     log_debug("%5d / %5d pixbufs = %d%%",
               pixbufs, sprites, 100 * pixbufs / sprites);
   }
-#endif
+#endif /* DEBUG */
 }
 
 /**************************************************************************
@@ -761,7 +767,7 @@ void update_overview_scroll_window_pos(int x, int y)
 }
 
 /**************************************************************************
-...
+  Refresh map canvas scrollbars
 **************************************************************************/
 void update_map_canvas_scrollbars(void)
 {
@@ -773,7 +779,7 @@ void update_map_canvas_scrollbars(void)
 }
 
 /**************************************************************************
-...
+  Refresh map canvas scrollbar as canvas size changes
 **************************************************************************/
 void update_map_canvas_scrollbars_size(void)
 {
@@ -799,7 +805,7 @@ void update_map_canvas_scrollbars_size(void)
 }
 
 /**************************************************************************
-...
+  Scrollbar has moved
 **************************************************************************/
 void scrollbar_jump_callback(GtkAdjustment *adj, gpointer hscrollbar)
 {
@@ -869,7 +875,6 @@ void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h)
 **************************************************************************/
 void tileset_changed(void)
 {
-  science_report_dialog_redraw();
   reset_city_dialogs();
   reset_unit_table();
   blank_max_unit_size();
@@ -880,4 +885,6 @@ void tileset_changed(void)
   gtk_window_set_icon(GTK_WINDOW(toplevel),
 		sprite_get_pixbuf(get_icon_sprite(tileset, ICON_FREECIV)));
 #endif
+
+  science_report_dialog_redraw();
 }

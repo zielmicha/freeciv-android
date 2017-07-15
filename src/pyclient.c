@@ -124,7 +124,7 @@ const char* get_unit_name(const struct unit* u) {
 }
 
 struct sprite* get_unit_image(const struct unit* u) {
-    return get_unittype_sprite(tileset, unit_type(u));
+    return get_unittype_sprite(tileset, unit_type(u), direction8_invalid(), TRUE);
 }
 
 void authenticate(const char* password) {
@@ -391,7 +391,7 @@ struct sprite* city_get_production_image(struct city* pCity) {
     int kind = pCity->production.kind;
     if(kind == VUT_UTYPE) {
         struct unit_type *pUnitType = pCity->production.value.utype;
-        return get_unittype_sprite(tileset, pUnitType);
+        return get_unittype_sprite(tileset, pUnitType, direction8_invalid(), TRUE);
     } else {
         struct impr_type *pImprove = pCity->production.value.building;
         return get_building_sprite(tileset, pImprove);
@@ -447,7 +447,7 @@ int get_playable_nation_count() {
   int playable_nation_count = 0;
 
   nations_iterate(pnation) {
-    if (pnation->is_playable && !pnation->player && pnation->is_available)
+    if (pnation->is_playable && !pnation->player && is_nation_pickable(pnation))
       ++playable_nation_count;
   } nations_iterate_end;
 
@@ -554,7 +554,7 @@ PyObject* get_buildable_units_in_city(struct city* pCity) {
 
             PyList_Append(list, Py_BuildValue(
                 "lisiii(iii)O", (long)un, VUT_UTYPE, name, turns, stock, cost,
-                attack, defense, moves, (PyObject*)get_unittype_sprite(tileset, un)
+                attack, defense, moves, (PyObject*)get_unittype_sprite(tileset, un, direction8_invalid(), TRUE)
             ));
         }
 
@@ -833,7 +833,7 @@ static void py_setup_const() {
     PY_SETUP_CONST(SPY_SABOTAGE_UNIT);
     PY_SETUP_CONST(DIPLOMAT_ANY_ACTION);
 
-    PY_SETUP_CONST(F_SPY);
+    PY_SETUP_CONST(UTYF_SPY);
     PY_SETUP_CONST(B_LAST);
     PY_SETUP_CONST(A_UNSET);
     PY_SETUP_CONST(INCITE_IMPOSSIBLE_COST);

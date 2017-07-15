@@ -1,7 +1,11 @@
 ## Process this file with automake to produce Makefile.in
 
 noinst_LTLIBRARIES = libgui-gtk2.la
-AM_CPPFLAGS = -I. -I$(srcdir)/.. -I$(srcdir)/../include -I$(top_srcdir)/utility -I$(top_srcdir)/common -I$(top_srcdir)/common/aicore -I$(srcdir)/../agents $(GUI_gtk2_CFLAGS) $(SOUND_CFLAGS) $(GGZ_GTK_INCLUDES)
+AM_CPPFLAGS = -I. -I$(srcdir)/.. -I$(srcdir)/../include \
+	-I$(top_srcdir)/utility -I$(top_srcdir)/common \
+	-I$(top_srcdir)/common/aicore -I$(top_srcdir)/common/scriptcore \
+	-I$(srcdir)/../agents  -I$(srcdir)/../luascript \
+	$(gui_gtk2_cflags) $(GGZ_GTK_INCLUDES) $(SOUND_CFLAGS)
 
 # The AM_CPPFLAGS "-I." is so resources.c includes the locally generated 
 # Freeciv.h in the builddir, in preference to the one 
@@ -28,6 +32,8 @@ libgui_gtk2_la_SOURCES = \
 	chatline.c	\
 	choice_dialog.c	\
 	choice_dialog.h \
+	citizensinfo.c	\
+	citizensinfo.h	\
 	citydlg.c	\
 	citydlg.h	\
 	cityrep.c	\
@@ -69,6 +75,8 @@ libgui_gtk2_la_SOURCES = \
 	inputdlg.h	\
 	inteldlg.c	\
 	inteldlg.h	\
+	luaconsole.c	\
+	luaconsole.h	\
 	mapctrl.c	\
 	mapctrl.h	\
 	mapview.c	\
@@ -90,6 +98,7 @@ libgui_gtk2_la_SOURCES = \
 	repodlgs.h	\
 	resources.c	\
 	resources.h	\
+	soundset_dlg.c	\
 	spaceshipdlg.c	\
 	spaceshipdlg.h  \
 	sprite.c	\
@@ -97,10 +106,11 @@ libgui_gtk2_la_SOURCES = \
 	theme_dlg.c	\
 	themes.c	\
 	tileset_dlg.c	\
+	unitselect.h	\
+	unitselect.c	\
 	voteinfo_bar.c	\
 	voteinfo_bar.h	\
 	wldlg.c		\
 	wldlg.h	
 
 libgui_gtk2_la_LIBADD = -lm
-

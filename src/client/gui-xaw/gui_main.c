@@ -13,11 +13,21 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #ifdef AUDIO_SDL
-#include "SDL.h"
+/* Though it would happily compile without this include,
+ * it is needed for sound to work as long as SDL-1.2 mixer is
+ * being used. It defines "main" macro to rename our main() so that
+ * it can install SDL's own. */
+#ifdef AUDIO_SDL1_2
+/* SDL */
+#include <SDL/SDL.h>
+#else  /* AUDIO_SDL1_2 */
+/* SDL2 */
+#include <SDL2/SDL.h>
+#endif /* AUDIO_SDL1_2 */
 #endif
 
 #include <stdio.h>
@@ -54,6 +64,7 @@
 #include "version.h"
 
 /* client */
+#include "chatline_common.h"
 #include "client_main.h"
 #include "climisc.h"
 #include "clinet.h"
@@ -245,28 +256,32 @@ static int myerr(Display *p, XErrorEvent *e)
 static void print_usage(const char *argv0)
 {
   /* add client-specific usage information here */
-  fc_fprintf(stderr, _("This client has no special command line options\n\n"));
+  fc_fprintf(stderr,
+            _("This client accepts the standard X toolkit command-line options\n"
+              "after '--'. See the X(7) man page.\n\n"));
+
 
   /* TRANS: No full stop after the URL, could cause confusion. */
   fc_fprintf(stderr, _("Report bugs at %s\n"), BUG_URL);
 }
 
 /**************************************************************************
-...
+  Parse and enact any client-specific options.
 **************************************************************************/
 static void parse_options(int argc, char **argv)
 {
-  int i;
+  int i = 1;
 
-  i = 1;
-  while (i < argc)
-  {
-    if (is_option("--help", argv[i]))
-    {
+  while (i < argc) {
+    if (is_option("--help", argv[i])) {
       print_usage(argv[0]);
       exit(EXIT_SUCCESS);
+    } else {
+      fc_fprintf(stderr, _("Unrecognized option: \"%s\"\n"), argv[i]);
+      exit(EXIT_FAILURE);
     }
-    i += 1;
+
+    i++;
   }
 }
 
@@ -312,13 +327,14 @@ int main(int argc, char **argv)
 void ui_main(int argc, char *argv[])
 {
   int i;
-  struct sprite *icon; 
+  struct sprite *icon;
+  const char *rev_ver;
 
   parse_options(argc, argv);
 
   /* include later - pain to see the warning at every run */
   XtSetLanguageProc(NULL, NULL, NULL);
-  
+
   toplevel = XtVaAppInitialize(
 	       &app_context,               /* Application context */
 	       "Freeciv",                  /* application class name */
@@ -339,7 +355,7 @@ void ui_main(int argc, char *argv[])
 /*  XSynchronize(display, 1); 
   XSetErrorHandler(myerr);*/
 
-  if(appResources.version==NULL)  {
+  if (appResources.version == NULL)  {
     log_fatal(_("No version number in resources."));
     log_fatal(_("You probably have an old (circa V1.0)"
                 " Freeciv resource file somewhere."));
@@ -348,7 +364,7 @@ void ui_main(int argc, char *argv[])
 
   /* TODO: Use capabilities here instead of version numbers */
   if (0 != strncmp(appResources.version, VERSION_STRING,
-		   strlen(appResources.version))) {
+                   strlen(appResources.version))) {
     log_fatal(_("Game version does not match Resource version."));
     log_fatal(_("Game version: %s - Resource version: %s"),
               VERSION_STRING, appResources.version);
@@ -356,19 +372,19 @@ void ui_main(int argc, char *argv[])
                 " in /usr/lib/X11/app-defaults"));
     exit(EXIT_FAILURE);
   }
-  
-  if(!appResources.gotAppDefFile) {
+
+  if (!appResources.gotAppDefFile) {
     log_normal(_("Using fallback resources - which is OK"));
   }
 
   display = XtDisplay(toplevel);
-  screen_number=XScreenNumberOfScreen(XtScreen(toplevel));
-  display_depth=DefaultDepth(display, screen_number);
-  root_window=DefaultRootWindow(display);
+  screen_number = XScreenNumberOfScreen(XtScreen(toplevel));
+  display_depth = DefaultDepth(display, screen_number);
+  root_window = DefaultRootWindow(display);
 
-  display_color_type=get_visual(); 
-  
-  if(display_color_type!=COLOR_DISPLAY) {
+  display_color_type = get_visual();
+
+  if (display_color_type != COLOR_DISPLAY) {
     log_fatal(_("Only color displays are supported for now..."));
     /*    exit(EXIT_FAILURE); */
   }
@@ -403,8 +419,8 @@ void ui_main(int argc, char *argv[])
     values.foreground = get_color(tileset, COLOR_MAPVIEW_CITYTEXT)->color.pixel;
     values.background = get_color(tileset, COLOR_MAPVIEW_UNKNOWN)->color.pixel;
     font_gc= XCreateGC(display, root_window, 
-		       GCForeground|GCBackground|GCGraphicsExposures, 
-		       &values);
+                       GCForeground|GCBackground|GCGraphicsExposures, 
+                       &values);
 
     prod_font_set = XCreateFontSet(display, city_productions_font_name,
 	&missing_charset_list_return,
@@ -422,8 +438,8 @@ void ui_main(int argc, char *argv[])
     values.foreground = get_color(tileset, COLOR_MAPVIEW_CITYTEXT)->color.pixel;
     values.background = get_color(tileset, COLOR_MAPVIEW_UNKNOWN)->color.pixel;
     prod_font_gc= XCreateGC(display, root_window,
-			    GCForeground|GCBackground|GCGraphicsExposures,
-			    &values);
+                            GCForeground|GCBackground|GCGraphicsExposures,
+                            &values);
 
     values.line_width = BORDER_WIDTH;
     values.line_style = LineOnOffDash;
@@ -431,33 +447,33 @@ void ui_main(int argc, char *argv[])
     values.join_style = JoinMiter;
     values.fill_style = FillSolid;
     border_line_gc = XCreateGC(display, root_window,
-			       GCGraphicsExposures|GCLineWidth|GCLineStyle
-			       |GCCapStyle|GCJoinStyle|GCFillStyle, &values);
+                               GCGraphicsExposures|GCLineWidth|GCLineStyle
+                               |GCCapStyle|GCJoinStyle|GCFillStyle, &values);
 
     values.foreground = 0;
     values.background = 0;
     fill_bg_gc= XCreateGC(display, root_window, 
-			  GCForeground|GCBackground|GCGraphicsExposures,
-			  &values);
+                          GCForeground|GCBackground|GCGraphicsExposures,
+                          &values);
 
-    values.fill_style=FillStippled;
-    fill_tile_gc= XCreateGC(display, root_window, 
-    			    GCForeground|GCBackground|GCFillStyle|GCGraphicsExposures,
-			    &values);
+    values.fill_style = FillStippled;
+    fill_tile_gc = XCreateGC(display, root_window, 
+                             GCForeground|GCBackground|GCFillStyle|GCGraphicsExposures,
+                             &values);
   }
 
   {
-    char d1[]={0x03,0x0c,0x03,0x0c};
-    char d2[]={0x08,0x02,0x08,0x02};
+    char d1[] = {0x03,0x0c,0x03,0x0c};
+    char d2[] = {0x08,0x02,0x08,0x02};
     gray50 = XCreateBitmapFromData(display, root_window, d1, 4, 4);
     gray25 = XCreateBitmapFromData(display, root_window, d2, 4, 4);
   }
-  
+
   /* 135 below is rough value (could be more intelligent) --dwp */
   num_units_below = 135 / tileset_full_tile_width(tileset);
-  num_units_below = MIN(num_units_below,MAX_NUM_UNITS_BELOW);
-  num_units_below = MAX(num_units_below,1);
-  
+  num_units_below = MIN(num_units_below, MAX_NUM_UNITS_BELOW);
+  num_units_below = MAX(num_units_below, 1);
+
   /* do setup_widgets before loading the rest of graphics to ensure that
      setup_widgets() has enough colors available:  (on 256-colour systems)
   */
@@ -478,15 +494,15 @@ void ui_main(int argc, char *argv[])
 
   /* Do this outside setup_widgets() so after tiles are loaded */
   fill_econ_label_pixmaps();
-		
-  XtAddCallback(map_horizontal_scrollbar, XtNjumpProc, 
-		scrollbar_jump_callback, NULL);
-  XtAddCallback(map_vertical_scrollbar, XtNjumpProc, 
-		scrollbar_jump_callback, NULL);
-  XtAddCallback(map_horizontal_scrollbar, XtNscrollProc, 
-		scrollbar_scroll_callback, NULL);
-  XtAddCallback(map_vertical_scrollbar, XtNscrollProc, 
-		scrollbar_scroll_callback, NULL);
+
+  XtAddCallback(map_horizontal_scrollbar, XtNjumpProc,
+                scrollbar_jump_callback, NULL);
+  XtAddCallback(map_vertical_scrollbar, XtNjumpProc,
+                scrollbar_jump_callback, NULL);
+  XtAddCallback(map_horizontal_scrollbar, XtNscrollProc,
+                scrollbar_scroll_callback, NULL);
+  XtAddCallback(map_vertical_scrollbar, XtNscrollProc,
+                scrollbar_scroll_callback, NULL);
   XtAddCallback(turn_done_button, XtNcallback, end_turn_callback, NULL);
 
   XtAppAddWorkProc(app_context, toplevel_work_proc, NULL);
@@ -494,16 +510,16 @@ void ui_main(int argc, char *argv[])
   XtRealizeWidget(toplevel);
 
   x_interval_id = XtAppAddTimeOut(app_context, TIMER_INTERVAL,
-				  timer_callback, NULL);
+                                  timer_callback, NULL);
 
   init_mapcanvas_and_overview();
 
   fill_unit_below_pixmaps();
 
   set_indicator_icons(client_research_sprite(),
-		      client_warming_sprite(),
-		      client_cooling_sprite(),
-		      client_government_sprite());
+                      client_warming_sprite(),
+                      client_cooling_sprite(),
+                      client_government_sprite());
 
   wm_delete_window = XInternAtom(XtDisplay(toplevel), "WM_DELETE_WINDOW", 0);
   XSetWMProtocols(display, XtWindow(toplevel), &wm_delete_window, 1);
@@ -512,7 +528,17 @@ void ui_main(int argc, char *argv[])
 
   XtSetSensitive(toplevel, FALSE);
 
+  rev_ver = fc_git_revision();
+  if (rev_ver != NULL) {
+    char buffer[512];
+
+    fc_snprintf(buffer, sizeof(buffer), _("Commit: %s"), rev_ver);
+    output_window_append(ftc_client, buffer);
+  }
+
   XtAppMainLoop(app_context);
+
+  start_quitting();
 }
 
 /**************************************************************************
@@ -520,7 +546,6 @@ void ui_main(int argc, char *argv[])
 **************************************************************************/
 void ui_exit()
 {
-
 }
 
 /**************************************************************************
@@ -550,7 +575,7 @@ static void unit_icon_callback(Widget w, XtPointer client_data,
   if (punit) { /* should always be true at this point */
     if (unit_owner(punit) == client.conn.playing) {
       /* may be non-true if alliance */
-      set_unit_focus(punit);
+      unit_focus_set(punit);
     }
   }
 }
@@ -725,10 +750,10 @@ void setup_widgets(void)
 
 
 
-  outputwindow_text= I_SW(XtVaCreateManagedWidget("outputwindowtext", 
-						  asciiTextWidgetClass, 
-						  bottom_form,
-						  NULL));
+  outputwindow_text = I_SW(XtVaCreateManagedWidget("outputwindowtext",
+                                                   asciiTextWidgetClass,
+                                                   bottom_form,
+                                                   NULL));
 
 
   inputline_text= XtVaCreateManagedWidget("inputlinetext", 
@@ -1080,7 +1105,7 @@ void add_unit_to_battlegroup(int battlegroup)
     if (punit && punit->battlegroup == battlegroup) {
       /* If top unit already in the same battlegroup, detach it */
       unit_change_battlegroup(punit, BATTLEGROUP_NONE);
-      refresh_unit_mapcanvas(punit, punit->tile, TRUE, FALSE);
+      refresh_unit_mapcanvas(punit, unit_tile(punit), TRUE, FALSE);
     } else {
       key_unit_assign_battlegroup(battlegroup, TRUE);
     }

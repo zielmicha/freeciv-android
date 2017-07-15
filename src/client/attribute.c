@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -42,8 +42,7 @@ struct attr_key {
   int key, id, x, y;
 };
 
-static genhash_val_t attr_key_val(const struct attr_key *pkey,
-                                  size_t num_buckets);
+static genhash_val_t attr_key_val(const struct attr_key *pkey);
 static bool attr_key_comp(const struct attr_key *pkey1,
                           const struct attr_key *pkey2);
 static struct attr_key *attr_key_dup(const struct attr_key *pkey);
@@ -72,11 +71,9 @@ static struct attribute_hash *attribute_hash = NULL;
 /****************************************************************************
   Hash function for attribute_hash.
 ****************************************************************************/
-static genhash_val_t attr_key_val(const struct attr_key *pkey,
-                                  size_t num_buckets)
+static genhash_val_t attr_key_val(const struct attr_key *pkey)
 {
-  return (((genhash_val_t) pkey->id ^ pkey->x ^ pkey->y ^ pkey->key)
-          % num_buckets);
+  return (genhash_val_t) pkey->id ^ pkey->x ^ pkey->y ^ pkey->key;
 }
 
 /****************************************************************************
@@ -85,7 +82,10 @@ static genhash_val_t attr_key_val(const struct attr_key *pkey,
 static bool attr_key_comp(const struct attr_key *pkey1,
                           const struct attr_key *pkey2)
 {
-  return (0 == memcmp(pkey1, pkey2, sizeof(*pkey1)));
+  return pkey1->key == pkey2->key
+      && pkey1->id  == pkey2->id
+      && pkey1->x   == pkey2->x
+      && pkey1->y   == pkey2->y;
 }
 
 /****************************************************************************
@@ -128,9 +128,7 @@ void attribute_free(void)
 }
 
 /****************************************************************************
-  This method isn't endian safe and there will also be problems if
-  sizeof(int) at serialization time is different from sizeof(int) at
-  deserialization time.
+  Serialize an attribute hash for network/storage.
 ****************************************************************************/
 static enum attribute_serial
 serialize_hash(const struct attribute_hash *hash,
@@ -162,9 +160,9 @@ serialize_hash(const struct attribute_hash *hash,
    * the total_length.
    */
   /* preamble */
-  total_length = 4 * 4;
+  total_length = 4 + 1 + 4 + 4;
   /* body */
-  total_length += entries * (4 + 4 * 4); /* value_size + key */
+  total_length += entries * (4 + 4 + 4 + 2 + 2); /* value_size + key */
   i = 0;
   attribute_hash_values_iterate(hash, pvalue) {
     struct data_in din;
@@ -207,6 +205,10 @@ serialize_hash(const struct attribute_hash *hash,
   } attribute_hash_iterate_end;
 
   fc_assert(!dout.too_short);
+  fc_assert_msg(dio_output_used(&dout) == total_length,
+                "serialize_hash() total_length = %lu, actual = %lu",
+                (long unsigned)total_length,
+                (long unsigned)dio_output_used(&dout));
 
   /*
    * Step 5: return.
@@ -267,35 +269,19 @@ static enum attribute_serial unserialize_hash(struct attribute_hash *hash,
     int value_length;
     struct data_out dout;
 
-    dio_get_uint32(&din, &value_length);
-    if (din.too_short) {
+    if (!dio_get_uint32(&din, &value_length)) {
       log_verbose("attribute.c unserialize_hash() "
                   "uint32 value_length dio_input_too_short");
-      return A_SERIAL_FAIL;
-    }
-    if (value_length > dio_input_remaining(&din)) {
-      log_verbose("attribute.c unserialize_hash() "
-                  "uint32 %lu value_length > %lu input_remaining",
-                  (long unsigned) value_length,
-                  (long unsigned) dio_input_remaining(&din));
-      return A_SERIAL_FAIL;
-    }
-    if (value_length < 16 /* including itself */) {
-      log_verbose("attribute.c unserialize_hash() "
-                  "uint32 %lu value_length < 16",
-                  (long unsigned) value_length);
       return A_SERIAL_FAIL;
     }
     log_attribute("attribute.c unserialize_hash() "
                   "uint32 %lu value_length", (long unsigned) value_length);
 
     /* next 12 bytes */
-    dio_get_uint32(&din, &key.key);
-    dio_get_uint32(&din, &key.id);
-    dio_get_sint16(&din, &key.x);
-    dio_get_sint16(&din, &key.y);
-
-    if (din.too_short) {
+    if (!dio_get_uint32(&din, &key.key)
+        || !dio_get_uint32(&din, &key.id)
+        || !dio_get_sint16(&din, &key.x)
+        || !dio_get_sint16(&din, &key.y)) {
       log_verbose("attribute.c unserialize_hash() "
                   "uint32 key dio_input_too_short");
       return A_SERIAL_FAIL;
@@ -304,7 +290,11 @@ static enum attribute_serial unserialize_hash(struct attribute_hash *hash,
 
     dio_output_init(&dout, pvalue, value_length + 4);
     dio_put_uint32(&dout, value_length);
-    dio_get_memory(&din, ADD_TO_POINTER(pvalue, 4), value_length);
+    if (!dio_get_memory(&din, ADD_TO_POINTER(pvalue, 4), value_length)) {
+      log_verbose("attribute.c unserialize_hash() "
+                  "memory dio_input_too_short");
+      return A_SERIAL_FAIL;
+    }
 
     if (!attribute_hash_insert(hash, &key, pvalue)) {
       /* There are some untraceable attribute bugs caused by the CMA that
@@ -317,6 +307,16 @@ static enum attribute_serial unserialize_hash(struct attribute_hash *hash,
       return A_SERIAL_FAIL;
     }
   }
+
+  if (dio_input_remaining(&din) > 0) {
+    /* This is not an error, as old clients sent overlong serialized
+     * attributes pre gna bug #21295, and these will be hanging around
+     * in savefiles forever. */
+    log_attribute("attribute.c unserialize_hash() "
+                  "ignored %lu trailing octets",
+                  (long unsigned) dio_input_remaining(&din));
+  }
+
   return A_SERIAL_OK;
 }
 
@@ -443,7 +443,7 @@ size_t attribute_get(int key, int id, int x, int y, size_t max_data_length,
 }
 
 /****************************************************************************
-...
+  Set unit related attribute
 *****************************************************************************/
 void attr_unit_set(enum attr_unit what, int unit_id, size_t data_length,
 		   const void *const data)
@@ -452,7 +452,7 @@ void attr_unit_set(enum attr_unit what, int unit_id, size_t data_length,
 }
 
 /****************************************************************************
-...
+  Get unit related attribute
 *****************************************************************************/
 size_t attr_unit_get(enum attr_unit what, int unit_id, size_t max_data_length,
 		  void *data)
@@ -461,7 +461,7 @@ size_t attr_unit_get(enum attr_unit what, int unit_id, size_t max_data_length,
 }
 
 /****************************************************************************
-...
+  Set unit related integer attribute
 *****************************************************************************/
 void attr_unit_set_int(enum attr_unit what, int unit_id, int data)
 {
@@ -469,7 +469,7 @@ void attr_unit_set_int(enum attr_unit what, int unit_id, int data)
 }
 
 /****************************************************************************
-...
+  Get unit related integer attribute
 *****************************************************************************/
 size_t attr_unit_get_int(enum attr_unit what, int unit_id, int *data)
 {
@@ -477,7 +477,7 @@ size_t attr_unit_get_int(enum attr_unit what, int unit_id, int *data)
 }
 
 /****************************************************************************
-...
+  Set city related attribute
 *****************************************************************************/
 void attr_city_set(enum attr_city what, int city_id, size_t data_length,
 		   const void *const data)
@@ -486,7 +486,7 @@ void attr_city_set(enum attr_city what, int city_id, size_t data_length,
 }
 
 /****************************************************************************
-...
+  Get city related attribute
 *****************************************************************************/
 size_t attr_city_get(enum attr_city what, int city_id, size_t max_data_length,
 		  void *data)
@@ -495,7 +495,7 @@ size_t attr_city_get(enum attr_city what, int city_id, size_t max_data_length,
 }
 
 /****************************************************************************
-...
+  Set city related integer attribute
 *****************************************************************************/
 void attr_city_set_int(enum attr_city what, int city_id, int data)
 {
@@ -503,7 +503,7 @@ void attr_city_set_int(enum attr_city what, int city_id, int data)
 }
 
 /****************************************************************************
-...
+  Get city related integer attribute
 *****************************************************************************/
 size_t attr_city_get_int(enum attr_city what, int city_id, int *data)
 {
@@ -511,7 +511,7 @@ size_t attr_city_get_int(enum attr_city what, int city_id, int *data)
 }
 
 /****************************************************************************
-...
+  Set player related attribute
 *****************************************************************************/
 void attr_player_set(enum attr_player what, int player_id, size_t data_length,
 		     const void *const data)
@@ -520,7 +520,7 @@ void attr_player_set(enum attr_player what, int player_id, size_t data_length,
 }
 
 /****************************************************************************
-...
+  Get player related attribute
 *****************************************************************************/
 size_t attr_player_get(enum attr_player what, int player_id,
 		    size_t max_data_length, void *data)
@@ -529,7 +529,7 @@ size_t attr_player_get(enum attr_player what, int player_id,
 }
 
 /****************************************************************************
-...
+  Set tile related attribute
 *****************************************************************************/
 void attr_tile_set(enum attr_tile what, int x, int y, size_t data_length,
 		   const void *const data)
@@ -538,7 +538,7 @@ void attr_tile_set(enum attr_tile what, int x, int y, size_t data_length,
 }
 
 /****************************************************************************
-...
+  Get tile related attribute
 *****************************************************************************/
 size_t attr_tile_get(enum attr_tile what, int x, int y, size_t max_data_length,
 		  void *data)

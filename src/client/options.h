@@ -13,6 +13,10 @@
 #ifndef FC__OPTIONS_H
 #define FC__OPTIONS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* utility */
 #include "support.h"            /* bool type */
 
@@ -20,6 +24,7 @@
 #include "events.h"
 #include "fc_types.h"           /* enum gui_type */
 #include "featured_text.h"      /* struct ft_color */
+#include "mapimg.h"
 
 #define DEFAULT_METASERVER_OPTION "default"
 
@@ -28,7 +33,7 @@ struct video_mode {
   int height;
 };
 #define VIDEO_MODE(ARG_width, ARG_height) \
-    { .width = ARG_width, .height = ARG_height }
+    { ARG_width, ARG_height }
 /****************************************************************************
   Constructor.
 ****************************************************************************/
@@ -51,6 +56,9 @@ extern char default_chat_logfile[512];
 extern bool save_options_on_exit;
 extern bool fullscreen_mode;
 
+/** Migrations **/
+extern bool gui_gtk3_migrated_from_gtk2;
+
 /** Local Options: **/
 
 extern bool solid_color_behind_units;
@@ -58,7 +66,6 @@ extern bool sound_bell_at_new_turn;
 extern int smooth_move_unit_msec;
 extern int smooth_center_slide_msec;
 extern int smooth_combat_step_msec;
-extern bool do_combat_animation;
 extern bool ai_manual_turn_done;
 extern bool auto_center_on_unit;
 extern bool auto_center_on_combat;
@@ -84,6 +91,9 @@ extern bool voteinfo_bar_always_show;
 extern bool voteinfo_bar_hide_when_not_player;
 extern bool voteinfo_bar_new_at_front;
 
+extern bool autoaccept_tileset_suggestion;
+extern bool autoaccept_soundset_suggestion;
+
 extern bool draw_city_outlines;
 extern bool draw_city_output;
 extern bool draw_map_grid;
@@ -105,6 +115,7 @@ extern bool draw_units;
 extern bool draw_focus_unit;
 extern bool draw_fog_of_war;
 extern bool draw_borders;
+extern bool draw_native;
 extern bool draw_full_citybar;
 extern bool draw_unit_shields;
 
@@ -112,8 +123,14 @@ extern bool player_dlg_show_dead_players;
 extern bool reqtree_show_icons;
 extern bool reqtree_curved_lines;
 
+/* options for map images */
+extern char mapimg_format[64];
+extern int mapimg_zoom;
+extern bool mapimg_layer[MAPIMG_LAYER_COUNT];
+extern char mapimg_filename[512];
+
 /* gui-gtk-2.0 client specific options. */
-#define FC_GTK_DEFAULT_THEME_NAME "Freeciv"
+#define FC_GTK2_DEFAULT_THEME_NAME "Freeciv"
 extern char gui_gtk2_default_theme_name[512];
 extern bool gui_gtk2_map_scrollbars;
 extern bool gui_gtk2_dialogs_on_top;
@@ -127,17 +144,25 @@ extern bool gui_gtk2_metaserver_tab_first;
 extern bool gui_gtk2_allied_chat_only;
 enum {
   /* Order must match strings in
-   * options.c:gui_gtk2_message_chat_location_name() */
-  GUI_GTK2_MSGCHAT_SPLIT,
-  GUI_GTK2_MSGCHAT_SEPARATE,
-  GUI_GTK2_MSGCHAT_MERGED
+   * options.c:gui_gtk_message_chat_location_name() */
+  GUI_GTK_MSGCHAT_SPLIT,
+  GUI_GTK_MSGCHAT_SEPARATE,
+  GUI_GTK_MSGCHAT_MERGED
 };
-extern int gui_gtk2_message_chat_location; /* enum GUI_GTK2_MSGCHAT_* */
+extern int gui_gtk2_message_chat_location; /* enum GUI_GTK_MSGCHAT_* */
 extern bool gui_gtk2_small_display_layout;
 extern bool gui_gtk2_mouse_over_map_focus;
 extern bool gui_gtk2_chatline_autocompletion;
 extern int gui_gtk2_citydlg_xsize;
 extern int gui_gtk2_citydlg_ysize;
+enum {
+  /* Order must match strings in
+   * options.c:gui_popup_tech_help_name() */
+  GUI_POPUP_TECH_HELP_ENABLED,
+  GUI_POPUP_TECH_HELP_DISABLED,
+  GUI_POPUP_TECH_HELP_RULESET
+};
+extern int  gui_gtk2_popup_tech_help;
 extern char gui_gtk2_font_city_label[512];
 extern char gui_gtk2_font_notify_label[512];
 extern char gui_gtk2_font_spaceship_label[512];
@@ -152,6 +177,39 @@ extern char gui_gtk2_font_city_names[512];
 extern char gui_gtk2_font_city_productions[512];
 extern char gui_gtk2_font_reqtree_text[512];
 
+/* gui-gtk-3.0 client specific options. */
+#define FC_GTK3_DEFAULT_THEME_NAME "Freeciv"
+extern char gui_gtk3_default_theme_name[512];
+extern bool gui_gtk3_map_scrollbars;
+extern bool gui_gtk3_dialogs_on_top;
+extern bool gui_gtk3_show_task_icons;
+extern bool gui_gtk3_enable_tabs;
+extern bool gui_gtk3_show_chat_message_time;
+extern bool gui_gtk3_new_messages_go_to_top;
+extern bool gui_gtk3_show_message_window_buttons;
+extern bool gui_gtk3_metaserver_tab_first;
+extern bool gui_gtk3_allied_chat_only;
+extern int gui_gtk3_message_chat_location; /* enum GUI_GTK_MSGCHAT_* */
+extern bool gui_gtk3_small_display_layout;
+extern bool gui_gtk3_mouse_over_map_focus;
+extern bool gui_gtk3_chatline_autocompletion;
+extern int gui_gtk3_citydlg_xsize;
+extern int gui_gtk3_citydlg_ysize;
+extern int  gui_gtk3_popup_tech_help;
+extern char gui_gtk3_font_city_label[512];
+extern char gui_gtk3_font_notify_label[512];
+extern char gui_gtk3_font_spaceship_label[512];
+extern char gui_gtk3_font_help_label[512];
+extern char gui_gtk3_font_help_link[512];
+extern char gui_gtk3_font_help_text[512];
+extern char gui_gtk3_font_chatline[512];
+extern char gui_gtk3_font_beta_label[512];
+extern char gui_gtk3_font_small[512];
+extern char gui_gtk3_font_comment_label[512];
+extern char gui_gtk3_font_city_names[512];
+extern char gui_gtk3_font_city_productions[512];
+extern char gui_gtk3_font_reqtree_text[512];
+
 /* gui-sdl client specific options. */
 #define FC_SDL_DEFAULT_THEME_NAME "human"
 extern char gui_sdl_default_theme_name[512];
@@ -159,11 +217,6 @@ extern bool gui_sdl_fullscreen;
 extern struct video_mode gui_sdl_screen;
 extern bool gui_sdl_do_cursor_animation;
 extern bool gui_sdl_use_color_cursors;
-
-/* gui-win32 client specific options. */
-extern bool gui_win32_better_fog;
-extern bool gui_win32_enable_alpha;
-
 
 #define SPECENUM_NAME option_type
 #define SPECENUM_VALUE0 OT_BOOLEAN
@@ -180,6 +233,7 @@ extern bool gui_win32_enable_alpha;
 struct option;                  /* Opaque type. */
 struct option_set;              /* Opaque type. */
 
+typedef void (*option_save_log_callback)(enum log_level lvl, const char *msg, ...);
 
 /* Main functions. */
 void options_init(void);
@@ -187,12 +241,12 @@ void options_free(void);
 void server_options_init(void);
 void server_options_free(void);
 void options_load(void);
-void options_save(void);
+void options_save(option_save_log_callback log_cb);
 
 
 /* Option sets. */
-extern const struct option_set const *client_optset;
-extern const struct option_set const *server_optset;
+extern const struct option_set *client_optset;
+extern const struct option_set *server_optset;
 
 struct option *optset_option_by_number(const struct option_set *poptset,
                                        int id);
@@ -311,7 +365,7 @@ void options_dialogs_set(void);
 #define MW_MESSAGES  2		/* add to the messages window */
 #define MW_POPUP     4		/* popup an individual window */
 
-extern int messages_where[];	/* OR-ed MW_ values [E_LAST] */
+extern int messages_where[];	/* OR-ed MW_ values [E_COUNT] */
 
 
 /** Client options **/
@@ -327,7 +381,22 @@ extern int messages_where[];	/* OR-ed MW_ values [E_LAST] */
 #define GUI_GTK2_CITYDLG_MIN_YSIZE      128
 #define GUI_GTK2_CITYDLG_MAX_YSIZE      4096
 
-
 #define GUI_GTK_OVERVIEW_MIN_XSIZE      160
 #define GUI_GTK_OVERVIEW_MIN_YSIZE      100
+
+/* gui-gtk3: [xy]size of the city dialog */
+#define GUI_GTK3_CITYDLG_DEFAULT_XSIZE  770
+#define GUI_GTK3_CITYDLG_MIN_XSIZE      256
+#define GUI_GTK3_CITYDLG_MAX_XSIZE      4096
+
+#define GUI_GTK3_CITYDLG_DEFAULT_YSIZE  512
+#define GUI_GTK3_CITYDLG_MIN_YSIZE      128
+#define GUI_GTK3_CITYDLG_MAX_YSIZE      4096
+
+#define GUI_DEFAULT_MAPIMG_FILENAME     "freeciv"
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
 #endif  /* FC__OPTIONS_H */

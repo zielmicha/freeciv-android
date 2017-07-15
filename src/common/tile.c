@@ -1,4 +1,4 @@
-/********************************************************************** 
+/***********************************************************************
  Freeciv - Copyright (C) 2005 - The Freeciv Project
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 /* utility */
@@ -24,10 +24,14 @@
 #include "fc_interface.h"
 #include "game.h"
 #include "movement.h"
+#include "road.h"
 #include "unit.h"
 #include "unitlist.h"
 
 #include "tile.h"
+
+static bv_bases empty_bases;
+static bv_roads empty_roads;
 
 #ifndef tile_index
 /****************************************************************************
@@ -121,11 +125,14 @@ void tile_set_terrain(struct tile *ptile, struct terrain *pterrain)
    * - pterrain is NULL (= unknown terrain)
    * - ptile is a virtual tile
    * - pterrain does not has the flag TER_NO_CITIES
-   * - there is no city on ptile.
+   * - there is no city on ptile
+   * - client may have had tile fogged and is receiving terrain change before
+   *   city removal
    * This should be read as: The terrain change is INVALID if a terrain with
    * the flag TER_NO_CITIES is given for a real tile with a city (i.e. all
    * check evaluate to TRUE). */
   fc_assert_msg(NULL == pterrain
+                || !is_server()
                 || tile_virtual_check(ptile)
                 || !terrain_has_flag(pterrain, TER_NO_CITIES)
                 || NULL == tile_city(ptile),
@@ -188,14 +195,39 @@ bool tile_has_any_specials(const struct tile *ptile)
 /****************************************************************************
   Returns a bit vector of the bases present at the tile.
 ****************************************************************************/
-bv_bases tile_bases(const struct tile *ptile)
+const bv_bases *tile_bases(const struct tile *ptile)
 {
   if (!ptile) {
-    bv_bases empty;
-    BV_CLR_ALL(empty);
-    return empty;
+    static bool empty_cleared = FALSE;
+
+    if (!empty_cleared) {
+      BV_CLR_ALL(empty_bases);
+      empty_cleared = TRUE;
+    }
+
+    return &empty_bases;
   }
-  return ptile->bases;
+
+  return &(ptile->bases);
+}
+
+/****************************************************************************
+  Returns a bit vector of the roads present at the tile.
+****************************************************************************/
+const bv_roads *tile_roads(const struct tile *ptile)
+{
+  if (!ptile) {
+    static bool empty_cleared = FALSE;
+
+    if (!empty_cleared) {
+      BV_CLR_ALL(empty_roads);
+      empty_cleared = TRUE;
+    }
+
+    return &empty_roads;
+  }
+
+  return &(ptile->roads);
 }
 
 /****************************************************************************
@@ -275,19 +307,69 @@ bool tile_has_claimable_base(const struct tile *ptile,
 }
 
 /****************************************************************************
-  Calculate defense bonus given by bases
+  Calculate defense bonus given for unit type by bases and roads
 ****************************************************************************/
-int tile_bases_defense_bonus(const struct tile *ptile,
-                             const struct unit_type *punittype)
+int tile_extras_defense_bonus(const struct tile *ptile,
+                              const struct unit_type *punittype)
+{
+  return tile_extras_class_defense_bonus(ptile, utype_class(punittype));
+}
+
+/****************************************************************************
+  Calculate defense bonus given for unit class by bases and roads
+****************************************************************************/
+int tile_extras_class_defense_bonus(const struct tile *ptile,
+                                    const struct unit_class *pclass)
 {
   int bonus = 0;
 
   base_type_iterate(pbase) {
     if (tile_has_base(ptile, pbase)
-        && is_native_base_to_uclass(pbase, utype_class(punittype))) {
+        && is_native_base_to_uclass(pbase, pclass)) {
       bonus += pbase->defense_bonus;
     }
   } base_type_iterate_end;
+
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)
+        && is_native_road_to_uclass(proad, pclass)) {
+      bonus += proad->defense_bonus;
+    }
+  } road_type_iterate_end;
+
+  return bonus;
+}
+
+/****************************************************************************
+  Calculate output increment given by roads
+****************************************************************************/
+int tile_roads_output_incr(const struct tile *ptile, enum output_type_id o)
+{
+  int const_incr = 0;
+  int incr = 0;
+
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)) {
+      const_incr += proad->tile_incr_const[o];
+      incr += proad->tile_incr[o];
+    }
+  } road_type_iterate_end;
+
+  return const_incr + incr * tile_terrain(ptile)->road_output_incr_pct[o] / 100;
+}
+
+/****************************************************************************
+  Calculate output bonus given by roads
+****************************************************************************/
+int tile_roads_output_bonus(const struct tile *ptile, enum output_type_id o)
+{
+  int bonus = 0;
+
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)) {
+      bonus += proad->tile_bonus[o];
+    }
+  } road_type_iterate_end;
 
   return bonus;
 }
@@ -416,18 +498,15 @@ int tile_activity_time(enum unit_activity activity, const struct tile *ptile)
 
   /* ACTIVITY_BASE not handled here */
   fc_assert_ret_val(activity != ACTIVITY_BASE, FC_INFINITY);
+  fc_assert_ret_val(activity != ACTIVITY_GEN_ROAD, FC_INFINITY);
 
   switch (activity) {
   case ACTIVITY_POLLUTION:
     return pterrain->clean_pollution_time * ACTIVITY_FACTOR;
-  case ACTIVITY_ROAD:
-    return pterrain->road_time * ACTIVITY_FACTOR;
   case ACTIVITY_MINE:
     return pterrain->mining_time * ACTIVITY_FACTOR;
   case ACTIVITY_IRRIGATE:
     return pterrain->irrigation_time * ACTIVITY_FACTOR;
-  case ACTIVITY_RAILROAD:
-    return pterrain->rail_time * ACTIVITY_FACTOR;
   case ACTIVITY_TRANSFORM:
     return pterrain->transform_time * ACTIVITY_FACTOR;
   case ACTIVITY_FALLOUT:
@@ -438,39 +517,25 @@ int tile_activity_time(enum unit_activity activity, const struct tile *ptile)
 }
 
 /****************************************************************************
-  Time to complete the given activity on the given tile.
+  Time to complete the base building activity on the given tile.
 ****************************************************************************/
 int tile_activity_base_time(const struct tile *ptile,
                             Base_type_id base)
 {
-  return base_by_number(base)->build_time * ACTIVITY_FACTOR;
+  struct terrain *pterrain = tile_terrain(ptile);
+
+  return terrain_base_time(pterrain, base) * ACTIVITY_FACTOR;
 }
 
 /****************************************************************************
-  Clear all infrastructure (man-made specials) from the tile.
+  Time to complete the road building activity on the given tile.
 ****************************************************************************/
-static void tile_clear_unsupported_infrastructure(struct tile *ptile)
+int tile_activity_road_time(const struct tile *ptile,
+                            Road_type_id road)
 {
-  int i;
-  bool city_present = tile_city(ptile) != NULL;
-  struct terrain *pterr = tile_terrain(ptile);
-  bool ocean = is_ocean(pterr);
+  struct terrain *pterrain = tile_terrain(ptile);
 
-  for (i = 0; infrastructure_specials[i] != S_LAST; i++) {
-    switch (infrastructure_specials[i]) {
-    case S_ROAD:
-    case S_RAILROAD:
-      if (!city_present && pterr->road_time == 0) {
-	tile_clear_special(ptile, infrastructure_specials[i]);
-      }
-      break;
-    default:
-      if (ocean) {
-	tile_clear_special(ptile, infrastructure_specials[i]);
-      }
-      break;
-    }
-  }
+  return terrain_road_time(pterrain, road) * ACTIVITY_FACTOR;
 }
 
 /****************************************************************************
@@ -490,11 +555,9 @@ static void tile_clear_dirtiness(struct tile *ptile)
 void tile_change_terrain(struct tile *ptile, struct terrain *pterrain)
 {
   tile_set_terrain(ptile, pterrain);
-  tile_clear_unsupported_infrastructure(ptile);
 
   if (is_ocean(pterrain)) {
     /* The code can't handle these specials in ocean. */
-    tile_clear_special(ptile, S_RIVER);
     tile_clear_special(ptile, S_HUT);
   }
 
@@ -518,13 +581,20 @@ void tile_change_terrain(struct tile *ptile, struct terrain *pterrain)
     if (tile_has_base(ptile, pbase)
         && !is_native_tile_to_base(pbase, ptile)) {
       if (fc_funcs->destroy_base != NULL) {
+        /* Assume callback calls tile_remove_base() itself. */
 	fc_funcs->destroy_base(ptile, pbase);
       } else {
 	tile_remove_base(ptile, pbase);
       }
-      tile_remove_base(ptile, pbase);
     }
   } base_type_iterate_end;
+
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)
+        && !is_native_tile_to_road(proad, ptile)) {
+      tile_remove_road(ptile, proad);
+    }
+  } road_type_iterate_end;
 }
 
 /****************************************************************************
@@ -534,6 +604,7 @@ void tile_change_terrain(struct tile *ptile, struct terrain *pterrain)
 void tile_add_special(struct tile *ptile, enum tile_special_type special)
 {
   fc_assert_ret(special != S_OLD_FORTRESS && special != S_OLD_AIRBASE);
+  fc_assert_ret(special != S_OLD_ROAD && special != S_OLD_RAILROAD && special != S_OLD_RIVER);
 
   tile_set_special(ptile, special);
 
@@ -544,18 +615,13 @@ void tile_add_special(struct tile *ptile, enum tile_special_type special)
   case S_IRRIGATION:
     tile_clear_special(ptile, S_MINE);
     break;
-  case S_RAILROAD:
-    tile_add_special(ptile, S_ROAD);
-    break;
   case S_MINE:
     tile_clear_special(ptile, S_IRRIGATION);
     tile_clear_special(ptile, S_FARMLAND);
     break;
 
-  case S_ROAD:
   case S_POLLUTION:
   case S_HUT:
-  case S_RIVER:
   case S_FALLOUT:
   default:
     break;
@@ -569,6 +635,7 @@ void tile_add_special(struct tile *ptile, enum tile_special_type special)
 void tile_remove_special(struct tile *ptile, enum tile_special_type special)
 {
   fc_assert_ret(special != S_OLD_FORTRESS && special != S_OLD_AIRBASE);
+  fc_assert_ret(special != S_OLD_ROAD && special != S_OLD_RAILROAD && special != S_OLD_RIVER);
 
   tile_clear_special(ptile, special);
 
@@ -576,15 +643,10 @@ void tile_remove_special(struct tile *ptile, enum tile_special_type special)
   case S_IRRIGATION:
     tile_clear_special(ptile, S_FARMLAND);
     break;
-  case S_ROAD:
-    tile_clear_special(ptile, S_RAILROAD);
-    break;
 
-  case S_RAILROAD:
   case S_MINE:
   case S_POLLUTION:
   case S_HUT:
-  case S_RIVER:
   case S_FARMLAND:
   case S_FALLOUT:
   default:
@@ -655,7 +717,7 @@ bool tile_apply_activity(struct tile *ptile, Activity_type_id act)
   case ACTIVITY_FALLOUT: 
     tile_clear_dirtiness(ptile);
     return TRUE;
-    
+
   case ACTIVITY_MINE:
     tile_mine(ptile);
     return TRUE;
@@ -664,31 +726,20 @@ bool tile_apply_activity(struct tile *ptile, Activity_type_id act)
     tile_irrigate(ptile);
     return TRUE;
 
-  case ACTIVITY_ROAD: 
-    if (!is_ocean_tile(ptile)
-	&& !tile_has_special(ptile, S_ROAD)) {
-      tile_set_special(ptile, S_ROAD);
-      return TRUE;
-    }
-    return FALSE;
-
-  case ACTIVITY_RAILROAD:
-    if (!is_ocean_tile(ptile)
-	&& !tile_has_special(ptile, S_RAILROAD)
-	&& tile_has_special(ptile, S_ROAD)) {
-      tile_set_special(ptile, S_RAILROAD);
-      return TRUE;
-    }
-    return FALSE;
-
   case ACTIVITY_TRANSFORM:
     tile_transform(ptile);
     return TRUE;
-    
+
+  case ACTIVITY_OLD_ROAD:
+  case ACTIVITY_OLD_RAILROAD:
   case ACTIVITY_FORTRESS:
-  case ACTIVITY_PILLAGE: 
-  case ACTIVITY_AIRBASE:   
+  case ACTIVITY_AIRBASE:
+    fc_assert(FALSE);
+    return FALSE;
+
+  case ACTIVITY_PILLAGE:
   case ACTIVITY_BASE:
+  case ACTIVITY_GEN_ROAD:
     /* do nothing  - not implemented */
     return FALSE;
 
@@ -697,6 +748,7 @@ bool tile_apply_activity(struct tile *ptile, Activity_type_id act)
   case ACTIVITY_SENTRY:
   case ACTIVITY_GOTO:
   case ACTIVITY_EXPLORE:
+  case ACTIVITY_CONVERT:
   case ACTIVITY_UNKNOWN:
   case ACTIVITY_FORTIFYING:
   case ACTIVITY_PATROL_UNUSED:
@@ -739,13 +791,16 @@ static bool tile_info_pollution(char *buf, int bufsz,
 
 /****************************************************************************
   Return a (static) string with tile name describing terrain and specials.
+  If include_nuisances is set, pollution and nuclear fallout will be
+  ignored.
 
   Examples:
     "Hills"
     "Hills (Coals)"
     "Hills (Coals) [Pollution]"
 ****************************************************************************/
-const char *tile_get_info_text(const struct tile *ptile, int linebreaks)
+const char *tile_get_info_text(const struct tile *ptile,
+                               bool include_nuisances, int linebreaks)
 {
   static char s[256];
   bool pollution;
@@ -758,15 +813,18 @@ const char *tile_get_info_text(const struct tile *ptile, int linebreaks)
     lb = TRUE;
   }
 
-  if (tile_has_special(ptile, S_RIVER)) {
-    if (lb) {
-      sz_strlcat(s, "\n");
-      lb = FALSE;
-    } else {
-      sz_strlcat(s, "/");
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)
+        && road_has_flag(proad, RF_NATURAL)) {
+      if (lb) {
+        sz_strlcat(s, "\n");
+        lb = FALSE;
+      } else {
+        sz_strlcat(s, "/");
+      }
+      sz_strlcat(s, road_name_translation(proad));
     }
-    sz_strlcat(s, special_name_translation(S_RIVER));
-  }
+  } road_type_iterate_end;
   if (linebreaks & TILE_LB_RIVER_RESOURCE) {
     /* New linebreak requested */
     lb = TRUE;
@@ -787,11 +845,15 @@ const char *tile_get_info_text(const struct tile *ptile, int linebreaks)
     lb = TRUE;
   }
 
-  pollution = FALSE;
-  pollution = tile_info_pollution(s, bufsz, ptile, S_POLLUTION, pollution, lb);
-  pollution = tile_info_pollution(s, bufsz, ptile, S_FALLOUT, pollution, lb);
-  if (pollution) {
-    sz_strlcat(s, "]");
+  if (include_nuisances) {
+    pollution = FALSE;
+    pollution = tile_info_pollution(s, bufsz, ptile, S_POLLUTION, pollution,
+                                    lb);
+    pollution = tile_info_pollution(s, bufsz, ptile, S_FALLOUT, pollution,
+                                    lb);
+    if (pollution) {
+      sz_strlcat(s, "]");
+    }
   }
 
   return s;
@@ -806,6 +868,21 @@ bool tile_has_base(const struct tile *ptile, const struct base_type *pbase)
 }
 
 /****************************************************************************
+  Returns TRUE if the given tile has a base conflicting with the given one.
+****************************************************************************/
+bool tile_has_conflicting_base(const struct tile *ptile, const struct base_type *pbase)
+{
+  base_type_iterate(pconfl) {
+    if (BV_ISSET(pbase->conflicts, base_index(pconfl))
+        && tile_has_base(ptile, pconfl)) {
+      return TRUE;
+    }
+  } base_type_iterate_end;
+
+  return FALSE;
+}
+
+/****************************************************************************
   Returns TRUE if the given tile has any bases on it.
 ****************************************************************************/
 bool tile_has_any_bases(const struct tile *ptile)
@@ -814,6 +891,41 @@ bool tile_has_any_bases(const struct tile *ptile)
     return FALSE;
   }
   return BV_ISSET_ANY(ptile->bases);
+}
+
+/****************************************************************************
+  Tile has any river type
+****************************************************************************/
+bool tile_has_river(const struct tile *ptile)
+{
+  road_type_iterate(priver) {
+    if (tile_has_road(ptile, priver)
+        && road_has_flag(priver, RF_RIVER)) {
+      return TRUE;
+    }
+  } road_type_iterate_end;
+
+  return FALSE;
+}
+
+/****************************************************************************
+  Adds road to tile
+****************************************************************************/
+void tile_add_road(struct tile *ptile, const struct road_type *proad)
+{
+  if (proad != NULL) {
+    BV_SET(ptile->roads, road_index(proad));
+  }
+}
+
+/****************************************************************************
+  Removes road from tile if such exist
+****************************************************************************/
+void tile_remove_road(struct tile *ptile, const struct road_type *proad)
+{
+  if (proad != NULL) {
+    BV_CLR(ptile->roads, road_index(proad));
+  }
 }
 
 /****************************************************************************
@@ -829,15 +941,12 @@ struct tile *tile_virtual_new(const struct tile *ptile)
   vtile = fc_calloc(1, sizeof(*vtile));
 
   /* initialise some values */
-  vtile->x = -1;
-  vtile->y = -1;
-  vtile->nat_x = -1;
-  vtile->nat_y = -1;
   vtile->index = -1;
   vtile->continent = -1;
 
   BV_CLR_ALL(vtile->special);
   BV_CLR_ALL(vtile->bases);
+  BV_CLR_ALL(vtile->roads);
   vtile->resource = NULL;
   vtile->terrain = NULL;
   vtile->units = unit_list_new();
@@ -848,9 +957,8 @@ struct tile *tile_virtual_new(const struct tile *ptile)
 
   if (ptile) {
     /* Used by is_city_center to give virtual tiles the output bonuses
-     * they deserve */
-    vtile->x = ptile->x;
-    vtile->y = ptile->y;
+     * they deserve. */
+    vtile->index = tile_index(ptile);
 
     /* Copy all but the unit list. */
     tile_special_type_iterate(spe) {
@@ -868,6 +976,12 @@ struct tile *tile_virtual_new(const struct tile *ptile)
         BV_SET(vtile->bases, base_number(pbase));
       }
     } base_type_iterate_end;
+
+    road_type_iterate(proad) {
+      if (tile_has_road(ptile, proad)) {
+        tile_add_road(vtile, proad);
+      }
+    } road_type_iterate_end;
 
     vtile->resource = ptile->resource;
     vtile->terrain = ptile->terrain;
@@ -898,7 +1012,7 @@ void tile_virtual_destroy(struct tile *vtile)
   if (vtile->units) {
     unit_list_iterate(vtile->units, vunit) {
       if (unit_is_virtual(vunit)) {
-        destroy_unit_virtual(vunit);
+        unit_virtual_destroy(vunit);
       }
     } unit_list_iterate_end;
     unit_list_destroy(vtile->units);
@@ -928,12 +1042,6 @@ bool tile_virtual_check(struct tile *vtile)
   }
 
   tindex = tile_index(vtile);
-
-  if (tindex == -1) {
-    /* This is a virtual tile. */
-    return TRUE;
-  }
-
   fc_assert_ret_val(0 <= tindex && tindex < map_num_tiles(), FALSE);
 
   return (vtile != map.tiles + tindex);
@@ -950,4 +1058,35 @@ void *tile_hash_key(const struct tile *ptile)
   key = FC_INT_TO_PTR(ptile->index);
 
   return key;
+}
+
+/****************************************************************************
+  Sets label for tile. Returns whether label changed.
+****************************************************************************/
+bool tile_set_label(struct tile *ptile, const char *label)
+{
+  bool changed = FALSE;
+
+  /* Handle empty label as NULL label */
+  if (label != NULL && label[0] == '\0') {
+    label = NULL;
+  }
+
+  if (ptile->label != NULL) {
+    if (label == NULL) {
+      changed = TRUE;
+    } else if (strcmp(ptile->label, label)) {
+      changed = TRUE;
+    }
+    FC_FREE(ptile->label);
+    ptile->label = NULL;
+  } else if (label != NULL) {
+    changed = TRUE;
+  }
+
+  if (label != NULL) {
+    ptile->label = fc_strdup(label);
+  }
+
+  return changed;
 }

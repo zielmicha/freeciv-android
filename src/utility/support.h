@@ -14,6 +14,10 @@
 #ifndef FC__SUPPORT_H
 #define FC__SUPPORT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /********************************************************************** 
   Replacements for functions which are not available on all platforms.
   Where the functions are available natively, these are just wrappers.
@@ -41,6 +45,7 @@
 #define TRUE true
 #define FALSE false
 
+#ifndef __cplusplus
 #if __BEOS__
 #include <posix/be_prim.h>
 #define __bool_true_false_are_defined 1
@@ -59,6 +64,17 @@
 typedef unsigned int fc_bool;
 #endif /* ! HAVE_STDBOOL_H */
 #endif /* ! __BEOS__ */
+#endif /* __cplusplus */
+
+/* intptr_t header */
+/* Prefer full inttypes.h if present. */
+#ifdef HAVE_INTTYPES_H
+#include <inttypes.h>
+#else
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif /* HAVE_STDINT_H */
+#endif /* HAVE_INTTYPES_H */
 
 /* Want to use GCC's __attribute__ keyword to check variadic
  * parameters to printf-like functions, without upsetting other
@@ -102,7 +118,8 @@ int fc_stricoll(const char *str0, const char *str1);
 
 FILE *fc_fopen(const char *filename, const char *opentype);
 #ifdef HAVE_LIBZ
-FILE *fc_gzopen(const char *filename, const char *opentype);
+#include <zlib.h>
+gzFile fc_gzopen(const char *filename, const char *opentype);
 #endif
 DIR *fc_opendir(const char *dirname);
 int fc_remove(const char *filename);
@@ -154,5 +171,13 @@ bool fc_isspace(char c);
 bool fc_isupper(char c);
 char fc_toupper(char c);
 char fc_tolower(char c);
+
+void fc_uname(char *buf, size_t len);
+
+const char *fc_basename(const char *path);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif  /* FC__SUPPORT_H */

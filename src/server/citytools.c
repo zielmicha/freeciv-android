@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -31,6 +31,7 @@
 /* common */
 #include "ai.h"
 #include "base.h"
+#include "citizens.h"
 #include "city.h"
 #include "events.h"
 #include "game.h"
@@ -41,21 +42,20 @@
 #include "movement.h"
 #include "player.h"
 #include "requirements.h"
+#include "road.h"
 #include "specialist.h"
 #include "tech.h"
+#include "traderoutes.h"
 #include "unit.h"
 #include "unitlist.h"
 #include "vision.h"
 
-/* ai */
-#include "aicity.h"
-#include "aiunit.h"
-
-/* scripting */
-#include "script.h"
+/* common/scriptcore */
+#include "luascript_types.h"
 
 /* server */
 #include "barbarian.h"
+#include "citizenshand.h"
 #include "cityturn.h"
 #include "gamehand.h"           /* send_game_info() */
 #include "maphand.h"
@@ -70,8 +70,13 @@
 #include "unittools.h"
 
 /* server/advisors */
+#include "advbuilding.h"
+#include "advgoto.h"
 #include "autosettlers.h"
 #include "infracache.h"
+
+/* server/scripting */
+#include "script_server.h"
 
 #include "citytools.h"
 
@@ -83,6 +88,9 @@ static struct city_list *arrange_workers_queue = NULL;
 static bool send_city_suppressed = FALSE;
 
 static bool city_workers_queue_remove(struct city *pcity);
+
+static void announce_trade_route_removal(struct city *pc1, struct city *pc2,
+                                         bool source_gone);
 
 /****************************************************************************
   Freeze the workers (citizens on tiles) for the city.  They will not be
@@ -199,6 +207,7 @@ static int evaluate_city_name_priority(struct tile *ptile,
      "better" than an unlisted terrain, which is mult_factor
      "better" than a non-matching terrain. */
   const float mult_factor = 1.4;
+  bool river = FALSE;
 
   /*
    * If natural city names aren't being used, we just return the
@@ -240,7 +249,14 @@ static int evaluate_city_name_priority(struct tile *ptile,
    * terrain labels would have their priorities hurt (or helped).
    */
   goodness = nation_city_river_preference(pncity);
-  if (!tile_has_special(ptile, S_RIVER)) {
+  road_type_iterate(priver) {
+    if (road_has_flag(priver, RF_RIVER)
+        && tile_has_road(ptile, priver)) {
+      river = TRUE;
+      break;
+    }
+  } road_type_iterate_end;
+  if (!river) {
     goodness = nation_city_preference_revert(goodness);
   }
 
@@ -500,7 +516,7 @@ const char *city_name_suggestion(struct player *pplayer, struct tile *ptile)
       }
 
       /* Still not found; append all remaining nations. */
-      nations_iterate(n) {
+      allowed_nations_iterate(n) {
         index = nation_index(n);
         if (!nations_selected[index]) {
           nation_list[queue_size] = n;
@@ -508,7 +524,7 @@ const char *city_name_suggestion(struct player *pplayer, struct tile *ptile)
           queue_size++;
           log_debug("Misc nation %s.", nation_rule_name(n));
         }
-      } nations_iterate_end;
+      } allowed_nations_iterate_end;
     }
   }
 
@@ -542,29 +558,37 @@ int build_points_left(struct city *pcity)
 }
 
 /**************************************************************************
-  Will unit of this type be created as veteran?
+  How many veteran levels will created unit of this type get?
 **************************************************************************/
 int do_make_unit_veteran(struct city *pcity,
                          const struct unit_type *punittype)
 {
-  if (get_unittype_bonus(city_owner(pcity), pcity->tile, punittype,
-                         EFT_VETERAN_BUILD) > 0) {
-    return TRUE;
-  }
-
-  return FALSE;
+  return MIN(get_unittype_bonus(city_owner(pcity), pcity->tile, punittype,
+                                EFT_VETERAN_BUILD),
+             utype_veteran_levels(punittype) - 1);
 }
 
 /*********************************************************************
-  Change home city of a unit with verbose output.
+  Change player that owns a unit and, if appropriate, its home city,
+  with verbose output.
+  If 'rehome' is not set, only change the player which owns the unit
+  (the new owner is new_pcity's owner). Otherwise the new unit will be
+  given a homecity, even if it was homeless before.
 ***********************************************************************/
 static void transfer_unit(struct unit *punit, struct city *tocity,
-			  bool verbose)
+                          bool rehome, bool verbose)
 {
   struct player *from_player = unit_owner(punit);
   struct player *to_player = city_owner(tocity);
 
+  /* Transferring a dying GameLoss unit as part of the loot for
+   * killing it caused gna bug #23676. */
+  fc_assert_ret_msg(!punit->server.dying,
+                    "Tried to transfer the dying unit %d.",
+                    punit->id);
+
   if (from_player == to_player) {
+    fc_assert_ret(rehome);
     log_verbose("Changed homecity of %s %s to %s",
                 nation_rule_name(nation_of_player(from_player)),
                 unit_rule_name(punit),
@@ -577,7 +601,41 @@ static void transfer_unit(struct unit *punit, struct city *tocity,
 		    city_link(tocity));
     }
   } else {
-    struct city *in_city = tile_city(punit->tile);
+    struct tile *utile = unit_tile(punit);
+    struct city *in_city = tile_city(utile);
+
+    if (utype_player_already_has_this_unique(to_player,
+                                             unit_type(punit))) {
+      /* This is a unique unit that to_player already has. A transfer would
+       * break the rule that a player only may have one unit of each unique
+       * unit type. */
+
+      log_debug("%s already have a %s. Can't transfer from %s",
+                nation_rule_name(nation_of_player(to_player)),
+                unit_rule_name(punit),
+                nation_rule_name(nation_of_player(from_player)));
+
+      if (utype_has_flag(unit_type(punit), UTYF_GAMELOSS)) {
+        /* Try to save game loss units. */
+        bounce_unit(punit, verbose);
+      } else {
+        /* Kill the unique unit. */
+
+        if (verbose) {
+          notify_player(from_player, unit_tile(punit),
+                        E_UNIT_LOST_MISC, ftc_server,
+                        /* TRANS: Americans ... Leader */
+                        _("The %s already have a %s. Can't transfer yours."),
+                        nation_plural_for_player(to_player),
+                        unit_tile_link(punit));
+        }
+
+        wipe_unit(punit, ULR_CITY_LOST, NULL);
+      }
+
+      return;
+    }
+
     if (in_city) {
       log_verbose("Transferred %s in %s from %s to %s",
                   unit_rule_name(punit), city_name(in_city),
@@ -620,26 +678,28 @@ static void transfer_unit(struct unit *punit, struct city *tocity,
                       nation_adjective_for_player(to_player),
                       city_link(tocity));
       }
-      from_player->score.units_lost++;
-      wipe_unit(punit);
+      wipe_unit(punit, ULR_CITY_LOST, NULL);
       return;
     }
+
+    maybe_make_contact(utile, to_player);
   }
-  unit_change_homecity_handling(punit, tocity);
+  unit_change_homecity_handling(punit, tocity, rehome);
 }
 
 /*********************************************************************
- Units in a bought city are transferred to the new owner, units 
+ When a city is transferred (bought, incited, disbanded, civil war):
+ Units in a transferred city are transferred to the new owner; units 
  supported by the city, but held in other cities are updated to
  reflect those cities as their new homecity.  Units supported 
- by the bought city, that are not in a city square may be deleted.
+ by the transferred city that are not in a city tile may be deleted.
 
  - Kris Bubendorfer <Kris.Bubendorfer@MCS.VUW.AC.NZ>
 
-pplayer: The player recieving the units if they are not disbanded and
+pplayer: The player receiving the units if they are not disbanded and
          are not in a city
 pvictim: The owner of the city the units are transferred from.
-units:   A list of units to be transferred, typically a cities unit list.
+units:   A list of units to be transferred, typically a city's unit list.
 pcity:   Default city the units are transferred to.
 exclude_city: The units cannot be transferred to this city.
 kill_outside: Units outside this range are deleted. -1 means no units
@@ -659,15 +719,39 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
    * Only relevant if we are transferring to another player. */
   if (pplayer != pvictim) {
     unit_list_iterate_safe((ptile)->units, vunit)  {
+      if (vunit->server.dying) {
+        /* Don't transfer or bounce a dying unit. It will soon be gone
+         * anyway.
+         *
+         * Bouncing a dying unit isn't a good idea.
+         * Remaining death handling may do things meant for its current
+         * location to the new location. (Example: Stack death)
+         * bounce_unit() will wipe the unit if it can't be bounced. Wiping
+         * the dying unit isn't a good idea. The remaining death handling
+         * code will try to read from it.
+         *
+         * Transferring a dying GameLoss unit as part of the loot for
+         * killing it caused gna bug #23676. */
+        continue;
+      }
+
       /* Don't transfer units already owned by new city-owner --wegge */
       if (unit_owner(vunit) == pvictim) {
+        /* Determine whether unit was homeless. If it was, we don't give
+         * it a homecity, only change ownership.
+         * We have to search the transferred city's former units because
+         * the unit may have been made only temporarily homeless during
+         * city transfer. */
+        bool homeless = (vunit->homecity == 0)
+          && !unit_list_search(units, vunit);
+
         /* vunit may die during transfer_unit().
          * unit_list_remove() is still safe using vunit pointer, as
          * pointer is not used for dereferencing, only as value.
          * Not sure if it would be safe to unlink first and transfer only
          * after that. Not sure if it is correct to unlink at all in
          * some cases, depending which list 'units' points to. */
-	transfer_unit(vunit, pcity, verbose);
+	transfer_unit(vunit, pcity, !homeless, verbose);
 	unit_list_remove(units, vunit);
       } else if (!pplayers_allied(pplayer, unit_owner(vunit))) {
         /* the owner of vunit is allied to pvictim but not to pplayer */
@@ -683,18 +767,29 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
   /* Any remaining units supported by the city are either given new home
      cities or maybe destroyed */
   unit_list_iterate_safe(units, vunit) {
-    struct city *new_home_city = tile_city(vunit->tile);
+    struct city *new_home_city = tile_city(unit_tile(vunit));
+
+    if (vunit->server.dying) {
+      /* Don't transfer or destroy a dying unit. It will soon be gone
+       * anyway.
+       *
+       * Transfering a dying GameLoss unit as part of the loot for
+       * killing it caused gna bug #23676. */
+      continue;
+    }
+
     if (new_home_city && new_home_city != exclude_city
 	&& city_owner(new_home_city) == unit_owner(vunit)) {
       /* unit is in another city: make that the new homecity,
-	 unless that city is actually the same city (happens if disbanding) */
-      transfer_unit(vunit, new_home_city, verbose);
+       * unless that city is actually the same city (happens if disbanding)
+       * Unit had a homecity since it was supported, so rehome. */
+      transfer_unit(vunit, new_home_city, TRUE, verbose);
     } else if ((kill_outside == -1
-                || real_map_distance(vunit->tile, ptile) <= kill_outside)
+                || real_map_distance(unit_tile(vunit), ptile) <= kill_outside)
                && saved_id) {
       /* else transfer to specified city. */
-      transfer_unit(vunit, pcity, verbose);
-      if (vunit->tile == ptile && !pplayers_allied(pplayer, pvictim)) {
+      transfer_unit(vunit, pcity, TRUE, verbose);
+      if (unit_tile(vunit) == ptile && !pplayers_allied(pplayer, pvictim)) {
         /* Unit is inside city being transferred, bounce it */
         bounce_unit(vunit, TRUE);
       }
@@ -710,13 +805,17 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
                       _("%s lost along with control of %s."),
                       unit_tile_link(vunit), name);
       }
-      unit_owner(vunit)->score.units_lost++;
-      wipe_unit(vunit);
+      wipe_unit(vunit, ULR_CITY_LOST, NULL);
     }
   } unit_list_iterate_safe_end;
 
 #ifdef DEBUG
   unit_list_iterate(pcity->units_supported, punit) {
+    if (punit->server.dying) {
+      /* Leave the dying alone. */
+      continue;
+    }
+
     fc_assert(punit->homecity == pcity->id);
     fc_assert(unit_owner(punit) == pplayer);
   } unit_list_iterate_end;
@@ -737,6 +836,8 @@ void transfer_city_units(struct player *pplayer, struct player *pvictim,
                     player are returned.
   'only_enemy'      if set and 'pplayer' is not NULL only cities of players
                     which are at war with 'pplayer' are returned.
+  'pclass'          if set, and 'pclass' is not NULL only cities that have
+                    adjacent native terrain for that unit class are returned.
 
   If no city is found NULL is returned.
 ****************************************************************************/
@@ -745,7 +846,7 @@ struct city *find_closest_city(const struct tile *ptile,
                                const struct player *pplayer,
                                bool only_ocean, bool only_continent,
                                bool only_known, bool only_player,
-                               bool only_enemy)
+                               bool only_enemy, const struct unit_class *pclass)
 {
   Continent_id con;
   struct city *best_city = NULL;
@@ -786,14 +887,17 @@ struct city *find_closest_city(const struct tile *ptile,
        * - closer than the current best city
        * - (if required) on the same continent
        * - (if required) adjacent to ocean
-       * - (if required) only cities known by the player */
+       * - (if required) only cities known by the player
+       * - (if required) only cities native to the class */
       if ((best_dist == -1 || city_dist < best_dist)
           && (!only_continent || con == tile_continent(pcity->tile))
-          && (!only_ocean || is_ocean_near_tile(city_tile(pcity)))
+          && (!only_ocean || is_terrain_class_near_tile(city_tile(pcity), TC_OCEAN))
           && (!only_known
               || (map_is_known(city_tile(pcity), pplayer)
                   && map_get_player_site(city_tile(pcity), pplayer)->identity
-                     > IDENTITY_NUMBER_ZERO))) {
+                     > IDENTITY_NUMBER_ZERO))
+          && (pclass == NULL
+              || is_native_near_tile(pclass, city_tile(pcity)))) {
         best_dist = city_dist;
         best_city = pcity;
       }
@@ -817,12 +921,9 @@ static void raze_city(struct city *pcity)
     razechance += 30;
 
   city_built_iterate(pcity, pimprove) {
-    if (is_small_wonder(pimprove)) {
-      /* small wonders are always razed
-       * This is not strictly necessary as transfer_city()
-       * would remove small wonders anyway. */
-      city_remove_improvement(pcity, pimprove);
-    }
+    /* Small wonders should have already been removed by
+     * transfer_city() (with 100% probability). */
+    fc_assert(!is_small_wonder(pimprove));
     if (is_improvement(pimprove) && (fc_rand(100) < razechance)) {
       city_remove_improvement(pcity, pimprove);
     }
@@ -838,24 +939,31 @@ static void raze_city(struct city *pcity)
 ***************************************************************************/
 static void reestablish_city_trade_routes(struct city *pcity) 
 {
-  int i;
-  struct city *ptrade_city;
+  trade_routes_iterate(pcity, ptrade_city) {
+    bool keep_route;
 
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
-    ptrade_city = game_city_by_number(pcity->trade[i]);
+    /* Remove the city's trade routes (old owner).
+     * Do not announce removal as we might restore the route immediately below */
+    remove_trade_route(ptrade_city, pcity, FALSE, FALSE);
 
-    if (!ptrade_city) {
-      /* no trade route on this slot */
-      continue;
+    keep_route = can_cities_trade(pcity, ptrade_city)
+      && can_establish_trade_route(pcity, ptrade_city);
+
+    if (!keep_route) {
+      enum trade_route_type type = cities_trade_route_type(pcity, ptrade_city);
+      struct trade_route_settings *settings = trade_route_settings_by_type(type);
+
+      if (settings->cancelling != TRI_CANCEL) {
+        keep_route = TRUE;
+      }
     }
 
-    /* Remove the city's trade routes (old owner). */
-    remove_trade_route(ptrade_city, pcity);
-
     /* Readd the city's trade route (new owner) */
-    if (can_cities_trade(pcity, ptrade_city)
-        && can_establish_trade_route(pcity, ptrade_city)) {
+    if (keep_route) {
       establish_trade_route(pcity, ptrade_city);
+    } else {
+      /* Now announce the traderoute removal */
+      announce_trade_route_removal(pcity, ptrade_city, FALSE);
     }
 
     /* refresh regardless; either it lost a trade route or the trade
@@ -868,20 +976,28 @@ static void reestablish_city_trade_routes(struct city *pcity)
     reality_check_city(city_owner(pcity), ptrade_city->tile);
     update_dumb_city(city_owner(pcity), ptrade_city);
     send_city_info(city_owner(pcity), ptrade_city);
-  }
+  } trade_routes_iterate_end;
 }
 
 /**************************************************************************
-  Create saved small wonders in a random city. Usually used to save the
-  palace when the capital was conquered.
+  Create saved small wonders in random cities. Usually used to save the
+  palace when the capital was conquered. Respects the 'savepalace'
+  server setting.
 **************************************************************************/
 static void build_free_small_wonders(struct player *pplayer,
 				     bv_imprs *had_small_wonders)
 {
   int size = city_list_size(pplayer->cities);
 
+  if (!game.server.savepalace) {
+    /* Nothing to do */
+    return;
+  }
+
   if (size == 0) {
-    /* The last city was removed or transferred to the enemy. R.I.P. */
+    /* The last city was removed or transferred to the enemy.
+     * If the victim survives to found or acquire another city, they'll
+     * get any savepalace initial buildings then. */
     return;
   }
 
@@ -922,10 +1038,13 @@ Handles all transactions in relation to transferring a city.
 
 The kill_outside and transfer_unit_verbose arguments are passed to
 transfer_city_units(), which is called in the middle of the function.
+
+  Return TRUE iff the city remains after transfering (the city may be
+  destroyed by a script, notably with bouncing or wiping units).
 ***********************************************************************/
-void transfer_city(struct player *ptaker, struct city *pcity,
+bool transfer_city(struct player *ptaker, struct city *pcity,
 		   int kill_outside, bool transfer_unit_verbose,
-		   bool resolve_stack, bool raze)
+		   bool resolve_stack, bool raze, bool build_free)
 {
   char old_city_name[MAX_LEN_NAME];
   bv_imprs had_small_wonders;
@@ -936,13 +1055,39 @@ void transfer_city(struct player *ptaker, struct city *pcity,
   int saved_id = pcity->id;
   bool city_remains = TRUE;
   bool had_great_wonders = FALSE;
-  const int old_taker_content_citizens = player_content_citizens(ptaker);
-  const int old_giver_content_citizens = player_content_citizens(pgiver);
+  const citizens old_taker_content_citizens = player_content_citizens(ptaker);
+  const citizens old_giver_content_citizens = player_content_citizens(pgiver);
+  const citizens old_taker_angry_citizens = player_angry_citizens(ptaker);
+  const citizens old_giver_angry_citizens = player_angry_citizens(pgiver);
+  bool taker_had_no_cities = (city_list_size(ptaker->cities) == 0);
+  bool new_roads, new_bases;
+  const int units_num = unit_list_size(pcenter->units);
+  bv_player *could_see_unit = (units_num > 0
+                               ? fc_malloc(sizeof(*could_see_unit)
+                                           * units_num)
+                               : NULL);
+  int i;
 
-  fc_assert_ret(pgiver != ptaker);
+  fc_assert_ret_val(pgiver != ptaker, TRUE);
+
+  /* Remember what player see what unit. */
+  i = 0;
+  unit_list_iterate(pcenter->units, aunit) {
+    BV_CLR_ALL(could_see_unit[i]);
+    players_iterate(aplayer) {
+      if (can_player_see_unit(aplayer, aunit)) {
+        BV_SET(could_see_unit[i], player_index(aplayer));
+      }
+    } players_iterate_end;
+    i++;
+  } unit_list_iterate_end;
+  fc_assert(i == units_num);
 
   /* Remove AI control of the old owner. */
   CALL_PLR_AI_FUNC(city_lost, pcity->owner, pcity->owner, pcity);
+
+  /* Forget old tasks */
+  worker_task_init(&pcity->server.task_req);
 
   /* Activate AI control of the new owner. */
   CALL_PLR_AI_FUNC(city_got, ptaker, ptaker, pcity);
@@ -1009,6 +1154,30 @@ void transfer_city(struct player *ptaker, struct city *pcity,
   map_claim_ownership(pcenter, ptaker, pcenter);
   city_list_prepend(ptaker->cities, pcity);
 
+  /* Hide/reveal units. Do it after vision have been given to taker, city
+   * owner has been changed, and before any script could be spawned. */
+  i = 0;
+  unit_list_iterate(pcenter->units, aunit) {
+    players_iterate(aplayer) {
+      if (can_player_see_unit(aplayer, aunit)) {
+        if (!BV_ISSET(could_see_unit[i], player_index(aplayer))
+            && !aunit->server.dying) {
+          /* Reveal 'aunit'. */
+          send_unit_info(aplayer->connections, aunit);
+        }
+      } else {
+        if (BV_ISSET(could_see_unit[i], player_index(aplayer))) {
+          /* Hide 'aunit'. */
+          unit_goes_out_of_sight(aplayer, aunit);
+        }
+      }
+    } players_iterate_end;
+    i++;
+  } unit_list_iterate_end;
+  fc_assert(i == units_num);
+  free(could_see_unit);
+  could_see_unit = NULL;
+
   transfer_city_units(ptaker, pgiver, old_city_units,
 		      pcity, NULL,
 		      kill_outside, transfer_unit_verbose);
@@ -1037,8 +1206,20 @@ void transfer_city(struct player *ptaker, struct city *pcity,
   maybe_make_contact(pcenter, ptaker);
 
   if (city_remains) {
+    struct road_type *upgradet_road;
+    struct base_type *upgradet_base;
+
     if (raze) {
       raze_city(pcity);
+    }
+
+    if (taker_had_no_cities) {
+      /* If conqueror previously had no cities, we might need to give
+       * them a palace etc */
+      if (build_free) {
+        city_build_free_buildings(pcity);
+      } /* else caller should probably ensure palace is built */
+      ptaker->server.got_first_city = TRUE;
     }
 
     /* Restore any global improvement effects that this city confers */
@@ -1055,24 +1236,48 @@ void transfer_city(struct player *ptaker, struct city *pcity,
     /* What wasn't obsolete for the old owner may be so now. */
     remove_obsolete_buildings_city(pcity, TRUE);
 
-    if (terrain_control.may_road
-        && player_knows_techs_with_flag(ptaker, TF_RAILROAD)
-        && !tile_has_special(pcenter, S_RAILROAD)) {
+    new_roads = upgrade_city_roads(pcity, &upgradet_road);
+    new_bases = upgrade_city_bases(pcity, &upgradet_base);
+
+    if (new_roads || new_bases) {
+      const char *clink = city_link(pcity);
+
       notify_player(ptaker, pcenter, E_CITY_TRANSFER, ftc_server,
-                    _("The people in %s are stunned by your"
-                      " technological insight!\n"
-                      "      Workers spontaneously gather and upgrade"
-                      " the city with railroads."),
-                    city_link(pcity));
-      tile_set_special(pcenter, S_RAILROAD);
+                    _("The people in %s are stunned by your "
+                      "technological insight!"),
+                    clink);
+      if (new_roads) {
+        if (upgradet_road != NULL) {
+          notify_player(ptaker, pcenter, E_CITY_TRANSFER, ftc_server,
+                        _("Workers spontaneously gather and upgrade "
+                          "%s with %s."),
+                        clink, road_name_translation(upgradet_road));
+        } else {
+          notify_player(ptaker, pcenter, E_CITY_TRANSFER, ftc_server,
+                        _("Workers spontaneously gather and upgrade "
+                          "%s roads."),
+                        clink);
+        }
+      }
+      if (new_bases) {
+        if (upgradet_base != NULL) {
+          notify_player(ptaker, pcenter, E_CITY_TRANSFER, ftc_server,
+                        _("Workers spontaneously gather and upgrade "
+                          "%s with %s."),
+                        clink, base_name_translation(upgradet_base));
+        } else {
+          notify_player(ptaker, pcenter, E_CITY_TRANSFER, ftc_server,
+                        _("Workers spontaneously gather and upgrade "
+                          "%s bases."),
+                        clink);
+        }
+      }
       update_tile_knowledge(pcenter);
     }
 
     /* Build a new palace for free if the player lost her capital and
        savepalace is on. */
-    if (game.server.savepalace) {
-      build_free_small_wonders(pgiver, &had_small_wonders);
-    }
+    build_free_small_wonders(pgiver, &had_small_wonders);
 
     /* Refresh the city's vision range, since it might be different 
      * under the new owner. */
@@ -1082,15 +1287,14 @@ void transfer_city(struct player *ptaker, struct city *pcity,
      * This could leave a border ring around the city, updated later by
      * map_calculate_borders() at the next turn.
      */
-    map_claim_border(pcenter, ptaker);
+    map_claim_border(pcenter, ptaker, -1);
     /* city_thaw_workers_queue() later */
 
     auto_arrange_workers(pcity); /* does city_map_update_all() */
     city_thaw_workers(pcity);
     city_thaw_workers_queue();  /* after old city has a chance to work! */
     city_refresh_queue_add(pcity);
-
-    sanity_check_city(pcity);
+    /* no sanity check here as the city is not refreshed! */
   }
 
   if (city_remains) {
@@ -1136,6 +1340,8 @@ void transfer_city(struct player *ptaker, struct city *pcity,
 
   /* Refresh all cities in the queue. */
   city_refresh_queue_processing();
+  /* After the refresh the sanity check can be done. */
+  sanity_check_city(pcity);
 
   if (city_remains) {
     /* Send information about conquered city to all players. */
@@ -1144,31 +1350,34 @@ void transfer_city(struct player *ptaker, struct city *pcity,
 
   /* We may cross the EFT_EMPIRE_SIZE_* effects, then we will have to
    * refresh all cities for the player. */
-  if (old_taker_content_citizens != player_content_citizens(ptaker)) {
+  if (old_taker_content_citizens != player_content_citizens(ptaker)
+      || old_taker_angry_citizens != player_angry_citizens(ptaker)) {
     city_refresh_for_player(ptaker);
   }
-  if (old_giver_content_citizens != player_content_citizens(pgiver)) {
+  if (old_giver_content_citizens != player_content_citizens(pgiver)
+      || old_giver_angry_citizens != player_angry_citizens(pgiver)) {
     city_refresh_for_player(pgiver);
   }
 
   sync_cities();
+
+  return city_remains;
 }
 
 /****************************************************************************
-  Give to a city the free (initial) buildings. Updates the
-  pplayer->server.capital field.
-  If need_player_info isn't NULL, it will be stored here a player pointer
-  that need to be updated at client sides, using send_player_info_c().
-  If need_game_info isn't NULL, it will be stored here whether the game_info
-  packet should be sent again or not, using send_game_info().
+  Give to a new city the free (initial) buildings.
+  Call this when a player has just acquired a city (or batch of cities,
+  e.g. civil war) after having no cities.
+  Doesn't check for building uniqueness! -- assumes player has no other
+  cities which might contain unique buildings.
 ****************************************************************************/
 void city_build_free_buildings(struct city *pcity)
 {
   struct player *pplayer;
   struct nation_type *nation;
   int i;
-  bool has_small_wonders;
-  bool has_great_wonders;
+  bool has_small_wonders, has_great_wonders;
+  bool first_city;
 
   fc_assert_ret(NULL != pcity);
   pplayer = city_owner(pcity);
@@ -1176,17 +1385,17 @@ void city_build_free_buildings(struct city *pcity)
   nation = nation_of_player(pplayer);
   fc_assert_ret(NULL != nation);
 
-  if (pplayer->server.capital) {
-    /* Already got it. */
-    return;
-  }
+  /* If this isn't the first city a player has ever had, they only get
+   * any initial buildings with the SaveSmallWonder flag, and then only
+   * if savepalace is enabled. */
+  first_city = !pplayer->server.got_first_city;
 
   has_small_wonders = FALSE;
   has_great_wonders = FALSE;
 
   /* Global free buildings. */
   for (i = 0; i < MAX_NUM_BUILDING_LIST; i++) {
-    Impr_type_id n = game.server.rgame.global_init_buildings[i];
+    Impr_type_id n = game.rgame.global_init_buildings[i];
     struct impr_type *pimprove;
 
     if (n == B_LAST) {
@@ -1194,16 +1403,20 @@ void city_build_free_buildings(struct city *pcity)
     }
 
     pimprove = improvement_by_number(n);
-    city_add_improvement(pcity, pimprove);
-    if (is_small_wonder(pimprove)) {
-      has_small_wonders = TRUE;
+    fc_assert_action(!is_great_wonder(pimprove), continue);
+    if (first_city ||
+        (game.server.savepalace
+         && improvement_has_flag(pimprove, IF_SAVE_SMALL_WONDER))) {
+      city_add_improvement(pcity, pimprove);
+      if (is_small_wonder(pimprove)) {
+        has_small_wonders = TRUE;
+      }
     }
-    fc_assert(!is_great_wonder(pimprove));
   }
 
   /* Nation specific free buildings. */
   for (i = 0; i < MAX_NUM_BUILDING_LIST; i++) {
-    Impr_type_id n = nation->server.init_buildings[i];
+    Impr_type_id n = nation->init_buildings[i];
     struct impr_type *pimprove;
 
     if (n == B_LAST) {
@@ -1211,18 +1424,20 @@ void city_build_free_buildings(struct city *pcity)
     }
 
     pimprove = improvement_by_number(n);
-    city_add_improvement(pcity, pimprove);
-    if (is_small_wonder(pimprove)) {
-      has_small_wonders = TRUE;
-    } else if (is_great_wonder(pimprove)) {
-      has_great_wonders = TRUE;
+    if (first_city ||
+        (game.server.savepalace
+         && improvement_has_flag(pimprove, IF_SAVE_SMALL_WONDER))) {
+      city_add_improvement(pcity, pimprove);
+      if (is_small_wonder(pimprove)) {
+        has_small_wonders = TRUE;
+      } else if (is_great_wonder(pimprove)) {
+        has_great_wonders = TRUE;
+      }
     }
   }
 
-  pplayer->server.capital = TRUE;
-
   /* Update wonder infos. */
-  if (has_small_wonders) {
+  if (has_great_wonders) {
     send_game_info(NULL);
     /* No need to send to detached connections. */
     send_player_info_c(pplayer, NULL);
@@ -1236,36 +1451,52 @@ void city_build_free_buildings(struct city *pcity)
   Creates real city.
 **************************************************************************/
 void create_city(struct player *pplayer, struct tile *ptile,
-                 const char *name)
+                 const char *name, struct player *nationality)
 {
   struct player *saved_owner = tile_owner(ptile);
   struct tile *saved_claimer = tile_claimer(ptile);
   struct city *pwork = tile_worked(ptile);
   struct city *pcity;
-  const int old_content_citizens = player_content_citizens(pplayer);
+  const citizens old_content_citizens = player_content_citizens(pplayer);
+  const citizens old_angry_citizens = player_angry_citizens(pplayer);
 
   log_debug("create_city() %s", name);
 
-  /* Before doing anything else, remove any bases and their effects */
-  base_type_iterate(pbase) {
-    if (tile_has_base(ptile, pbase)) {
-      destroy_base(ptile, pbase);
-    }
-  } base_type_iterate_end;
-
   pcity = create_city_virtual(pplayer, ptile, name);
+
+  /* Remove units no more seen. Do it before city is really put into the
+   * game. */
+  players_iterate(other_player) {
+    if (can_player_see_units_in_city(other_player, pcity)
+        || !map_is_known_and_seen(ptile, other_player, V_MAIN)) {
+      continue;
+    }
+    unit_list_iterate(ptile->units, punit) {
+      if (can_player_see_unit(other_player, punit)) {
+        unit_goes_out_of_sight(other_player, punit);
+      }
+    } unit_list_iterate_end;
+  } players_iterate_end;
 
   adv_city_alloc(pcity);
 
   tile_set_owner(ptile, pplayer, ptile); /* temporarily */
   city_choose_build_default(pcity);
   pcity->id = identity_number();
-  idex_register_city(pcity);
 
-  if (!pplayer->server.capital) {
+  fc_allocate_mutex(&game.server.mutexes.city_list);
+  idex_register_city(pcity);
+  fc_release_mutex(&game.server.mutexes.city_list);
+
+  if (city_list_size(pplayer->cities) == 0) {
+    /* Free initial buildings, or at least a palace if they were
+     * previously careless enough to lose all their cities */
     city_build_free_buildings(pcity);
-    fc_assert(TRUE == pplayer->server.capital);
+    pplayer->server.got_first_city = TRUE;
   }
+
+  /* Set up citizens nationality. */
+  citizens_init(pcity);
 
   /* Place a worker at the is_city_center() is_free_worked().
    * It is possible to build a city on a tile that is already worked;
@@ -1282,8 +1513,35 @@ void create_city(struct player *pplayer, struct tile *ptile,
     city_freeze_workers_queue(pwork);
   }
 
-  /* Claim the ground we stand on */
+  /* Update citizens. */
+  citizens_update(pcity, nationality);
+
+  /* Restore the old-owner information so removal
+   * of territory claiming bases can work relative to it. */
   tile_set_owner(ptile, saved_owner, saved_claimer);
+
+  /* Remove any roads that don't belong in the city. */
+  road_type_iterate(proad) {
+    if (tile_has_road(ptile, proad)
+        && !is_native_tile_to_road(proad, ptile)) {
+      tile_remove_road(ptile, proad);
+    }
+  } road_type_iterate_end;
+  /* Build any roads that the city should have. */
+  upgrade_city_roads(pcity, NULL);
+
+  /* Destroy any bases that don't belong in the city. */
+  base_type_iterate(pbase) {
+    if (tile_has_base(ptile, pbase)
+        && !is_native_tile_to_base(pbase, ptile)) {
+      destroy_base(ptile, pbase);
+    }
+  } base_type_iterate_end;
+
+  /* Build any bases that the city should have. */
+  upgrade_city_bases(pcity, NULL);
+
+  /* Claim the ground we stand on */
   map_claim_ownership(ptile, pplayer, ptile);
 
   /* Before arranging workers to show unknown land */
@@ -1294,15 +1552,8 @@ void create_city(struct player *pplayer, struct tile *ptile,
 
   /* This is dependent on the current vision, so must be done after
    * vision is prepared and before arranging workers. */
-  map_claim_border(ptile, pplayer);
+  map_claim_border(ptile, pplayer, -1);
   /* city_thaw_workers_queue() later */
-
-  if (terrain_control.may_road) {
-    tile_set_special(ptile, S_ROAD);
-    if (player_knows_techs_with_flag(pplayer, TF_RAILROAD)) {
-      tile_set_special(ptile, S_RAILROAD);
-    }
-  }
 
   /* Refresh the city.  First a city refresh is done (this shouldn't
    * send any packets to the client because the city has no supported units)
@@ -1320,7 +1571,8 @@ void create_city(struct player *pplayer, struct tile *ptile,
 
   update_tile_knowledge(ptile);
 
-  if (old_content_citizens != player_content_citizens(pplayer)) {
+  if (old_content_citizens != player_content_citizens(pplayer)
+      || old_angry_citizens != player_angry_citizens(pplayer)) {
     /* We crossed the EFT_EMPIRE_SIZE_* effects, we have to refresh all
      * cities for the player. */
     city_refresh_for_player(pplayer);
@@ -1345,14 +1597,19 @@ void create_city(struct player *pplayer, struct tile *ptile,
 
     /* Update happiness (the unit may no longer cause unrest). */
     if (home) {
-      city_refresh(home);
+      if (city_refresh(home)) {
+        /* Shouldn't happen, but better be safe than sorry. */
+        auto_arrange_workers(home);
+      }
+      sanity_check_city(home);
       send_city_info(city_owner(home), home);
     }
   } unit_list_iterate_end;
 
   sanity_check_city(pcity);
 
-  script_signal_emit("city_built", 1, API_TYPE_CITY, pcity);
+  script_server_signal_emit("city_built", 1,
+                            API_TYPE_CITY, pcity);
 }
 
 /**************************************************************************
@@ -1360,14 +1617,17 @@ void create_city(struct player *pplayer, struct tile *ptile,
 **************************************************************************/
 void remove_city(struct city *pcity)
 {
-  int o;
   struct player *powner = city_owner(pcity);
   struct tile *pcenter = city_tile(pcity);
   bv_imprs had_small_wonders;
   struct vision *old_vision;
   int id = pcity->id; /* We need this even after memory has been freed */
   bool had_great_wonders = FALSE;
-  const int old_content_citizens = player_content_citizens(powner);
+  const citizens old_content_citizens = player_content_citizens(powner);
+  const citizens old_angry_citizens = player_angry_citizens(powner);
+  struct dbv tile_processed;
+  struct tile_list *process_queue;
+  const char *ctl = city_tile_link(pcity);
 
   BV_CLR_ALL(had_small_wonders);
   city_built_iterate(pcity, pimprove) {
@@ -1382,12 +1642,13 @@ void remove_city(struct city *pcity)
 
   /* Rehome units in other cities */
   unit_list_iterate_safe(pcity->units_supported, punit) {
-    struct city *new_home_city = tile_city(punit->tile);
+    struct city *new_home_city = tile_city(unit_tile(punit));
 
     if (new_home_city
 	&& new_home_city != pcity
-	&& city_owner(new_home_city) == powner) {
-      transfer_unit(punit, new_home_city, TRUE);
+        && city_owner(new_home_city) == powner
+        && !punit->server.dying) {
+      transfer_unit(punit, new_home_city, TRUE, TRUE);
     }
   } unit_list_iterate_safe_end;
 
@@ -1404,15 +1665,14 @@ void remove_city(struct city *pcity)
     moved = FALSE;
     adjc_iterate(pcenter, tile1) {
       if (!moved && is_native_tile(punittype, tile1)) {
-	if (could_unit_move_to_tile(punit, tile1) == 1) {
+        if (adv_could_unit_move_to_tile(punit, tile1) == 1) {
 	  moved = unit_move_handling(punit, tile1, FALSE, TRUE);
 	  if (moved) {
             notify_player(unit_owner(punit), tile1,
                           E_UNIT_RELOCATED, ftc_server,
                           _("Moved %s out of disbanded city %s "
                             "since it cannot stay on %s."),
-                          unit_link(punit),
-                          city_tile_link(pcity),
+                          unit_link(punit), ctl,
                           terrain_name_translation(tile_terrain(pcenter)));
             break;
 	  }
@@ -1424,21 +1684,62 @@ void remove_city(struct city *pcity)
                     E_UNIT_LOST_MISC, ftc_server,
                     _("When %s was disbanded your %s could not "
                       "get out, and it was therefore lost."),
-                    city_link(pcity),
+                    ctl,
                     unit_tile_link(punit));
-      unit_owner(punit)->score.units_lost++;
-      wipe_unit(punit);
+      wipe_unit(punit, ULR_CITY_LOST, NULL);
     }
   } unit_list_iterate_safe_end;
 
+  process_queue = tile_list_new();
+  dbv_init(&tile_processed, map_num_tiles());
+  for (tile_list_append(process_queue, pcenter); tile_list_size(process_queue) > 0;) {
+    struct tile *ptile = tile_list_front(process_queue);
+    tile_list_pop_front(process_queue);
+    dbv_set(&tile_processed, tile_index(ptile));
+    adjc_iterate(ptile, piter) {
+      struct city *other_city;
+
+      if (dbv_isset(&tile_processed, tile_index(piter))) {
+        continue;
+      }
+      other_city = tile_city(piter);
+      if (other_city != NULL) {
+        /* Adjacent tile has a city that may have been part of same channel */
+        dbv_set(&tile_processed, tile_index(piter));
+        tile_list_append(process_queue, piter);
+        unit_list_iterate_safe(piter->units, punit) {
+          struct unit_class *pclass = utype_class(punit->utype);
+
+          if (!uclass_has_flag(pclass, UCF_BUILD_ANYWHERE)
+              && !is_native_tile(punit->utype, piter)
+              && !is_city_channel_tile(pclass, piter, pcenter)) {
+            notify_player(unit_owner(punit), unit_tile(punit),
+                          E_UNIT_LOST_MISC, ftc_server,
+                          _("When %s was disbanded your %s in %s was trapped, "
+                            "and it was therefore lost."),
+                          ctl,
+                          unit_tile_link(punit),
+                          city_link(other_city));
+            wipe_unit(punit, ULR_CITY_LOST, NULL);
+          }
+        } unit_list_iterate_safe_end;
+      } else {
+        dbv_set(&tile_processed, tile_index(piter));
+      }
+    } adjc_iterate_end;
+  }
+
+  dbv_free(&tile_processed);
+  tile_list_destroy(process_queue);
+
   if (!city_exist(id)) {
+    /* Wiping trapped units caused city to disappear. */
     return;
   }
 
   /* Any remaining supported units are destroyed */
   unit_list_iterate_safe(pcity->units_supported, punit) {
-    unit_owner(punit)->score.units_lost++;
-    wipe_unit(punit);
+    wipe_unit(punit, ULR_CITY_LOST, NULL);
   } unit_list_iterate_safe_end;
 
   if (!city_exist(id)) {
@@ -1446,15 +1747,9 @@ void remove_city(struct city *pcity)
     return;
   }
 
-  for (o = 0; o < NUM_TRADE_ROUTES; o++) {
-    struct city *pother_city = game_city_by_number(pcity->trade[o]);
-
-    if (!pother_city) {
-      continue;
-    }
-
-    remove_trade_route(pother_city, pcity);
-  }
+  trade_routes_iterate(pcity, pother_city) {
+    remove_trade_route(pcity, pother_city, TRUE, TRUE);
+  } trade_routes_iterate_end;
 
   map_clear_border(pcenter);
   city_workers_queue_remove(pcity);
@@ -1470,14 +1765,44 @@ void remove_city(struct city *pcity)
 
   old_vision = pcity->server.vision;
   pcity->server.vision = NULL;
-  script_remove_exported_object(pcity);
+  script_server_remove_exported_object(pcity);
   adv_city_free(pcity);
-  game_remove_city(pcity);
 
-  if (tile_terrain(pcenter)->road_time == 0) {
-    tile_remove_special(pcenter, S_RAILROAD);
-    tile_remove_special(pcenter, S_ROAD);
-  }
+  /* Remove city from the map. */
+  tile_set_worked(pcenter, NULL);
+
+  /* Reveal units. */
+  players_iterate(other_player) {
+    if (can_player_see_units_in_city(other_player, pcity)
+        || !map_is_known_and_seen(pcenter, other_player, V_MAIN)) {
+      continue;
+    }
+    unit_list_iterate(pcenter->units, punit) {
+      if (can_player_see_unit(other_player, punit)) {
+        send_unit_info(other_player->connections, punit);
+      }
+    } unit_list_iterate_end;
+  } players_iterate_end;
+
+  fc_allocate_mutex(&game.server.mutexes.city_list);
+  game_remove_city(pcity);
+  fc_release_mutex(&game.server.mutexes.city_list);
+
+  /* Remove any roads that were only there because the city was there. */
+  road_type_iterate(proad) {
+    if (tile_has_road(pcenter, proad)
+        && !is_native_tile_to_road(proad, pcenter)) {
+      tile_remove_road(pcenter, proad);
+    }
+  } road_type_iterate_end;
+
+  /* Remove any bases that were only there because the city was there. */
+  base_type_iterate(pbase) {
+    if (tile_has_base(pcenter, pbase)
+        && !is_native_tile_to_base(pbase, pcenter)) {
+      tile_remove_base(pcenter, pbase);
+    }
+  } base_type_iterate_end;
 
   players_iterate(other_player) {
     if (map_is_known_and_seen(pcenter, other_player, V_MAIN)) {
@@ -1497,11 +1822,12 @@ void remove_city(struct city *pcity)
   vision_clear_sight(old_vision);
   vision_free(old_vision);
 
+  /* Infrastructures may have changed. */
+  send_tile_info(NULL, pcenter, FALSE);
+
   /* Build a new palace for free if the player lost her capital and
      savepalace is on. */
-  if (game.server.savepalace) {
-    build_free_small_wonders(powner, &had_small_wonders);
-  }
+  build_free_small_wonders(powner, &had_small_wonders);
 
   /* Update wonder infos. */
   if (had_great_wonders) {
@@ -1513,7 +1839,8 @@ void remove_city(struct city *pcity)
     send_player_info_c(powner, NULL);
   }
 
-  if (old_content_citizens != player_content_citizens(powner)) {
+  if (old_content_citizens != player_content_citizens(powner)
+      || old_angry_citizens != player_angry_citizens(powner)) {
     /* We crossed the EFT_EMPIRE_SIZE_* effects, we have to refresh all
      * cities for the player. */
     city_refresh_for_player(powner);
@@ -1532,10 +1859,10 @@ void remove_city(struct city *pcity)
 void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
 {
   bool try_civil_war = FALSE;
+  bool city_remains;
   int coins;
   struct player *pplayer = unit_owner(punit);
   struct player *cplayer = city_owner(pcity);
-  bv_player saw_entering;
 
   /* If not at war, may peacefully enter city. Or, if we cannot occupy
    * the city, this unit entering will not trigger the effects below. */
@@ -1552,15 +1879,6 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
      Also check spaceships --dwp
   */
 
-  /* Store information who saw unit entering city.
-   * This means old owner + allies + shared vision */
-  BV_CLR_ALL(saw_entering);
-  players_iterate(pplayer) {
-    if (map_is_known_and_seen(pcity->tile, pplayer, V_MAIN)) {
-      BV_SET(saw_entering, player_index(pplayer));
-    }
-  } players_iterate_end;
-
   if (is_capital(pcity)
       && (cplayer->spaceship.state == SSHIP_STARTED
           || cplayer->spaceship.state == SSHIP_LAUNCHED)) {
@@ -1568,8 +1886,7 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
   }
   
   if (is_capital(pcity)
-      && city_list_size(cplayer->cities) >= game.server.civilwarsize
-      && game.server.civilwarsize < GAME_MAX_CIVILWARSIZE
+      && civil_war_possible(cplayer, TRUE, TRUE)
       && normal_player_count() < MAX_NUM_PLAYERS
       && civil_war_triggered(cplayer)) {
     try_civil_war = TRUE;
@@ -1579,7 +1896,7 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
    * We later remove a citizen. Lets check if we can save this since
    * the city will be destroyed.
    */
-  if (pcity->size <= 1) {
+  if (city_size_get(pcity) <= 1) {
     int saved_id = pcity->id;
 
     notify_player(pplayer, city_tile(pcity), E_UNIT_WIN_ATT, ftc_server,
@@ -1588,10 +1905,10 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
     notify_player(cplayer, city_tile(pcity), E_CITY_LOST, ftc_server,
                   _("%s has been destroyed by %s."), 
                   city_tile_link(pcity), player_name(pplayer));
-    script_signal_emit("city_destroyed", 3,
-                       API_TYPE_CITY, pcity,
-                       API_TYPE_PLAYER, cplayer,
-                       API_TYPE_PLAYER, pplayer);
+    script_server_signal_emit("city_destroyed", 3,
+                              API_TYPE_CITY, pcity,
+                              API_TYPE_PLAYER, cplayer,
+                              API_TYPE_PLAYER, pplayer);
 
     /* We cant't be sure of city existence after running some script */
     if (city_exist(saved_id)) {
@@ -1599,13 +1916,15 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
     }
 
     if (try_civil_war) {
-      civil_war(cplayer);
+      (void) civil_war(cplayer);
     }
     return;
   }
 
   coins = cplayer->economic.gold;
-  coins = fc_rand((coins / 20) + 1) + (coins * (pcity->size)) / 200;
+  coins = MIN(coins,
+              fc_rand((coins / 20) + 1)
+              + (coins * (city_size_get(pcity))) / 200);
   pplayer->economic.gold += coins;
   cplayer->economic.gold -= coins;
   send_player_info_c(cplayer, cplayer->connections);
@@ -1664,37 +1983,31 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
   }
 
   steal_a_tech(pplayer, cplayer, A_UNSET);
+  send_player_info_c(pplayer, pplayer->connections);
 
   /* We transfer the city first so that it is in a consistent state when
    * the size is reduced. */
-  transfer_city(pplayer, pcity , 0, TRUE, TRUE, TRUE);
+  /* FIXME: maybe it should be a ruleset option whether barbarians get
+   * free buildings such as palaces? */
+  city_remains = transfer_city(pplayer, pcity, 0, TRUE, TRUE, TRUE,
+                               !is_barbarian(pplayer));
 
-  /* After city has been transferred, some players may no longer see inside. */
-  players_iterate(pplayer) {
-    if (BV_ISSET(saw_entering, player_index(pplayer))
-        && !can_player_see_unit_at(pplayer, punit, pcity->tile)) {
-      /* Player saw unit entering, but now unit is hiding inside city */
-      unit_goes_out_of_sight(pplayer, punit);
-    } else if (!BV_ISSET(saw_entering, player_index(pplayer))
-               && can_player_see_unit_at(pplayer, punit, pcity->tile)) {
-      /* Player sees inside cities of new owner */
-      send_unit_info_to_onlookers(pplayer->connections, punit,
-                                  pcity->tile, FALSE);
-    }
-  } players_iterate_end;
-
-  fc_assert(pcity->size > 1); /* reduce size should not destroy this city */
-  city_reduce_size(pcity, 1, pplayer);
-  send_player_info_c(pplayer, pplayer->connections); /* Update techs */
-
-  if (try_civil_war) {
-    civil_war(cplayer);
+  if (city_remains) {
+    /* reduce size should not destroy this city */
+    fc_assert(city_size_get(pcity) > 1);
+    city_reduce_size(pcity, 1, pplayer);
   }
 
-  script_signal_emit("city_lost", 3,
-                     API_TYPE_CITY, pcity,
-                     API_TYPE_PLAYER, cplayer,
-                     API_TYPE_PLAYER, pplayer);
+  if (try_civil_war) {
+    (void) civil_war(cplayer);
+  }
+
+  if (city_remains) {
+    script_server_signal_emit("city_lost", 3,
+                              API_TYPE_CITY, pcity,
+                              API_TYPE_PLAYER, cplayer,
+                              API_TYPE_PLAYER, pplayer);
+  }
 }
 
 /**************************************************************************
@@ -1704,14 +2017,12 @@ void unit_enter_city(struct unit *punit, struct city *pcity, bool passenger)
 static bool player_has_trade_route_with_city(struct player *pplayer,
                                              struct city *pcity)
 {
-  int i;
-
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
-    struct city *other = game_city_by_number(pcity->trade[i]);
-    if (other && city_owner(other) == pplayer) {
+  trade_routes_iterate(pcity, other) {
+    if (city_owner(other) == pplayer) {
       return TRUE;
     }
-  }
+  } trade_routes_iterate_end;
+
   return FALSE;
 }
 
@@ -1735,15 +2046,16 @@ static void package_dumb_city(struct player* pplayer, struct tile *ptile,
   struct vision_site *pdcity = map_get_player_city(ptile, pplayer);
 
   packet->id = pdcity->identity;
-  packet->owner = player_number(vision_owner(pdcity));
+  packet->owner = player_number(vision_site_owner(pdcity));
 
   packet->tile = tile_index(ptile);
   sz_strlcpy(packet->name, pdcity->name);
 
-  packet->size = pdcity->size;
+  packet->size = vision_site_size_get(pdcity);
 
   packet->occupied = pdcity->occupied;
   packet->walls = pdcity->walls;
+  packet->city_image = pdcity->city_image;
 
   packet->happy = pdcity->happy;
   packet->unhappy = pdcity->unhappy;
@@ -1802,6 +2114,7 @@ static void broadcast_city_info(struct city *pcity)
     } else {
       if (map_is_known_and_seen(pcity->tile, pplayer, V_MAIN)
           || player_has_trade_route_with_city(pplayer, pcity)) {
+        reality_check_city(pplayer, pcity->tile);
 	update_dumb_city(pplayer, pcity);
 	package_dumb_city(pplayer, pcity->tile, &sc_pack);
 	lsend_packet_city_short_info(pplayer->connections, &sc_pack);
@@ -1841,12 +2154,18 @@ void send_all_known_cities(struct conn_list *dest)
 }
 
 /**************************************************************************
-...
+  Send information about all his/her cities to player
 **************************************************************************/
 void send_player_cities(struct player *pplayer)
 {
   city_list_iterate(pplayer->cities, pcity) {
-    city_refresh(pcity);
+    if (city_refresh(pcity)) {
+      log_error("%s radius changed while sending to player.",
+                city_name(pcity));
+
+      /* Make sure that no workers in illegal position outside radius. */
+      auto_arrange_workers(pcity);
+    }
     send_city_info(pplayer, pcity);
   }
   city_list_iterate_end;
@@ -1862,8 +2181,9 @@ void send_city_info(struct player *dest, struct city *pcity)
 {
   struct player *powner = city_owner(pcity);
 
-  if (S_S_RUNNING != server_state() && S_S_OVER != server_state())
+  if (S_S_RUNNING != server_state() && S_S_OVER != server_state()) {
     return;
+  }
 
   if (dest == powner && send_city_suppressed) {
     return;
@@ -1877,6 +2197,12 @@ void send_city_info(struct player *dest, struct city *pcity)
     broadcast_city_info(pcity);
   } else {
     send_city_info_at_tile(dest, dest->connections, pcity, pcity->tile);
+  }
+
+  if (game.info.team_pooled_research
+      && player_list_size(team_members(powner->team)) > 1) {
+    /* We want to send the new total bulbs production of the team. */
+    send_player_info_c(powner, NULL);
   }
 }
 
@@ -1959,7 +2285,7 @@ void send_city_info_at_tile(struct player *pviewer, struct conn_list *dest,
 }
 
 /**************************************************************************
-...
+  Fill city info packet with information about given city.
 **************************************************************************/
 void package_city(struct city *pcity, struct packet_city_info *packet,
 		  bool dipl_invest)
@@ -1972,7 +2298,7 @@ void package_city(struct city *pcity, struct packet_city_info *packet,
   packet->tile = tile_index(city_tile(pcity));
   sz_strlcpy(packet->name, city_name(pcity));
 
-  packet->size=pcity->size;
+  packet->size = city_size_get(pcity);
   for (i = 0; i < FEELING_LAST; i++) {
     packet->ppl_happy[i] = pcity->feel[CITIZEN_HAPPY][i];
     packet->ppl_content[i] = pcity->feel[CITIZEN_CONTENT][i];
@@ -1992,6 +2318,30 @@ void package_city(struct city *pcity, struct packet_city_info *packet,
     ppl += packet->specialists[sp];
   } specialist_type_iterate_end;
 
+  /* The nationality of the citizens. */
+  packet->nationalities_count = 0;
+  if (game.info.citizen_nationality) {
+    int cit = 0;
+
+    player_slots_iterate(pslot) {
+      citizens nationality = citizens_nation_get(pcity, pslot);
+      if (nationality != 0) {
+        /* This player should exist! */
+        fc_assert(player_slot_get_player(pslot) != NULL);
+
+        packet->nation_id[packet->nationalities_count]
+          = player_slot_index(pslot);
+        packet->nation_citizens[packet->nationalities_count]
+          = nationality;
+        packet->nationalities_count++;
+
+        cit += nationality;
+      }
+    } player_slots_iterate_end;
+
+    fc_assert(cit == packet->size);
+  }
+
   if (packet->size != ppl) {
     static bool recursion = FALSE;
 
@@ -2007,6 +2357,7 @@ void package_city(struct city *pcity, struct packet_city_info *packet,
                 packet->size, ppl, city_name(pcity));
       /* Try to fix */
       city_refresh(pcity);
+      auto_arrange_workers(pcity);
 
       /* And repackage */
       recursion = TRUE;
@@ -2019,9 +2370,9 @@ void package_city(struct city *pcity, struct packet_city_info *packet,
 
   packet->city_radius_sq = pcity->city_radius_sq;
 
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
-    packet->trade[i]=pcity->trade[i];
-    packet->trade_value[i]=pcity->trade_value[i];
+  for (i = 0; i < MAX_TRADE_ROUTES; i++) {
+    packet->trade[i] = pcity->trade[i];
+    packet->trade_value[i] = pcity->trade_value[i];
   }
 
   output_type_iterate(o) {
@@ -2062,6 +2413,7 @@ void package_city(struct city *pcity, struct packet_city_info *packet,
   packet->was_happy = pcity->was_happy;
 
   packet->walls = city_got_citywalls(pcity);
+  packet->city_image = get_city_bonus(pcity, EFT_CITY_IMAGE);
 
   BV_CLR_ALL(packet->improvements);
   improvement_iterate(pimprove) {
@@ -2086,12 +2438,13 @@ bool update_dumb_city(struct player *pplayer, struct city *pcity)
   bv_imprs improvements;
   struct tile *pcenter = city_tile(pcity);
   struct vision_site *pdcity = map_get_player_city(pcenter, pplayer);
-  /* pcity->occupied isn't used at the server, so we go straight to the
+  /* pcity->client.occupied isn't used at the server, so we go straight to the
    * unit list to check the occupied status. */
   bool occupied = (unit_list_size(pcenter->units) > 0);
   bool walls = city_got_citywalls(pcity);
   bool happy = city_happy(pcity);
   bool unhappy = city_unhappy(pcity);
+  int city_image = get_city_bonus(pcity, EFT_CITY_IMAGE);
 
   BV_CLR_ALL(improvements);
   improvement_iterate(pimprove) {
@@ -2102,7 +2455,7 @@ bool update_dumb_city(struct player *pplayer, struct city *pcity)
   } improvement_iterate_end;
 
   if (NULL == pdcity) {
-    pdcity = create_vision_site_from_city(pcity);
+    pdcity = vision_site_new_from_city(pcity);
     change_playertile_site(map_get_player_tile(pcenter, pplayer), pdcity);
   } else if (pdcity->location != pcenter) {
     log_error("Trying to update bad city (wrong location) "
@@ -2118,16 +2471,18 @@ bool update_dumb_city(struct player *pplayer, struct city *pcity)
 	  && pdcity->walls == walls
 	  && pdcity->happy == happy
 	  && pdcity->unhappy == unhappy
+          && pdcity->city_image == city_image
 	  && BV_ARE_EQUAL(pdcity->improvements, improvements)
-	  && pdcity->size == pcity->size
-	  && vision_owner(pdcity) == city_owner(pcity)
+          && vision_site_size_get(pdcity) == city_size_get(pcity)
+	  && vision_site_owner(pdcity) == city_owner(pcity)
 	  && 0 == strcmp(pdcity->name, city_name(pcity))) {
     return FALSE;
   }
 
-  update_vision_site_from_city(pdcity, pcity);
+  vision_site_update_from_city(pdcity, pcity);
   pdcity->occupied = occupied;
   pdcity->walls = walls;
+  pdcity->city_image = city_image;
   pdcity->happy = happy;
   pdcity->unhappy = unhappy;
   pdcity->improvements = improvements;
@@ -2138,7 +2493,7 @@ bool update_dumb_city(struct player *pplayer, struct city *pcity)
 /**************************************************************************
   Removes outdated (nonexistant) cities from a player
 **************************************************************************/
-void reality_check_city(struct player *pplayer,struct tile *ptile)
+void reality_check_city(struct player *pplayer, struct tile *ptile)
 {
   struct vision_site *pdcity = map_get_player_city(ptile, pplayer);
 
@@ -2151,7 +2506,7 @@ void reality_check_city(struct player *pplayer,struct tile *ptile)
       dlsend_packet_city_remove(pplayer->connections, pdcity->identity);
       fc_assert_ret(playtile->site == pdcity);
       playtile->site = NULL;
-      free_vision_site(pdcity);
+      vision_site_destroy(pdcity);
     }
   }
 }
@@ -2169,39 +2524,104 @@ void remove_dumb_city(struct player *pplayer, struct tile *ptile)
     dlsend_packet_city_remove(pplayer->connections, pdcity->identity);
     fc_assert_ret(playtile->site == pdcity);
     playtile->site = NULL;
-    free_vision_site(pdcity);
+    vision_site_destroy(pdcity);
+  }
+}
+
+/**************************************************************************
+  Announce to the owners of the cities that trade route has been canceled
+  between them.
+**************************************************************************/
+static void announce_trade_route_removal(struct city *pc1, struct city *pc2,
+                                         bool source_gone)
+{
+  struct player *plr1 = city_owner(pc1);
+  struct player *plr2 = city_owner(pc2);
+  char city1_link[MAX_LEN_LINK];
+  char city2_link[MAX_LEN_LINK];
+
+  sz_strlcpy(city1_link, city_link(pc1));
+  sz_strlcpy(city2_link, city_link(pc2));
+
+  if (plr1 == plr2) {
+    if (source_gone) {
+      notify_player(plr2, city_tile(pc2),
+                    E_CARAVAN_ACTION, ftc_server,
+                    _("Trade between %s and %s lost along with city."),
+                    city1_link, city2_link);
+    } else {
+      notify_player(plr1, city_tile(pc1),
+                    E_CARAVAN_ACTION, ftc_server,
+                    _("Trade route between %s and %s canceled."),
+                    city1_link, city2_link);
+    }
+  } else {
+    if (source_gone) {
+      notify_player(plr2, city_tile(pc2),
+                    E_CARAVAN_ACTION, ftc_server,
+                    /* TRANS: "...between Spanish city Madrid and Paris..." */
+                    _("Trade between %s city %s and %s lost along with "
+                      "their city."),
+                    nation_adjective_for_player(plr1), city1_link, city2_link);
+      /* It's implicit to removed city's owner that that city no longer
+       * has trade routes, so say nothing in that case */
+    } else {
+      notify_player(plr2, city_tile(pc2),
+                    E_CARAVAN_ACTION, ftc_server,
+                    _("Sorry, the %s canceled the trade route "
+                      "from %s to your city %s."),
+                    nation_plural_for_player(plr1), city1_link, city2_link);
+      notify_player(plr1, city_tile(pc1),
+                    E_CARAVAN_ACTION, ftc_server,
+                    /* TRANS: "...from Paris to Spanish city Madrid." */
+                    _("We canceled the trade route "
+                      "from %s to %s city %s."),
+                    city1_link, nation_adjective_for_player(plr2), city2_link);
+    }
   }
 }
 
 /**************************************************************************
   Remove the trade route between pc1 and pc2 (if one exists).
+  source_gone should be TRUE if the reason for removal is the imminent
+  removal of the source city (pc1) from the game.
 **************************************************************************/
-void remove_trade_route(struct city *pc1, struct city *pc2)
+void remove_trade_route(struct city *pc1, struct city *pc2,
+                        bool announce, bool source_gone)
 {
   int i;
 
   fc_assert_ret(pc1 && pc2);
 
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
-    if (pc1->trade[i] == pc2->id)
+  for (i = 0; i < MAX_TRADE_ROUTES; i++) {
+    if (pc1->trade[i] == pc2->id) {
       pc1->trade[i] = 0;
-    if (pc2->trade[i] == pc1->id)
+    }
+    if (pc2->trade[i] == pc1->id) {
       pc2->trade[i] = 0;
+    }
+  }
+
+  if (announce) {
+    announce_trade_route_removal(pc1, pc2, source_gone);
+
+    city_refresh(pc2);
+    send_city_info(city_owner(pc2), pc2);
   }
 }
 
-/**************************************************************************
-  Remove/cancel the city's least valuable trade route.
-**************************************************************************/
-static void remove_smallest_trade_route(struct city *pcity)
+/****************************************************************************
+  Remove/cancel the city's least valuable trade routes.
+****************************************************************************/
+static void remove_smallest_trade_routes(struct city *pcity)
 {
-  int slot;
+  struct city_list *remove = city_list_new();
 
-  if (get_city_min_trade_route(pcity, &slot) <= 0) {
-    return;
-  }
-
-  remove_trade_route(pcity, game_city_by_number(pcity->trade[slot]));
+  (void) city_trade_removable(pcity, remove);
+  city_list_iterate(remove, pother_city) {
+    remove_trade_route(pcity, pother_city, TRUE, FALSE);
+  } city_list_iterate_end;
+  city_list_destroy(remove);
 }
 
 /**************************************************************************
@@ -2212,26 +2632,28 @@ void establish_trade_route(struct city *pc1, struct city *pc2)
 {
   int i;
 
-  if (city_num_trade_routes(pc1) == NUM_TRADE_ROUTES) {
-    remove_smallest_trade_route(pc1);
+  if (city_num_trade_routes(pc1) >= max_trade_routes(pc1)) {
+    remove_smallest_trade_routes(pc1);
   }
 
-  if (city_num_trade_routes(pc2) == NUM_TRADE_ROUTES) {
-    remove_smallest_trade_route(pc2);
+  if (city_num_trade_routes(pc2) >= max_trade_routes(pc2)) {
+    remove_smallest_trade_routes(pc2);
   }
 
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+  for (i = 0; i < MAX_TRADE_ROUTES; i++) {
     if (pc1->trade[i] == 0) {
       pc1->trade[i] = pc2->id;
       break;
     }
   }
-  for (i = 0; i < NUM_TRADE_ROUTES; i++) {
+  fc_assert(i < MAX_TRADE_ROUTES);
+  for (i = 0; i < MAX_TRADE_ROUTES; i++) {
     if (pc2->trade[i] == 0) {
       pc2->trade[i] = pc1->id;
       break;
     }
   }
+  fc_assert(i < MAX_TRADE_ROUTES);
 
   /* recalculate illness due to trade */
   if (game.info.illness_on) {
@@ -2276,7 +2698,9 @@ void building_lost(struct city *pcity, const struct impr_type *pimprove)
   }
 
   /* update city; influence of effects (buildings, ...) on unit upkeep */
-  city_refresh(pcity);
+  if (city_refresh(pcity)) {
+    auto_arrange_workers(pcity);
+  }
 
   /* Re-update the city's visible area.  This updates fog if the vision
    * range increases or decreases. */
@@ -2346,8 +2770,8 @@ void city_units_upkeep(const struct city *pcity)
     } output_type_iterate_end;
 
     if (update) {
-      /* update unit information to the player */
-      send_unit_info(plr, punit);
+      /* Update unit information to the player and global observers. */
+      send_unit_info(NULL, punit);
     }
   } unit_list_iterate_end;
 }
@@ -2385,7 +2809,9 @@ void change_build_target(struct player *pplayer, struct city *pcity,
 
   /* Manage the city change-production penalty.
      (May penalize, restore or do nothing to the shield_stock.) */
-  pcity->shield_stock = city_change_production_penalty(pcity, target);
+  if (!pplayer->ai_controlled || ai_handicap(pplayer, H_AWAY)) {
+    pcity->shield_stock = city_change_production_penalty(pcity, target);
+  }
 
   /* Change build target. */
   pcity->production = target;
@@ -2496,7 +2922,8 @@ bool city_map_update_tile_now(struct tile *ptile)
 }
 
 /**************************************************************************
-...
+  Make sure all players (clients) have up-to-date information about all
+  their cities.
 **************************************************************************/
 void sync_cities(void)
 {
@@ -2529,7 +2956,7 @@ void city_map_update_all(struct city *pcity)
 }
 
 /**************************************************************************
-...
+  Update worked map of all cities of given player
 **************************************************************************/
 void city_map_update_all_cities_for_player(struct player *pplayer)
 {
@@ -2555,7 +2982,7 @@ void city_landlocked_sell_coastal_improvements(struct tile *ptile)
   adjc_iterate(ptile, tile1) {
     struct city *pcity = tile_city(tile1);
 
-    if (pcity && !is_ocean_near_tile(tile1)) {
+    if (pcity && !is_terrain_class_near_tile(tile1, TC_OCEAN)) {
       struct player *pplayer = city_owner(pcity);
 
       /* Sell all buildings (but not Wonders) that must be next to the ocean */
@@ -2565,11 +2992,13 @@ void city_landlocked_sell_coastal_improvements(struct tile *ptile)
         }
 
 	requirement_vector_iterate(&pimprove->reqs, preq) {
-	  if (VUT_TERRAIN == preq->source.kind
+	  if ((VUT_TERRAIN == preq->source.kind
+               || VUT_TERRAINCLASS == preq->source.kind)
 	      && !is_req_active(city_owner(pcity), pcity, NULL,
 				NULL, NULL, NULL, NULL,
 				preq, TRUE)) {
             int price = impr_sell_gold(pimprove);
+
             do_sell_building(pplayer, pcity, pimprove);
             notify_player(pplayer, tile1, E_IMP_SOLD, ftc_server,
                           PL_("You sell %s in %s (now landlocked)"
@@ -2600,11 +3029,21 @@ void city_refresh_vision(struct city *pcity)
   ASSERT_VISION(pcity->server.vision);
 }
 
+/****************************************************************************
+  Refresh the vision of all cities owned by a player, for empire-wide
+  effects.
+****************************************************************************/
+void refresh_player_cities_vision(struct player *pplayer)
+{
+  city_list_iterate(pplayer->cities, pcity) {
+    city_refresh_vision(pcity);
+  } city_list_iterate_end;
+}
+
 /**************************************************************************
-  Updates the squared city radius. If the radius is changed and
-  arrange_workers is set to TRUE auto_arrange_workers() is called.
+  Updates the squared city radius. Returns if the radius is changed.
 **************************************************************************/
-bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
+bool city_map_update_radius_sq(struct city *pcity)
 {
 
   fc_assert_ret_val(pcity != NULL, FALSE);
@@ -2638,7 +3077,7 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
 
   /* workers map before */
   log_debug("[%s (%d)] city size: %d; specialists: %d (before change)",
-            city_name(pcity), pcity->id, pcity->size,
+            city_name(pcity), pcity->id, city_size_get(pcity),
             city_specialists(pcity));
   citylog_map_workers(LOG_DEBUG, pcity);
 
@@ -2647,9 +3086,6 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
   if (city_tiles_old < city_tiles_new) {
     /* increased number of city tiles */
     city_refresh_vision(pcity);
-    if (arrange_workers) {
-      auto_arrange_workers(pcity);
-    }
   } else {
     /* reduced number of city tiles */
     int workers = 0;
@@ -2670,7 +3106,7 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
     /* add workers to free city tiles */
     if (workers > 0) {
       int radius_sq = city_map_radius_sq_get(pcity);
-      city_map_iterate(radius_sq, city_index, city_x, city_y) {
+      city_map_iterate_without_index(radius_sq, city_x, city_y) {
         struct tile *ptile = city_map_to_tile(city_tile(pcity), radius_sq,
                                               city_x, city_y);
 
@@ -2684,7 +3120,7 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
         if (workers <= 0) {
           break;
         }
-      } city_map_iterate_end;
+      } city_map_iterate_without_index_end;
     }
 
     /* if there are still workers they will be updated to specialists */
@@ -2693,16 +3129,10 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
     }
 
     city_refresh_vision(pcity);
-    if (arrange_workers) {
-      auto_arrange_workers(pcity);
-    }
   }
 
   /* if city is under AI control update it */
-  ai_city_update(pcity);
-
-  /* Force a sync of the city after the change. */
-  send_city_info(city_owner(pcity), pcity);
+  adv_city_update(pcity);
 
   notify_player(city_owner(pcity), city_tile(pcity), E_CITY_RADIUS_SQ,
                 ftc_server, _("The size of the city map of %s is %s."),
@@ -2712,7 +3142,7 @@ bool city_map_update_radius_sq(struct city *pcity, bool arrange_workers)
 
   /* workers map after */
   log_debug("[%s (%d)] city size: %d; specialists: %d (after change)",
-            city_name(pcity), pcity->id, pcity->size,
+            city_name(pcity), pcity->id, city_size_get(pcity),
             city_specialists(pcity));
   citylog_map_workers(LOG_DEBUG, pcity);
 

@@ -1,0 +1,261 @@
+/*****************************************************************************
+ Freeciv - Copyright (C) 2005 - The Freeciv Project
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2, or (at your option)
+   any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+*****************************************************************************/
+
+/*****************************************************************************
+  ADVERTISEMENT: do not attempt to change the name of the API functions.
+  They *must* be compatible between the minor Freeciv versions within the
+  same major version. If you really like to change a function name, be sure
+  to keep also the old one running.
+*****************************************************************************/
+
+$#ifdef HAVE_CONFIG_H
+$#include <fc_config.h>
+$#endif
+
+/* common/scriptcore */
+$#include "luascript_types.h"
+
+/* server */
+$#include "commands.h"
+$#include "console.h"
+
+/* server/scripting */
+$#include "api_server_edit.h"
+$#include "api_server_base.h"
+$#include "api_server_notify.h"
+$#include "script_server.h"
+
+/* Server module. */
+module server {
+  bool api_server_save
+    @ save (lua_State *L, const char *filename);
+  bool api_server_was_started
+    @ started (lua_State *L);
+  int api_server_player_civilization_score
+    @ civilization_score (lua_State *L, Player *pplayer);
+
+  module setting {
+    const char *api_server_setting_get
+      @ get (lua_State *L, const char *setting_name);
+  }
+}
+
+/* Notify module. */
+module notify {
+  void api_notify_embassies_msg
+    @ embassies_msg (lua_State *L, Player *pplayer, Tile *ptile, int event,
+                     const char *message);
+  void api_notify_event_msg
+    @ event_msg (lua_State *L, Player *pplayer, Tile *ptile, int event,
+                 const char *message);
+}
+
+$[
+-- Notify module implementation.
+
+function notify.all(...)
+  local arg = table.pack(...);
+  notify.event_msg(nil, nil, E.SCRIPT, string.format(table.unpack(arg)))
+end
+
+function notify.player(player, ...)
+  local arg = table.pack(...);
+  notify.event_msg(player, nil, E.SCRIPT, string.format(table.unpack(arg)))
+end
+
+function notify.event(player, tile, event, ...)
+  local arg = table.pack(...);
+  notify.event_msg(player, tile, event, string.format(table.unpack(arg)))
+end
+
+function notify.embassies(player, ptile, event, ...)
+  local arg = table.pack(...);
+  notify.embassies_msg(player, ptile, event, string.format(table.unpack(arg)))
+end
+$]
+
+/* Edit module. */
+module edit {
+  Unit *api_edit_create_unit
+    @ create_unit (lua_State *L, Player *pplayer, Tile *ptile,
+                   Unit_Type *ptype, int veteran_level, City *homecity,
+                   int moves_left);
+  Unit *api_edit_create_unit_full
+    @ create_unit_full (lua_State *L, Player *pplayer, Tile *ptile,
+                        Unit_Type *ptype, int veteran_level, City *homecity,
+                        int moves_left, int hp_left, Unit *ptransport);
+  bool api_edit_unit_teleport
+    @ unit_teleport(lua_State *L, Unit *self, Tile *dest);
+  void api_edit_create_city
+    @ create_city (lua_State *L, Player *pplayer, Tile *ptile,
+                   const char *name);
+  void api_edit_create_base
+    @ create_base (lua_State *L, Tile *ptile, const char *name,
+                   Player *pplayer);
+  void api_edit_create_road
+    @ create_road (lua_State *L, Tile *ptile, const char *name);
+  void api_edit_tile_set_label
+    @ tile_set_label (lua_State *L, Tile *ptile, const char *label);
+  Player *api_edit_create_player
+    @ create_player(lua_State *L, const char *username, Nation_Type *nation,
+                    const char *ai);
+  void api_edit_change_gold
+    @ change_gold (lua_State *L, Player *pplayer, int amount);
+  Tech_Type *api_edit_give_technology
+    @ give_technology (lua_State *L, Player *pplayer, Tech_Type *ptech,
+                       const char *reason);
+  bool api_edit_trait_mod
+    @ trait_mod (lua_State *L, Player *pplayer, const char *trait_name,
+                 const int mod);
+  bool api_edit_unleash_barbarians
+    @ unleash_barbarians (lua_State *L, Tile *ptile);
+  void api_edit_place_partisans
+    @ place_partisans (lua_State *L, Tile *ptile, Player *pplayer, int count,
+                       int sq_radius);
+  enum climate_change_type {
+    CLIMATE_CHANGE_GLOBAL_WARMING @ GLOBAL_WARMING,
+    CLIMATE_CHANGE_NUCLEAR_WINTER @ NUCLEAR_WINTER
+  };
+  void api_edit_climate_change
+    @ climate_change (lua_State *L, enum climate_change_type type,
+                      int effect);
+  Player *api_edit_civil_war
+    @ civil_war(lua_State *L, Player *pplayer, int probability);
+  void api_edit_unit_turn
+    @ unit_turn(lua_State *L, Unit *punit, Direction dir);
+  void api_edit_player_victory
+    @ player_victory (lua_State *L, Player *self);
+  bool api_edit_unit_move
+    @ unit_move(lua_State *L, Unit *self, Tile *moveto, int movecost);
+}
+
+$[
+-- Compatibility functions (function names prior to freeciv 2.4)
+function create_unit(player, tile, utype, veteran_level, homecity, moves_left)
+  return edit.create_unit(player, tile, utype, veteran_level, homecity,
+                          moves_left)
+end
+
+function create_unit_full(player, tile, utype, veteran_level, homecity,
+                          moves_left, hp_left, transport)
+  return edit.create_unit_full(player, tile, utype, veteran_level, homecity,
+                               moves_left, hp_left, transport)
+end
+
+function create_city(player, tile, name)
+  edit.create_city (player, tile, name)
+end
+
+function create_base(tile, name, player)
+  edit.create_base(tile, name, player)
+end
+
+function create_player(username, nation)
+  return edit.create_player(username, nation, nil)
+end
+
+function change_gold(pplayer, amount)
+  edit.change_gold(pplayer, amount)
+end
+
+function give_technology(player, tech, reason)
+  return edit.give_technology(player, tech, reason)
+end
+
+function trait_mod(player, trait, mod)
+  return edit.trait_mod(player, trait, mod)
+end
+
+function unleash_barbarians(tile)
+  return edit.unleash_barbarians(tile)
+end
+
+function place_partisans(tile, player, count, sq_radius)
+  edit.place_partisans(tile, player, count, sq_radius)
+end
+
+-- Server functions for Player module
+function Player:create_unit(tile, utype, veteran_level, homecity, moves_left)
+  return edit.create_unit(self, tile, utype, veteran_level, homecity,
+                          moves_left)
+end
+
+function Player:create_unit_full(tile, utype, veteran_level, homecity,
+                                 moves_left, hp_left, ptransport)
+  return edit.create_unit_full(self, tile, utype, veteran_level, homecity,
+                               moves_left, hp_left, ptransport)
+end
+
+function Player:civilization_score()
+  return server.civilization_score(self)
+end
+
+function Player:create_city(tile, name)
+  edit.create_city(self, tile, name)
+end
+
+function Player:change_gold(amount)
+  edit.change_gold(self, amount)
+end
+
+function Player:give_technology(tech, reason)
+  return edit.give_technology(self, tech, reason)
+end
+
+function Player:trait_mod(trait, mod)
+  return edit.trait_mod(self, trait, mod)
+end
+
+function Player:civil_war(probability)
+  return edit.civil_war(self, probability)
+end
+
+function Player:victory()
+  edit.player_victory(self)
+end
+
+-- Server functions for Unit module
+function Unit:teleport(dest)
+  return edit.unit_teleport(self, dest)
+end
+
+function Unit:turn(direction)
+  edit.unit_turn(self, direction)
+end
+
+function Unit:move(moveto, movecost)
+  return edit.unit_move(self, moveto, movecost)
+end
+
+-- Server functions for Tile module
+function Tile:create_base(name, player)
+  edit.create_base(self, name, player)
+end
+
+function Tile:create_road(name)
+  edit.create_road(self, name)
+end
+
+function Tile:unleash_barbarians()
+  return edit.unleash_barbarians(self)
+end
+
+function Tile:place_partisans(player, count, sq_radius)
+  edit.place_partisans(self, player, count, sq_radius)
+end
+
+function Tile:set_label(label)
+  edit.tile_set_label(self, label)
+end
+
+$]

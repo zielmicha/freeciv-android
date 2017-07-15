@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #include <stdio.h>
@@ -22,12 +22,14 @@
 #include "log.h"
 #include "mem.h"
 
+#include "rgbcolor.h"
+
 #include "gui_main.h"
 
 #include "colors.h"
 
 /*************************************************************
-...
+  Get display color type of default visual
 *************************************************************/
 enum Display_color_type get_visual(void)
 {
@@ -63,9 +65,9 @@ struct color *color_alloc(int r, int g, int b)
   struct color *color = fc_malloc(sizeof(*color));
   GdkColormap *cmap = gtk_widget_get_default_colormap();
 
-  color->color.red = r << 8;
-  color->color.green = g << 8;
-  color->color.blue = b << 8;
+  color->color.red = (r << 8) + r;
+  color->color.green = (g << 8) + g;
+  color->color.blue = (b << 8) + b;
   gdk_rgb_find_color(cmap, &color->color);
 
   return color;
@@ -77,6 +79,21 @@ struct color *color_alloc(int r, int g, int b)
 void color_free(struct color *color)
 {
   free(color);
+}
+
+/****************************************************************************
+  Return a number indicating the perceptual brightness of this color
+  relative to others (larger is brighter).
+****************************************************************************/
+int color_brightness_score(struct color *pcolor)
+{
+  struct rgbcolor *prgb = rgbcolor_new(pcolor->color.red >> 8,
+                                       pcolor->color.green >> 8,
+                                       pcolor->color.blue >> 8);
+  int score = rgbcolor_brightness_score(prgb);
+
+  rgbcolor_destroy(prgb);
+  return score;
 }
 
 /****************************************************************************

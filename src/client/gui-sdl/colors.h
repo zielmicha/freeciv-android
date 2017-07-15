@@ -22,15 +22,17 @@
 #ifndef FC__COLORS_H
 #define FC__COLORS_H
 
-#include "SDL.h"
+#include "SDL/SDL.h"
+#include "themecolors.h"
 
 #include "colors_g.h"
 
 struct color {
-  SDL_Color *color;	
+  SDL_Color *color;
 };
 
 struct color *color_alloc_rgba(int r, int g, int b, int a);
-SDL_Color * get_game_colorRGB(enum color_std color_offset);
+SDL_Color *get_theme_color(enum theme_color themecolor);
+SDL_Color *get_game_color(enum color_std stdcolor);
 
 #endif	/* FC__COLORS_H */

@@ -1,13 +1,16 @@
 [nation_austrian]
 
+translation_domain="freeciv"
+
 name=_("Austrian")
 plural=_("?plural:Austrians")
-groups="Medieval", "Early Modern", "Modern", "European"
+groups="Medieval", "Early Modern", "Modern", "European", "Core"
+; /* TRANS: Legend for nation in "core" set */
 legend=_("The origins of Austria date back to the time of the Roman\
  Empire when a Celtic kingdom was conquered by the Romans in\
- approximately 15 BC, and later became Noricum, a Roman province, in the\
- mid 1st century AD - an area which mostly encloses today's Austria. In\
- 788 AD, the Frankish king Charlemagne conquered the area, and introduced\
+ approximately 15 BCE, and later became Noricum, a Roman province, in the\
+ mid 1st century CE - an area which mostly encloses today's Austria. In\
+ 788 CE, the Frankish king Charlemagne conquered the area, and introduced\
  Christianity. Under the native Habsburg dynasty, Austria became one\
  of the great powers of Europe. In 1867, the Austrian Empire was reformed\
  into Austria-Hungary. The Austro-Hungarian Empire collapsed in 1918 with\
@@ -43,10 +46,10 @@ leaders = {
 
 ruler_titles = {
  "government",      "male_title",            "female_title"
- "Despotism",       _("Master %s"),          _("Mistress %s")
+ "Despotism",       _("Archduke %s"),        _("Archduchess %s")
  "Monarchy",        _("Kaiser %s"),          _("Kaiserin %s")
  "Democracy",       _("Chancellor %s"),      _("?female:Chancellor %s")
- "Fundamentalism",  _("Archbishop %s"),      _("?female:Archbishop %s")
+ "Fundamentalism",  _("Archbishop %s"),      _("Mother Superior %s")
  "Communism",       _("First Secretary %s"), _("?female:First Secretary %s")
 }
 
@@ -56,7 +59,6 @@ city_style = "European"
 
 init_techs=""
 init_buildings=""
-init_government="Despotism"
 init_units=""
 civilwar_nations="swiss", "hungarian", "tyrolian"
 
