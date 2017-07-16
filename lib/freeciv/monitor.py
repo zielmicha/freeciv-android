@@ -19,6 +19,7 @@ import time
 import features
 import gc
 import random
+from freeciv.client import _freeciv as freeciv
 
 features.add_feature('debug.garbage', False, type=bool)
 features.add_feature('debug.gc_count', False, type=bool)
@@ -71,18 +72,31 @@ def get_server_pid():
     return int(open(get_save_dir() + '/serverpid', 'r').read())
 
 log_file = None
+use_freeciv_log_method = False
 
-def _open_log():
+def get_log_path_base():
     dir = get_save_dir()
     if not os.path.exists(dir):
         os.makedirs(dir)
-    return open(os.path.join(dir, 'more.log'), 'a', 1)
+    return os.path.join(dir, 'more')
+
+def _open_log():
+    return open(get_log_path_base() + '-earlyInit.log', 'a', 1)
 
 def log(cat, s):
     global log_file
-    if not log_file:
-        log_file = _open_log()
-    log_file.write('%s:%d:%s\n' % (cat, time.time()*1000, s))
+    global use_freeciv_log_method
+    if use_freeciv_log_method:
+        freeciv.func.pyjni_log_normal(s)
+    else:
+        if not log_file:
+            log_file = _open_log()
+        log_file.write('%s:%d:%s\n' % (cat, time.time()*1000, s))
+
+@freeciv.register
+def change_log_method_to_freeciv_utility_log_c():
+    global use_freeciv_log_method
+    use_freeciv_log_method = True
 
 log('on', 'Client is launching...')
 

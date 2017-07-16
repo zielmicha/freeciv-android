@@ -110,6 +110,7 @@
 #include "script_client.h"
 
 #include "client_main.h"
+#include "pyclient.h"
 
 
 static enum known_type mapimg_client_tile_known(const struct tile *ptile,
@@ -541,6 +542,8 @@ int client_main(int argc, char *argv[])
 
   log_init(logfile, loglevel, NULL, NULL, fatal_assertions);
   backtrace_init();
+  PyObject* ret = PY_CALL("s", "change_log_method_to_freeciv_utility_log_c");
+  Py_DECREF(ret);
 
   /* after log_init: */
 

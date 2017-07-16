@@ -1,5 +1,5 @@
 #include "pyclient.h"
-#define errlog(VARS...) do{fprintf(stderr, "%s:%d: ", __FILE__, __LINE__);fprintf(stderr, VARS);fflush(stderr);}while(false)
+#include "log.h"
 #define _RESOLV(name) name
 #define PY_SETUP_CONST(name) PY_CALL("ssi", "set_const", #name, _RESOLV(name))
 #define B2I(B) ((B)?1:0)
@@ -86,7 +86,7 @@ PyObject* py_mapper_option_set(struct message* s) {
 
 void recenter_at_tile_int(long tile) {
     if(tile == 0)
-        errlog("recenter_at_tile_int: tile == 0\n");
+        log_error("recenter_at_tile_int: tile == 0\n");
     center_tile_mapcanvas((struct tile*)tile);
 }
 
@@ -106,7 +106,7 @@ void cancel_city_at_unit(long unit) {
 
 void* py_alloc_struct(PyObject* stru) {
     if(stru == NULL)
-        errlog("py_alloc_struct: stru == NULL");
+        log_error("py_alloc_struct: stru == NULL");
     Py_INCREF(stru);
     return (void*)stru;
 }
@@ -136,7 +136,7 @@ void authenticate(const char* password) {
 
 void get_overview_area_dimensions(int *width, int *height) {
     PyObject* ret = PY_CALL("s", "get_overview_area_dimensions");
-    if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");
+    if(PyArg_ParseTuple(ret, "ii", width, height) == 0) log_error("Type error\n");
 }
 
 const char* gfx_fileextensions_const[5] = {
@@ -152,23 +152,23 @@ const char **gfx_fileextensions(void) {
 }
 void get_sprite_dimensions(struct sprite *sprite, int *width, int *height) {
     PyObject* ret = PY_CALL("sO", "get_sprite_dimensions", py_get_pyobject(sprite));
-    if(PyArg_ParseTuple(ret, "ii", width, height) == 0) errlog("Type error\n");
+    if(PyArg_ParseTuple(ret, "ii", width, height) == 0) log_error("Type error\n");
 }
 bool city_dialog_is_open(struct city *pcity) {
     PyObject* ret = PY_CALL("sO", "city_dialog_is_open", py_mapper_city(pcity));
     int retval;
-    if(PyArg_ParseTuple(ret, "i", &retval) == 0) errlog("Type error\n");
+    if(PyArg_ParseTuple(ret, "i", &retval) == 0) log_error("Type error\n");
     return (bool)retval;
 }
 void get_text_size(int *width, int *height, enum client_font font, const char *text) {
     PyObject* ret = PY_CALL("sis", "get_text_size", font, text);
     int m_width, m_height;
-    if(PyArg_ParseTuple(ret, "ii", &m_width, &m_height) == 0) errlog("Type error\n");
+    if(PyArg_ParseTuple(ret, "ii", &m_width, &m_height) == 0) log_error("Type error\n");
     if(width) *width = m_width;
     if(height) *height = m_height;
 }
 void gui_set_rulesets(int num_rulesets, char **rulesets) {
-    errlog("TODO: get_set_rulesets\n");
+    log_error("TODO: get_set_rulesets\n");
 }
 
 void control_mouse_cursor_pos(int x, int y) {
@@ -193,7 +193,7 @@ int idle_callback_count = 0;
 void add_idle_callback(void (callback)(void *), void *data) {
     //errlog("add_idle_callback\n");
     if(idle_callback_count >= 512)
-        errlog("Too many idle callbacks.\n");
+        log_error("Too many idle callbacks.\n");
     idle_callbacks[idle_callback_count].data = data;
     idle_callbacks[idle_callback_count].callback = callback;
     idle_callback_count ++;
@@ -206,7 +206,7 @@ void call_idle_callbacks() {
     idle_callback_count = 0;
 }
 bool caravan_dialog_is_open(int *unit_id, int *city_id) {
-    errlog("TODO: caravan_dialog_is_open\n");
+    log_error("TODO: caravan_dialog_is_open\n");
     return false;
 }
 
@@ -233,12 +233,12 @@ void py_caravan_help_build_wonder(struct unit* punit)
 }
 
 void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases) {
-    errlog("TODO: popup_pillage_dialog\n");
+    log_error("TODO: popup_pillage_dialog\n");
 }
 
 void init_things() {
     //tilespec_try_read("amplio", true);
-    if(tileset == NULL) errlog("tileset is NULL\n");
+    if(tileset == NULL) log_error("tileset is NULL\n");
     tileset_init(tileset);
     tileset_load_tiles(tileset);
     tileset_use_prefered_theme(tileset);
@@ -250,16 +250,16 @@ struct canvas* get_mapview_store() {
 
 static char** parse_char_seq(PyObject* seq, int *count) {
     if(!seq)
-        errlog("Sequence is NULL\n");
+        log_error("Sequence is NULL\n");
     if(!PySequence_Check(seq))
-        errlog("Bad type - expected sequence\n");
+        log_error("Bad type - expected sequence\n");
     *count = PySequence_Size(seq);
     char** vals = malloc((*count) * sizeof(char*));
     int i;
     for(i=0; i<*count; i++) {
         PyObject* item = PySequence_GetItem(seq, i);
         vals[i] = PyString_AsString(item);
-        if(!vals[i]) errlog("Found NULL item at %d\n", i);
+        if(!vals[i]) log_error("Found NULL item at %d\n", i);
     }
     return vals;
 }
@@ -348,7 +348,7 @@ static PyObject* call_freeciv(PyObject* self, PyObject* args) {
 void free_ref(struct sprite* cref) {
     PyObject* ref = (PyObject*)cref;
     if(ref == NULL) {
-        errlog("free_ref: ref == NULL\n");
+        log_error("free_ref: ref == NULL\n");
     } else {
         // py_alloc_struct increfs so decref twice
         //if(ref->ob_refcnt != 2)
@@ -572,7 +572,7 @@ PyObject* get_players() {
 }
 
 void set_nation_settings(int nation, char* leader_name, int sex, int city_style) {
-    if(client.conn.playing == NULL) errlog("set_nation_settings: client.conn.playing == NULL\n");
+    if(client.conn.playing == NULL) log_error("set_nation_settings: client.conn.playing == NULL\n");
     dsend_packet_nation_select_req(&client.conn,
         player_number(client.conn.playing), nation,
         sex, leader_name, city_style);
@@ -722,6 +722,10 @@ PyObject* get_activity_str(struct unit* unit) {
     PyObject* ret = PyString_FromStringAndSize(astr_str(&astr), astr_len(&astr));
     astr_free(&astr);
     return ret;
+}
+
+void pyjni_log_normal(PyObject* arg_msg) {
+    log_normal("%s", PyString_AsString(arg_msg));
 }
 
 void py_server_main_forking(PyObject* cmd) {

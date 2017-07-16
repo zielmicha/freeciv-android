@@ -372,8 +372,7 @@ def main():
 
     if ctrl:
         ctrl.maybe_init()
-
-    client.freeciv.run()
+    client.freeciv.run(['--log', monitor.get_log_path_base() + '.log'])
 
 if __name__ == '__main__':
     main()

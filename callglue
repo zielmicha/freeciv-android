@@ -193,3 +193,4 @@ int get_invention_state(int i)
 
 PyObject* py_canvas_to_map(int x, int y)
 PyObject* get_activity_str(struct unit* unit)
+void pyjni_log_normal(PyObject* args)
