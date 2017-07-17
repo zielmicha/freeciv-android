@@ -1326,6 +1326,10 @@ static struct sprite *load_gfx_file(const char *gfx_filename)
     }
   }
 
+  s = load_gfxfile(gfx_filename);
+  if (s) {
+    return s;
+  }
   log_error("Could not load gfx file \"%s\".", gfx_filename);
   return NULL;
 }
