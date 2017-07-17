@@ -83,6 +83,8 @@
 /* Define to 1 if you have the `backtrace' function. */
 /*#define HAVE_BACKTRACE 1*/
 
+#define CUSTOM_LOG_FORMAT_ACTIVE 1
+
 /* Define to 1 if you have the `bind' function. */
 #define HAVE_BIND 1
 

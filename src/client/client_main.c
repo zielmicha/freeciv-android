@@ -542,6 +542,7 @@ int client_main(int argc, char *argv[])
 
   log_init(logfile, loglevel, NULL, NULL, fatal_assertions);
   backtrace_init();
+  custom_log_init();
   PyObject* ret = PY_CALL("s", "change_log_method_to_freeciv_utility_log_c");
   Py_DECREF(ret);
 
