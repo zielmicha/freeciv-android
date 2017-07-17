@@ -162,7 +162,8 @@ flag_index = {}
 def init():
     global fonts
     fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
-    init_flags()
+    if osutil.is_android:
+        init_flags()
 
 def init_flags():
     names = ['large', 'shield', 'shield-large', 'flags']

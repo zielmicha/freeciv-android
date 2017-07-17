@@ -41,9 +41,15 @@ mkdir -p $B
 done
 
 (cd ../data; find -type f) | while read line; do
-    if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
-        cp ../data/$line $B/$line || exit 1
-    elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
-        cp ../data/$line project/assets/data/$line || exit 1
+    if [[ ! $line =~ ^\./flags/.*\.png$ ]] ; then
+        if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
+            cp ../data/$line $B/$line || exit 1
+        elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
+            cp ../data/$line project/assets/data/$line || exit 1
+        fi
     fi
 done
+(cd ../data/flags && ../../android/compose.py '*-large.png' shield ../../android/project/assets/data/flags/large)
+(cd ../data/flags && ../../android/compose.py '*-shield-large.png' '' ../../android/project/assets/data/flags/shield-large)
+(cd ../data/flags && ../../android/compose.py '*.png' shield,large ../../android/project/assets/data/flags/flags)
+(cd ../data/flags && ../../android/compose.py '*-shield.png' large ../../android/project/assets/data/flags/shield)
