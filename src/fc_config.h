@@ -81,7 +81,7 @@
 #define HAVE_ARPA_INET_H 1
 
 /* Define to 1 if you have the `backtrace' function. */
-#define HAVE_BACKTRACE 0
+/*#define HAVE_BACKTRACE 1*/
 
 /* Define to 1 if you have the `bind' function. */
 #define HAVE_BIND 1

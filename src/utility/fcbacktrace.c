@@ -104,7 +104,7 @@ static void backtrace_log(enum log_level level, bool print_from_where,
     void *buffer[MAX_NUM_FRAMES];
     int frames;
     char **names;
-/*
+
     frames = backtrace(buffer, ARRAY_SIZE(buffer));
     names = backtrace_symbols(buffer, frames);
 
@@ -124,7 +124,7 @@ static void backtrace_log(enum log_level level, bool print_from_where,
       }
 
       free(names);
-    }*/
+    }
   }
 }
 
