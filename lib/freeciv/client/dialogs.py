@@ -62,9 +62,9 @@ def popup_newcity_dialog(unit, default_name):
                       cancel=lambda: freeciv.func.cancel_city_at_unit(unit))
 
 @freeciv.register
-def popup_unit_select_dialog(tile):
+def unit_select_dialog_popup(tile):
     units = freeciv.func.get_units_at_tile(tile)
-    client.client.popup_unit_select_dialog(map(actions.Unit, units))
+    client.client.unit_select_dialog_popup(map(actions.Unit, units))
 
 @freeciv.register
 def popup_caravan_dialog(unit, home_city, dest_city):

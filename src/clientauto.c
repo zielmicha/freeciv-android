@@ -505,9 +505,9 @@ void popdown_races_dialog(void){
 	PyObject* ret = PY_CALL("s", "popdown_races_dialog");
 	Py_DECREF(ret);
 }
-// void popup_unit_select_dialog(struct tile *ptile)
-void popup_unit_select_dialog(struct tile *ptile){
-	PyObject* ret = PY_CALL("sO", "popup_unit_select_dialog", py_mapper_tile(ptile));
+// void unit_select_dialog_popup(struct tile *ptile)
+void unit_select_dialog_popup(struct tile *ptile){
+	PyObject* ret = PY_CALL("sO", "unit_select_dialog_popup", py_mapper_tile(ptile));
 	Py_DECREF(ret);
 }
 // void races_toggles_set_sensitive(void)

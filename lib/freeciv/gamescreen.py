@@ -163,7 +163,7 @@ class ScreenClient(client.Client):
     def popup_unit_diplomat_dialog(self, diplomat_action):
         message = 'Subvert enemy unit'
 
-    def popup_unit_select_dialog(self, units):
+    def unit_select_dialog_popup(self, units):
         def focus(unit):
             unit.focus()
             ui.back()

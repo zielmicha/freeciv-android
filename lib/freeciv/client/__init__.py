@@ -165,7 +165,7 @@ class Client(object):
         freeciv.func.update_line(x, y)
         freeciv.func.control_mouse_cursor_pos(x, y)
 
-    def popup_unit_select_dialog(self, units):
+    def unit_select_dialog_popup(self, units):
         print 'unit_select_dialog', units
 
     def key_event(self, type, keycode):
