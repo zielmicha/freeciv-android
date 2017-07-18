@@ -193,14 +193,6 @@ def remove_pause_file():
     except OSError:
         print 'Failed to remove pause file'
 
-def setup_freeciv_config():
-    path = os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3-1'
-    try:
-        if not os.path.exists(path):
-            shutil.copy('data/civrc-2.3-default', path)
-    except (IOError, OSError):
-        pass
-
 def maybe_start_remote_debug():
     if features.get('debug.remote'):
         import remote_shell
@@ -363,7 +355,6 @@ def main():
     ui.init()
     ui.set_fill_image(graphics.load_image('data/user/background.jpg'))
 
-    setup_freeciv_config()
     client.window.init()
     gamescreen.init()
 

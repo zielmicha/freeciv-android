@@ -77,7 +77,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = data/buildings
+subdir = data/scenarios
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/dependencies/m4/mkstemp.m4 \
@@ -165,7 +165,7 @@ am__installdirs = "$(DESTDIR)$(pkgdatadir)"
 DATA = $(pkgdata_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-pkgdatadir = $(datadir)/$(PACKAGE)/buildings
+pkgdatadir = $(datadir)/$(PACKAGE)/scenarios
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
@@ -521,49 +521,35 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkgdata_DATA = \
-	airport.png		\
-	aqueduct.png		\
-	bank.png		\
-	barracks_i.png		\
-	barracks_ii.png		\
-	barracks_iii.png	\
-	capitalization.png	\
-	cathedral.png		\
-	city_walls.png		\
-	coastal_defense.png	\
-	colosseum.png		\
-	courthouse.png		\
-	factory.png		\
-	granary.png		\
-	harbor.png		\
-	hydro_plant.png		\
-	library.png		\
-	marketplace.png		\
-	mass_transit.png	\
-	mfg_plant.png		\
-	nuclear_plant.png	\
-	offshore_platform.png	\
-	palace.png		\
-	police_station.png	\
-	port_facility.png	\
-	power_plant.png		\
-	recycling_center.png	\
-	research_lab.png	\
-	sam_battery.png		\
-	sdi_defense.png		\
-	sewer_system.png	\
-	solar_plant.png		\
-	space_component.png	\
-	space_modules.png	\
-	space_structural.png	\
-	stock_exchange.png	\
-	super_highways.png	\
-	supermarket.png		\
-	temple.png		\
-	university.png
+zipped_files = \
+	british-isles-85x80-v2.80.sav.gz	\
+	earth-160x90-v2.sav.gz			\
+	earth-80x50-v3.sav.gz			\
+	europe-200x100-v2.sav.gz		\
+	france-140x90-v2.sav.gz			\
+	hagworld-120x60-v1.2.sav.gz		\
+	iberian-peninsula-136x100-v1.0.sav.gz	\
+	italy-100x100-v1.5.sav.gz		\
+	japan-88x100-v1.3.sav.gz		\
+	north_america_116x100-v1.2.sav.gz	\
+	tutorial.sav.gz
 
-EXTRA_DIST = $(pkgdata_DATA)
+unzipped_files = \
+	british-isles-85x80-v2.80.sav		\
+	earth-160x90-v2.sav			\
+	earth-80x50-v3.sav			\
+	europe-200x100-v2.sav			\
+	france-140x90-v2.sav			\
+	hagworld-120x60-v1.2.sav		\
+	iberian-peninsula-136x100-v1.0.sav	\
+	italy-100x100-v1.5.sav			\
+	japan-88x100-v1.3.sav			\
+	north_america_116x100-v1.2.sav		\
+	tutorial.sav
+
+pkgdata_DATA = $(zipped_files)
+MOSTLYCLEANFILES = $(zipped_files)
+EXTRA_DIST = $(unzipped_files)
 all: all-am
 
 .SUFFIXES:
@@ -576,9 +562,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu data/buildings/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu data/scenarios/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu data/buildings/Makefile
+	  $(AUTOMAKE) --gnu data/scenarios/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -688,6 +674,7 @@ install-strip:
 	    "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'" install; \
 	fi
 mostlyclean-generic:
+	-test -z "$(MOSTLYCLEANFILES)" || rm -f $(MOSTLYCLEANFILES)
 
 clean-generic:
 
@@ -778,6 +765,9 @@ uninstall-am: uninstall-pkgdataDATA
 	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
 	ps ps-am tags-am uninstall uninstall-am uninstall-pkgdataDATA
 
+
+$(zipped_files): %.sav.gz: %.sav
+	$(GZIP) --best -n -c $< > $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

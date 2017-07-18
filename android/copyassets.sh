@@ -49,6 +49,7 @@ done
         fi
     fi
 done
+find $B/scenarios/ -type f -name "*.sav" -exec gzip "{}" \;
 (cd ../data/flags && ../../android/compose.py '*-large.png' shield ../../android/project/assets/data/flags/large)
 (cd ../data/flags && ../../android/compose.py '*-shield-large.png' '' ../../android/project/assets/data/flags/shield-large)
 (cd ../data/flags && ../../android/compose.py '*.png' shield,large ../../android/project/assets/data/flags/flags)

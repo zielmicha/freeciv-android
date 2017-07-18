@@ -216,8 +216,8 @@ def load_scenario():
 def get_scenarios():
     #f = [ line.split(':') for line in open('data/scenario/list.txt').read().splitlines() ]
     #return [ (name, 'scenarion/' + fn) for name, fn in f ]
-    return [ (name.split('.')[0], 'data/scenario/' + name)
-        for name in os.listdir('data/scenario')
+    return [ (name.split('.')[0], 'data/scenarios/' + name)
+        for name in os.listdir('data/scenarios')
         if '.sav' in name ]
 
 def load_dialog():

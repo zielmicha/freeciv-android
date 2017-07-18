@@ -77,7 +77,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = data/buildings
+subdir = data/default
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/dependencies/m4/mkstemp.m4 \
@@ -165,7 +165,7 @@ am__installdirs = "$(DESTDIR)$(pkgdatadir)"
 DATA = $(pkgdata_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-pkgdatadir = $(datadir)/$(PACKAGE)/buildings
+pkgdatadir = $(datadir)/$(PACKAGE)/default
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
@@ -522,46 +522,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 pkgdata_DATA = \
-	airport.png		\
-	aqueduct.png		\
-	bank.png		\
-	barracks_i.png		\
-	barracks_ii.png		\
-	barracks_iii.png	\
-	capitalization.png	\
-	cathedral.png		\
-	city_walls.png		\
-	coastal_defense.png	\
-	colosseum.png		\
-	courthouse.png		\
-	factory.png		\
-	granary.png		\
-	harbor.png		\
-	hydro_plant.png		\
-	library.png		\
-	marketplace.png		\
-	mass_transit.png	\
-	mfg_plant.png		\
-	nuclear_plant.png	\
-	offshore_platform.png	\
-	palace.png		\
-	police_station.png	\
-	port_facility.png	\
-	power_plant.png		\
-	recycling_center.png	\
-	research_lab.png	\
-	sam_battery.png		\
-	sdi_defense.png		\
-	sewer_system.png	\
-	solar_plant.png		\
-	space_component.png	\
-	space_modules.png	\
-	space_structural.png	\
-	stock_exchange.png	\
-	super_highways.png	\
-	supermarket.png		\
-	temple.png		\
-	university.png
+	ai_effects.ruleset \
+	default.lua	\
+	nationlist.ruleset
 
 EXTRA_DIST = $(pkgdata_DATA)
 all: all-am
@@ -576,9 +539,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu data/buildings/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu data/default/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu data/buildings/Makefile
+	  $(AUTOMAKE) --gnu data/default/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \

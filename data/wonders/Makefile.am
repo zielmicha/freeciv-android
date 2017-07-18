@@ -15,6 +15,7 @@ pkgdata_DATA =          		\
 	great_wall.png			\
 	hanging_gardens.png		\
 	hoover_dam.png			\
+	internet.png			\
 	isaac_newtons_college.png	\
 	js_bachs_cathedral.png		\
 	king_richards_crusade.png	\
@@ -23,13 +24,16 @@ pkgdata_DATA =          		\
 	magellans_expedition.png	\
 	manhattan_project.png		\
 	marco_polos_embassy.png		\
+	mausoleum_of_halicarnassus.png	\
 	michelangelos_chapel.png	\
 	oracle.png			\
 	pyramids.png			\
 	seti_program.png		\
 	shakespeares_theatre.png	\
 	statue_of_liberty.png		\
+	statue_of_zeus.png		\
 	sun_tzus_war_academy.png	\
+	temple_of_artemis.png		\
 	united_nations.png		\
 	womens_suffrage.png
 
