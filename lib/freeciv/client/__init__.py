@@ -322,5 +322,8 @@ def get_nations_groups():
     nations_groups.append('All')
     return nations_groups
 
+def set_nationset(value):
+    freeciv.func.option_str_set_by_name('nationset', value)
+
 def get_nation_name(i):
     return freeciv.func.get_name_of_nation_id(i)

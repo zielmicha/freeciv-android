@@ -6,6 +6,7 @@
 
 #include "repodlgs_common.h"
 #include "fc_types.h"
+#include "options.h"
 #include "government.h"
 #include "name_translation.h"
 #include "astring.h"
@@ -462,6 +463,12 @@ PyObject* get_list_of_nations_in_group(int group_id) {
     } nations_iterate_end;
 
     return nation_ids;
+}
+
+void option_str_set_by_name(char* name, char* value) {
+    struct option *poption = optset_option_by_name(server_optset, name);
+    option_str_set(poption, value);
+    printf("%s=%s; option_str_get=%s\n",name,value,option_str_get(poption));
 }
 
 int get_playable_nation_count() {
