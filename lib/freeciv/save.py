@@ -105,7 +105,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_barbarians()
         self.add(self.barbarians_button)
 
-        self.nation_id = 1 #random.choice(client.get_nations())[2]
+        self.nation_id = random.choice(client.get_nations())[2]
         self.leader_name = 'Player'
         self.city_style = 1
         self.leader_sex = 2
