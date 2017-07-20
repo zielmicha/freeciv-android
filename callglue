@@ -95,6 +95,11 @@ int get_playable_nation_count()
 int city_style_of_nation_id(int id)
 char* get_name_of_nation_id(int id)
 
+int nation_group_count()
+char* get_name_of_nation_group_id(int id)
+
+PyObject* get_list_of_nations_in_group(int group_id)
+
 void set_nation_settings(int nation, char* leader_name, int sex, int city_style)
 
 void disconnect_from_server(void)

@@ -308,11 +308,19 @@ class Tech(object):
     def set_as_current(self):
         freeciv.func.set_tech_research(self.index)
 
-def get_nations():
+def get_nations(group=-1):
     return [
         (freeciv.func.get_name_of_nation_id(i),
          freeciv.func.city_style_of_nation_id(i), i)
-        for i in xrange(freeciv.func.get_playable_nation_count()) ]
+        for i in freeciv.func.get_list_of_nations_in_group(group) ]
+
+def get_nations_groups():
+    nation_group_count = freeciv.func.nation_group_count()
+    nations_groups = []
+    for group_id in range(nation_group_count):
+        nations_groups.append(freeciv.func.get_name_of_nation_group_id(group_id))
+    nations_groups.append('All')
+    return nations_groups
 
 def get_nation_name(i):
     return freeciv.func.get_name_of_nation_id(i)

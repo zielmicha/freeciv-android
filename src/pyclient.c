@@ -442,6 +442,28 @@ char* get_name_of_nation_id(int id) {
     return (char*)nation_plural_translation(nation_by_number(id));
 }
 
+char* get_name_of_nation_group_id(int id) {
+    return (char*)nation_group_name_translation(nation_group_by_number(id));
+}
+
+PyObject* get_list_of_nations_in_group(int group_id) {
+    struct nation_group *group = nation_group_by_number(group_id);
+    PyObject* nation_ids = PyList_New(0);
+
+    nations_iterate(pnation) {
+        if (!is_nation_playable(pnation) || !is_nation_pickable(pnation)) {
+            continue;
+        }
+        if (NULL != group && !nation_is_in_group(pnation, group)) {
+            continue;
+        }
+
+        PyList_Append(nation_ids, PyInt_FromLong(nation_number(pnation)));
+    } nations_iterate_end;
+
+    return nation_ids;
+}
+
 int get_playable_nation_count() {
 
   int playable_nation_count = 0;

@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import gamescreen
+import nationdlg
 import ui
 import uidialog
 import osutil
@@ -195,11 +196,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.nation_id = id
             self.set_nation_settings()
             ui.back()
-        nations = ui.LinearLayoutWidget()
-        for name, style, id in client.get_nations():
-            nations.add(ui.Button(name, functools.partial(set_nation, style, id)))
-
-        ui.set_dialog(nations, scroll=True)
+        nationdlg.NationDialog(set_nation).show()
 
 def server_command_dialog():
     uidialog.inputbox('Command', finish=client.client.chat)
