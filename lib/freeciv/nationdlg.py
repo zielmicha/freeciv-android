@@ -23,7 +23,7 @@ class NationDialog(ui.LinearLayoutWidget):
     def setup_ui(self):
         self.add(ui.Label('Select a nation'))
 
-        nationSet_panel = ui.HorizontalLayoutWidget(spacing=10)
+        nationSet_panel = ui.HorizontalLayoutWidget(spacing=self.spacing)
         self.nationSet_label = ui.Label('')
         nationSet_panel.add(self.nationSet_label)
         self.nationSet_button = ui.Button('', self.change_nationSet)
@@ -32,15 +32,20 @@ class NationDialog(ui.LinearLayoutWidget):
 
         self.add(ui.Label('Nation Groups:'))
 
-        nations_panel = ui.HorizontalLayoutWidget(spacing=10)
+        self.update_layout()
+        y = self.spacing
+        for item in self.items:
+            y += item.size[1] + self.spacing
+
+        nations_panel = ui.HorizontalLayoutWidget(spacing=self.spacing)
         self.nationGroups = ui.LinearLayoutWidget()
         nations_panel.add(ui.ScrollWrapper(self.nationGroups,
-                                height=ui.screen_height*0.7,
-                                width=ui.screen_width*0.7,ways=ui.SCROLL_HEIGHT|ui.SCROLL_WIDTH))
+                                height=ui.screen_height-y - self.spacing,
+                                width=ui.screen_width*0.5,ways=ui.SCROLL_HEIGHT))
         self.nations = ui.LinearLayoutWidget()
         nations_panel.add(ui.ScrollWrapper(self.nations,
-                                height=ui.screen_height*0.7,
-                                width=ui.screen_width*0.7,ways=ui.SCROLL_HEIGHT|ui.SCROLL_WIDTH))
+                                height=ui.screen_height-y - self.spacing,
+                                width=ui.screen_width*0.5,ways=ui.SCROLL_HEIGHT))
         self.set_nation_group()
         self.set_nationSet(False)
         for id, name in enumerate(client.get_nations_groups()):
