@@ -366,6 +366,7 @@ def main():
 
     if ctrl:
         ctrl.maybe_init()
+    # To change tileset, append tileset argument below, for example : '-t', 'isophex'
     client.freeciv.run(['--log', monitor.get_log_path_base() + '.log'])
 
 if __name__ == '__main__':
