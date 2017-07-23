@@ -223,6 +223,8 @@ class CityCanvas(ui.Widget):
         image = self.city.make_citymap()
         self.orig_size = size = image.get_size()
         self.size = (scale_to, size[1] * scale_to / size[0])
+        if self.size[1] > ui.screen_height / 2:
+            self.size = (self.orig_size[0] * ui.screen_height / 2 / self.orig_size[1], ui.screen_height / 2)
         self.image = image.scale(self.size)
         self.dialog = dialog
 

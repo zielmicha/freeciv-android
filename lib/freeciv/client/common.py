@@ -124,6 +124,13 @@ def canvas_put_sprite_full(canvas, x, y, sprite):
     canvas.blit(sprite, (x, y))
 
 @freeciv.register
+def canvas_put_sprite_fogged(canvas, x, y, sprite, fog, fog_x, fog_y):
+    if (fog):
+        canvas.blit(sprite, (x, y), alpha_mask=128)
+    else:
+        canvas.blit(sprite, (x, y))
+
+@freeciv.register
 def free_sprite(sprite):
     freeciv.func.free_ref(sprite)
 

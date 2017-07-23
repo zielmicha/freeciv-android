@@ -571,3 +571,8 @@ cdef extern from "SDL_ttf.h":
 
     # Get the kerning size of two glyphs */
     cdef int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index)
+
+cdef extern from "SDL_surface.h":
+    cdef int SDL_SetSurfaceAlphaMod(SDL_Surface* surface, Uint8 alpha)
+    cdef int SDL_SetTextureAlphaMod(SDL_Texture* texture, Uint8 alpha)
+
