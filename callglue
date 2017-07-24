@@ -145,6 +145,7 @@ const char *player_name(const struct player *pplayer);
 
 void set_tech_research(int index)
 
+bool can_unit_do_activity_road(const struct unit *punit, int road);
 bool can_unit_do_activity_base(const struct unit *punit, int base);
 void set_unit_activity_base(struct unit *punit, int base);
 

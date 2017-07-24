@@ -13,15 +13,16 @@
 from freeciv.client import _freeciv as freeciv
 from freeciv import client
 
+# Activity list: see src/common/fc_types.h
 ACTIVITY_IDLE = 0
 ACTIVITY_POLLUTION = 1
-ACTIVITY_ROAD = 2
+ACTIVITY_OLD_ROAD = 2
 ACTIVITY_MINE = 3
 ACTIVITY_IRRIGATE = 4
 ACTIVITY_FORTIFIED = 5
 ACTIVITY_FORTRESS = 6
 ACTIVITY_SENTRY = 7
-ACTIVITY_RAILROAD = 8
+ACTIVITY_OLD_RAILROAD = 8
 ACTIVITY_PILLAGE = 9
 ACTIVITY_GOTO = 10
 ACTIVITY_EXPLORE = 11
@@ -32,6 +33,8 @@ ACTIVITY_FORTIFYING = 15
 ACTIVITY_FALLOUT = 16
 # ACTIVITY_PATROL_UNUSED = 17
 ACTIVITY_BASE = 18
+ACTIVITY_GEN_ROAD = 19
+ACTIVITY_CONVERT = 20 # TODO: to implement
 
 ACTIVITY_DISBAND = 1001
 ACTIVITY_WAIT = 1002
@@ -51,6 +54,9 @@ ACTIVITY_UPGRADE = 2004
 
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
+
+ROCO_ROAD = 0
+ROCO_RAILROAD = 1
 
 activities = dict( (k,v) for k,v in globals().items() if k.startswith('ACTIVITY_' ) )
 activity_names = dict( (v, k) for k,v in activities.items() )
@@ -101,9 +107,12 @@ class Unit(object):
         if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_FORTRESS):
             yield ACTIVITY_FORTRESS
 
+        if freeciv.func.can_unit_do_activity_road(id, ROCO_ROAD):
+            yield ACTIVITY_GEN_ROAD
+        elif freeciv.func.can_unit_do_activity_road(id, ROCO_RAILROAD):
+            yield ACTIVITY_GEN_ROAD
+
         standard_activities = [
-            ACTIVITY_RAILROAD,
-            ACTIVITY_ROAD,
             ACTIVITY_IRRIGATE,
             ACTIVITY_MINE,
             ACTIVITY_TRANSFORM,
@@ -157,9 +166,7 @@ class Unit(object):
         id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
             freeciv.func.key_unit_goto()
-        elif ident == ACTIVITY_ROAD:
-            freeciv.func.key_unit_road()
-        elif ident == ACTIVITY_RAILROAD:
+        elif ident == ACTIVITY_GEN_ROAD:
             freeciv.func.key_unit_road()
         elif ident == ACTIVITY_BUILD_CITY:
             freeciv.func.key_unit_build_city()

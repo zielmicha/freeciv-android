@@ -25,7 +25,7 @@ dirkeymap = {
 keymap = {
     graphics.const.K_g: [actions.ACTIVITY_GOTO],
     graphics.const.K_b: [actions.ACTIVITY_BUILD_CITY, actions.ACTIVITY_ADD_TO_CITY],
-    graphics.const.K_r: [actions.ACTIVITY_ROAD, actions.ACTIVITY_RAILROAD],
+    graphics.const.K_r: [actions.ACTIVITY_GEN_ROAD],
     graphics.const.K_m: [actions.ACTIVITY_MINE],
     graphics.const.K_i: [actions.ACTIVITY_IRRIGATE, ], # FARMLAND?
     graphics.const.K_o: [actions.ACTIVITY_TRANSFORM],
