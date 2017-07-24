@@ -168,7 +168,7 @@ class Unit(object):
             freeciv.func.key_unit_goto()
         elif ident == ACTIVITY_GEN_ROAD:
             freeciv.func.key_unit_road()
-        elif ident == ACTIVITY_BUILD_CITY:
+        elif ident == ACTIVITY_BUILD_CITY || ident == ACTIVITY_ADD_TO_CITY:
             freeciv.func.key_unit_build_city()
         #elif ident == ACTIVITY_:
         #    freeciv.func.key_unit_trade_route()
