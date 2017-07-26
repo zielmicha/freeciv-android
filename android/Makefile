@@ -80,3 +80,4 @@ project/jni/SDL/Android.mk: submodules
 project/jni/python/Android.mk: ../python4android/prepare.sh
 	cd ../python4android; ./prepare.sh
 	mv ../python4android/build/jni project/jni/python
+	cp pyconfig.h project/jni/python/pyconfig.h

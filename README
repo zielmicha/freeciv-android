@@ -11,6 +11,9 @@ Known working version (and remember to run ./augogen.sh first!):
    hg clone -r 363 http://hg.libsdl.org/SDL_image
    hg clone -r 228 http://hg.libsdl.org/SDL_ttf
 
+SDL2, SDL2_image and SDL2_ttf are automatically checked out by running (put android and ndk-build in your PATH):
+    make -C android build
+
 Dependency installation:
 
    apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0
