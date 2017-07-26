@@ -14,15 +14,17 @@ from freeciv.client import _freeciv as freeciv
 from freeciv import client
 
 # Activity list: see src/common/fc_types.h
+# We're still using old values as ACTIVITY_ROAD and ACTIVITY_RAILROAD instead of ACTIVITY_GEN_ROAD
+# but this is not a problem because these values are not sent to the server.
 ACTIVITY_IDLE = 0
 ACTIVITY_POLLUTION = 1
-ACTIVITY_OLD_ROAD = 2
+ACTIVITY_ROAD = 2
 ACTIVITY_MINE = 3
 ACTIVITY_IRRIGATE = 4
 ACTIVITY_FORTIFIED = 5
 ACTIVITY_FORTRESS = 6
 ACTIVITY_SENTRY = 7
-ACTIVITY_OLD_RAILROAD = 8
+ACTIVITY_RAILROAD = 8
 ACTIVITY_PILLAGE = 9
 ACTIVITY_GOTO = 10
 ACTIVITY_EXPLORE = 11
@@ -108,9 +110,9 @@ class Unit(object):
             yield ACTIVITY_FORTRESS
 
         if freeciv.func.can_unit_do_activity_road(id, ROCO_ROAD):
-            yield ACTIVITY_GEN_ROAD
+            yield ACTIVITY_ROAD
         elif freeciv.func.can_unit_do_activity_road(id, ROCO_RAILROAD):
-            yield ACTIVITY_GEN_ROAD
+            yield ACTIVITY_ROAD
 
         standard_activities = [
             ACTIVITY_IRRIGATE,
@@ -166,7 +168,9 @@ class Unit(object):
         id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
             freeciv.func.key_unit_goto()
-        elif ident == ACTIVITY_GEN_ROAD:
+        elif ident == ACTIVITY_ROAD:
+            freeciv.func.key_unit_road()
+        elif ident == ACTIVITY_RAILROAD:
             freeciv.func.key_unit_road()
         elif ident == ACTIVITY_BUILD_CITY or ident == ACTIVITY_ADD_TO_CITY:
             freeciv.func.key_unit_build_city()
