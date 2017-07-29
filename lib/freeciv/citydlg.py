@@ -197,7 +197,7 @@ class Dialog(ui.HorizontalLayoutWidget):
             return '+%d' % n if n > 0 else '%s' % n
 
         def add_basic(title, name):
-            surplus = plus(self.city.get_prod('surplus', name))
+            surplus = plus(self.city.get_prod('surplus', name) + self.city.get_prod('waste', name))
             add(title, '%s (%s)' % (self.city.get_prod('prod', name), surplus))
 
         add_basic('Food', 'food')
@@ -206,13 +206,19 @@ class Dialog(ui.HorizontalLayoutWidget):
 
         add('', '')
 
-        add_basic('Gold', 'gold')
+        gold_surplus = plus(self.city.get_prod('surplus', 'gold'))
+        add('Gold', '%s (%s)' % (self.city.get_prod('prod', 'gold'), gold_surplus))
         add('Science', self.city.get_prod('prod', 'science'))
         add('Luxury', self.city.get_prod('prod', 'luxury'))
 
         add('', '')
 
         add('Corruption', self.city.get_prod('waste', 'trade'))
+        add('Waste', self.city.get_prod('waste', 'shield'))
+        add('Pollution risk', '%d %%' % self.city.get_pollution())
+        illness = self.city.get_illness()
+        if illness >= 0: # illness is on
+            add('Plague risk', '%0.1f %%' % illness)
 
         return panel
 

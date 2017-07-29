@@ -372,6 +372,11 @@ int city_get_prod(struct city* city, int mode, int type) {
         return city->surplus[type];
     return FC_INFINITY;
 }
+
+int city_get_pollution(struct city* pCity) {
+    return pCity->pollution;
+}
+
 int city_get_size(struct city* pCity) {
     return pCity->size;
 }
@@ -437,6 +442,14 @@ void city_change_production_type(struct city* pCity, int type, long value) {
     u.kind = type;
     u.value = (universals_u)((struct impr_type *)value);
     city_change_production(pCity, u);
+}
+
+bool is_illness_on() {
+    return game.info.illness_on;
+}
+
+int city_get_illness(const struct city *pcity) {
+    return city_illness_calc(pcity, NULL, NULL, NULL, NULL);
 }
 
 char* get_name_of_nation_id(int id) {
