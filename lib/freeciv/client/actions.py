@@ -112,7 +112,7 @@ class Unit(object):
         if freeciv.func.can_unit_do_activity_road(id, ROCO_ROAD):
             yield ACTIVITY_ROAD
         elif freeciv.func.can_unit_do_activity_road(id, ROCO_RAILROAD):
-            yield ACTIVITY_ROAD
+            yield ACTIVITY_RAILROAD
 
         standard_activities = [
             ACTIVITY_IRRIGATE,
