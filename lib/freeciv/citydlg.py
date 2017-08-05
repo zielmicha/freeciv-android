@@ -197,8 +197,9 @@ class Dialog(ui.HorizontalLayoutWidget):
             return '+%d' % n if n > 0 else '%s' % n
 
         def add_basic(title, name):
-            surplus = plus(self.city.get_prod('surplus', name) + self.city.get_prod('waste', name))
-            add(title, '%s (%s)' % (self.city.get_prod('prod', name), surplus))
+            surplus = plus(self.city.get_prod('surplus', name))
+            prod_and_waste = self.city.get_prod('prod', name) + self.city.get_prod('waste', name)
+            add(title, '%s (%s)' % (prod_and_waste, surplus))
 
         add_basic('Food', 'food')
         add_basic('Production', 'shield')
