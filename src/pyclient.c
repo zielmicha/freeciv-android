@@ -736,6 +736,12 @@ PyObject* get_cities() {
 
 }
 
+PyObject* get_home_citiy(struct unit *unit) {
+    struct player *owner = unit_owner(unit);
+    struct city *pcity = player_city_by_number(owner, unit->homecity);
+    return Py_BuildValue("i", pcity);
+}
+
 int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove) {
     return city_sell_improvement(pcity, improvement_index(pimprove));
 }

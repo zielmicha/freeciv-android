@@ -68,6 +68,8 @@ const char* get_unit_name(const struct unit* u)
 void request_new_unit_activity(struct unit *punit, enum unit_activity act)
 void unit_focus_set(struct unit *punit)
 
+PyObject* get_home_citiy(struct unit *unit)
+
 void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
 int get_citydlg_canvas_width()
 int get_citydlg_canvas_height()

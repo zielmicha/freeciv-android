@@ -12,6 +12,7 @@
 
 from freeciv.client import _freeciv as freeciv
 from freeciv import client
+import city
 
 # Activity list: see src/common/fc_types.h
 # We're still using old values as ACTIVITY_ROAD and ACTIVITY_RAILROAD instead of ACTIVITY_GEN_ROAD
@@ -225,6 +226,13 @@ class Unit(object):
 
     def get_activity_string(self):
         return freeciv.func.get_activity_str(self.handle)
+
+    def get_home_citiy(self):
+        home_city = freeciv.func.get_home_citiy(self.handle)
+        if home_city:
+            return city.City(home_city)
+        else:
+            return None
 
 def get_unit_in_focus():
     units = freeciv.func.get_units_in_focus()

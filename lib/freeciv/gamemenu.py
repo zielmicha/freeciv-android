@@ -71,9 +71,10 @@ class Menu(ui.LinearLayoutWidget):
         self.add(self.panel)
         self.panel.add(ui.Label('loading...', color=(0, 255, 0)))
 
+        self.home_city_label = ui.Label('', font=ui.consolefont)
         self.activity_label = ui.Label('', font=ui.consolefont)
-
         self.left_widget = ui.LinearLayoutWidget()
+        self.left_widget.add(self.home_city_label)
         self.left_widget.add(self.activity_label)
 
         self.joystick_layout = ui.LinearLayoutWidget()
@@ -98,8 +99,14 @@ class Menu(ui.LinearLayoutWidget):
 
     def update_left_widget(self, unit):
         if unit:
+            home_citiy = unit.get_home_citiy()
+            if home_citiy is not None:
+                self.home_city_label.set_text(home_citiy.get_name())
+            else:
+                self.home_city_label.set_text('')
             self.activity_label.set_text(unit.get_activity_string())
         else:
+            self.home_city_label.set_text('')
             self.activity_label.set_text('')
 
     def update_joystick(self):
