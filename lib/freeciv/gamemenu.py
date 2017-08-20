@@ -183,8 +183,10 @@ class Button(ui.Widget):
         pass
 
     def click(self):
+        self.client.draw_patrol_lines = False
         def do():
             self.client.get_unit_in_focus().perform_activity(self.action_ident)
+            self.client.draw_patrol_lines = False
 
         if self.action_ident in confirm_actions:
             ui.ask('Really %s?' % self.action_name, do)
@@ -280,7 +282,7 @@ class TileJoystick(ui.LinearLayoutWidget):
         super(TileJoystick, self).__init__(spacing=spacing)
         self.client = client
 
-        b = functools.partial(TileButton, self)
+        b = functools.partial(TileButton, self, client.client)
 
         top = ui.HorizontalLayoutWidget(spacing=spacing)
         top.add(b(freeciv.const.DIR8_NORTHWEST))
@@ -307,11 +309,12 @@ class TileButton(ui.Widget):
     bg = (130, 100, 0, 90)
     fg = (150, 150, 50)
 
-    def __init__(self, joystick, dir):
+    def __init__(self, joystick, client, dir):
         self.size = (60, 60)
         self.dir = dir
         self.active = False
         self.joystick = joystick
+        self.client = client
 
     def draw(self, surf, pos):
         if self.dir != None and self.joystick.hidden:
@@ -338,6 +341,7 @@ class TileButton(ui.Widget):
             self.click()
 
     def click(self):
+        self.client.draw_patrol_lines = False
         if self.dir == None:
             self.joystick.hidden = not self.joystick.hidden
         else:

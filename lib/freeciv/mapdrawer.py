@@ -61,6 +61,7 @@ class MapWidget(ui.Widget):
                 x, y = self.drawer.coord_ui_to_map(ev.pos)
                 print ev.pos, x, y
                 freeciv.func.action_button_pressed(x, y, SELECT_POPUP)
+                self.client.draw_patrol_lines = False
             self.drawer.end_scrolling()
             self.start_drag = None
             self.last_drag_pos = None
