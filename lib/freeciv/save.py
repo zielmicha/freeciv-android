@@ -40,6 +40,7 @@ from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='default')
 
+# Using fork causes the "Failed to connect to game server" error that happens randomly
 # https://stackoverflow.com/questions/6078712/is-it-safe-to-fork-from-within-a-thread#6079669
 # https://docs.oracle.com/cd/E19455-01/806-5257/gen-2/index.html
 # http://bugs.python.org/issue1336
