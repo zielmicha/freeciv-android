@@ -4,6 +4,7 @@
 /src/callauto.c
 /src/Makefile
 /src/freecivclient.so
+/src/freeciv-server
 /lib/graphics.c
 /lib/graphics.so
 /pythonforandroid

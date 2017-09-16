@@ -47,6 +47,7 @@ project/jni/src/pyjnius.c:
 
 project/jni/freeciv:
 	ln -sf ../../../src project/jni/freeciv
+	(cd project/jni/freeciv-server && ln -sf ../../../../src/server && ln -sf ../../../../src/common && ln -sf ../../../../src/utility && ln -sf ../../../../src/ai && ln -sf ../../../../src/lua && ln -sf ../../../../src/tolua && ln -sf ../../../../src/fc_config.h)
 	(cd ../src && python ../gencallglue.py)
 
 project/jni/src/graphics.c: ../lib/graphics.pyx

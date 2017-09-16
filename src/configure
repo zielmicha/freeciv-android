@@ -19,6 +19,7 @@ output() {
 echo > Makefile.tmp
 
 ev=""
+sev=""
 if [ -e callauto.c ]; then
     rm callauto.c
 fi
@@ -28,23 +29,32 @@ output "CC_FLAGS=\$(CC_FLAGS_MORE) $CC_FLAGS"
 output "CC=gcc"
 
 pushd "$SRC"
-for name in callauto.c client/*.c *.c client/agents/*.c client/luascript/*.c \
-    common/*.c common/aicore/*.c common/scriptcore/*.c cvercmp/*.c \
-    server/*.c server/generator/*.c server/scripting/*.c server/advisors/*.c \
-    ai/*.c ai/*/*.c utility/*.c lua/*.c tolua/*.c; do
+for name in callauto.c client/*.c *.c client/agents/*.c client/luascript/*.c cvercmp/*.c; do
 
     objfile=objectfiles/$(basename $name .c).o
     ev="$ev $objfile"
     output "$objfile: $name"
     output "	\$(CC) \$(CC_FLAGS) $additional -c -o $objfile $SRC/$name"
 done
+for name in common/*.c common/aicore/*.c common/scriptcore/*.c \
+    server/*.c server/generator/*.c server/scripting/*.c server/advisors/*.c \
+    ai/*.c ai/*/*.c utility/*.c lua/*.c tolua/*.c; do
+
+    objfile=objectfiles/$(basename $name .c).o
+    ev="$ev $objfile"
+    sev="$sev $objfile"
+    output "$objfile: $name"
+    output "	\$(CC) \$(CC_FLAGS) $additional -c -o $objfile $SRC/$name"
+done
 popd
 
-echo "all: freecivclient.so" > client.mk
+echo "all: freecivclient.so freeciv-server" > client.mk
 echo "objectfiles_gen: $ev
 " >> client.mk
 echo "freecivclient.so: $ev
 	\$(CC) -fPIC -shared -o freecivclient.so objectfiles/*.o -lm -lz -l$PYTHON -lcurl $MY_LDFLAGS" >> client.mk
+echo "freeciv-server: $sev
+	\$(CC) -fPIC -pthread -o freeciv-server objectfiles/*.o -lm -lz -l$PYTHON -lcurl $MY_LDFLAGS" >> client.mk
 echo "freecivclient.a: $ev
 	ar rcs freecivclient.a objectfiles/*.o" >> client.mk
 echo "callauto.c: $SRC/../callglue

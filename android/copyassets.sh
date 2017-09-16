@@ -18,10 +18,18 @@ heapq bisect random __future__ glob socket StringIO urlparse
 mimetools tempfile rfc822 gzip struct io subprocess pickle
 atexit encodings/__init__ encodings/ascii encodings/utf_8
 encodings/aliases encodings/hex_codec encodings/string_escape
-hashlib weakref _weakrefset codecs SocketServer"
+hashlib weakref _weakrefset codecs SocketServer platform"
 mkdir $A/lib/python2.7/encodings
 for mod in $STDMODULES; do
     cp ../pythonforandroid/python-install/lib/python2.7/$mod.py $A/lib/python2.7/$mod.py || exit 1
+done
+
+# Copy the freeciv-server executables
+mkdir $A/bin
+ls -1 project/libs/*/freeciv-server | while read exec_path ; do
+	dirname=`dirname "$exec_path"`
+	mkdir "$A/bin/`basename $dirname`"
+	cp "$exec_path" "$A/bin/`basename $dirname`"
 done
 cp ../pyjnius/jnius/reflect.py $A/lib/python2.7/reflect.py
 rm -r project/assets/fonts

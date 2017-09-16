@@ -29,6 +29,8 @@ import features
 import subprocess
 import atexit
 import sys
+import stat
+import platform
 
 import dropbox
 
@@ -37,7 +39,12 @@ from freeciv.client import _freeciv as freeciv
 from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='default')
-features.add_feature('app.fork', type=bool, default=hasattr(os, 'fork'))
+
+# https://stackoverflow.com/questions/6078712/is-it-safe-to-fork-from-within-a-thread#6079669
+# https://docs.oracle.com/cd/E19455-01/806-5257/gen-2/index.html
+# http://bugs.python.org/issue1336
+# https://bugs.python.org/issue6721
+features.add_feature('app.fork', type=bool, default=False)
 
 localhost = '127.0.0.1'
 
@@ -327,11 +334,18 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
         print 'server:', line.rstrip()
 
 def subprocess_start_server(args):
-    if sys.argv[0].endswith('.py'): # if running as script, not cython --embed
-        cmd = [sys.executable, '-m', 'freeciv.main']
-    else:
-        cmd = [sys.argv[0]]
-    cmd.append('server')
+    if sys.argv[0].endswith('.py'): # if running as script, not cython --embed (on desktop)
+        cmd = ['src/freeciv-server']
+    else: # on android
+        machine = platform.machine()
+        print 'platform.machine():', machine
+        if 'arm' in machine:
+            machine = 'armeabi'
+        else:
+            machine = 'x86'
+        executable = 'bin/' + machine + '/freeciv-server'
+        os.chmod(executable, stat.S_IXUSR)
+        cmd = [executable]
     cmd += args
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return proc.stdout

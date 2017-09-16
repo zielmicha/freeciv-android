@@ -798,7 +798,7 @@ void py_server_main_forking(PyObject* cmd) {
   if(result != 0) {
     //
   } else {
-    civserver_main(length + 1, cmdlist);
+    //civserver_main(length + 1, cmdlist);
   }
   for(i=0; i<length+1; i++)
     free(cmdlist[i]);
@@ -818,7 +818,7 @@ void py_server_main_run(PyObject* cmd) {
     char* buff = strdup(PyString_AsString(str));
     cmdlist[i + 1] = buff;
   }
-  civserver_main(length + 1, cmdlist);
+  //civserver_main(length + 1, cmdlist);
   for(i=0; i<length+1; i++)
     free(cmdlist[i]);
 }
