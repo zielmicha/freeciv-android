@@ -1,5 +1,5 @@
 all: src lib data/techtree.index
-src/Makefile:
+src/Makefile: src/configure
 	cd src; ./configure
 src/objectfiles:
 	mkdir src/objectfiles
