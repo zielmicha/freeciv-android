@@ -34,7 +34,7 @@ copyassets:
 
 # BUILD
 
-build: builddep cython project/jni/freeciv project/build.xml
+build: cython project/jni/freeciv project/build.xml
 	ndk-build -C project -j4
 
 project/build.xml:
@@ -56,28 +56,3 @@ project/jni/src/graphics.c: ../lib/graphics.pyx
 project/jni/src/android.c: ../lib/android.pyx
 	cython ../lib/android.pyx -o project/jni/src/android.c
 
-# DEPENDENCIES
-
-builddep: project/jni/SDL/Android.mk project/jni/python/Android.mk \
-	project/jni/SDL_image/Android.mk project/jni/SDL_ttf/Android.mk \
-	project/jni/SDL_ttf/freetype
-
-project/jni/SDL_image/Android.mk:
-	cd project/jni; hg clone -r 363 http://hg.libsdl.org/SDL_image/
-
-project/jni/SDL_ttf/Android.mk:
-	cd project/jni; hg clone -r 228 http://hg.libsdl.org/SDL_ttf/
-
-project/jni/SDL_ttf/freetype: project/jni/SDL_ttf/Android.mk
-	git clone git://github.com/LuaDist/freetype.git project/jni/SDL_ttf/freetype
-
-submodules: ../python4android/prepare.sh
-project/jni/SDL/Android.mk: submodules
-
-../python4android/prepare.sh:
-	cd ..; git submodule init; git submodule update
-
-project/jni/python/Android.mk: ../python4android/prepare.sh
-	cd ../python4android; ./prepare.sh
-	mv ../python4android/build/jni project/jni/python
-	cp pyconfig.h project/jni/python/pyconfig.h

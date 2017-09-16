@@ -1,18 +1,10 @@
-It includes Freeciv 2.3.1
+It includes Freeciv 2.5.7
 
 If you don't need to change source code and don't need latest version simply download APK from http://civ.zielm.com
 
 == INSTALLATION ==
 
-Running Freeciv on desktop requires SDL2 with modified alpha blending from http://github.com/zielmicha/SDL2. You also need SDL2_image and SDL2_ttf (from http://hg.libsdl.org/SDL_image/ and http://hg.libsdl.org/SDL_ttf/).
-
-Known working version (and remember to run ./augogen.sh first!):
-
-   hg clone -r 363 http://hg.libsdl.org/SDL_image
-   hg clone -r 228 http://hg.libsdl.org/SDL_ttf
-
-SDL2, SDL2_image and SDL2_ttf are automatically checked out by running (put android and ndk-build in your PATH):
-    make -C android build
+Running Freeciv on desktop requires a patched version of SDL2 (with modified alpha blending). To patch SDL 2.0.4, use configure_project/SDL_modify_blending.patch. You also need Curl, SDL2_image and SDL2_ttf.
 
 Dependency installation:
 
@@ -30,10 +22,13 @@ Dependency installation:
 
 Don't install SDL2 from your distribution repository! It is highly probable that it will be incompatible.
 
+Before your first build, run this to setup workspace:
+   ./configure_project.sh
+
 Build and run on desktop (for debugging):
    make run
 
 (Warning: if you break build process you may need to start again with clean repo)
 
 Build for Android (put android, adb and ndk-build in your PATH):
-   make -C android debug
+   make -C android debugapk

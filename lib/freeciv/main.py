@@ -352,8 +352,15 @@ def main():
     init_window()
     client.window.init_screen()
     osutil.init()
-    if not osutil.is_desktop:
-        set_logical_size()
+
+    #Disable "set_logical_size" feature because
+    # - it needs patching SDL
+    # - there is a zoom feature in the game.
+    # - it makes the graphics to be more blurred because they are zoomed twice when using game zoom
+    # TODO: adapt fonts and buttons and make their size customizable
+    #if not osutil.is_desktop:
+    #    set_logical_size()
+
 
     ui.init()
     ui.set_fill_image(graphics.load_image('data/user/background.jpg'))

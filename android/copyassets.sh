@@ -4,14 +4,12 @@ rm -r $A
 mkdir -p $A
 mkdir $A/lib
 mkdir $A/lib/python2.7
-echo > $A/lib/python2.7/site.py
 mkdir -p $A/lib/python2.7/freeciv/client
 mkdir -p $A/lib/python2.7/ui
 cp ../lib/*.py $A/lib/python2.7
 cp ../lib/freeciv/*.py $A/lib/python2.7/freeciv
 cp ../lib/ui/*.py $A/lib/python2.7/ui
 cp ../lib/freeciv/client/*.py $A/lib/python2.7/freeciv/client
-echo 'array = str' > $A/lib/python2.7/array.py
 STDMODULES="shutil stat os posixpath traceback linecache
 types posixpath genericpath warnings fnmatch collections
 functools threading httplib urllib string re UserDict _abcoll
@@ -19,10 +17,11 @@ abc copy_reg sre_compile sre_constants sre_parse keyword
 heapq bisect random __future__ glob socket StringIO urlparse
 mimetools tempfile rfc822 gzip struct io subprocess pickle
 atexit encodings/__init__ encodings/ascii encodings/utf_8
-encodings/aliases encodings/hex_codec codecs SocketServer"
+encodings/aliases encodings/hex_codec encodings/string_escape
+hashlib weakref _weakrefset codecs SocketServer"
 mkdir $A/lib/python2.7/encodings
 for mod in $STDMODULES; do
-    cp ../python4android/Python-2.7/Lib/$mod.py $A/lib/python2.7/$mod.py || exit 1
+    cp ../pythonforandroid/python-install/lib/python2.7/$mod.py $A/lib/python2.7/$mod.py || exit 1
 done
 cp ../pyjnius/jnius/reflect.py $A/lib/python2.7/reflect.py
 rm -r project/assets/fonts

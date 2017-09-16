@@ -2,8 +2,11 @@
 /local.properties
 /bin
 /gen
+/libs
 /obj
 /jni/python
-/jni/SDL_image
-/jni/SDL_ttf
 /jni/freeciv
+/jni/SDL
+/jni/SDL2_image
+/jni/SDL2_ttf
+/jni/SDL2_mixer
