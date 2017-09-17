@@ -98,7 +98,7 @@ class MapDrawer(object):
         self.widget_size = (0, 0)
         self.scrolling = False
         self.zoom = 1
-        self.canvas_last_updated = 0
+        self.canvas_next_update = 0
 
         self.MAP_CACHE_SIZE = 0.
 
@@ -151,10 +151,11 @@ class MapDrawer(object):
     def maybe_update_whole_canvas(self):
         # need to throttle update, to make animations smooth
         current_time = time.time()
-        TIMEOUT = 1
-        if current_time > self.canvas_last_updated + TIMEOUT:
-            self.canvas_last_updated = current_time
+        if current_time >= self.canvas_next_update:
             freeciv.func.update_map_canvas_whole()
+            update_time = time.time() - current_time
+            # Before redrawing again, wait 10 times the time it took to redraw
+            self.canvas_next_update = time.time() + 10 * update_time
 
     def reload(self):
         self.prepare_map_cache()
