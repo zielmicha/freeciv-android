@@ -22,7 +22,9 @@ Dependency installation:
 
 Don't install SDL2 from your distribution repository! It is highly probable that it will be incompatible.
 
-Before your first build, run this to setup workspace:
+Building for Android requires Android NDK with a version not greater than r12b.
+
+Before your first build, to setup workspace, edit configure_project.sh to update the sdk_dir and ndk_dir variables, and run:
    ./configure_project.sh
 
 Build and run on desktop (for debugging):
