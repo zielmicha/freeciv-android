@@ -234,6 +234,7 @@ class CityCanvas(ui.Widget):
             self.scale_to = self.orig_size[0] * ui.screen_height / 2 / self.orig_size[1]
             self.size = (self.scale_to, ui.screen_height / 2)
         self.image = image.scale(self.size)
+        image.destroy()
         self.dialog = dialog
 
     def draw(self, surf, pos):

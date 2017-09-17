@@ -225,6 +225,12 @@ cdef class Surface(object):
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
 
+    def destroy(self):
+        if self._tex != NULL:
+            SDL_DestroyTexture(self._tex)
+            self._tex = NULL
+            _debug_destroytexture(self.get_size())
+
     def __dealloc__(self):
         if self._tex != NULL:
             SDL_DestroyTexture(self._tex)
@@ -344,7 +350,7 @@ class Allocator:
 def _init_alloc():
     global allocators
     if not allocators:
-        allocators = [Allocator(48), Allocator(96, 48), Allocator(128)]
+        allocators = []
 
 allocators = []
 
