@@ -75,6 +75,7 @@ files =
   "misc/buildings.spec",
   "trident/units.spec",
   "isotrident/unitextras.spec",
+  "isophex/select.spec",
   "misc/flags.spec",
   "misc/shields.spec",
   "misc/cursors.spec",
