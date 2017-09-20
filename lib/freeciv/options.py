@@ -171,7 +171,7 @@ def change_ruleset():
         features.set_perm('app.ruleset', name)
         ui.back()
 
-    rulesets = ['default', 'civ1', 'civ2']
+    rulesets = ['classic', 'civ1', 'civ2', 'civ2civ3', 'experimental']
     panel = ui.LinearLayoutWidget()
 
     for ruleset in rulesets:
