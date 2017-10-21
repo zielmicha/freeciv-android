@@ -93,7 +93,7 @@ import sys
 sys.stdout = open("src/callauto.c", 'w')
 print '#include "pyclient.h"'
 names = []
-for line in open('callglue').readlines():
+for line in open('src/callglue').readlines():
     if line.startswith('#') or not line.strip():
         continue
     line = line.strip()

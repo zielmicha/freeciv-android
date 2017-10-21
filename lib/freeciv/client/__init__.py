@@ -302,8 +302,8 @@ class Tech(object):
     def set_as_goal(self):
         freeciv.func.set_tech_goal(self.index)
 
-    def get_research_state(self):
-        return freeciv.func.get_invention_state(self.index)
+    #def get_research_state(self):
+    #    return freeciv.func.get_invention_state(self.index)
 
     def set_as_current(self):
         freeciv.func.set_tech_research(self.index)

@@ -99,8 +99,9 @@ class TechtreeClientModel(object):
         self.client = client
         self.state = {}
         techs = self.client.get_all_techs()
-        for tech in techs:
-            self.state[tech.name] = tech.get_research_state()
+        # FIXME: tech tree is broken and needs to be re-developped from "scratch" (using reqtree.c)
+        #for tech in techs:
+        #    self.state[tech.name] = tech.get_research_state()
 
     def is_researched(self, name):
         return self.state.get(name) == 2

@@ -364,7 +364,7 @@ def main():
 
 
     ui.init()
-    ui.set_fill_image(graphics.load_image('data/user/background.jpg'))
+    ui.set_fill_image(graphics.load_image('userdata/background.jpg'))
 
     client.window.init()
     gamescreen.init()
@@ -376,8 +376,7 @@ def main():
         ctrl.maybe_init()
     tileset = 'amplio2'
     if features.get('app.hex_tileset'):
-        tileset = 'isophex'
-    # To change tileset, append tileset argument below, for example : '-t', 'isophex'
+        tileset = 'hexemplio'
     client.freeciv.run(['--log', monitor.get_log_path_base() + '.log', '-t', tileset])
 
 if __name__ == '__main__':

@@ -52,7 +52,7 @@ def main():
     started = time.time()
     unpack_res()
     print 'unpack_res took', time.time() - started
-    display_splash('data/user/presplash.png', (255, 255, 255))
+    display_splash('userdata/presplash.png', (255, 255, 255))
     os.chdir(get_internal_storage() + '/package')
     from freeciv import main
     main.main()
@@ -62,7 +62,7 @@ def init_screen():
     wnd = graphics.create_window(graphics.get_screen_size())
     wnd.fill((0, 128, 0))
     graphics.flip()
-    display_splash('data/user/portedby.png', (0, 0, 0))
+    display_splash('userdata/portedby.png', (0, 0, 0))
 
 def display_splash(name, background):
     wnd = graphics.get_window()

@@ -28,7 +28,6 @@
 /* client */
 #include "client_main.h"
 #include "editgui_g.h"
-#include "ggz_g.h"
 #include "options.h"
 
 

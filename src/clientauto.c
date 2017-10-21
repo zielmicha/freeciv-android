@@ -127,14 +127,22 @@ struct sprite *create_sprite(int width, int height, struct color *pcolor){
 }
 // int color_brightness_score(struct color *pcolor)
 int color_brightness_score(struct color *pcolor){
+  struct rgbcolor *prgb = rgbcolor_new(pcolor->r,
+                                       pcolor->g,
+                                       pcolor->b);
+  int score = rgbcolor_brightness_score(prgb);
+
+  rgbcolor_destroy(prgb);
+  return score;
+/*
 	PyObject* ret = PY_CALL("sO", "color_brightness_score", py_mapper_color(pcolor));
-	PyObject* retval;
+	double retval;
 	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from color_brightness_score (expected 'O')\n");
 	Py_INCREF(retval);
 	Py_DECREF(ret);
 
 	struct sprite* retstru = py_alloc_struct(retval);
-	return retstru;
+	return retstru;*/
 }
 
 void real_luaconsole_append(const char *astring,
@@ -521,8 +529,8 @@ void popup_revolution_dialog(void){
 	Py_DECREF(ret);
 }
 // void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity)
-void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity){
-	PyObject* ret = PY_CALL("sOOO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity));
+void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity, struct tile *target_tile, PyObject *act_list){
+	PyObject* ret = PY_CALL("sOOOiO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity), target_tile, act_list);
 	Py_DECREF(ret);
 }
 // bool caravan_dialog_is_open(int *unit_id, int *city_id)

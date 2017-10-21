@@ -131,7 +131,7 @@ class City(object):
         return freeciv.func.city_get_shield_stock(self.handle)
 
     def get_name(self):
-        return freeciv.func.city_name(self.handle)
+        return freeciv.func.city_name_get(self.handle)
 
     def rotate_specialist(self, index):
         freeciv.func.city_rotate_specialist(self.handle, index)

@@ -81,7 +81,7 @@ class PrettyMenu(ui.AbsoluteLayoutWidget):
             self.show_balloon(over, baloon)
 
     def load_background(self):
-        img = ui.load_image('data/user/intro.jpg')
+        img = ui.load_image('userdata/intro.jpg')
         img_size = img.get_size()
         surf_size = graphics.get_window().get_size()
         new_height = float(surf_size[0]) / img_size[0] * img_size[1]
@@ -143,7 +143,7 @@ def main_menu():
     if features.get('app.multiplayer'):
         menu.left.add(MenuButton('Connect', save.connect_dialog))
 
-    menu.right.add(MenuButton('', options.show_options, image=ui.load_image('data/user/options.png')))
+    menu.right.add(MenuButton('', options.show_options, image=ui.load_image('userdata/options.png')))
     menu.right.add(MenuButton('Exit', ui.back))
     menu.right.add(ui.Spacing(0, 0))
 

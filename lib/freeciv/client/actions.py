@@ -14,7 +14,7 @@ from freeciv.client import _freeciv as freeciv
 from freeciv import client
 import city
 
-# Activity list: see src/common/fc_types.h
+# Activity list: see freeciv-src/common/fc_types.h
 # We're still using old values as ACTIVITY_ROAD and ACTIVITY_RAILROAD instead of ACTIVITY_GEN_ROAD
 # but this is not a problem because these values are not sent to the server.
 ACTIVITY_IDLE = 0
@@ -44,16 +44,29 @@ ACTIVITY_WAIT = 1002
 ACTIVITY_DONE = 1003
 ACTIVITY_ADD_TO_CITY = 1004
 ACTIVITY_BUILD_CITY = 1005
-ACTIVITY_HELP_BUILD_WONDER = 1006
 ACTIVITY_PARADROP = 1007
 ACTIVITY_CHANGE_HOMECITY = 1008
 ACTIVITY_LOAD = 1009
 ACTIVITY_UNLOAD = 1010
 
-ACTIVITY_ESTABLISH_TRADE_ROUTE = 2001
-ACTIVITY_HELP_BUILD_WONDER = 2002
 ACTIVITY_CENTER_ON_UNIT = 2003
 ACTIVITY_UPGRADE = 2004
+
+# freeciv-src/common/actions.h
+ACTION_ESTABLISH_EMBASSY=3000
+ACTION_SPY_INVESTIGATE_CITY=3001
+ACTION_SPY_POISON=3001
+ACTION_SPY_STEAL_GOLD=3003
+ACTION_SPY_SABOTAGE_CITY=3004
+ACTION_SPY_TARGETED_SABOTAGE_CITY=3005
+ACTION_SPY_STEAL_TECH=3006
+ACTION_SPY_TARGETED_STEAL_TECH=3007
+ACTION_SPY_INCITE_CITY=3008
+ACTIVITY_ESTABLISH_TRADE_ROUTE=3009
+ACTION_MARKETPLACE=3010
+ACTIVITY_HELP_BUILD_WONDER=3011
+ACTION_SPY_BRIBE_UNIT=3012
+ACTION_SPY_SABOTAGE_UNIT=3013
 
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
@@ -104,10 +117,10 @@ class Unit(object):
         if freeciv.func.can_unit_upgrade(self.handle):
             yield ACTIVITY_UPGRADE
 
-        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
+        if freeciv.func.get_possible_unit_base_name(id, BASE_GUI_AIRBASE):
             yield ACTIVITY_AIRBASE
 
-        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_FORTRESS):
+        if freeciv.func.get_possible_unit_base_name(id, BASE_GUI_FORTRESS):
             yield ACTIVITY_FORTRESS
 
         if freeciv.func.can_unit_do_activity_road(id, ROCO_ROAD):
@@ -138,9 +151,14 @@ class Unit(object):
         if type > 1000:
             return 0
         else:
-            return freeciv.func.tile_activity_time(type, self.get_tile())
+            return freeciv.func.py_tile_activity_time(type, self.get_tile())
 
     def get_action_name(self, type):
+        if type in [ACTIVITY_FORTRESS, ACTIVITY_AIRBASE]:
+            base_gui_type = BASE_GUI_FORTRESS
+            if type == ACTIVITY_AIRBASE:
+                base_gui_type = BASE_GUI_AIRBASE
+            return freeciv.func.get_possible_unit_base_name(self.handle, base_gui_type)
         def_name = activity_names[type][len('ACTIVITY_'):].lower().replace('_', ' ')
         if def_name in action_names:
             return action_names[def_name]
@@ -164,7 +182,7 @@ class Unit(object):
         freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
         freeciv.func.unit_focus_set(self.handle)
 
-    def perform_activity(self, ident):
+    def perform_activity(self, ident, target=0):
         # Warning! Safe to use only when `self` is in focus.
         id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
@@ -214,9 +232,9 @@ class Unit(object):
         elif ident == ACTIVITY_EXPLORE:
             freeciv.func.key_unit_auto_explore()
         elif ident == ACTIVITY_HELP_BUILD_WONDER:
-            freeciv.func.py_caravan_help_build_wonder(self.handle)
+            freeciv.func.py_caravan_help_build_wonder(self.handle, target)
         elif ident == ACTIVITY_ESTABLISH_TRADE_ROUTE:
-            freeciv.func.py_caravan_establish_trade(self.handle)
+            freeciv.func.py_caravan_establish_trade(self.handle, target)
         elif ident == ACTIVITY_CENTER_ON_UNIT:
             freeciv.func.request_center_focus_unit()
         elif ident == ACTIVITY_UPGRADE:

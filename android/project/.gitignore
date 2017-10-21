@@ -5,14 +5,8 @@
 /libs
 /obj
 /jni/python
-/jni/freeciv
-/jni/freeciv-server/ai
-/jni/freeciv-server/common
-/jni/freeciv-server/fc_config.h
-/jni/freeciv-server/lua
-/jni/freeciv-server/server
-/jni/freeciv-server/tolua
-/jni/freeciv-server/utility
+/jni/freeciv-client
+/jni/freeciv-server
 /jni/SDL
 /jni/SDL2_image
 /jni/SDL2_ttf

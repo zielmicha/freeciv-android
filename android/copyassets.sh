@@ -46,18 +46,25 @@ mkdir -p $B
     mkdir -p $B/$line
     mkdir -p project/assets/data/$line
 done
+rmdir $B/flags
+rm -r $B/themes
 
 (cd ../data; find -type f) | while read line; do
-    if [[ ! $line =~ ^\./flags/.*\.png$ ]] ; then
+    if [[ ! $line =~ ^\./(flags|themes)/.*$ ]] ; then
         if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
             cp ../data/$line $B/$line || exit 1
-        elif [[ $line =~ \.(png|jpg|index)|android-help.txt$ ]]; then
+        elif [[ $line =~ \.(png)$ ]]; then
             cp ../data/$line project/assets/data/$line || exit 1
         fi
     fi
 done
+cp ../data/civ2civ3/README.civ2civ3 $B/civ2civ3/
+cp ../data/experimental/README.experimental $B/experimental/
+mkdir -p project/assets/userdata
+cp ../userdata/*.png ../userdata/*.jpg project/assets/userdata/
+cp ../userdata/android-help.txt project/assets/userdata/
 find $B/scenarios/ -type f -name "*.sav" -exec gzip "{}" \;
-(cd ../data/flags && ../../android/compose.py '*-large.png' shield ../../android/project/assets/data/flags/large)
-(cd ../data/flags && ../../android/compose.py '*-shield-large.png' '' ../../android/project/assets/data/flags/shield-large)
-(cd ../data/flags && ../../android/compose.py '*.png' shield,large ../../android/project/assets/data/flags/flags)
-(cd ../data/flags && ../../android/compose.py '*-shield.png' large ../../android/project/assets/data/flags/shield)
+(cd ../data/flags && ../../../android/compose.py '*-large.png' shield ../../../android/project/assets/data/flags/large)
+(cd ../data/flags && ../../../android/compose.py '*-shield-large.png' '' ../../../android/project/assets/data/flags/shield-large)
+(cd ../data/flags && ../../../android/compose.py '*.png' shield,large ../../../android/project/assets/data/flags/flags)
+(cd ../data/flags && ../../../android/compose.py '*-shield.png' large ../../../android/project/assets/data/flags/shield)

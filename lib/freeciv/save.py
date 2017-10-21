@@ -336,7 +336,7 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
 
 def subprocess_start_server(args):
     if sys.argv[0].endswith('.py'): # if running as script, not cython --embed (on desktop)
-        cmd = ['src/freeciv-server']
+        cmd = ['freeciv-src/freeciv-server']
     else: # on android
         machine = platform.machine()
         print 'platform.machine():', machine

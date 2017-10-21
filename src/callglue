@@ -1,0 +1,209 @@
+void call_idle_callbacks()
+bool client_start_server(void)
+int connect_to_server(const char *username, const char *hostname, int port, char *errbuf, int errbufsize)
+double real_timer_callback()
+void input_from_server(int fd)
+void py_dsend_packet_player_ready(int number, bool ready)
+void send_chat(char* msg)
+void control_mouse_cursor_pos(int x, int y)
+void recenter_button_pressed(int canvas_x, int canvas_y)
+void recenter_at_tile_int(long tile)
+void init_mapcanvas_and_overview()
+bool map_canvas_resized(int width, int height)
+void init_things()
+void update_map_canvas_visible()
+void update_map_canvas(int canvas_x, int canvas_y, int width, int height)
+struct canvas* get_mapview_store()
+
+void key_unit_move_direction(int gui_dir)
+void key_unit_goto()
+void update_line(int canvas_x, int canvas_y)
+void key_cancel_action()
+void key_unit_road()
+void key_unit_build_city()
+void key_unit_trade_route()
+void key_unit_irrigate()
+void key_unit_mine()
+void key_unit_transform()
+void key_unit_fortress()
+void key_unit_fortify()
+void key_unit_airbase()
+void key_unit_pollution()
+void key_unit_paradrop()
+void key_unit_fallout()
+void key_unit_sentry()
+void key_unit_pillage()
+void key_unit_homecity()
+void key_unit_unload_all()
+void key_unit_wait()
+void key_unit_done()
+void key_unit_disband()
+void key_unit_auto_explore()
+
+void action_button_pressed(int canvas_x, int canvas_y, int qtype)
+void free_ref(struct sprite* ref)
+void key_end_turn()
+int meswin_get_num_messages(void)
+const struct message *meswin_get_message(int message_index)
+void finish_city_at_unit(long unit, char* title)
+void cancel_city_at_unit(long unit)
+long canvas_pos_to_nearest_tile_id(int x, int y)
+void set_mapview_scroll_pos(int gui_x0, int gui_y0)
+void base_set_mapview_origin(int gui_x0, int gui_y0)
+PyObject* get_map_view_origin()
+
+struct unit_list* get_units_in_focus()
+struct unit_list* get_units_at_tile(long tile)
+bool can_unit_do_activity(const struct unit* unit, enum unit_activity activity)
+int py_tile_activity_time(enum unit_activity activity, const struct tile *ptile)
+bool unit_can_add_or_build_city(const struct unit *punit)
+bool unit_can_help_build_wonder_here(const struct unit *punit)
+bool can_unit_paradrop(const struct unit *punit)
+bool can_unit_change_homecity(const struct unit *punit)
+#bool units_can_load(const struct unit_list *punit)
+#bool units_can_unload(const struct unit_list *punit)
+PyObject* get_unit_properties(struct unit* s)
+const char* get_unit_name(const struct unit* u)
+
+void request_new_unit_activity(struct unit *punit, enum unit_activity act)
+void unit_focus_set(struct unit *punit)
+
+PyObject* get_home_citiy(struct unit *unit)
+
+void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
+int get_citydlg_canvas_width()
+int get_citydlg_canvas_height()
+
+bool city_unhappy(const struct city *pcity)
+bool city_happy(const struct city *pcity)
+bool city_celebrating(const struct city *pcity)
+int city_get_prod(struct city* pCity, int mode, int type)
+int city_get_pollution(struct city* pCity)
+int city_get_size(struct city* pCity)
+int city_turns_to_grow(const struct city *pCity)
+int city_granary_size(int size)
+int city_production_turns_to_build(const struct city *pcity, bool include_shield_stock)
+int city_get_shield_stock(struct city* pCity)
+const char* city_name_get(const struct city* pCity)
+struct sprite* city_get_production_image(struct city* pCity)
+int city_get_production_cost(struct city* pCity)
+char* city_get_production_name(struct city* pCity)
+int city_get_citizen_count(struct city* pCity, bool specialist, int type)
+
+bool is_illness_on()
+int city_get_illness(const struct city *pcity)
+
+void city_rotate_specialist(struct city *pcity, int citizen_index)
+void city_map_click(struct city* pCity, int canvas_x, int canvas_y)
+void city_change_production_type(struct city* pCity, int type, long value)
+struct unit_list* get_units_present_in_city(struct city* pCity)
+
+int get_playable_nation_count()
+int city_style_of_nation_id(int id)
+char* get_name_of_nation_id(int id)
+
+int nation_group_count()
+char* get_name_of_nation_group_id(int id)
+
+PyObject* get_list_of_nations_in_group(int group_id)
+
+void option_str_set_by_name(char* name, char* value)
+
+void set_nation_settings(int nation, char* leader_name, int sex, int city_style)
+
+void disconnect_from_server(void)
+
+PyObject* get_buildable_improvements_in_city(struct city* pcity)
+PyObject* get_buildable_units_in_city(struct city* pCity)
+
+void set_tax_values(int tax, int luxury, int science)
+int get_tax_value(bool luxury)
+int get_gold_amount()
+int get_gold_income()
+
+PyObject* get_techs(int level)
+void set_tech_goal(int index)
+PyObject* get_current_tech()
+
+char* get_current_year_name()
+PyObject* get_governments()
+void change_government(long gov)
+
+void py_accept_treaty(int counterpart)
+void py_cancel_treaty(int counterpart)
+
+int call_callback(int val)
+
+int city_production_buy_gold_cost(const struct city *pcity)
+bool city_can_buy(const struct city *pcity)
+int city_buy_production(struct city *pcity)
+
+bool get_turn_done_button_state(void)
+
+PyObject* get_built_improvements_in_city(struct city* pCity)
+#int impr_sell_gold(const struct impr_type *pimprove)
+#bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove)
+struct sprite* get_unit_image(const struct unit* u)
+
+void authenticate(const char* password)
+
+PyObject* get_players()
+const char *player_name(const struct player *pplayer);
+
+void set_tech_research(int index)
+
+bool can_unit_do_activity_road(const struct unit *punit, bool rail)
+PyObject* get_possible_unit_base_name(const struct unit *punit, enum base_gui_type base_type)
+void set_unit_activity_base(struct unit *punit, int base);
+
+int impr_sell_gold(const struct impr_type *pimprove)
+bool can_city_sell_building(const struct city *pcity, struct impr_type *pimprove);
+int city_sell_improvement_type(struct city *pcity, const struct impr_type *pimprove)
+
+const char *nation_adjective_for_player(const struct player *pplayer)
+const char *nation_plural_for_player(const struct player *pplayer)
+bool can_meet_with_player(const struct player *pplayer)
+void py_init_meeting(int counterpart)
+
+struct player *player_by_number(const int player_id)
+#int py_get_player_number(struct player* p)
+int player_number(const struct player *pplayer)
+
+struct sprite *py_get_nation_flag(const struct player *pplayer)
+struct player* get_playing()
+
+void py_add_clause(int counterpart, int giver, int type, int value)
+void py_cancel_pact(struct player* p, int clause)
+int py_get_dipl_state(struct player* p)
+bool py_gives_shared_vision(struct player* p)
+
+void py_overview_click(int x, int y)
+void request_toggle_city_full_bar(void)
+
+PyObject* py_get_caravan_options(struct unit *punit, struct city *phomecity, struct city *pdestcity)
+void py_action_selection_no_longer_in_progress(struct unit* punit)
+void py_caravan_help_build_wonder(struct unit* punit, struct city* target_city)
+void py_caravan_establish_trade(struct unit* punit, struct city* target_city)
+void request_unit_non_action_move(struct unit *punit, struct tile *dest_tile)
+
+void request_center_focus_unit(void)
+
+struct city *tile_city(const struct tile *ptile)
+bool unit_has_type_flag(const struct unit *punit, enum unit_type_flag_id flag)
+
+int py_get_city_id(struct city* city)
+int py_get_unit_id(struct unit* unit)
+
+void py_server_main_forking(PyObject* cmd)
+void py_server_main_run(PyObject* cmd)
+
+void request_unit_upgrade(struct unit *punit);
+bool can_unit_upgrade(struct unit *punit);
+
+void update_map_canvas_whole()
+
+PyObject* get_advances()
+
+PyObject* py_canvas_to_map(int x, int y)
+PyObject* get_activity_str(struct unit* unit)
+void pyjni_log_normal(PyObject* args)

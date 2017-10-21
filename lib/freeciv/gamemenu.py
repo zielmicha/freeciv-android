@@ -354,7 +354,7 @@ def init():
 
 def init_orders():
     global order_sprites
-    img_orders = graphics.load_image('data/user/theme_orders_buttons.png')
+    img_orders = graphics.load_image('userdata/theme_orders_buttons.png')
     order_sprites = client.common.split_sprites(img_orders, start=(0, 1), each=(29, 31), size=(31, 29), num=(1, 38))
 
     for line in order_sprites:

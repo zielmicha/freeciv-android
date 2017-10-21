@@ -34,7 +34,9 @@ copyassets:
 
 # BUILD
 
-build: cython project/jni/freeciv project/build.xml
+build: cython project/jni/freeciv-client project/jni/freeciv-server project/build.xml
+	(cd .. && make freeciv-src/data freeciv-src/Makefile)
+	(cd ../freeciv-src && make py_integration/callauto.c)
 	ndk-build -C project -j4
 
 project/build.xml:
@@ -45,10 +47,17 @@ cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyj
 project/jni/src/pyjnius.c:
 	./makejnius.sh
 
-project/jni/freeciv:
-	ln -sf ../../../src project/jni/freeciv
-	(cd project/jni/freeciv-server && ln -sf ../../../../src/server && ln -sf ../../../../src/common && ln -sf ../../../../src/utility && ln -sf ../../../../src/ai && ln -sf ../../../../src/lua && ln -sf ../../../../src/tolua && ln -sf ../../../../src/fc_config.h)
-	(cd ../src && python ../gencallglue.py)
+project/jni/freeciv-client:
+	ln -sf ../../../freeciv-src project/jni/freeciv-client
+project/jni/freeciv-server:
+	mkdir -p project/jni/freeciv-server
+	ln -sf ../../../../freeciv-src/ai project/jni/freeciv-server/ai
+	ln -sf ../../../../freeciv-src/common project/jni/freeciv-server/common
+	ln -sf ../../../../freeciv-src/dependencies project/jni/freeciv-server/dependencies
+	ln -sf ../../../../src/fc_config.h project/jni/freeciv-server/fc_config.h
+	ln -sf ../../../../src/freeciv_config.h project/jni/freeciv-server/freeciv_config.h
+	ln -sf ../../../../freeciv-src/server project/jni/freeciv-server/server
+	ln -sf ../../../../freeciv-src/utility project/jni/freeciv-server/utility
 
 project/jni/src/graphics.c: ../lib/graphics.pyx
 	make -C ../lib graphics.c

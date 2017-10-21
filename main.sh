@@ -5,4 +5,4 @@ else
 	name="$1"
 	shift
 fi
-PYTHONPATH=lib:src $INSTRUMENT python -m "$name" "$@"
+PYTHONPATH=lib:freeciv-src $INSTRUMENT python -m "$name" "$@"
