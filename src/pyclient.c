@@ -232,6 +232,11 @@ void py_caravan_establish_trade(struct unit* punit, struct city *target_city)
   request_do_action(ACTION_TRADE_ROUTE, punit->id, target_city->id, 0);
 }
 
+void py_request_do_action(enum gen_action action, struct unit* punit, struct city *target_city)
+{
+  request_do_action(action, punit->id, target_city->id, 0);
+}
+
 void py_caravan_help_build_wonder(struct unit* punit, struct city *target_city)
 {
   if (!target_city) {

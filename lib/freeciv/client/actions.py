@@ -52,10 +52,11 @@ ACTIVITY_UNLOAD = 1010
 ACTIVITY_CENTER_ON_UNIT = 2003
 ACTIVITY_UPGRADE = 2004
 
-# freeciv-src/common/actions.h
+# freeciv-src/common/actions.h (+ 3000 to avoid collision with activities)
+ACTION_MIN_VALUE=3000
 ACTION_ESTABLISH_EMBASSY=3000
 ACTION_SPY_INVESTIGATE_CITY=3001
-ACTION_SPY_POISON=3001
+ACTION_SPY_POISON=3002
 ACTION_SPY_STEAL_GOLD=3003
 ACTION_SPY_SABOTAGE_CITY=3004
 ACTION_SPY_TARGETED_SABOTAGE_CITY=3005
@@ -67,6 +68,15 @@ ACTION_MARKETPLACE=3010
 ACTIVITY_HELP_BUILD_WONDER=3011
 ACTION_SPY_BRIBE_UNIT=3012
 ACTION_SPY_SABOTAGE_UNIT=3013
+ACTION_MAX_VALUE=3013
+
+def py_action_to_freeciv_action(py_action):
+    if py_action < ACTION_MIN_VALUE or py_action > ACTION_MAX_VALUE:
+        return -1
+    return py_action - ACTION_MIN_VALUE
+
+def freeciv_action_target_city_to_py_action(act_id):
+    return act_id + ACTION_MIN_VALUE
 
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
@@ -240,7 +250,11 @@ class Unit(object):
         elif ident == ACTIVITY_UPGRADE:
             freeciv.func.request_unit_upgrade(self.handle)
         else:
-            print 'Unsupported action ', ident
+            freeciv_action = py_action_to_freeciv_action(ident)
+            if freeciv_action >= 0:
+                freeciv.func.py_request_do_action(freeciv_action, self.handle, target)
+            else:
+                print 'Unsupported action', ident
 
     def get_activity_string(self):
         return freeciv.func.get_activity_str(self.handle)

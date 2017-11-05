@@ -71,16 +71,36 @@ class ScreenClient(client.Client):
     def popup_caravan_dialog(self, unit, home, dest, target_tile, act_list):
         items = []
         for act_id in act_list:
-            py_action = act_id + 3000
+            py_action = client.actions.freeciv_action_target_city_to_py_action(act_id)
             label = 'action ' + str(act_id)
-            if py_action == client.actions.ACTIVITY_ESTABLISH_TRADE_ROUTE:
+            if py_action == client.actions.ACTION_ESTABLISH_EMBASSY:
+                label = 'Establish Embassy'
+            elif py_action == client.actions.ACTION_SPY_INVESTIGATE_CITY:
+                label = 'Investigate City'
+            elif py_action == client.actions.ACTION_SPY_POISON:
+                label = 'Poison City'
+            elif py_action == client.actions.ACTION_SPY_STEAL_GOLD:
+                label = 'Steal Gold'
+            elif py_action == client.actions.ACTION_SPY_SABOTAGE_CITY:
+                label = 'Sabotage City'
+            elif py_action == client.actions.ACTION_SPY_TARGETED_SABOTAGE_CITY:
+                label = 'Targeted Sabotage City'
+            elif py_action == client.actions.ACTION_SPY_STEAL_TECH:
+                label = 'Steal Technology'
+            elif py_action == client.actions.ACTION_SPY_TARGETED_STEAL_TECH:
+                label = 'Targeted Steal Tech'
+            elif py_action == client.actions.ACTION_SPY_INCITE_CITY:
+                label = 'Incite Revolt'
+            elif py_action == client.actions.ACTIVITY_ESTABLISH_TRADE_ROUTE:
                 label = 'Establish trade route'
+            elif py_action == client.actions.ACTION_MARKETPLACE:
+                label = 'Enter Marketplace'
             elif py_action == client.actions.ACTIVITY_HELP_BUILD_WONDER:
                 label = 'Help building wonder'
-            def callback():
-                unit.perform_activity(py_action, dest.handle)
+            def callback(act):
+                unit.perform_activity(act, dest.handle)
                 freeciv.func.py_action_selection_no_longer_in_progress(unit.handle)
-            items.append((label, callback))
+            items.append((label, functools.partial(callback, py_action)))
 
         def no_move():
             freeciv.func.request_unit_non_action_move(unit.handle, target_tile)

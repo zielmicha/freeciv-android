@@ -184,6 +184,7 @@ PyObject* py_get_caravan_options(struct unit *punit, struct city *phomecity, str
 void py_action_selection_no_longer_in_progress(struct unit* punit)
 void py_caravan_help_build_wonder(struct unit* punit, struct city* target_city)
 void py_caravan_establish_trade(struct unit* punit, struct city* target_city)
+void py_request_do_action(enum gen_action action, struct unit* punit, struct city *target_city)
 void request_unit_non_action_move(struct unit *punit, struct tile *dest_tile)
 
 void request_center_focus_unit(void)
