@@ -68,7 +68,8 @@ class ScreenClient(client.Client):
     def disable_menus(self):
         self.ui.menu.update(None)
 
-    def popup_caravan_dialog(self, unit, home, dest, target_tile, act_list):
+    def popup_caravan_dialog(self, unit, home, target_city, target_unit, target_tile, act_list):
+        target = target_city
         items = []
         for act_id in act_list:
             py_action = client.actions.freeciv_action_target_city_to_py_action(act_id)
@@ -97,8 +98,14 @@ class ScreenClient(client.Client):
                 label = 'Enter Marketplace'
             elif py_action == client.actions.ACTIVITY_HELP_BUILD_WONDER:
                 label = 'Help building wonder'
+            elif py_action == client.actions.ACTION_SPY_BRIBE_UNIT:
+                label = 'Bribe unit'
+                target = target_unit
+            elif py_action == client.actions.ACTION_SPY_SABOTAGE_UNIT:
+                label = 'Sabotage unit'
+                target = target_unit
             def callback(act):
-                unit.perform_activity(act, dest.handle)
+                unit.perform_activity(act, target.handle)
                 freeciv.func.py_action_selection_no_longer_in_progress(unit.handle)
             items.append((label, functools.partial(callback, py_action)))
 
@@ -108,7 +115,7 @@ class ScreenClient(client.Client):
         items.append(('Do nothing', no_move))
 
         ui.show_list_dialog(items, title='Your %s from %s has arrived to city %s'
-                            % (unit.get_name(), home.get_name(), dest.get_name()),
+                            % (unit.get_name(), home.get_name(), target.get_name()),
                             titlefont=ui.consolefont)
 
     def popup_diplomat_dialog(self, diplomat_action):

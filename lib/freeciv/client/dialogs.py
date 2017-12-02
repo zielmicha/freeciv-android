@@ -67,8 +67,8 @@ def unit_select_dialog_popup(tile):
     client.client.unit_select_dialog_popup(map(actions.Unit, units))
 
 @freeciv.register
-def popup_caravan_dialog(unit, home_city, dest_city, target_tile, act_list):
-    client.client.popup_caravan_dialog(actions.Unit(unit), city.City(home_city), city.City(dest_city), target_tile, act_list)
+def popup_caravan_dialog(unit, home_city, target_city, target_unit, target_tile, act_list):
+    client.client.popup_caravan_dialog(actions.Unit(unit), city.City(home_city), city.City(target_city), actions.Unit(target_unit), target_tile, act_list)
 
 @freeciv.register
 def popup_diplomat_dialog(unit, tile):

@@ -529,8 +529,8 @@ void popup_revolution_dialog(void){
 	Py_DECREF(ret);
 }
 // void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity)
-void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity, struct tile *target_tile, PyObject *act_list){
-	PyObject* ret = PY_CALL("sOOOiO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity), target_tile, act_list);
+void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity, struct unit *target_unit, struct tile *target_tile, PyObject *act_list){
+	PyObject* ret = PY_CALL("sOOOOiO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity), py_mapper_unit(target_unit), target_tile, act_list);
 	Py_DECREF(ret);
 }
 // bool caravan_dialog_is_open(int *unit_id, int *city_id)

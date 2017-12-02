@@ -252,7 +252,10 @@ class Unit(object):
         else:
             freeciv_action = py_action_to_freeciv_action(ident)
             if freeciv_action >= 0:
-                freeciv.func.py_request_do_action(freeciv_action, self.handle, target)
+                if ident == ACTION_SPY_BRIBE_UNIT or ident == ACTION_SPY_SABOTAGE_UNIT:
+                    freeciv.func.py_request_do_action_target_unit(freeciv_action, self.handle, target)
+                else:
+                    freeciv.func.py_request_do_action(freeciv_action, self.handle, target)
             else:
                 print 'Unsupported action', ident
 

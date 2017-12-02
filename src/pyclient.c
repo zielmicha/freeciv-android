@@ -237,6 +237,11 @@ void py_request_do_action(enum gen_action action, struct unit* punit, struct cit
   request_do_action(action, punit->id, target_city->id, 0);
 }
 
+void py_request_do_action_target_unit(enum gen_action action, struct unit* punit, struct unit *target_unit)
+{
+  request_do_action(action, punit->id, target_unit->id, 0);
+}
+
 void py_caravan_help_build_wonder(struct unit* punit, struct city *target_city)
 {
   if (!target_city) {
@@ -889,7 +894,7 @@ void popup_action_selection(struct unit *actor_unit,
       }
     }
   } action_iterate_end;
-  popup_caravan_dialog(actor_unit, actor_homecity, target_city, target_tile, list);
+  popup_caravan_dialog(actor_unit, actor_homecity, target_city, target_unit, target_tile, list);
   Py_DECREF(list);
 }
 
