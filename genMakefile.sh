@@ -10,6 +10,7 @@ fi
 CC_FLAGS="-g -Ipy_integration -Iclient -Iclient/include -Iclient/agents -Iclient/luascript -Icommon -Icommon/aicore -Icommon/scriptcore -Idependencies/cvercmp -Iutility -I$PYTHON_INC -I$SRC -Iserver -Iserver/generator -Iserver/scripting -Iserver/advisors -Iai -Iai/classic -Iai/default -Iai/stub -Iai/threaded -Idependencies/lua-5.3/src -Idependencies/tolua-5.2/include -DHAVE_CONFIG_H -fPIC $MY_CFLAGS"
 
 export MKTMP="$PWD/$SRC/Makefile.tmp"
+test -f "$MKTMP" && rm "$MKTMP"
 
 output() {
     echo "$1" >> $MKTMP
