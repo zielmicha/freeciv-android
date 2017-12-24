@@ -170,6 +170,8 @@ class Dialog(ui.HorizontalLayoutWidget):
                     icon = icons.get_small_image('%s-%d' % (name, i % 2)) # man and woman
                 except KeyError:
                     icon = icons.get_small_image(name) # elvis, taxman, scientist
+                w, h = icon.get_size()
+                icon = icon.scale((ui.scale_for_device(w * 2), ui.scale_for_device(h * 2)))
                 panel.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
                 index += 1
         return panel

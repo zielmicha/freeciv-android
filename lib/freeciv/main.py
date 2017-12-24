@@ -302,16 +302,6 @@ def init_window():
         size = features.get('app.desktop_size')
         ui.create_window(map(int, size.split(',')))
 
-def set_logical_size():
-    good_dpi = 250
-    dev_dpi = osutil.get_dpi()
-    print 'device dpi', dev_dpi
-    if dev_dpi > 0 and dev_dpi > good_dpi:
-        w, h = graphics.get_window().get_size()
-        SCALE = float(good_dpi) / dev_dpi
-        print 'scale factor', SCALE
-        graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
-
 def maybe_setup_launch_param():
     param = features.get('app.launch_param')
     if param:
@@ -358,9 +348,8 @@ def main():
     # - it needs patching SDL
     # - there is a zoom feature in the game.
     # - it makes the graphics to be more blurred because they are zoomed twice when using game zoom
-    # TODO: adapt fonts and buttons and make their size customizable
     #if not osutil.is_desktop:
-    #    set_logical_size()
+    #    set_logical_size() # Deleted. See lib/ui/core.py:scale_for_device
 
 
     ui.init()
