@@ -14,6 +14,7 @@
 #include "control.h"
 #include "packhand.h"
 #include "astring.h"
+#include "reqtree.h"
 
 #if !__MINGW32__
     #include <sys/prctl.h>
@@ -498,6 +499,17 @@ void free_ref(struct sprite* cref) {
 
 static PyObject* get_overview_size(PyObject* self, PyObject* args) {
     return Py_BuildValue("ii", gui_options.overview.width, gui_options.overview.height);
+}
+
+PyObject* py_get_overview_size(struct reqtree *reqtree) {
+    int w, h;
+    get_reqtree_dimensions(reqtree, &w, &h);
+    return Py_BuildValue("ii", w, h);
+}
+
+void py_draw_reqtree(int tree, struct canvas *pcanvas, int canvas_x, int canvas_y, int tt_x, int tt_y, int w, int h) {
+    draw_reqtree(tree, pcanvas, canvas_x, canvas_y, tt_x, tt_y, w, h);
+    Py_DECREF(pcanvas);
 }
 
 int city_get_prod(struct city* city, int mode, int type) {
