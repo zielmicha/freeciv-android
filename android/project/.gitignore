@@ -4,6 +4,7 @@
 /gen
 /libs
 /obj
+/jni/curl
 /jni/python
 /jni/freeciv-client
 /jni/freeciv-server
