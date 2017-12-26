@@ -61,7 +61,7 @@ android/project/jni/curl:
 	mv curl-7.47.0 android/project/jni/curl/
 	cp -r configure_project/curl/* android/project/jni/curl/
 
-pyjnius:
+pyjnius/jnius:
 	git submodule init
 	git submodule update
 

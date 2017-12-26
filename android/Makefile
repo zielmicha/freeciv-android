@@ -45,7 +45,7 @@ project/build.xml:
 cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyjnius.c
 
 project/jni/src/pyjnius.c:
-	(cd .. && make pyjnius)
+	(cd .. && make pyjnius/jnius)
 	./makejnius.sh
 
 project/jni/freeciv-client:
