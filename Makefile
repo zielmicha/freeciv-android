@@ -1,5 +1,11 @@
 all: src lib freeciv-src/data
-freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk
+freeciv-2.6.0-beta1:
+	wget -c http://files.freeciv.org/beta/freeciv-2.6.0-beta1.tar.bz2
+	sha256sum -c freeciv-2.6.0-SHA256SUM || exit 1
+	tar xjf freeciv-2.6.0-beta1.tar.bz2
+	(cd freeciv-2.6.0-beta1 && patch -p1 <../freeciv-2.6.0-beta1.patch)
+	ln -sf freeciv-2.6.0-beta1 freeciv-src
+freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-2.6.0-beta1
 	./genMakefile.sh
 src/objectfiles:
 	mkdir src/objectfiles
@@ -23,4 +29,40 @@ lib:
 	$(MAKE) -C lib
 run: all
 	./main.sh freeciv.main $(ARG0) $(ARG1)
+
+pythonforandroid:
+	p4a symlink_dist --dist-name freeciv-android-jni-dependancies --android_api 17 --ndk_ver r12b --output pythonforandroid
+android/project/jni/SDL: pythonforandroid
+	cp -r pythonforandroid/jni/SDL android/project/jni/
+	(cd android/project/jni/SDL && patch -p1 <../../../../configure_project/SDL_modify_blending.patch)
+	touch android/project/jni/SDL
+android/project/jni/SDL2_image: pythonforandroid
+	cp -r pythonforandroid/jni/SDL2_image android/project/jni/
+	touch android/project/jni/SDL2_image
+android/project/jni/SDL2_ttf: pythonforandroid
+	cp -r pythonforandroid/jni/SDL2_ttf android/project/jni/
+	touch android/project/jni/SDL2_ttf
+android/project/jni/SDL2_mixer: pythonforandroid
+	cp -r pythonforandroid/jni/SDL2_mixer android/project/jni/
+	touch android/project/jni/SDL2_mixer
+android/project/jni/python: pythonforandroid
+	mkdir -p android/project/jni/python
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Python android/project/jni/python/
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Modules android/project/jni/python/
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Parser android/project/jni/python/
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Objects android/project/jni/python/
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Include android/project/jni/python/
+	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/pyconfig.h android/project/jni/python/
+	cp -r configure_project/python/* android/project/jni/python/
+	touch android/project/jni/python
+android/project/jni/curl:
+	wget -c https://curl.haxx.se/download/curl-7.47.0.tar.bz2
+	tar xjf curl-7.47.0.tar.bz2
+	mv curl-7.47.0 android/project/jni/curl/
+	cp -r configure_project/curl/* android/project/jni/curl/
+
+pyjnius:
+	git submodule init
+	git submodule update
+
 .PHONY: src lib run

@@ -69,7 +69,7 @@ echo "freeciv-server: $ev $sev
 	\$(CC) -fPIC -pthread -o freeciv-server $ev $sev -lm -lz -l$PYTHON -lcurl $MY_LDFLAGS" >> $SRC/client.mk
 echo "freecivclient.a: $ev $cev
 	ar rcs freecivclient.a $ev $cev" >> $SRC/client.mk
-echo "py_integration/callauto.c: py_integration/callglue
+echo "py_integration/callauto.c: py_integration/callglue ../gencallglue.py ../genglue.py
 	python ../gencallglue.py" >> $SRC/client.mk
 echo "clean:
 	rm objectfiles/* freecivclient.so $SRC/callauto.c" >> $SRC/client.mk
