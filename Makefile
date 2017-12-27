@@ -1,26 +1,26 @@
-all: src lib freeciv-src/data
-freeciv-src:
+all: src lib data
+freeciv-src/data:
 	wget -c http://files.freeciv.org/beta/freeciv-2.6.0-beta1.tar.bz2
 	sha256sum -c freeciv-2.6.0-SHA256SUM || exit 1
 	tar xjf freeciv-2.6.0-beta1.tar.bz2
 	(cd freeciv-2.6.0-beta1 && patch -p1 <../freeciv-2.6.0-beta1.patch)
 	ln -sf freeciv-2.6.0-beta1 freeciv-src
-freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-src
+freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-src/data
 	./genMakefile.sh
 src/objectfiles:
 	mkdir src/objectfiles
 
-freeciv-src/data: freeciv-src/data/misc/overlays_white.png freeciv-src/data/hexemplio/terrain_white.png freeciv-src/data/hexemplio/grid_white.png freeciv-src/data/amplio2/terrain1_white.png freeciv-src/data/amplio2/grid_white.png
+data: freeciv-src/data/misc/overlays_white.png freeciv-src/data/hexemplio/terrain_white.png freeciv-src/data/hexemplio/grid_white.png freeciv-src/data/amplio2/terrain1_white.png freeciv-src/data/amplio2/grid_white.png
 	ln -sf freeciv-src/data
-freeciv-src/data/misc/overlays_white.png: freeciv-src freeciv-src/data/misc/overlays.png
+freeciv-src/data/misc/overlays_white.png: freeciv-src/data freeciv-src/data/misc/overlays.png
 	python makemask.py freeciv-src/data/misc/overlays.png freeciv-src/data/misc/overlays_white.png
-freeciv-src/data/hexemplio/terrain_white.png: freeciv-src freeciv-src/data/hexemplio/terrain.png
+freeciv-src/data/hexemplio/terrain_white.png: freeciv-src/data freeciv-src/data/hexemplio/terrain.png
 	python makemask.py freeciv-src/data/hexemplio/terrain.png freeciv-src/data/hexemplio/terrain_white.png
-freeciv-src/data/hexemplio/grid_white.png: freeciv-src freeciv-src/data/hexemplio/grid.png
+freeciv-src/data/hexemplio/grid_white.png: freeciv-src/data freeciv-src/data/hexemplio/grid.png
 	python makemask.py freeciv-src/data/hexemplio/grid.png freeciv-src/data/hexemplio/grid_white.png
-freeciv-src/data/amplio2/terrain1_white.png: freeciv-src freeciv-src/data/amplio2/terrain1.png
+freeciv-src/data/amplio2/terrain1_white.png: freeciv-src/data freeciv-src/data/amplio2/terrain1.png
 	python makemask.py freeciv-src/data/amplio2/terrain1.png freeciv-src/data/amplio2/terrain1_white.png
-freeciv-src/data/amplio2/grid_white.png: freeciv-src freeciv-src/data/amplio2/grid.png
+freeciv-src/data/amplio2/grid_white.png: freeciv-src/data freeciv-src/data/amplio2/grid.png
 	python makemask.py freeciv-src/data/amplio2/grid.png freeciv-src/data/amplio2/grid_white.png
 
 src: freeciv-src/Makefile src/objectfiles

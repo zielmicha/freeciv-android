@@ -35,7 +35,7 @@ copyassets:
 # BUILD
 
 build: cython project/jni/freeciv-client project/jni/freeciv-server project/build.xml
-	(cd .. && make freeciv-src/data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
+	(cd .. && make data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
 	(cd ../freeciv-src && make py_integration/callauto.c)
 	"${ANDROIDNDK}/ndk-build" -C project -j4
 
