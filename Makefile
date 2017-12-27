@@ -5,6 +5,7 @@ freeciv-src/data:
 	tar xjf freeciv-2.6.0-beta1.tar.bz2
 	(cd freeciv-2.6.0-beta1 && patch -p1 <../freeciv-2.6.0-beta1.patch)
 	ln -sf freeciv-2.6.0-beta1 freeciv-src
+	make -C android project/jni/freeciv-client project/jni/freeciv-server
 freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-src/data
 	./genMakefile.sh
 src/objectfiles:
