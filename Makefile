@@ -1,5 +1,6 @@
 all: src lib data
 freeciv-src/data:
+	# mirror of this file: https://cdn.atomshare.net/2738dc98073eb97c35f47d9b0d3b34decf783766ff7afbe08bded9092730b759/freeciv-2.6.0-beta1.tar.bz2
 	wget -c http://files.freeciv.org/beta/freeciv-2.6.0-beta1.tar.bz2
 	sha256sum -c freeciv-2.6.0-SHA256SUM || exit 1
 	tar xjf freeciv-2.6.0-beta1.tar.bz2
@@ -57,6 +58,7 @@ android/project/jni/python: pythonforandroid
 	cp -r configure_project/python/* android/project/jni/python/
 	touch android/project/jni/python
 android/project/jni/curl:
+	# mirror of this file: https://cdn.atomshare.net/2b096f9387fb9b2be08d17e518c62b6537b1f4d4bb59111d5b4fa0272f383f66/curl-7.47.0.tar.bz2
 	wget -c https://curl.haxx.se/download/curl-7.47.0.tar.bz2
 	tar xjf curl-7.47.0.tar.bz2
 	mv curl-7.47.0 android/project/jni/curl/
