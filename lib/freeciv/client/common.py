@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import graphics
+import ui
 from freeciv.client import _freeciv as freeciv
 import window
 import sys
@@ -32,6 +33,16 @@ def load_gfxfile(fn):
             except graphics.SDLError:
                 return graphics.load_image(fn + '.jpg')
         return graphics.load_image(fn)
+
+@freeciv.register
+def create_sprite(width, height, color):
+    surf = graphics.create_surface(width, height)
+    surf.fill(color)
+    return surf
+
+@freeciv.register
+def color_brightness_score(color):
+    return (color[0]*299 + color[1]*587 + color[2]*114) / 1000;
 
 @freeciv.register
 def get_sprite_dimensions(image):
@@ -114,6 +125,13 @@ def canvas_put_sprite_full(canvas, x, y, sprite):
     canvas.blit(sprite, (x, y))
 
 @freeciv.register
+def canvas_put_sprite_fogged(canvas, x, y, sprite, fog, fog_x, fog_y):
+    if (fog):
+        canvas.blit(sprite, (x, y), alpha_mask=128)
+    else:
+        canvas.blit(sprite, (x, y))
+
+@freeciv.register
 def free_sprite(sprite):
     freeciv.func.free_ref(sprite)
 
@@ -151,8 +169,9 @@ flag_index = {}
 
 def init():
     global fonts
-    fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
-    init_flags()
+    fonts = [ ui.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
+    if osutil.is_android:
+        init_flags()
 
 def init_flags():
     names = ['large', 'shield', 'shield-large', 'flags']

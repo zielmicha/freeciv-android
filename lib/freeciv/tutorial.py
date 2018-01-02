@@ -1,3 +1,4 @@
+import os
 import save
 import client
 
@@ -10,5 +11,7 @@ def start():
             print 'change nation to', name, style, id
             client.freeciv.func.set_nation_settings(id, 'Player', style, 2)
         return True
-
-    save.load_game('data/tutorial.sav', before_callback=callback)
+    path = 'data/scenarios/tutorial.sav.gz'
+    if not os.path.exists(path):
+        path = 'data/scenarios/tutorial.sav'
+    save.load_game(path, before_callback=callback)

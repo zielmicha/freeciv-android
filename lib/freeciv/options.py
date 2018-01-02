@@ -81,6 +81,8 @@ def show_options():
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
+    st = 'Tileset (restart to take effect):'
+    options.add_feature_bool(st + ' hexemplio', st + ' amplio2', 'app.hex_tileset')
 
     if osutil.is_desktop:
         st = 'Fullscreen (restart to take effect): '
@@ -169,7 +171,7 @@ def change_ruleset():
         features.set_perm('app.ruleset', name)
         ui.back()
 
-    rulesets = ['default', 'civ1', 'civ2']
+    rulesets = ['classic', 'civ1', 'civ2', 'civ2civ3', 'experimental']
     panel = ui.LinearLayoutWidget()
 
     for ruleset in rulesets:

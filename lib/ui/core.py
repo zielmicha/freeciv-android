@@ -327,7 +327,17 @@ def merge_mouse_events(events):
     return res
 
 def load_font(name, size):
-    return graphics.load_font('fonts/ProcionoTT.ttf', size)
+    if name is None:
+        name = 'fonts/ProcionoTT.ttf'
+    return graphics.load_font(name, scale_for_device(size))
+
+# TODO: make size customizable ?
+def scale_for_device(size):
+    good_dpi = 250
+    dev_dpi = osutil.get_dpi()
+    if dev_dpi > 0 and dev_dpi > good_dpi:
+        size = size * dev_dpi / good_dpi
+    return size
 
 def load_image(name):
     return graphics.load_image(name)

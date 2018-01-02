@@ -1,3 +1,4 @@
+mkdir -p project/obj/jnius
 rm -r project/obj/jnius
 cp -r ../pyjnius/jnius/ project/obj/jnius
 echo 'DEF JNIUS_PLATFORM = "android"' > project/obj/jnius/config.pxi

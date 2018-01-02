@@ -114,10 +114,10 @@ cdef class Surface(object):
     def get_at(self, pos):
         pass
 
-    def blit(self, image, dest=(0, 0), src=None, blend=MODE_BLEND):
+    def blit(self, image, dest=(0, 0), src=None, blend=MODE_BLEND, alpha_mask=255):
         global same_blit_buffer
         if isinstance(image, CroppedSurface):
-            (<CroppedSurface>image).blit_into(self, dest, src, blend)
+            (<CroppedSurface>image).blit_into(self, dest, src, blend, alpha_mask)
             return
         cdef SDL_Rect srect, drect
         cdef SDL_Texture* blit_src
@@ -134,12 +134,12 @@ cdef class Surface(object):
             same_blit_buffer.blit(image, src=src)
             src = newsrc
             image = same_blit_buffer
-
         self._set_target()
 
         if len(dest) == 2:
             dest = (dest[0], dest[1], src[2], src[3])
         blit_src = _sdl_get_texture(self._sdl, image)
+        SDL_SetTextureAlphaMod(blit_src, alpha_mask)
         srect = _make_rect(src)
         drect = _make_rect(dest)
         SDL_SetTextureBlendMode(blit_src, blend)
@@ -225,6 +225,12 @@ cdef class Surface(object):
     def __repr__(self):
         return '<Surface 0x%X filename=%r>' % (id(self), self._filename)
 
+    def destroy(self):
+        if self._tex != NULL:
+            SDL_DestroyTexture(self._tex)
+            self._tex = NULL
+            _debug_destroytexture(self.get_size())
+
     def __dealloc__(self):
         if self._tex != NULL:
             SDL_DestroyTexture(self._tex)
@@ -251,7 +257,7 @@ cdef class CroppedSurface(Surface):
     def get_size(self):
         return self.rect[2], self.rect[3]
 
-    cdef object blit_into(self, surf, dest, src, blend):
+    cdef object blit_into(self, surf, dest, src, blend, alpha_mask):
         if not src:
             src = self.rect
         else:
@@ -259,7 +265,7 @@ cdef class CroppedSurface(Surface):
             src = self.rect.clip(src)
         if len(dest) == 2:
             dest = dest + (src[2], src[3])
-        surf.blit(self.orig, dest, src, blend)
+        surf.blit(self.orig, dest, src, blend, alpha_mask)
 
     def blit(self, surf, dest=(0, 0), src=None, *args, **kwargs):
         if not src:
@@ -344,7 +350,7 @@ class Allocator:
 def _init_alloc():
     global allocators
     if not allocators:
-        allocators = [Allocator(48), Allocator(96, 48), Allocator(128)]
+        allocators = []
 
 allocators = []
 
@@ -499,8 +505,7 @@ cdef object _translate_event(SDL_Event* ev):
         return Event(ev.type, pos=(ev.button.x, ev.button.y),
                      button=ev.button.button)
     elif ev.type in (SDL_KEYUP, SDL_KEYDOWN):
-        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym),
-                     unicode=unichr(ev.key.keysym.unicode))
+        return Event(ev.type, key=_translate_sym(ev.key.keysym.sym))
     elif ev.type == SDL_TEXTINPUT:
         return Event(ev.type, text=str(ev.text.text))
     elif ev.type == SDL_TEXTEDITING:

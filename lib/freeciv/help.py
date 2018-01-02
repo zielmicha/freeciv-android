@@ -46,7 +46,7 @@ def load_help():
 def _load_help():
     acum = []
     title = None
-    lines = osutil.open_res('data/android-help.txt').read().splitlines()
+    lines = osutil.open_res('userdata/android-help.txt').read().splitlines()
     for line in lines:
         if line.startswith('=== '):
             if acum: yield title, '\n'.join(acum)

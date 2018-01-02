@@ -71,9 +71,10 @@ class Menu(ui.LinearLayoutWidget):
         self.add(self.panel)
         self.panel.add(ui.Label('loading...', color=(0, 255, 0)))
 
+        self.home_city_label = ui.Label('', font=ui.consolefont)
         self.activity_label = ui.Label('', font=ui.consolefont)
-
         self.left_widget = ui.LinearLayoutWidget()
+        self.left_widget.add(self.home_city_label)
         self.left_widget.add(self.activity_label)
 
         self.joystick_layout = ui.LinearLayoutWidget()
@@ -98,8 +99,14 @@ class Menu(ui.LinearLayoutWidget):
 
     def update_left_widget(self, unit):
         if unit:
+            home_citiy = unit.get_home_citiy()
+            if home_citiy is not None:
+                self.home_city_label.set_text(home_citiy.get_name())
+            else:
+                self.home_city_label.set_text('')
             self.activity_label.set_text(unit.get_activity_string())
         else:
+            self.home_city_label.set_text('')
             self.activity_label.set_text('')
 
     def update_joystick(self):
@@ -176,8 +183,10 @@ class Button(ui.Widget):
         pass
 
     def click(self):
+        self.client.draw_patrol_lines = False
         def do():
             self.client.get_unit_in_focus().perform_activity(self.action_ident)
+            self.client.draw_patrol_lines = False
 
         if self.action_ident in confirm_actions:
             ui.ask('Really %s?' % self.action_name, do)
@@ -273,7 +282,7 @@ class TileJoystick(ui.LinearLayoutWidget):
         super(TileJoystick, self).__init__(spacing=spacing)
         self.client = client
 
-        b = functools.partial(TileButton, self)
+        b = functools.partial(TileButton, self, client.client)
 
         top = ui.HorizontalLayoutWidget(spacing=spacing)
         top.add(b(freeciv.const.DIR8_NORTHWEST))
@@ -300,11 +309,12 @@ class TileButton(ui.Widget):
     bg = (130, 100, 0, 90)
     fg = (150, 150, 50)
 
-    def __init__(self, joystick, dir):
+    def __init__(self, joystick, client, dir):
         self.size = (60, 60)
         self.dir = dir
         self.active = False
         self.joystick = joystick
+        self.client = client
 
     def draw(self, surf, pos):
         if self.dir != None and self.joystick.hidden:
@@ -331,6 +341,7 @@ class TileButton(ui.Widget):
             self.click()
 
     def click(self):
+        self.client.draw_patrol_lines = False
         if self.dir == None:
             self.joystick.hidden = not self.joystick.hidden
         else:
@@ -343,7 +354,7 @@ def init():
 
 def init_orders():
     global order_sprites
-    img_orders = graphics.load_image('data/user/theme_orders_buttons.png')
+    img_orders = graphics.load_image('userdata/theme_orders_buttons.png')
     order_sprites = client.common.split_sprites(img_orders, start=(0, 1), each=(29, 31), size=(31, 29), num=(1, 38))
 
     for line in order_sprites:

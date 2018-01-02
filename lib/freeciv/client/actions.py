@@ -12,7 +12,11 @@
 
 from freeciv.client import _freeciv as freeciv
 from freeciv import client
+import city
 
+# Activity list: see freeciv-src/common/fc_types.h
+# We're still using old values as ACTIVITY_ROAD and ACTIVITY_RAILROAD instead of ACTIVITY_GEN_ROAD
+# but this is not a problem because these values are not sent to the server.
 ACTIVITY_IDLE = 0
 ACTIVITY_POLLUTION = 1
 ACTIVITY_ROAD = 2
@@ -32,25 +36,53 @@ ACTIVITY_FORTIFYING = 15
 ACTIVITY_FALLOUT = 16
 # ACTIVITY_PATROL_UNUSED = 17
 ACTIVITY_BASE = 18
+ACTIVITY_GEN_ROAD = 19
+ACTIVITY_CONVERT = 20 # TODO: to implement
 
 ACTIVITY_DISBAND = 1001
 ACTIVITY_WAIT = 1002
 ACTIVITY_DONE = 1003
 ACTIVITY_ADD_TO_CITY = 1004
 ACTIVITY_BUILD_CITY = 1005
-ACTIVITY_HELP_BUILD_WONDER = 1006
 ACTIVITY_PARADROP = 1007
 ACTIVITY_CHANGE_HOMECITY = 1008
 ACTIVITY_LOAD = 1009
 ACTIVITY_UNLOAD = 1010
 
-ACTIVITY_ESTABLISH_TRADE_ROUTE = 2001
-ACTIVITY_HELP_BUILD_WONDER = 2002
 ACTIVITY_CENTER_ON_UNIT = 2003
 ACTIVITY_UPGRADE = 2004
 
+# freeciv-src/common/actions.h (+ 3000 to avoid collision with activities)
+ACTION_MIN_VALUE=3000
+ACTION_ESTABLISH_EMBASSY=3000
+ACTION_SPY_INVESTIGATE_CITY=3001
+ACTION_SPY_POISON=3002
+ACTION_SPY_STEAL_GOLD=3003
+ACTION_SPY_SABOTAGE_CITY=3004
+ACTION_SPY_TARGETED_SABOTAGE_CITY=3005
+ACTION_SPY_STEAL_TECH=3006
+ACTION_SPY_TARGETED_STEAL_TECH=3007
+ACTION_SPY_INCITE_CITY=3008
+ACTIVITY_ESTABLISH_TRADE_ROUTE=3009
+ACTION_MARKETPLACE=3010
+ACTIVITY_HELP_BUILD_WONDER=3011
+ACTION_SPY_BRIBE_UNIT=3012
+ACTION_SPY_SABOTAGE_UNIT=3013
+ACTION_MAX_VALUE=3013
+
+def py_action_to_freeciv_action(py_action):
+    if py_action < ACTION_MIN_VALUE or py_action > ACTION_MAX_VALUE:
+        return -1
+    return py_action - ACTION_MIN_VALUE
+
+def freeciv_action_target_city_to_py_action(act_id):
+    return act_id + ACTION_MIN_VALUE
+
 BASE_GUI_FORTRESS = 0
 BASE_GUI_AIRBASE = 1
+
+ROCO_ROAD = 0
+ROCO_RAILROAD = 1
 
 activities = dict( (k,v) for k,v in globals().items() if k.startswith('ACTIVITY_' ) )
 activity_names = dict( (v, k) for k,v in activities.items() )
@@ -95,15 +127,18 @@ class Unit(object):
         if freeciv.func.can_unit_upgrade(self.handle):
             yield ACTIVITY_UPGRADE
 
-        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_AIRBASE):
+        if freeciv.func.get_possible_unit_base_name(id, BASE_GUI_AIRBASE):
             yield ACTIVITY_AIRBASE
 
-        if freeciv.func.can_unit_do_activity_base(id, BASE_GUI_FORTRESS):
+        if freeciv.func.get_possible_unit_base_name(id, BASE_GUI_FORTRESS):
             yield ACTIVITY_FORTRESS
 
+        if freeciv.func.can_unit_do_activity_road(id, ROCO_ROAD):
+            yield ACTIVITY_ROAD
+        elif freeciv.func.can_unit_do_activity_road(id, ROCO_RAILROAD):
+            yield ACTIVITY_RAILROAD
+
         standard_activities = [
-            ACTIVITY_RAILROAD,
-            ACTIVITY_ROAD,
             ACTIVITY_IRRIGATE,
             ACTIVITY_MINE,
             ACTIVITY_TRANSFORM,
@@ -126,9 +161,14 @@ class Unit(object):
         if type > 1000:
             return 0
         else:
-            return freeciv.func.tile_activity_time(type, self.get_tile())
+            return freeciv.func.py_tile_activity_time(type, self.get_tile())
 
     def get_action_name(self, type):
+        if type in [ACTIVITY_FORTRESS, ACTIVITY_AIRBASE]:
+            base_gui_type = BASE_GUI_FORTRESS
+            if type == ACTIVITY_AIRBASE:
+                base_gui_type = BASE_GUI_AIRBASE
+            return freeciv.func.get_possible_unit_base_name(self.handle, base_gui_type)
         def_name = activity_names[type][len('ACTIVITY_'):].lower().replace('_', ' ')
         if def_name in action_names:
             return action_names[def_name]
@@ -150,9 +190,9 @@ class Unit(object):
 
     def focus(self):
         freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
-        freeciv.func.set_unit_focus(self.handle)
+        freeciv.func.unit_focus_set(self.handle)
 
-    def perform_activity(self, ident):
+    def perform_activity(self, ident, target=0):
         # Warning! Safe to use only when `self` is in focus.
         id, tileid, city, terrain_name = self.get_properties()
         if ident == ACTIVITY_GOTO:
@@ -161,7 +201,7 @@ class Unit(object):
             freeciv.func.key_unit_road()
         elif ident == ACTIVITY_RAILROAD:
             freeciv.func.key_unit_road()
-        elif ident == ACTIVITY_BUILD_CITY:
+        elif ident == ACTIVITY_BUILD_CITY or ident == ACTIVITY_ADD_TO_CITY:
             freeciv.func.key_unit_build_city()
         #elif ident == ACTIVITY_:
         #    freeciv.func.key_unit_trade_route()
@@ -202,18 +242,32 @@ class Unit(object):
         elif ident == ACTIVITY_EXPLORE:
             freeciv.func.key_unit_auto_explore()
         elif ident == ACTIVITY_HELP_BUILD_WONDER:
-            freeciv.func.py_caravan_help_build_wonder(self.handle)
+            freeciv.func.py_caravan_help_build_wonder(self.handle, target)
         elif ident == ACTIVITY_ESTABLISH_TRADE_ROUTE:
-            freeciv.func.py_caravan_establish_trade(self.handle)
+            freeciv.func.py_caravan_establish_trade(self.handle, target)
         elif ident == ACTIVITY_CENTER_ON_UNIT:
             freeciv.func.request_center_focus_unit()
         elif ident == ACTIVITY_UPGRADE:
             freeciv.func.request_unit_upgrade(self.handle)
         else:
-            print 'Unsupported action ', ident
+            freeciv_action = py_action_to_freeciv_action(ident)
+            if freeciv_action >= 0:
+                if ident == ACTION_SPY_BRIBE_UNIT or ident == ACTION_SPY_SABOTAGE_UNIT:
+                    freeciv.func.py_request_do_action_target_unit(freeciv_action, self.handle, target)
+                else:
+                    freeciv.func.py_request_do_action(freeciv_action, self.handle, target)
+            else:
+                print 'Unsupported action', ident
 
     def get_activity_string(self):
         return freeciv.func.get_activity_str(self.handle)
+
+    def get_home_citiy(self):
+        home_city = freeciv.func.get_home_citiy(self.handle)
+        if home_city:
+            return city.City(home_city)
+        else:
+            return None
 
 def get_unit_in_focus():
     units = freeciv.func.get_units_in_focus()

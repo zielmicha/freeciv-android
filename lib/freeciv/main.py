@@ -60,15 +60,19 @@ features.add_feature('app.launch_param', default=None)
 features.add_feature('app.launch_token', default=None, safe=True)
 features.add_feature('app.action', default=None, safe=True)
 features.add_feature('app.action_arg', default=None, safe=True)
+features.add_feature('app.hex_tileset', type=bool)
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
 features.add_feature('debug.remote.port', default=15589, type=int)
 
-ANDR_DSN = 'http://247716acba64489e9165dd294491248b' \
-           ':38d1cedf2fda48dc80b825c568d17c3f@sentrypublic.civsync.com/4'
-DESK_DSN = 'http://90be6086bef6448aa6cdba1a9f7abebe' \
-           ':b48118eaa7374c44b55e0cf8ad39c103@sentrypublic.civsync.com/5'
+# Disable this because it sends error reporting to zielmicha, the main developper of the project
+#ANDR_DSN = 'http://247716acba64489e9165dd294491248b' \
+#           ':38d1cedf2fda48dc80b825c568d17c3f@sentrypublic.civsync.com/4'
+#DESK_DSN = 'http://90be6086bef6448aa6cdba1a9f7abebe' \
+#           ':b48118eaa7374c44b55e0cf8ad39c103@sentrypublic.civsync.com/5'
+ANDR_DSN = None
+DESK_DSN = None
 
 features.add_feature('debug.dsn',
                      default=DESK_DSN if osutil.is_desktop else ANDR_DSN,
@@ -193,14 +197,6 @@ def remove_pause_file():
     except OSError:
         print 'Failed to remove pause file'
 
-def setup_freeciv_config():
-    path = os.environ['FREECIV_OPT'] = save.get_save_dir() + '/civrc-2.3-1'
-    try:
-        if not os.path.exists(path):
-            shutil.copy('data/civrc-2.3-default', path)
-    except (IOError, OSError):
-        pass
-
 def maybe_start_remote_debug():
     if features.get('debug.remote'):
         import remote_shell
@@ -306,16 +302,6 @@ def init_window():
         size = features.get('app.desktop_size')
         ui.create_window(map(int, size.split(',')))
 
-def set_logical_size():
-    good_dpi = 250
-    dev_dpi = osutil.get_dpi()
-    print 'device dpi', dev_dpi
-    if dev_dpi > 0 and dev_dpi > good_dpi:
-        w, h = graphics.get_window().get_size()
-        SCALE = float(good_dpi) / dev_dpi
-        print 'scale factor', SCALE
-        graphics.set_logical_size(int(w * SCALE), int(h * SCALE))
-
 def maybe_setup_launch_param():
     param = features.get('app.launch_param')
     if param:
@@ -357,13 +343,18 @@ def main():
     init_window()
     client.window.init_screen()
     osutil.init()
-    if not osutil.is_desktop:
-        set_logical_size()
+
+    #Disable "set_logical_size" feature because
+    # - it needs patching SDL
+    # - there is a zoom feature in the game.
+    # - it makes the graphics to be more blurred because they are zoomed twice when using game zoom
+    #if not osutil.is_desktop:
+    #    set_logical_size() # Deleted. See lib/ui/core.py:scale_for_device
+
 
     ui.init()
-    ui.set_fill_image(graphics.load_image('data/user/background.jpg'))
+    ui.set_fill_image(graphics.load_image('userdata/background.jpg'))
 
-    setup_freeciv_config()
     client.window.init()
     gamescreen.init()
 
@@ -372,8 +363,10 @@ def main():
 
     if ctrl:
         ctrl.maybe_init()
-
-    client.freeciv.run()
+    tileset = 'amplio2'
+    if features.get('app.hex_tileset'):
+        tileset = 'hexemplio'
+    client.freeciv.run(['--log', monitor.get_log_path_base() + '.log', '-t', tileset])
 
 if __name__ == '__main__':
     main()

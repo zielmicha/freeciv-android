@@ -96,6 +96,16 @@ class City(object):
 
         return '\n'.join(s)
 
+    def get_pollution(self):
+        return freeciv.func.city_get_pollution(self.handle)
+
+    def get_illness(self):
+        if not freeciv.func.is_illness_on():
+            return -1
+        illness_int = freeciv.func.city_get_illness(self.handle)
+        # illness is in tenth of percent
+        return float(illness_int) / 10
+
     def get_size(self):
         return freeciv.func.city_get_size(self.handle)
 
@@ -121,7 +131,7 @@ class City(object):
         return freeciv.func.city_get_shield_stock(self.handle)
 
     def get_name(self):
-        return freeciv.func.city_name(self.handle)
+        return freeciv.func.city_name_get(self.handle)
 
     def rotate_specialist(self, index):
         freeciv.func.city_rotate_specialist(self.handle, index)

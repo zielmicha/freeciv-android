@@ -114,6 +114,43 @@ struct sprite *load_gfxfile(const char *filename){
 	return retstru;
 
 }
+// struct sprite *create_sprite(int width, int height, struct color *pcolor)
+struct sprite *create_sprite(int width, int height, struct color *pcolor){
+	PyObject* ret = PY_CALL("siiO", "create_sprite", width, height, py_mapper_color(pcolor));
+	PyObject* retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from create_sprite (expected 'O')\n");
+	Py_INCREF(retval);
+	Py_DECREF(ret);
+
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;
+}
+// int color_brightness_score(struct color *pcolor)
+int color_brightness_score(struct color *pcolor){
+  struct rgbcolor *prgb = rgbcolor_new(pcolor->r,
+                                       pcolor->g,
+                                       pcolor->b);
+  int score = rgbcolor_brightness_score(prgb);
+
+  rgbcolor_destroy(prgb);
+  return score;
+/*
+	PyObject* ret = PY_CALL("sO", "color_brightness_score", py_mapper_color(pcolor));
+	double retval;
+	if(PyArg_ParseTuple(ret, "O", &retval) == 0) fprintf(stderr, "TypeError: bad return value from color_brightness_score (expected 'O')\n");
+	Py_INCREF(retval);
+	Py_DECREF(ret);
+
+	struct sprite* retstru = py_alloc_struct(retval);
+	return retstru;*/
+}
+
+void real_luaconsole_append(const char *astring,
+                            const struct text_tag_list *tags)
+{
+  /* PORTME */
+}
+
 // struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y)
 struct sprite *crop_sprite(struct sprite *source, int x, int y, int width, int height, struct sprite *mask, int mask_offset_x, int mask_offset_y){
 	PyObject* ret = PY_CALL("sOiiiiOii", "crop_sprite", py_get_pyobject(source), x, y, width, height, py_get_pyobject(mask), mask_offset_x, mask_offset_y);
@@ -476,9 +513,9 @@ void popdown_races_dialog(void){
 	PyObject* ret = PY_CALL("s", "popdown_races_dialog");
 	Py_DECREF(ret);
 }
-// void popup_unit_select_dialog(struct tile *ptile)
-void popup_unit_select_dialog(struct tile *ptile){
-	PyObject* ret = PY_CALL("sO", "popup_unit_select_dialog", py_mapper_tile(ptile));
+// void unit_select_dialog_popup(struct tile *ptile)
+void unit_select_dialog_popup(struct tile *ptile){
+	PyObject* ret = PY_CALL("sO", "unit_select_dialog_popup", py_mapper_tile(ptile));
 	Py_DECREF(ret);
 }
 // void races_toggles_set_sensitive(void)
@@ -492,8 +529,8 @@ void popup_revolution_dialog(void){
 	Py_DECREF(ret);
 }
 // void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity)
-void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity){
-	PyObject* ret = PY_CALL("sOOO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity));
+void popup_caravan_dialog(struct unit *punit, struct city *phomecity, struct city *pdestcity, struct unit *target_unit, struct tile *target_tile, PyObject *act_list){
+	PyObject* ret = PY_CALL("sOOOOiO", "popup_caravan_dialog", py_mapper_unit(punit), py_mapper_city(phomecity), py_mapper_city(pdestcity), py_mapper_unit(target_unit), target_tile, act_list);
 	Py_DECREF(ret);
 }
 // bool caravan_dialog_is_open(int *unit_id, int *city_id)

@@ -1,0 +1,15 @@
+This patch modifies SDL2.0.4
+List of modifications:
+- Blending modifications from https://github.com/zielmicha/SDL2
+- Revert of commit 7502:6ff02ff3cf06 (mercurial) because freeciv-android has been developped before this change (SDL2 was not released yet), and this change made freeciv-android's graphics completely unusable.
+  Detail of commit 7502:6ff02ff3cf06:
+# HG changeset patch
+# User Sam Lantinga <slouken@libsdl.org>
+# Date 1374592009 25200
+#      Tue Jul 23 08:06:49 2013 -0700
+# Node ID 6ff02ff3cf06e98e8c67e3cd4fcbff7847979d12
+# Parent  b27825bb5879bee529ba424842249ab6987c2b66
+Updated blend semantics so blending uses the following formula:
+    dstRGB = (srcRGB * srcA) + (dstRGB * (1-srcA))
+    dstA = srcA + (dstA * (1-srcA))
+This allows proper compositing semantics without requiring premultiplied alpha.

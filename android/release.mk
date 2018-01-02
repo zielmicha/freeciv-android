@@ -33,12 +33,12 @@ ndk:
 _links: build build/src build/jni build/res build/obj build/assets
 
 build/src:
-	ln -sf $(PWD)/project/src build/src
+	ln -sf ../project/src build/src
 build/jni:
-	ln -sf $(PWD)/project/jni build/jni
+	ln -sf ../project/jni build/jni
 build/res:
-	ln -sf $(PWD)/project/res build/res
+	ln -sf ../project/res build/res
 build/obj:
-	ln -sf $(PWD)/project/obj build/obj
+	ln -sf ../project/obj build/obj
 build/assets:
-	ln -sf $(PWD)/project/assets build/assets
+	ln -sf ../project/assets build/assets

@@ -11,6 +11,7 @@
 # GNU General Public License for more details.
 
 import gamescreen
+import nationdlg
 import ui
 import uidialog
 import osutil
@@ -28,6 +29,8 @@ import features
 import subprocess
 import atexit
 import sys
+import stat
+import platform
 
 import dropbox
 
@@ -35,8 +38,14 @@ from freeciv.client import _freeciv as freeciv
 
 from monitor import get_save_dir
 
-features.add_feature('app.ruleset', default='default')
-features.add_feature('app.fork', type=bool, default=hasattr(os, 'fork'))
+features.add_feature('app.ruleset', default='classic')
+
+# Using fork causes the "Failed to connect to game server" error that happens randomly
+# https://stackoverflow.com/questions/6078712/is-it-safe-to-fork-from-within-a-thread#6079669
+# https://docs.oracle.com/cd/E19455-01/806-5257/gen-2/index.html
+# http://bugs.python.org/issue1336
+# https://bugs.python.org/issue6721
+features.add_feature('app.fork', type=bool, default=False)
 
 localhost = '127.0.0.1'
 
@@ -104,7 +113,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_barbarians()
         self.add(self.barbarians_button)
 
-        self.nation_id = 1 #random.choice(client.get_nations())[2]
+        self.nation_id = random.choice(client.get_nations())[2]
         self.leader_name = 'Player'
         self.city_style = 1
         self.leader_sex = 2
@@ -144,7 +153,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.difficulty = name
             self.set_difficulty_settings()
 
-        ui.show_list_dialog(['novice', 'easy', 'normal', 'hard'], callback=set_do)
+        ui.show_list_dialog(['novice', 'easy', 'normal', 'hard', 'cheating'], callback=set_do)
 
     def set_difficulty_settings(self):
         client.client.chat('/%s' % self.difficulty)
@@ -195,11 +204,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.nation_id = id
             self.set_nation_settings()
             ui.back()
-        nations = ui.LinearLayoutWidget()
-        for name, style, id in client.get_nations():
-            nations.add(ui.Button(name, functools.partial(set_nation, style, id)))
-
-        ui.set_dialog(nations, scroll=True)
+        nationdlg.NationDialog(set_nation).show()
 
 def server_command_dialog():
     uidialog.inputbox('Command', finish=client.client.chat)
@@ -216,8 +221,8 @@ def load_scenario():
 def get_scenarios():
     #f = [ line.split(':') for line in open('data/scenario/list.txt').read().splitlines() ]
     #return [ (name, 'scenarion/' + fn) for name, fn in f ]
-    return [ (name.split('.')[0], 'data/scenario/' + name)
-        for name in os.listdir('data/scenario')
+    return [ (name.split('.')[0], 'data/scenarios/' + name)
+        for name in os.listdir('data/scenarios')
         if '.sav' in name ]
 
 def load_dialog():
@@ -311,7 +316,7 @@ def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
 
 def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     assert quit_on_disconnect
-    args = ('--Ppm', '-p', str(port), '-s', get_save_dir(), ) + args
+    args = ('-p', str(port), '-s', get_save_dir(), ) + args
 
     piddir = get_save_dir()
     print 'server args', args
@@ -330,11 +335,18 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
         print 'server:', line.rstrip()
 
 def subprocess_start_server(args):
-    if sys.argv[0].endswith('.py'): # if running as script, not cython --embed
-        cmd = [sys.executable, '-m', 'freeciv.main']
-    else:
-        cmd = [sys.argv[0]]
-    cmd.append('server')
+    if sys.argv[0].endswith('.py'): # if running as script, not cython --embed (on desktop)
+        cmd = ['freeciv-src/freeciv-server']
+    else: # on android
+        machine = platform.machine()
+        print 'platform.machine():', machine
+        if 'arm' in machine:
+            machine = 'armeabi'
+        else:
+            machine = 'x86'
+        executable = 'bin/' + machine + '/freeciv-server'
+        os.chmod(executable, stat.S_IXUSR)
+        cmd = [executable]
     cmd += args
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return proc.stdout

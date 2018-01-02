@@ -21,6 +21,9 @@ class LayoutWidget(DecoratedWidget):
         assert isinstance(item, ui.Widget)
         self.items.append(item)
 
+    def clear(self):
+        self.items = []
+
     def unhover(self):
         for item in self.items:
             self._call_unhover(item)

@@ -68,29 +68,54 @@ class ScreenClient(client.Client):
     def disable_menus(self):
         self.ui.menu.update(None)
 
-    def popup_caravan_dialog(self, unit, home, dest):
-        can_establish, can_trade, can_wonder = self.get_caravan_options(unit, home, dest)
-        def establish_trade_route():
-            unit.perform_activity(client.actions.ACTIVITY_ESTABLISH_TRADE_ROUTE)
-
-        def help_wonder():
-            unit.perform_activity(client.actions.ACTIVITY_HELP_BUILD_WONDER)
-
+    def popup_caravan_dialog(self, unit, home, target_city, target_unit, target_tile, act_list):
+        target = target_city
         items = []
+        for act_id in act_list:
+            py_action = client.actions.freeciv_action_target_city_to_py_action(act_id)
+            label = 'action ' + str(act_id)
+            if py_action == client.actions.ACTION_ESTABLISH_EMBASSY:
+                label = 'Establish Embassy'
+            elif py_action == client.actions.ACTION_SPY_INVESTIGATE_CITY:
+                label = 'Investigate City'
+            elif py_action == client.actions.ACTION_SPY_POISON:
+                label = 'Poison City'
+            elif py_action == client.actions.ACTION_SPY_STEAL_GOLD:
+                label = 'Steal Gold'
+            elif py_action == client.actions.ACTION_SPY_SABOTAGE_CITY:
+                label = 'Sabotage City'
+            elif py_action == client.actions.ACTION_SPY_TARGETED_SABOTAGE_CITY:
+                label = 'Targeted Sabotage City'
+            elif py_action == client.actions.ACTION_SPY_STEAL_TECH:
+                label = 'Steal Technology'
+            elif py_action == client.actions.ACTION_SPY_TARGETED_STEAL_TECH:
+                label = 'Targeted Steal Tech'
+            elif py_action == client.actions.ACTION_SPY_INCITE_CITY:
+                label = 'Incite Revolt'
+            elif py_action == client.actions.ACTIVITY_ESTABLISH_TRADE_ROUTE:
+                label = 'Establish trade route'
+            elif py_action == client.actions.ACTION_MARKETPLACE:
+                label = 'Enter Marketplace'
+            elif py_action == client.actions.ACTIVITY_HELP_BUILD_WONDER:
+                label = 'Help building wonder'
+            elif py_action == client.actions.ACTION_SPY_BRIBE_UNIT:
+                label = 'Bribe unit'
+                target = target_unit
+            elif py_action == client.actions.ACTION_SPY_SABOTAGE_UNIT:
+                label = 'Sabotage unit'
+                target = target_unit
+            def callback(act):
+                unit.perform_activity(act, target.handle)
+                freeciv.func.py_action_selection_no_longer_in_progress(unit.handle)
+            items.append((label, functools.partial(callback, py_action)))
 
-        if not can_establish and not can_wonder:
-            return
-
-        if can_establish:
-            items.append(('Establish trade route', establish_trade_route))
-
-        if can_wonder:
-            items.append(('Help building wonder', help_wonder))
-
-        items.append(('Do nothing', lambda: None))
+        def no_move():
+            freeciv.func.request_unit_non_action_move(unit.handle, target_tile)
+            freeciv.func.py_action_selection_no_longer_in_progress(unit.handle)
+        items.append(('Do nothing', no_move))
 
         ui.show_list_dialog(items, title='Your %s from %s has arrived to city %s'
-                            % (unit.get_name(), home.get_name(), dest.get_name()),
+                            % (unit.get_name(), home.get_name(), target.get_name()),
                             titlefont=ui.consolefont)
 
     def popup_diplomat_dialog(self, diplomat_action):
@@ -109,32 +134,30 @@ class ScreenClient(client.Client):
             message = 'Choose Your diplomat\'s strategy'
 
         action_titles = {
-            freeciv.const.DIPLOMAT_MOVE: "Keep moving",
-            freeciv.const.DIPLOMAT_EMBASSY: "Establish Embassy",
-            freeciv.const.DIPLOMAT_INVESTIGATE: "Investigate City",
-            freeciv.const.DIPLOMAT_SABOTAGE: "Sabotage City",
-            freeciv.const.DIPLOMAT_INCITE: "Incite Revolt",
-            freeciv.const.DIPLOMAT_STEAL: "Steal Technology",
-            freeciv.const.SPY_POISON: "Poison City",
+            freeciv.const.ACTION_ESTABLISH_EMBASSY: "Establish Embassy",
+            freeciv.const.ACTION_SPY_INVESTIGATE_CITY: "Investigate City",
+            freeciv.const.ACTION_SPY_SABOTAGE_CITY: "Sabotage City",
+            freeciv.const.ACTION_SPY_INCITE_CITY: "Incite Revolt",
+            freeciv.const.ACTION_SPY_STEAL_TECH: "Steal Technology",
+            freeciv.const.ACTION_SPY_POISON: "Poison City",
         }
 
-        simple_actions = [freeciv.const.DIPLOMAT_EMBASSY,
-                          freeciv.const.DIPLOMAT_INVESTIGATE,
-                          freeciv.const.DIPLOMAT_SABOTAGE,
-                          freeciv.const.DIPLOMAT_MOVE,
-                          freeciv.const.SPY_POISON]
+        simple_actions = [freeciv.const.ACTION_ESTABLISH_EMBASSY,
+                          freeciv.const.ACTION_SPY_INVESTIGATE_CITY,
+                          freeciv.const.ACTION_SPY_SABOTAGE_CITY,
+                          freeciv.const.ACTION_SPY_POISON]
 
         def do_action(action):
             if action in simple_actions:
                 diplomat_action.perform_simple_action(action)
-            elif action == freeciv.const.DIPLOMAT_SABOTAGE:
+            elif action == freeciv.const.ACTION_SPY_SABOTAGE_CITY:
                 # TODO: spy can choose building
                 diplomat_action.perform_simple_action(action,
                                                       value=freeciv.const.B_LAST+1)
-            elif action == freeciv.const.DIPLOMAT_STEAL:
+            elif action == freeciv.const.ACTION_SPY_STEAL_TECH:
                 # TODO: spy can choose technology
                 diplomat_action.perform_simple_action(action, value=freeciv.const.A_UNSET)
-            elif action == freeciv.const.DIPLOMAT_INCITE:
+            elif action == freeciv.const.ACTION_SPY_INCITE_CITY:
                 diplomat_action.request_answer(action)
             else:
                 ui.not_implemented()
@@ -156,14 +179,14 @@ class ScreenClient(client.Client):
             return
 
         def yes():
-            diplomat_action.perform_simple_action(freeciv.const.DIPLOMAT_INCITE)
+            diplomat_action.perform_simple_action(freeciv.const.ACTION_SPY_INCITE_CITY)
 
         ui.ask('Incite revolt? (costs %d)' % cost, yes)
 
     def popup_unit_diplomat_dialog(self, diplomat_action):
         message = 'Subvert enemy unit'
 
-    def popup_unit_select_dialog(self, units):
+    def unit_select_dialog_popup(self, units):
         def focus(unit):
             unit.focus()
             ui.back()

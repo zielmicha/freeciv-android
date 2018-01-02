@@ -12,7 +12,7 @@
 ***********************************************************************/
 
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#include <fc_config.h>
 #endif
 
 #ifdef AUDIO_SDL
@@ -28,7 +28,6 @@
 /* client */
 #include "client_main.h"
 #include "editgui_g.h"
-#include "ggz_g.h"
 #include "options.h"
 
 

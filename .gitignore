@@ -1,9 +1,15 @@
 *.pyc
 *.a
 *.o
+/curl-7.47.0.tar.bz2
+/freeciv-2.6.0-beta1.tar.bz2
+/freeciv-2.6.0-beta1
+/freeciv-src
 /src/callauto.c
 /src/Makefile
 /src/freecivclient.so
+/src/freeciv-server
 /lib/graphics.c
 /lib/graphics.so
-/android/project/libs/
+/pythonforandroid
+/data

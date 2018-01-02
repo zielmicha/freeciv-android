@@ -1,15 +1,10 @@
-It includes Freeciv 2.3.1
+It includes Freeciv 2.6.0-beta1
 
 If you don't need to change source code and don't need latest version simply download APK from http://civ.zielm.com
 
 == INSTALLATION ==
 
-Running Freeciv on desktop requires SDL2 with modified alpha blending from http://github.com/zielmicha/SDL2. You also need SDL2_image and SDL2_ttf (from http://hg.libsdl.org/SDL_image/ and http://hg.libsdl.org/SDL_ttf/).
-
-Known working version (and remember to run ./augogen.sh first!):
-
-   hg clone -r 363 http://hg.libsdl.org/SDL_image
-   hg clone -r 228 http://hg.libsdl.org/SDL_ttf
+Running Freeciv on desktop requires a patched version of SDL2 (with modified alpha blending). To patch SDL 2.0.4, use configure_project/SDL_modify_blending.patch. You also need Curl, SDL2_image and SDL2_ttf.
 
 Dependency installation:
 
@@ -18,6 +13,7 @@ Dependency installation:
    pip install Cython==0.15
    # for running web/proxy.py
    pip install tornado==3.1.1
+   pip install python-for-android==0.4
    apt-get install -y python-imaging
    # if on fairly new system
    ln -s /usr/bin/aclocal /usr/local/bin/aclocal-1.13
@@ -25,12 +21,18 @@ Dependency installation:
    # if software renderer needed
    apt-get install libgl1-mesa-swx11-dev xvfb
 
-Don't install SDL2 from your distribution repository! It is highly probable that it will be incompatible.
+Building for Android requires Android NDK with version r12b.
+
+Configuration:
+Add these environment variables:
+   ANDROIDSDK=<PATH to your SDK installation>
+   ANDROIDNDK=<PATH to your NDK installation>
+and make sure that p4a (python-for-android) is in your PATH
 
 Build and run on desktop (for debugging):
    make run
 
 (Warning: if you break build process you may need to start again with clean repo)
 
-Build for Android (put android, adb and ndk-build in your PATH):
-   make -C android debug
+Build for Android:
+   make -C android debugapk

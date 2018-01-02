@@ -34,19 +34,31 @@ copyassets:
 
 # BUILD
 
-build: builddep cython project/jni/freeciv project/build.xml
-	ndk-build -C project -j4
+build: cython project/jni/freeciv-client project/jni/freeciv-server project/build.xml
+	(cd .. && make data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
+	(cd ../freeciv-src && make py_integration/callauto.c)
+	"${ANDROIDNDK}/ndk-build" -C project -j4
 
 project/build.xml:
-	android update project --path project --name "FreecivDebug" --target android-17
+	"${ANDROIDSDK}/tools/android" update project --path project --name "FreecivDebug" --target android-17
 
 cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyjnius.c
 
 project/jni/src/pyjnius.c:
+	(cd .. && make pyjnius/jnius)
 	./makejnius.sh
 
-project/jni/freeciv:
-	ln -sf $(PWD)/../src project/jni/freeciv
+project/jni/freeciv-client:
+	ln -sf ../../../freeciv-src project/jni/freeciv-client
+project/jni/freeciv-server:
+	mkdir -p project/jni/freeciv-server
+	ln -sf ../../../../freeciv-src/ai project/jni/freeciv-server/ai
+	ln -sf ../../../../freeciv-src/common project/jni/freeciv-server/common
+	ln -sf ../../../../freeciv-src/dependencies project/jni/freeciv-server/dependencies
+	ln -sf ../../../../src/fc_config.h project/jni/freeciv-server/fc_config.h
+	ln -sf ../../../../src/freeciv_config.h project/jni/freeciv-server/freeciv_config.h
+	ln -sf ../../../../freeciv-src/server project/jni/freeciv-server/server
+	ln -sf ../../../../freeciv-src/utility project/jni/freeciv-server/utility
 
 project/jni/src/graphics.c: ../lib/graphics.pyx
 	make -C ../lib graphics.c
@@ -55,27 +67,3 @@ project/jni/src/graphics.c: ../lib/graphics.pyx
 project/jni/src/android.c: ../lib/android.pyx
 	cython ../lib/android.pyx -o project/jni/src/android.c
 
-# DEPENDENCIES
-
-builddep: project/jni/SDL/Android.mk project/jni/python/Android.mk \
-	project/jni/SDL_image/Android.mk project/jni/SDL_ttf/Android.mk \
-	project/jni/SDL_ttf/freetype
-
-project/jni/SDL_image/Android.mk:
-	cd project/jni; hg clone -r 363 http://hg.libsdl.org/SDL_image/
-
-project/jni/SDL_ttf/Android.mk:
-	cd project/jni; hg clone -r 228 http://hg.libsdl.org/SDL_ttf/
-
-project/jni/SDL_ttf/freetype: project/jni/SDL_ttf/Android.mk
-	git clone git://github.com/LuaDist/freetype.git project/jni/SDL_ttf/freetype
-
-submodules: ../python4android/prepare.sh
-project/jni/SDL/Android.mk: submodules
-
-../python4android/prepare.sh:
-	cd ..; git submodule init; git submodule update
-
-project/jni/python/Android.mk: ../python4android/prepare.sh
-	cd ../python4android; ./prepare.sh
-	mv ../python4android/build/jni project/jni/python

@@ -23,7 +23,7 @@ class DBButton(ui.Button):
 
     def __init__(self, *args, **kwargs):
         ui.Button.__init__(self, *args, **kwargs)
-        self._image = ui.load_image('data/dropbox_logo.png')
+        self._image = ui.load_image('userdata/dropbox_logo.png')
 
     def set_text(self, label):
         ui.Button.set_text(self, '     ' + label)

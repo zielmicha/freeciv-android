@@ -170,6 +170,8 @@ class Dialog(ui.HorizontalLayoutWidget):
                     icon = icons.get_small_image('%s-%d' % (name, i % 2)) # man and woman
                 except KeyError:
                     icon = icons.get_small_image(name) # elvis, taxman, scientist
+                w, h = icon.get_size()
+                icon = icon.scale((ui.scale_for_device(w * 2), ui.scale_for_device(h * 2)))
                 panel.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
                 index += 1
         return panel
@@ -198,7 +200,8 @@ class Dialog(ui.HorizontalLayoutWidget):
 
         def add_basic(title, name):
             surplus = plus(self.city.get_prod('surplus', name))
-            add(title, '%s (%s)' % (self.city.get_prod('prod', name), surplus))
+            prod_and_waste = self.city.get_prod('prod', name) + self.city.get_prod('waste', name)
+            add(title, '%s (%s)' % (prod_and_waste, surplus))
 
         add_basic('Food', 'food')
         add_basic('Production', 'shield')
@@ -206,13 +209,19 @@ class Dialog(ui.HorizontalLayoutWidget):
 
         add('', '')
 
-        add_basic('Gold', 'gold')
+        gold_surplus = plus(self.city.get_prod('surplus', 'gold'))
+        add('Gold', '%s (%s)' % (self.city.get_prod('prod', 'gold'), gold_surplus))
         add('Science', self.city.get_prod('prod', 'science'))
         add('Luxury', self.city.get_prod('prod', 'luxury'))
 
         add('', '')
 
         add('Corruption', self.city.get_prod('waste', 'trade'))
+        add('Waste', self.city.get_prod('waste', 'shield'))
+        add('Pollution risk', '%d %%' % self.city.get_pollution())
+        illness = self.city.get_illness()
+        if illness >= 0: # illness is on
+            add('Plague risk', '%0.1f %%' % illness)
 
         return panel
 
@@ -223,7 +232,11 @@ class CityCanvas(ui.Widget):
         image = self.city.make_citymap()
         self.orig_size = size = image.get_size()
         self.size = (scale_to, size[1] * scale_to / size[0])
+        if self.size[1] > ui.screen_height / 2:
+            self.scale_to = self.orig_size[0] * ui.screen_height / 2 / self.orig_size[1]
+            self.size = (self.scale_to, ui.screen_height / 2)
         self.image = image.scale(self.size)
+        image.destroy()
         self.dialog = dialog
 
     def draw(self, surf, pos):

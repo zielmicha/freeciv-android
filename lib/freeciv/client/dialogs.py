@@ -62,13 +62,13 @@ def popup_newcity_dialog(unit, default_name):
                       cancel=lambda: freeciv.func.cancel_city_at_unit(unit))
 
 @freeciv.register
-def popup_unit_select_dialog(tile):
+def unit_select_dialog_popup(tile):
     units = freeciv.func.get_units_at_tile(tile)
-    client.client.popup_unit_select_dialog(map(actions.Unit, units))
+    client.client.unit_select_dialog_popup(map(actions.Unit, units))
 
 @freeciv.register
-def popup_caravan_dialog(unit, home_city, dest_city):
-    client.client.popup_caravan_dialog(actions.Unit(unit), city.City(home_city), city.City(dest_city))
+def popup_caravan_dialog(unit, home_city, target_city, target_unit, target_tile, act_list):
+    client.client.popup_caravan_dialog(actions.Unit(unit), city.City(home_city), city.City(target_city), actions.Unit(target_unit), target_tile, act_list)
 
 @freeciv.register
 def popup_diplomat_dialog(unit, tile):
@@ -97,16 +97,14 @@ class DiplomatAction(object):
         return freeciv.func.diplomat_can_do_action(self.diplomat, const, self.tile)
 
     def get_actions(self):
-        actions = [ freeciv.const.DIPLOMAT_MOVE,
-                    freeciv.const.DIPLOMAT_EMBASSY,
-                    freeciv.const.DIPLOMAT_BRIBE,
-                    freeciv.const.DIPLOMAT_INCITE,
-                    freeciv.const.DIPLOMAT_INVESTIGATE,
-                    freeciv.const.DIPLOMAT_SABOTAGE,
-                    freeciv.const.DIPLOMAT_STEAL,
-                    freeciv.const.SPY_POISON,
-                    freeciv.const.SPY_SABOTAGE_UNIT,
-                    freeciv.const.DIPLOMAT_ANY_ACTION]
+        actions = [ freeciv.const.ACTION_ESTABLISH_EMBASSY,
+                    freeciv.const.ACTION_SPY_BRIBE_UNIT,
+                    freeciv.const.ACTION_SPY_INCITE_CITY,
+                    freeciv.const.ACTION_SPY_INVESTIGATE_CITY,
+                    freeciv.const.ACTION_SPY_SABOTAGE_CITY,
+                    freeciv.const.ACTION_SPY_STEAL_TECH,
+                    freeciv.const.ACTION_SPY_POISON,
+                    freeciv.const.ACTION_SPY_SABOTAGE_UNIT]
         for action in actions:
             if self.can_do(action):
                 yield action

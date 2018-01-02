@@ -1,0 +1,303 @@
+diff -ru freeciv-2.6.0-beta1.orig/client/client_main.c freeciv-2.6.0-beta1/client/client_main.c
+--- freeciv-2.6.0-beta1.orig/client/client_main.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/client_main.c	2017-12-25 11:25:51.000000000 +0100
+@@ -107,6 +107,7 @@
+ #include "script_client.h"
+ 
+ #include "client_main.h"
++#include "pyclient.h"
+ 
+ 
+ static enum known_type mapimg_client_tile_known(const struct tile *ptile,
+@@ -573,6 +574,9 @@
+ 
+   log_init(logfile, loglevel, NULL, NULL, fatal_assertions);
+   backtrace_init();
++  custom_log_init();
++  PyObject* ret = PY_CALL("s", "change_log_method_to_freeciv_utility_log_c");
++  Py_DECREF(ret);
+ 
+   /* after log_init: */
+ 
+diff -ru freeciv-2.6.0-beta1.orig/client/mapview_common.c freeciv-2.6.0-beta1/client/mapview_common.c
+--- freeciv-2.6.0-beta1.orig/client/mapview_common.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/mapview_common.c	2017-12-25 11:25:51.000000000 +0100
+@@ -76,7 +76,7 @@
+ 
+ struct tile *center_tile = NULL;
+ 
+-static void base_canvas_to_map_pos(int *map_x, int *map_y,
++void base_canvas_to_map_pos(int *map_x, int *map_y,
+                                    float canvas_x, float canvas_y);
+ 
+ enum update_type {
+@@ -381,7 +381,7 @@
+   Finds the map coordinates corresponding to pixel coordinates.  The
+   resulting position is unwrapped and may be unreal.
+ ****************************************************************************/
+-static void base_canvas_to_map_pos(int *map_x, int *map_y,
++void base_canvas_to_map_pos(int *map_x, int *map_y,
+ 				   float canvas_x, float canvas_y)
+ {
+   gui_to_map_pos(tileset, map_x, map_y,
+@@ -501,7 +501,7 @@
+   Move the GUI origin to the given normalized, clipped origin.  This may
+   be called many times when sliding the mapview.
+ ****************************************************************************/
+-static void base_set_mapview_origin(float gui_x0, float gui_y0)
++void base_set_mapview_origin(float gui_x0, float gui_y0)
+ {
+   float old_gui_x0, old_gui_y0;
+   float dx, dy;
+diff -ru freeciv-2.6.0-beta1.orig/client/options.c freeciv-2.6.0-beta1/client/options.c
+--- freeciv-2.6.0-beta1.orig/client/options.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/options.c	2017-12-25 11:25:51.000000000 +0100
+@@ -495,7 +495,8 @@
+   /* Volatile. */
+   void *gui_data;
+ };
+-
++#define INIT_BRACE_BEGIN {
++#define INIT_BRACE_END }
+ #define OPTION(poption) ((struct option *) (poption))
+ 
+ #define OPTION_INIT(optset, spec_type, spec_table_var, common_table,        \
+@@ -6212,7 +6213,7 @@
+ ****************************************************************************/
+ static void client_option_adjust_defaults(void)
+ {
+-  adjust_default_options();
++  //adjust_default_options();
+ }
+ 
+ /****************************************************************************
+diff -ru freeciv-2.6.0-beta1.orig/client/reqtree.c freeciv-2.6.0-beta1/client/reqtree.c
+--- freeciv-2.6.0-beta1.orig/client/reqtree.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/reqtree.c	2017-12-25 11:26:43.000000000 +0100
+@@ -1051,7 +1051,7 @@
+         canvas_put_line(pcanvas,
+ 		        get_color(tileset, edge_color(node, NULL)),
+ 		        LINE_GOTO,
+-		        startx, starty, width, 0);
++		        startx + tt_x, starty + tt_y, width, 0);
+       } else {
+         const char *text = research_advance_name_translation
+                                (research_get(client_player()), node->tech);
+@@ -1060,11 +1060,11 @@
+ 
+         canvas_put_rectangle(pcanvas,
+                              get_color(tileset, COLOR_REQTREE_BACKGROUND),
+-                             startx, starty, width, height);
++                             startx + tt_x, starty + tt_y, width, height);
+ 
+ 	/* Print color rectangle with text inside. */
+ 	canvas_put_rectangle(pcanvas, get_color(tileset, node_color(node)),
+-			     startx + 1, starty + 1,
++			     startx + tt_x + 1, starty + tt_y + 1,
+ 			     width - 2, height - 2);
+ 	/* The following code is similar to the one in 
+ 	 * node_rectangle_minimum_size(). If you change something here,
+@@ -1074,8 +1074,8 @@
+ 	get_text_size(&text_w, &text_h, FONT_REQTREE_TEXT, text);
+ 
+ 	canvas_put_text(pcanvas,
+-			startx + (width - text_w) / 2,
+-			starty + 4,
++			startx + tt_x + (width - text_w) / 2,
++			starty + tt_y + 4,
+ 			FONT_REQTREE_TEXT,
+ 			get_color(tileset, COLOR_REQTREE_TEXT),
+ 			text);
+@@ -1090,8 +1090,8 @@
+                                          direction8_invalid(), TRUE);
+  	    get_sprite_dimensions(sprite, &swidth, &sheight);
+  	    canvas_put_sprite_full(pcanvas,
+- 	                           icon_startx,
+- 				   starty + text_h + 4
++ 	                           icon_startx + tt_x,
++ 				   starty + tt_y + text_h + 4
+  				   + (height - text_h - 4 - sheight) / 2,
+  				   sprite);
+  	    icon_startx += swidth + 2;
+@@ -1106,8 +1106,8 @@
+                 if (sprite) {
+                   get_sprite_dimensions(sprite, &swidth, &sheight);
+                   canvas_put_sprite_full(pcanvas,
+-                                         icon_startx,
+-                                         starty + text_h + 4
++                                         icon_startx + tt_x,
++                                         starty + tt_y + text_h + 4
+                                          + (height - text_h - 4 - sheight) / 2,
+                                          sprite);
+                   icon_startx += swidth + 2;
+@@ -1123,8 +1123,8 @@
+                 sprite = get_government_sprite(tileset, gov);
+                 get_sprite_dimensions(sprite, &swidth, &sheight);
+  	        canvas_put_sprite_full(pcanvas,
+- 	                               icon_startx,
+- 				       starty + text_h + 4
++ 	                               icon_startx + tt_x,
++ 				       starty + tt_y + text_h + 4
+  				       + (height - text_h - 4 - sheight) / 2,
+  	                               sprite);
+  	        icon_startx += swidth + 2;
+@@ -1146,11 +1146,11 @@
+ 	
+         if (gui_options.reqtree_curved_lines) {
+           canvas_put_curved_line(pcanvas, color, LINE_GOTO,
+-                                 startx, starty, endx - startx,
++                                 startx + tt_x, starty + tt_y, endx - startx,
+                                  endy - starty);
+         } else {
+           canvas_put_line(pcanvas, color, LINE_GOTO,
+-                          startx, starty, endx - startx,
++                          startx + tt_x, starty + tt_y, endx - startx,
+                           endy - starty);
+         }
+       }
+diff -ru freeciv-2.6.0-beta1.orig/client/servers.c freeciv-2.6.0-beta1/client/servers.c
+--- freeciv-2.6.0-beta1.orig/client/servers.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/servers.c	2017-12-25 11:25:51.000000000 +0100
+@@ -139,19 +139,19 @@
+                   _("Latest %s release of Freeciv is %s, this is %s."),
+                   Q_(followtag), latest_ver, my_comparable);
+ 
+-      version_message(vertext);
++//      version_message(vertext);
+     } else if (comment == NULL) {
+       fc_snprintf(vertext, sizeof(vertext),
+                   _("There is no newer %s release of Freeciv available."),
+                   FOLLOWTAG);
+ 
+-      version_message(vertext);
++//      version_message(vertext);
+     }
+   }
+ 
+   if (comment != NULL) {
+     log_verbose("Mesaserver comment about '" FOLLOWTAG "': %s", comment);
+-    version_message(comment);
++//    version_message(comment);
+   }
+ 
+   server_list = server_list_new();
+diff -ru freeciv-2.6.0-beta1.orig/client/tilespec.c freeciv-2.6.0-beta1/client/tilespec.c
+--- freeciv-2.6.0-beta1.orig/client/tilespec.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/tilespec.c	2017-12-25 11:25:51.000000000 +0100
+@@ -1438,6 +1438,10 @@
+     }
+   }
+ 
++  s = load_gfxfile(gfx_filename);
++  if (s) {
++    return s;
++  }
+   log_error("Could not load gfx file \"%s\".", gfx_filename);
+   return NULL;
+ }
+@@ -1646,6 +1650,7 @@
+ ***********************************************************************/
+ static char *tilespec_gfx_filename(const char *gfx_filename)
+ {
++#ifdef TILESPEC_SEARCH_FILENAME
+   const char  *gfx_current_fileext;
+   const char **gfx_fileexts = gfx_fileextensions();
+ 
+@@ -1668,6 +1673,9 @@
+                 gfx_filename);
+ 
+   return NULL;
++#else
++  return strdup(gfx_filename);
++#endif
+ }
+ 
+ /**********************************************************************
+diff -ru freeciv-2.6.0-beta1.orig/client/update_queue.c freeciv-2.6.0-beta1/client/update_queue.c
+--- freeciv-2.6.0-beta1.orig/client/update_queue.c	2017-09-16 16:33:13.000000000 +0200
++++ freeciv-2.6.0-beta1/client/update_queue.c	2017-12-25 11:25:51.000000000 +0100
+@@ -571,7 +571,7 @@
+ ****************************************************************************/
+ void multipliers_dialog_update(void)
+ {
+-  update_queue_add(UQ_CALLBACK(real_multipliers_dialog_update), NULL);
++//  update_queue_add(UQ_CALLBACK(real_multipliers_dialog_update), NULL);
+ }
+ 
+ /****************************************************************************
+@@ -699,5 +699,5 @@
+ ****************************************************************************/
+ void unit_select_dialog_update(void)
+ {
+-  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
++//  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
+ }
+diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.6.0-beta1/dependencies/lua-5.3/src/lmathlib.c
+--- freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/lmathlib.c	2017-09-16 16:33:14.000000000 +0200
++++ freeciv-2.6.0-beta1/dependencies/lua-5.3/src/lmathlib.c	2017-12-25 11:25:51.000000000 +0100
+@@ -183,7 +183,8 @@
+     res = l_mathop(log)(x);
+   else {
+     lua_Number base = luaL_checknumber(L, 2);
+-#if !defined(LUA_USE_C89)
++//if !defined(LUA_USE_C89) Why "!defined" ???
++#if defined(LUA_USE_LOG2)
+     if (base == l_mathop(2.0))
+       res = l_mathop(log2)(x); else
+ #endif
+diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6.0-beta1/dependencies/lua-5.3/src/luaconf.h
+--- freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/luaconf.h	2017-09-16 16:33:14.000000000 +0200
++++ freeciv-2.6.0-beta1/dependencies/lua-5.3/src/luaconf.h	2017-12-25 11:25:51.000000000 +0100
+@@ -669,7 +669,7 @@
+ ** macro must include header 'locale.h'.)
+ */
+ #if !defined(lua_getlocaledecpoint)
+-#define lua_getlocaledecpoint()		(localeconv()->decimal_point[0])
++#define lua_getlocaledecpoint()		('.')
+ #endif
+ 
+ /* }================================================================== */
+diff -ru freeciv-2.6.0-beta1.orig/server/connecthand.c freeciv-2.6.0-beta1/server/connecthand.c
+--- freeciv-2.6.0-beta1.orig/server/connecthand.c	2017-09-16 16:33:15.000000000 +0200
++++ freeciv-2.6.0-beta1/server/connecthand.c	2017-12-25 11:25:51.000000000 +0100
+@@ -456,6 +456,13 @@
+ ****************************************************************************/
+ void lost_connection_to_client(struct connection *pconn)
+ {
++  log_normal(_("Freeciv Android: Lost connection to player!"));
++  if(getenv("FREECIV_QUIT_ON_DISCONNECT")) {
++    log_normal(_("Freeciv Android: Server quit."));
++    exit(3);
++  } else {
++    log_normal(_("Freeciv Android: Not quiting."));
++  }
+   const char *desc = conn_description(pconn);
+ 
+   fc_assert_ret(TRUE == pconn->server.is_closing);
+diff -ru freeciv-2.6.0-beta1.orig/server/settings.c freeciv-2.6.0-beta1/server/settings.c
+--- freeciv-2.6.0-beta1.orig/server/settings.c	2017-09-16 16:33:15.000000000 +0200
++++ freeciv-2.6.0-beta1/server/settings.c	2017-12-25 11:25:51.000000000 +0100
+@@ -1211,7 +1211,8 @@
+   }
+   return TRUE;
+ }
+-
++#define INIT_BRACE_BEGIN {
++#define INIT_BRACE_END }
+ #define GEN_BOOL(name, value, sclass, scateg, slevel, to_client,            \
+                  short_help, extra_help, func_validate, func_action,        \
+                  _default)                                                  \
+diff -ru freeciv-2.6.0-beta1.orig/utility/fcintl.c freeciv-2.6.0-beta1/utility/fcintl.c
+--- freeciv-2.6.0-beta1.orig/utility/fcintl.c	2017-09-16 16:33:15.000000000 +0200
++++ freeciv-2.6.0-beta1/utility/fcintl.c	2017-12-25 11:25:51.000000000 +0100
+@@ -99,10 +99,3 @@
+   return autocap;
+ }
+ 
+-/**********************************************************************
+-  Return directory containing locales.
+-***********************************************************************/
+-const char *get_locale_dir(void)
+-{
+-  return LOCALEDIR;
+-}
