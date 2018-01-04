@@ -8,7 +8,7 @@ Running Freeciv on desktop requires a patched version of SDL2 (with modified alp
 
 Dependency installation:
 
-   apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0
+   apt-get build-dep -y libsdl1.2debian libsdl-image1.2 libsdl-ttf2.0-0 libcurl4-openssl-dev python2.7-dev
    apt-get install -y graphviz python-pip mercurial python2.7-dev git-core
    pip install Cython==0.15
    # for running web/proxy.py
