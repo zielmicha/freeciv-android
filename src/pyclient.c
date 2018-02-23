@@ -267,6 +267,18 @@ bool can_unit_do_activity_road(const struct unit *punit, Road_type_id road)
 }
 
 /**************************************************************************
+  Return TRUE if the unit can do any road building activity at its
+  current location.
+**************************************************************************/
+bool can_unit_do_activity_any_road(const struct unit *punit) {
+struct extra_type *tgt = next_extra_for_tile(unit_tile(punit),
+                                                 EC_ROAD,
+                                                 unit_owner(punit),
+                                                 punit);
+	return tgt != NULL && can_unit_do_activity_targeted(punit, ACTIVITY_GEN_ROAD, tgt);
+}
+
+/**************************************************************************
   Get best base name for given parameters, or None if the unit can't do the
   given base building activity at its current location
 **************************************************************************/

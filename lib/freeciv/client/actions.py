@@ -35,6 +35,7 @@ ACTIVITY_AIRBASE = 14
 ACTIVITY_FORTIFYING = 15
 ACTIVITY_FALLOUT = 16
 # ACTIVITY_PATROL_UNUSED = 17
+ACTIVITY_MAGLEV = 17
 ACTIVITY_BASE = 18
 ACTIVITY_GEN_ROAD = 19
 ACTIVITY_CONVERT = 20 # TODO: to implement
@@ -137,6 +138,8 @@ class Unit(object):
             yield ACTIVITY_ROAD
         elif freeciv.func.can_unit_do_activity_road(id, ROCO_RAILROAD):
             yield ACTIVITY_RAILROAD
+        elif freeciv.func.can_unit_do_activity_any_road(id):
+            yield ACTIVITY_MAGLEV
 
         standard_activities = [
             ACTIVITY_IRRIGATE,
@@ -200,6 +203,8 @@ class Unit(object):
         elif ident == ACTIVITY_ROAD:
             freeciv.func.key_unit_road()
         elif ident == ACTIVITY_RAILROAD:
+            freeciv.func.key_unit_road()
+        elif ident == ACTIVITY_MAGLEV:
             freeciv.func.key_unit_road()
         elif ident == ACTIVITY_BUILD_CITY or ident == ACTIVITY_ADD_TO_CITY:
             freeciv.func.key_unit_build_city()

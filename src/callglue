@@ -153,6 +153,7 @@ const char *player_name(const struct player *pplayer);
 void set_tech_research(int index)
 
 bool can_unit_do_activity_road(const struct unit *punit, bool rail)
+bool can_unit_do_activity_any_road(const struct unit *punit)
 PyObject* get_possible_unit_base_name(const struct unit *punit, enum base_gui_type base_type)
 void set_unit_activity_base(struct unit *punit, int base);
 
