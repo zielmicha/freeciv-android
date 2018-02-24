@@ -1,6 +1,6 @@
-diff -ru freeciv-2.6.0-beta1.orig/client/client_main.c freeciv-2.6.0-beta1/client/client_main.c
---- freeciv-2.6.0-beta1.orig/client/client_main.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/client_main.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/client_main.c freeciv-2.6.0-beta2/client/client_main.c
+--- freeciv-2.6.0-beta2.orig/client/client_main.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/client_main.c	2018-02-24 18:27:27.000000000 +0100
 @@ -107,6 +107,7 @@
  #include "script_client.h"
  
@@ -9,7 +9,7 @@ diff -ru freeciv-2.6.0-beta1.orig/client/client_main.c freeciv-2.6.0-beta1/clien
  
  
  static enum known_type mapimg_client_tile_known(const struct tile *ptile,
-@@ -573,6 +574,9 @@
+@@ -575,6 +576,9 @@
  
    log_init(logfile, loglevel, NULL, NULL, fatal_assertions);
    backtrace_init();
@@ -19,10 +19,10 @@ diff -ru freeciv-2.6.0-beta1.orig/client/client_main.c freeciv-2.6.0-beta1/clien
  
    /* after log_init: */
  
-diff -ru freeciv-2.6.0-beta1.orig/client/mapview_common.c freeciv-2.6.0-beta1/client/mapview_common.c
---- freeciv-2.6.0-beta1.orig/client/mapview_common.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/mapview_common.c	2017-12-25 11:25:51.000000000 +0100
-@@ -76,7 +76,7 @@
+diff -ru freeciv-2.6.0-beta2.orig/client/mapview_common.c freeciv-2.6.0-beta2/client/mapview_common.c
+--- freeciv-2.6.0-beta2.orig/client/mapview_common.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/mapview_common.c	2018-02-24 18:27:27.000000000 +0100
+@@ -78,7 +78,7 @@
  
  struct tile *center_tile = NULL;
  
@@ -31,7 +31,7 @@ diff -ru freeciv-2.6.0-beta1.orig/client/mapview_common.c freeciv-2.6.0-beta1/cl
                                     float canvas_x, float canvas_y);
  
  enum update_type {
-@@ -381,7 +381,7 @@
+@@ -702,7 +702,7 @@
    Finds the map coordinates corresponding to pixel coordinates.  The
    resulting position is unwrapped and may be unreal.
  ****************************************************************************/
@@ -40,7 +40,7 @@ diff -ru freeciv-2.6.0-beta1.orig/client/mapview_common.c freeciv-2.6.0-beta1/cl
  				   float canvas_x, float canvas_y)
  {
    gui_to_map_pos(tileset, map_x, map_y,
-@@ -501,7 +501,7 @@
+@@ -822,7 +822,7 @@
    Move the GUI origin to the given normalized, clipped origin.  This may
    be called many times when sliding the mapview.
  ****************************************************************************/
@@ -49,9 +49,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/mapview_common.c freeciv-2.6.0-beta1/cl
  {
    float old_gui_x0, old_gui_y0;
    float dx, dy;
-diff -ru freeciv-2.6.0-beta1.orig/client/options.c freeciv-2.6.0-beta1/client/options.c
---- freeciv-2.6.0-beta1.orig/client/options.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/options.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/options.c freeciv-2.6.0-beta2/client/options.c
+--- freeciv-2.6.0-beta2.orig/client/options.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/options.c	2018-02-24 18:27:27.000000000 +0100
 @@ -495,7 +495,8 @@
    /* Volatile. */
    void *gui_data;
@@ -71,9 +71,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/options.c freeciv-2.6.0-beta1/client/op
  }
  
  /****************************************************************************
-diff -ru freeciv-2.6.0-beta1.orig/client/reqtree.c freeciv-2.6.0-beta1/client/reqtree.c
---- freeciv-2.6.0-beta1.orig/client/reqtree.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/reqtree.c	2017-12-25 11:26:43.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/reqtree.c freeciv-2.6.0-beta2/client/reqtree.c
+--- freeciv-2.6.0-beta2.orig/client/reqtree.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/reqtree.c	2018-02-24 18:27:27.000000000 +0100
 @@ -1051,7 +1051,7 @@
          canvas_put_line(pcanvas,
  		        get_color(tileset, edge_color(node, NULL)),
@@ -155,9 +155,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/reqtree.c freeciv-2.6.0-beta1/client/re
                            endy - starty);
          }
        }
-diff -ru freeciv-2.6.0-beta1.orig/client/servers.c freeciv-2.6.0-beta1/client/servers.c
---- freeciv-2.6.0-beta1.orig/client/servers.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/servers.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/servers.c freeciv-2.6.0-beta2/client/servers.c
+--- freeciv-2.6.0-beta2.orig/client/servers.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/servers.c	2018-02-24 18:27:27.000000000 +0100
 @@ -139,19 +139,19 @@
                    _("Latest %s release of Freeciv is %s, this is %s."),
                    Q_(followtag), latest_ver, my_comparable);
@@ -181,9 +181,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/servers.c freeciv-2.6.0-beta1/client/se
    }
  
    server_list = server_list_new();
-diff -ru freeciv-2.6.0-beta1.orig/client/tilespec.c freeciv-2.6.0-beta1/client/tilespec.c
---- freeciv-2.6.0-beta1.orig/client/tilespec.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/tilespec.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/tilespec.c freeciv-2.6.0-beta2/client/tilespec.c
+--- freeciv-2.6.0-beta2.orig/client/tilespec.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/tilespec.c	2018-02-24 18:27:27.000000000 +0100
 @@ -1438,6 +1438,10 @@
      }
    }
@@ -213,9 +213,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/tilespec.c freeciv-2.6.0-beta1/client/t
  }
  
  /**********************************************************************
-diff -ru freeciv-2.6.0-beta1.orig/client/update_queue.c freeciv-2.6.0-beta1/client/update_queue.c
---- freeciv-2.6.0-beta1.orig/client/update_queue.c	2017-09-16 16:33:13.000000000 +0200
-+++ freeciv-2.6.0-beta1/client/update_queue.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/client/update_queue.c freeciv-2.6.0-beta2/client/update_queue.c
+--- freeciv-2.6.0-beta2.orig/client/update_queue.c	2018-01-20 15:32:29.000000000 +0100
++++ freeciv-2.6.0-beta2/client/update_queue.c	2018-02-24 18:27:27.000000000 +0100
 @@ -571,7 +571,7 @@
  ****************************************************************************/
  void multipliers_dialog_update(void)
@@ -232,9 +232,9 @@ diff -ru freeciv-2.6.0-beta1.orig/client/update_queue.c freeciv-2.6.0-beta1/clie
 -  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
 +//  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
  }
-diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.6.0-beta1/dependencies/lua-5.3/src/lmathlib.c
---- freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/lmathlib.c	2017-09-16 16:33:14.000000000 +0200
-+++ freeciv-2.6.0-beta1/dependencies/lua-5.3/src/lmathlib.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.6.0-beta2/dependencies/lua-5.3/src/lmathlib.c
+--- freeciv-2.6.0-beta2.orig/dependencies/lua-5.3/src/lmathlib.c	2018-01-20 15:32:30.000000000 +0100
++++ freeciv-2.6.0-beta2/dependencies/lua-5.3/src/lmathlib.c	2018-02-24 18:27:27.000000000 +0100
 @@ -183,7 +183,8 @@
      res = l_mathop(log)(x);
    else {
@@ -245,9 +245,9 @@ diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.
      if (base == l_mathop(2.0))
        res = l_mathop(log2)(x); else
  #endif
-diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6.0-beta1/dependencies/lua-5.3/src/luaconf.h
---- freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/luaconf.h	2017-09-16 16:33:14.000000000 +0200
-+++ freeciv-2.6.0-beta1/dependencies/lua-5.3/src/luaconf.h	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6.0-beta2/dependencies/lua-5.3/src/luaconf.h
+--- freeciv-2.6.0-beta2.orig/dependencies/lua-5.3/src/luaconf.h	2018-01-20 15:32:30.000000000 +0100
++++ freeciv-2.6.0-beta2/dependencies/lua-5.3/src/luaconf.h	2018-02-24 18:27:27.000000000 +0100
 @@ -669,7 +669,7 @@
  ** macro must include header 'locale.h'.)
  */
@@ -257,9 +257,9 @@ diff -ru freeciv-2.6.0-beta1.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6
  #endif
  
  /* }================================================================== */
-diff -ru freeciv-2.6.0-beta1.orig/server/connecthand.c freeciv-2.6.0-beta1/server/connecthand.c
---- freeciv-2.6.0-beta1.orig/server/connecthand.c	2017-09-16 16:33:15.000000000 +0200
-+++ freeciv-2.6.0-beta1/server/connecthand.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/server/connecthand.c freeciv-2.6.0-beta2/server/connecthand.c
+--- freeciv-2.6.0-beta2.orig/server/connecthand.c	2018-01-20 15:32:30.000000000 +0100
++++ freeciv-2.6.0-beta2/server/connecthand.c	2018-02-24 18:27:27.000000000 +0100
 @@ -456,6 +456,13 @@
  ****************************************************************************/
  void lost_connection_to_client(struct connection *pconn)
@@ -274,9 +274,9 @@ diff -ru freeciv-2.6.0-beta1.orig/server/connecthand.c freeciv-2.6.0-beta1/serve
    const char *desc = conn_description(pconn);
  
    fc_assert_ret(TRUE == pconn->server.is_closing);
-diff -ru freeciv-2.6.0-beta1.orig/server/settings.c freeciv-2.6.0-beta1/server/settings.c
---- freeciv-2.6.0-beta1.orig/server/settings.c	2017-09-16 16:33:15.000000000 +0200
-+++ freeciv-2.6.0-beta1/server/settings.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/server/settings.c freeciv-2.6.0-beta2/server/settings.c
+--- freeciv-2.6.0-beta2.orig/server/settings.c	2018-01-20 15:32:30.000000000 +0100
++++ freeciv-2.6.0-beta2/server/settings.c	2018-02-24 18:27:27.000000000 +0100
 @@ -1211,7 +1211,8 @@
    }
    return TRUE;
@@ -287,9 +287,9 @@ diff -ru freeciv-2.6.0-beta1.orig/server/settings.c freeciv-2.6.0-beta1/server/s
  #define GEN_BOOL(name, value, sclass, scateg, slevel, to_client,            \
                   short_help, extra_help, func_validate, func_action,        \
                   _default)                                                  \
-diff -ru freeciv-2.6.0-beta1.orig/utility/fcintl.c freeciv-2.6.0-beta1/utility/fcintl.c
---- freeciv-2.6.0-beta1.orig/utility/fcintl.c	2017-09-16 16:33:15.000000000 +0200
-+++ freeciv-2.6.0-beta1/utility/fcintl.c	2017-12-25 11:25:51.000000000 +0100
+diff -ru freeciv-2.6.0-beta2.orig/utility/fcintl.c freeciv-2.6.0-beta2/utility/fcintl.c
+--- freeciv-2.6.0-beta2.orig/utility/fcintl.c	2018-01-20 15:32:31.000000000 +0100
++++ freeciv-2.6.0-beta2/utility/fcintl.c	2018-02-24 18:27:27.000000000 +0100
 @@ -99,10 +99,3 @@
    return autocap;
  }

@@ -508,7 +508,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.6.0-beta1"
+#define PACKAGE_VERSION "2.6.0-beta2"
 
 /* Patch version */
 #define PATCH_VERSION 0
@@ -562,13 +562,13 @@
 
 
 /* Version number of package */
-#define VERSION "2.6.0-beta1"
+#define VERSION "2.6.0-beta2"
 
 /* Version label */
 #define VERSION_LABEL ""
 
 /* Version string */
-#define VERSION_STRING "2.6.0-beta1"
+#define VERSION_STRING "2.6.0-beta2"
 
 /* Informational URL */
 #define WIKI_URL "http://www.freeciv.org/"

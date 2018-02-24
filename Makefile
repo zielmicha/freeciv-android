@@ -1,11 +1,11 @@
 all: src lib data
 freeciv-src/data:
 	# mirror of this file: https://cdn.atomshare.net/2738dc98073eb97c35f47d9b0d3b34decf783766ff7afbe08bded9092730b759/freeciv-2.6.0-beta1.tar.bz2
-	wget -c http://files.freeciv.org/beta/freeciv-2.6.0-beta1.tar.bz2
-	sha256sum -c freeciv-2.6.0-SHA256SUM || exit 1
-	tar xjf freeciv-2.6.0-beta1.tar.bz2
-	(cd freeciv-2.6.0-beta1 && patch -p1 <../freeciv-2.6.0-beta1.patch)
-	ln -sf freeciv-2.6.0-beta1 freeciv-src
+	wget -c http://files.freeciv.org/beta/freeciv-2.6.0-beta2.tar.bz2
+	sha256sum -c freeciv-2.6-SHA256SUM || exit 1
+	tar xjf freeciv-2.6.0-beta2.tar.bz2
+	(cd freeciv-2.6.0-beta2 && patch -p1 <../freeciv-2.6.patch)
+	ln -sf freeciv-2.6.0-beta2 freeciv-src
 	make -C android project/jni/freeciv-client project/jni/freeciv-server
 freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-src/data
 	./genMakefile.sh
