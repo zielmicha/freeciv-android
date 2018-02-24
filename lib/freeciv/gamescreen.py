@@ -17,6 +17,7 @@ import client
 import functools
 
 from client import freeciv
+from client import city
 
 import graphics
 import citydlg
@@ -185,6 +186,16 @@ class ScreenClient(client.Client):
 
     def popup_unit_diplomat_dialog(self, diplomat_action):
         message = 'Subvert enemy unit'
+
+    def popup_airlift_dialog(self, unit):
+        items = []
+        cities = freeciv.func.get_airlift_dest_cities(unit.handle)
+        def callback(target_city):
+            freeciv.func.request_unit_airlift(unit.handle, target_city.handle)
+        for handle in cities:
+            target_city = city.City(handle)
+            items.append((target_city.get_name(), functools.partial(callback, target_city)))
+        ui.show_list_dialog(items, title='Airlift to', titlefont=ui.consolefont)
 
     def unit_select_dialog_popup(self, units):
         def focus(unit):

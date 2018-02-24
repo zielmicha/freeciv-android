@@ -49,6 +49,7 @@ ACTIVITY_PARADROP = 1007
 ACTIVITY_CHANGE_HOMECITY = 1008
 ACTIVITY_LOAD = 1009
 ACTIVITY_UNLOAD = 1010
+ACTIVITY_AIRLIFT = 1011
 
 ACTIVITY_CENTER_ON_UNIT = 2003
 ACTIVITY_UPGRADE = 2004
@@ -140,6 +141,8 @@ class Unit(object):
             yield ACTIVITY_RAILROAD
         elif freeciv.func.can_unit_do_activity_any_road(id):
             yield ACTIVITY_MAGLEV
+        if len(freeciv.func.get_airlift_dest_cities(self.handle)) > 0:
+            yield ACTIVITY_AIRLIFT
 
         standard_activities = [
             ACTIVITY_IRRIGATE,
@@ -254,6 +257,8 @@ class Unit(object):
             freeciv.func.request_center_focus_unit()
         elif ident == ACTIVITY_UPGRADE:
             freeciv.func.request_unit_upgrade(self.handle)
+        elif ident == ACTIVITY_AIRLIFT:
+            client.client.popup_airlift_dialog(self)
         else:
             freeciv_action = py_action_to_freeciv_action(ident)
             if freeciv_action >= 0:

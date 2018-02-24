@@ -68,6 +68,7 @@ const char* get_unit_name(const struct unit* u)
 void request_new_unit_activity(struct unit *punit, enum unit_activity act)
 void unit_focus_set(struct unit *punit)
 
+PyObject* get_airlift_dest_cities(struct unit *unit)
 PyObject* get_home_citiy(struct unit *unit)
 
 void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
@@ -202,6 +203,8 @@ void py_server_main_run(PyObject* cmd)
 
 void request_unit_upgrade(struct unit *punit);
 bool can_unit_upgrade(struct unit *punit);
+
+void request_unit_airlift(struct unit *punit, struct city *pcity)
 
 void update_map_canvas_whole()
 

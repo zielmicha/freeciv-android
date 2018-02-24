@@ -1022,6 +1022,20 @@ PyObject* get_cities() {
 
 }
 
+PyObject* get_airlift_dest_cities(struct unit *unit) {
+    PyObject* list = PyList_New(0);
+    struct tile *pTile = unit_tile(unit);
+    struct city *pCity = tile_city(pTile);
+    if (pCity && pCity->airlift) {
+	city_list_iterate(client.conn.playing->cities, pcity) {
+		if (unit_can_airlift_to(unit, pcity)) {
+			PyList_Append(list, Py_BuildValue("i", pcity));
+		}
+	} city_list_iterate_end;
+    }
+    return list;
+}
+
 PyObject* get_home_citiy(struct unit *unit) {
     struct player *owner = unit_owner(unit);
     struct city *pcity = player_city_by_number(owner, unit->homecity);
