@@ -66,13 +66,10 @@ features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
 features.add_feature('debug.remote.port', default=15589, type=int)
 
-# Disable this because it sends error reporting to zielmicha, the main developper of the project
-#ANDR_DSN = 'http://247716acba64489e9165dd294491248b' \
-#           ':38d1cedf2fda48dc80b825c568d17c3f@sentrypublic.civsync.com/4'
-#DESK_DSN = 'http://90be6086bef6448aa6cdba1a9f7abebe' \
-#           ':b48118eaa7374c44b55e0cf8ad39c103@sentrypublic.civsync.com/5'
-ANDR_DSN = None
-DESK_DSN = None
+ANDR_DSN = 'http://b1b01ae8b523432f964fb452f6da634a' \
+           ':4c61157ab7154d159704c05dfaa73842@sentrypublic.civsync.com/15'
+DESK_DSN = 'http://b1b01ae8b523432f964fb452f6da634a' \
+           ':4c61157ab7154d159704c05dfaa73842@sentrypublic.civsync.com/15'
 
 features.add_feature('debug.dsn',
                      default=DESK_DSN if osutil.is_desktop else ANDR_DSN,
