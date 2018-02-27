@@ -35,7 +35,7 @@ def ask(msg, callback):
 def not_implemented():
     message('Sorry. This feature is not implemented.\nCheck Google Play for updates.')
 
-def show_list_dialog(items, callback=None, get_text_func=None, title=None, titlefont=None):
+def show_list_dialog(items, callback=None, get_text_func=None, title=None, titlefont=None, scroll=False):
     def default_get_text_func(it):
         if isinstance(it, tuple):
             label, action = it
@@ -58,7 +58,7 @@ def show_list_dialog(items, callback=None, get_text_func=None, title=None, title
     for item in items:
         label = (get_text_func or default_get_text_func)(item)
         gui.add(ui.Button(label, functools.partial(clicked, item) ))
-    set_dialog(gui)
+    set_dialog(gui, scroll=scroll)
 
 
 class Dialog(ui.Widget):

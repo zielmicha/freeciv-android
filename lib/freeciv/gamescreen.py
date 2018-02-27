@@ -195,7 +195,7 @@ class ScreenClient(client.Client):
         for handle in cities:
             target_city = city.City(handle)
             items.append((target_city.get_name(), functools.partial(callback, target_city)))
-        ui.show_list_dialog(items, title='Airlift to', titlefont=ui.consolefont)
+        ui.show_list_dialog(items, title='Airlift to', titlefont=ui.consolefont, scroll=True)
 
     def unit_select_dialog_popup(self, units):
         def focus(unit):
