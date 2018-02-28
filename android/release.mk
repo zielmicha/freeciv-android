@@ -19,7 +19,7 @@ build/AndroidManifest.xml: build project/AndroidManifest.xml release.mk
 		| cat  >  build/AndroidManifest.xml
 
 build/build.xml: build/AndroidManifest.xml _links
-	android update project --path build --name "Freeciv" --target android-17
+	"${ANDROIDSDK}/tools/android" update project --path build --name "Freeciv" --target android-17
 
 dropboxdep: build/libs/commons-logging-1.1.1.jar build/libs/dropbox-android-sdk-1.5.4.jar build/libs/httpclient-4.0.3.jar build/libs/httpcore-4.0.1.jar build/libs/httpmime-4.0.3.jar build/libs/json_simple-1.1.jar
 
@@ -28,7 +28,7 @@ build/libs/%.jar: project/dropbox-sdk/lib/%.jar
 	cp $^ $@
 
 ndk:
-	ndk-build -C build
+	"${ANDROIDNDK}/ndk-build" -C build
 
 _links: build build/src build/jni build/res build/obj build/assets
 
