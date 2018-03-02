@@ -22,7 +22,7 @@ class WithText(ui.Widget):
     def redraw(self):
         self.label_image = ui.render_text(self.font, self.label, self.color)
         size = self.label_image.get_size()
-        if self.force_width:
+        if self.force_width > size[0]:
             size = self.force_width, size[1]
         self.size = size[0] + self.padding*2, size[1] + self.padding*2
         self.padding_left = (self.size[0] - self.label_image.get_size()[0])/2

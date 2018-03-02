@@ -103,7 +103,7 @@ class MenuButton(ui.Button):
     fg = (150, 150, 50)
 
     def __init__(self, text, callback, **kwargs):
-        ui.Button.__init__(self, text, callback, force_width=100, **kwargs)
+        ui.Button.__init__(self, text, callback, force_width=ui.scale_for_device(100), **kwargs)
 
     def set_text(self, label):
         if '\n' not in label:

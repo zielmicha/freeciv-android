@@ -284,7 +284,7 @@ class ScreenWidget(ui.AbsoluteLayoutWidget):
 
         def make_button(name, func):
             return ui.Button(name, func,
-                             force_width=width - 15,
+                             force_width=ui.scale_for_device(width - 15),
                              padding=1)
 
         self.client = client
@@ -440,7 +440,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
             line.add(img_l)
             if type != 0:
                 line.add(ui.Spacing(10, 0))
-                w = 40
+                w = ui.scale_for_device(40)
                 line.add(ui.Button(' - ', functools.partial(change, type, -1), font=font,
                                    force_width=w))
                 line.add(ui.Spacing(10, 0))

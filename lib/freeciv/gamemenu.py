@@ -63,8 +63,8 @@ class Menu(ui.LinearLayoutWidget):
         self.width = width or ui.screen_width
         self.client = client
         self.zoom_panel = ui.HorizontalLayoutWidget(spacing=4)
-        self.zoom_panel.add(ui.Button('+', self.incr_zoom, force_width=20))
-        self.zoom_panel.add(ui.Button(' - ', self.decr_zoom, force_width=20))
+        self.zoom_panel.add(ui.Button('+', self.incr_zoom, force_width=ui.scale_for_device(20)))
+        self.zoom_panel.add(ui.Button('-', self.decr_zoom, force_width=ui.scale_for_device(20)))
         self.zoom_level = ZOOM_LEVELS.index(1)
         self.panel = ui.HorizontalLayoutWidget(spacing=4)
         self.add(self.zoom_panel)
@@ -358,4 +358,4 @@ def init_orders():
     order_sprites = client.common.split_sprites(img_orders, start=(0, 1), each=(29, 31), size=(31, 29), num=(1, 38))
 
     for line in order_sprites:
-        line[0] = line[0].scale((56, 56))
+        line[0] = line[0].scale((ui.scale_for_device(56), ui.scale_for_device(56)))
