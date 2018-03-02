@@ -375,8 +375,10 @@ class TaxesPanel(ui.LinearLayoutWidget):
         tax, lux, science = self.client.get_tax_values()
 
         science_img = icons.get_small_image('scientist')
-        tax_img = icons.get_small_image('taxman')
-        lux_img = icons.get_small_image('elvis')
+        w, h = science_img.get_size()
+        science_img = science_img.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+        tax_img = icons.get_small_image('taxman').scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+        lux_img = icons.get_small_image('elvis').scale((ui.scale_for_device(w), ui.scale_for_device(h)))
 
         def add(value, img):
             for i in xrange(int(value/10)):
@@ -432,7 +434,7 @@ class TaxesDialog(ui.LinearLayoutWidget):
 
         def add(type, img):
             # spacing here are hard-coded so the layout breaks when font is changed
-            img = img.scale((30, 45))
+            img = img.scale((ui.scale_for_device(30), ui.scale_for_device(45)))
             line = ui.HorizontalLayoutWidget()
             img_l = ui.LinearLayoutWidget()
             img_l.add(ui.Image(img))
