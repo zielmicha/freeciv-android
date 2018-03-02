@@ -194,7 +194,7 @@ class Button(ui.Widget):
             do()
 
 class NewJoystick(ui.Widget):
-    small_radius = 35
+    small_radius = ui.scale_for_device(35)
 
     consts = {
         0: freeciv.const.DIR8_EAST,
@@ -213,7 +213,7 @@ class NewJoystick(ui.Widget):
 
     def __init__(self, client):
         self.client = client
-        self.size = (180, 180)
+        self.size = (ui.scale_for_device(180), ui.scale_for_device(180))
         self.current = None
         self.clicked = False
 
@@ -310,7 +310,7 @@ class TileButton(ui.Widget):
     fg = (150, 150, 50)
 
     def __init__(self, joystick, client, dir):
-        self.size = (60, 60)
+        self.size = (ui.scale_for_device(60), ui.scale_for_device(60))
         self.dir = dir
         self.active = False
         self.joystick = joystick
