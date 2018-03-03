@@ -180,7 +180,7 @@ class MapDrawer(object):
         zero_corner = (int(self.MAP_CACHE_SIZE * w), int(self.MAP_CACHE_SIZE * h))
         delta = self.user_corner[0] - zero_corner[0], self.user_corner[1] - zero_corner[1]
         ox, oy = freeciv.func.get_map_view_origin()
-        freeciv.func.set_mapview_scroll_pos(ox + delta[0], oy + delta[1])
+        freeciv.func.set_mapview_scroll_pos(int(ox + delta[0]), int(oy + delta[1]))
 
     def prepare_map_cache(self):
         w, h = self.widget_size
