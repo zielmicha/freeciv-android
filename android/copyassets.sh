@@ -10,6 +10,7 @@ cp ../lib/*.py $A/lib/python2.7
 cp ../lib/freeciv/*.py $A/lib/python2.7/freeciv
 cp ../lib/ui/*.py $A/lib/python2.7/ui
 cp ../lib/freeciv/client/*.py $A/lib/python2.7/freeciv/client
+echo 'array = str' > $A/lib/python2.7/array.py
 STDMODULES="shutil stat os posixpath traceback linecache
 types posixpath genericpath warnings fnmatch collections
 functools threading httplib urllib string re UserDict _abcoll
