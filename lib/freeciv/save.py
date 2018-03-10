@@ -311,10 +311,6 @@ def start_client():
     ui.replace_anim(client.client.ui)
 
 def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
-    thread.start_new_thread(server_loop, (port, args, line_callback, quit_on_disconnect))
-    time.sleep(0.4)
-
-def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
     assert quit_on_disconnect
     args = ('-p', str(port), '-s', get_save_dir(), ) + args
 
@@ -325,7 +321,10 @@ def server_loop(port, args=(), line_callback=None, quit_on_disconnect=True):
         stream = zygote_start_server(args)
     else:
         stream = subprocess_start_server(args)
+    thread.start_new_thread(server_loop, (stream, line_callback))
+    time.sleep(0.4)
 
+def server_loop(stream, line_callback=None):
     while True:
         line = stream.readline()
         if not line:
