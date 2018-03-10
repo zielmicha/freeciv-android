@@ -68,8 +68,9 @@ features.add_feature('debug.remote.port', default=15589, type=int)
 
 ANDR_DSN = 'http://b1b01ae8b523432f964fb452f6da634a' \
            ':4c61157ab7154d159704c05dfaa73842@sentrypublic.civsync.com/15'
-DESK_DSN = 'http://b1b01ae8b523432f964fb452f6da634a' \
-           ':4c61157ab7154d159704c05dfaa73842@sentrypublic.civsync.com/15'
+#DESK_DSN = 'http://b1b01ae8b523432f964fb452f6da634a' \
+#           ':4c61157ab7154d159704c05dfaa73842@sentrypublic.civsync.com/15'
+DESK_DSN = None
 
 features.add_feature('debug.dsn',
                      default=DESK_DSN if osutil.is_desktop else ANDR_DSN,
