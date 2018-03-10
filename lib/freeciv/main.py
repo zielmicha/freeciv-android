@@ -238,6 +238,8 @@ def except_hook_raven(exc_info=None):
     dsn = features.get('debug.dsn')
     if dsn:
         raven_report(dsn, exc_info=exc_info)
+    else:
+        print 'Raven report is disabled'
 
 def raven_report(dsn, exc_info=None):
     import ravensimple
