@@ -12,7 +12,7 @@ freeciv-src/Makefile: genMakefile.sh src/Client.mk src/Server.mk freeciv-src/dat
 src/objectfiles:
 	mkdir src/objectfiles
 
-data: freeciv-src/data/misc/overlays_white.png freeciv-src/data/hexemplio/terrain_white.png freeciv-src/data/hexemplio/grid_white.png freeciv-src/data/amplio2/terrain1_white.png freeciv-src/data/amplio2/grid_white.png
+data: freeciv-src/data/misc/overlays_white.png freeciv-src/data/hexemplio/terrain_white.png freeciv-src/data/hexemplio/grid_white.png freeciv-src/data/amplio2/terrain1_white.png freeciv-src/data/amplio2/grid_white.png freeciv-src/data/trident/tiles_white.png freeciv-src/data/trident/grid_white.png
 	ln -sf freeciv-src/data
 freeciv-src/data/misc/overlays_white.png: freeciv-src/data freeciv-src/data/misc/overlays.png
 	python makemask.py freeciv-src/data/misc/overlays.png freeciv-src/data/misc/overlays_white.png
@@ -24,6 +24,10 @@ freeciv-src/data/amplio2/terrain1_white.png: freeciv-src/data freeciv-src/data/a
 	python makemask.py freeciv-src/data/amplio2/terrain1.png freeciv-src/data/amplio2/terrain1_white.png
 freeciv-src/data/amplio2/grid_white.png: freeciv-src/data freeciv-src/data/amplio2/grid.png
 	python makemask.py freeciv-src/data/amplio2/grid.png freeciv-src/data/amplio2/grid_white.png
+freeciv-src/data/trident/tiles_white.png: freeciv-src/data freeciv-src/data/trident/tiles.png
+	python makemask.py freeciv-src/data/trident/tiles.png freeciv-src/data/trident/tiles_white.png
+freeciv-src/data/trident/grid_white.png: freeciv-src/data freeciv-src/data/trident/grid.png
+	python makemask.py freeciv-src/data/trident/grid.png freeciv-src/data/trident/grid_white.png
 
 src: freeciv-src/Makefile src/objectfiles
 	$(MAKE) -C freeciv-src
