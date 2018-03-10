@@ -284,11 +284,7 @@ def load_game(path, user_callback=None, before_callback=None):
     start_server(port, ('-f', path), line_callback=sc_client.server_line_callback)
 
     sc_client.out_window_callback = out_callback
-    try:
-        sc_client.connect_to_server('player', localhost, port)
-    except client.ConnectionError:
-        ui.message('Failed to connect to game server, try again', type='error')
-        return
+    sc_client.connect_to_server('player', localhost, port)
 
     def callback():
         if before_callback() if before_callback else True:
