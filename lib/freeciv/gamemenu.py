@@ -185,8 +185,8 @@ class Button(ui.Widget):
     def click(self):
         self.client.draw_patrol_lines = False
         def do():
-            self.client.get_unit_in_focus().perform_activity(self.action_ident)
             self.client.draw_patrol_lines = False
+            self.client.get_unit_in_focus().perform_activity(self.action_ident)
 
         if self.action_ident in confirm_actions:
             ui.ask('Really %s?' % self.action_name, do)
