@@ -57,6 +57,7 @@ PyObject* py_get_pyobject(void* stru);
 int civserver_main(int argc, char *argv[]);
 int test_glue(int val);
 const char *get_science_target_text(double *percent);
+const char *get_science_goal_text(Tech_type_id goal);
 void base_set_mapview_origin(int gui_x0, int gui_y0);
 void key_unit_move_direction(int gui_dir);
 void cancel_city_at_unit(long unit);

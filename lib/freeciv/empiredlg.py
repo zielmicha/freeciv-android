@@ -35,6 +35,10 @@ class EmpireDialog(ui.LinearLayoutWidget):
         self.items = []
         self.tech_label = ui.Label('')
         self.add(self.tech_label)
+        self.tech_goal_label = ui.Label('')
+        self.add(self.tech_goal_label)
+        self.tech_progress_label = ui.Label('', font=ui.consolefont)
+        self.add(self.tech_progress_label)
         tech_panel = ui.HorizontalLayoutWidget(spacing=10)
         tech_panel.add(ui.Button('Change tech goal', self.research_goal_dialog))
         tech_panel.add(ui.Button('Change current tech', self.research_current_dialog))
@@ -45,13 +49,15 @@ class EmpireDialog(ui.LinearLayoutWidget):
         self.add(ui.Button('Taxes & Government', lambda: ui.set_dialog(gamescreen.TaxesDialog(self.client))))
         self.update_layout()
 
-    def update_tech_label(self):
+    def update_tech_labels(self):
         self.tech_label.set_text(', '.join(self.client.get_current_tech()))
+        self.tech_goal_label.set_text('Tech goal: ' + ', '.join(self.client.get_current_tech_goal()))
+        self.tech_progress_label.set_text(self.client.science_dialog_text())
 
     def tick(self):
         super(EmpireDialog, self).tick()
         self.client.tick() # important
-        self.update_tech_label()
+        self.update_tech_labels()
 
     def research_goal_dialog(self):
         self.research_list_dialog('set_as_goal', 11)

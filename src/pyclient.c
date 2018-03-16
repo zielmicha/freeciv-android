@@ -682,6 +682,13 @@ PyObject* get_current_tech() {
         get_science_target_text(NULL));
 }
 
+PyObject* get_current_tech_goal() {
+    struct research *research = research_get(client.conn.playing);
+    return Py_BuildValue("ss",
+        research_advance_name_translation(research, research->tech_goal),
+        get_science_goal_text(research->tech_goal));
+}
+
 void set_tech_goal(int index) {
     dsend_packet_player_tech_goal(&client.conn, index);
 }

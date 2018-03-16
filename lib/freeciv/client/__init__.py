@@ -226,6 +226,12 @@ class Client(object):
     def get_current_tech(self):
         return freeciv.func.get_current_tech()
 
+    def get_current_tech_goal(self):
+        return freeciv.func.get_current_tech_goal()
+
+    def science_dialog_text(self):
+        return freeciv.func.science_dialog_text()
+
     def get_techs(self, level=11):
         return map(Tech, freeciv.func.get_techs(level))
 
