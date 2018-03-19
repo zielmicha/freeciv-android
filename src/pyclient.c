@@ -697,6 +697,14 @@ void set_tech_research(int index) {
     dsend_packet_player_research(&client.conn, index);
 }
 
+struct unit_list* get_units_supported_by_city(struct city* pCity) {
+    if (city_owner(pCity) != client.conn.playing) {
+        return pCity->client.info_units_supported;
+    } else {
+        return pCity->units_supported;
+    }
+}
+
 struct unit_list* get_units_present_in_city(struct city* pCity) {
     if (city_owner(pCity) != client.conn.playing) {
         return pCity->client.info_units_present;

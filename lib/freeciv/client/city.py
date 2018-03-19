@@ -151,6 +151,9 @@ class City(object):
     def get_built_improvements(self):
         return freeciv.func.get_built_improvements_in_city(self.handle)
 
+    def get_supported_units(self):
+        return [ actions.Unit(unit) for unit in freeciv.func.get_units_supported_by_city(self.handle) ]
+
     def get_units(self):
         return [ actions.Unit(unit) for unit in freeciv.func.get_units_present_in_city(self.handle) ]
 
