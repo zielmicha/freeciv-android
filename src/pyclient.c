@@ -1087,6 +1087,27 @@ PyObject* get_activity_str(struct unit* unit) {
     return ret;
 }
 
+PyObject* py_get_city_dialog_output_text(struct city* city, Output_type_id otype) {
+    char buf[1024];
+    get_city_dialog_output_text(city, otype, buf, sizeof(buf));
+    PyObject* ret = PyString_FromStringAndSize(buf, strlen(buf));
+    return ret;
+}
+
+PyObject* get_trade_routes(struct city* city) {
+    return py_get_city_dialog_output_text(city, O_TRADE);
+}
+
+int count_trade_routes(struct city* city) {
+    int count = 0;
+    for (int i = 0; i < MAX_TRADE_ROUTES; i++) {
+        if (city->trade[i] != 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
 void pyjni_log_normal(PyObject* arg_msg) {
     log_normal("%s", PyString_AsString(arg_msg));
 }

@@ -106,6 +106,12 @@ class City(object):
         # illness is in tenth of percent
         return float(illness_int) / 10
 
+    def count_trade_routes(self):
+        return freeciv.func.count_trade_routes(self.handle)
+
+    def get_trade_routes(self):
+        return freeciv.func.get_trade_routes(self.handle)
+
     def get_size(self):
         return freeciv.func.city_get_size(self.handle)
 

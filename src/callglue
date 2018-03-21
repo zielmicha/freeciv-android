@@ -215,6 +215,8 @@ PyObject* get_advances()
 
 PyObject* py_canvas_to_map(int x, int y)
 PyObject* get_activity_str(struct unit* unit)
+PyObject* get_trade_routes(struct city* city)
+int count_trade_routes(struct city* city)
 void pyjni_log_normal(PyObject* args)
 int create_reqtree(const struct player* pplayer, bool show_all)
 void py_draw_reqtree(int tree, PyObject *pcanvas, int canvas_x, int canvas_y, int tt_x, int tt_y, int w, int h)

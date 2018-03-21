@@ -50,28 +50,30 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.add(self.citypanel)
         self.add(self.prodpanel)
 
+        showbuttons = ui.HorizontalLayoutWidget(spacing=10)
+        showbuttons.add(ui.Button('Buildings in city', self.show_buildings))
+        if self.city.count_trade_routes() > 0:
+            showbuttons.add(ui.Button('Trade routes', self.show_trade_routes))
+        self.prodpanel.add(showbuttons)
+        self.prodpanel.add(ui.Label('Prod: ' + self.city.get_production_name(), font=ui.smallfont))
         self.unit_img = ui.Image(self.city.get_production_image())
-        self.prodpanel.add(ui.Label(self.city.get_production_name(), font=ui.smallfont))
-
+        prodbuttons = ui.HorizontalLayoutWidget(spacing=10)
+        prodbuttons.add(self.unit_img)
+        prodbuttons.add(ui.Button('Change', lambda: self.change_prod(add=False)))
+        prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
         stock = self.city.get_shield_stock()
         cost = self.city.get_production_cost()
         turns = self.city.get_production_turns_to_build()
         if cost != 999:
-            self.prodpanel.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns), font=ui.smallfont))
-        self.prodpanel.add(self.unit_img)
-        prodbuttons = ui.HorizontalLayoutWidget(spacing=10)
-        prodbuttons.add(ui.Label('Prod: '))
-        prodbuttons.add(ui.Button('Change', lambda: self.change_prod(add=False)))
-        prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
-        #prodbuttons.add(ui.Button('Add', lambda: self.change_prod(add=False)))
+            prodbuttons.add(ui.Label('%d/%d (%d turns)' % (stock, cost, turns), font=ui.smallfont))
         self.prodpanel.add(prodbuttons)
+
         self.update_layout() # to get updated position of self.prodpanel
         width = ui.screen_width - self.get_position_of(self.prodpanel)[0]
         self.prodpanel.add(ui.Label('Supported units', font=ui.smallfont))
         self.prodpanel.add(ui.ScrollWrapper(self.supported_units, width=width, height=120, ways=ui.SCROLL_WIDTH))
         self.prodpanel.add(ui.Label('Present units', font=ui.smallfont))
         self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=width, height=120, ways=ui.SCROLL_WIDTH))
-        self.prodpanel.add(ui.Button('Buildings in city', self.show_buildings))
 
         #print self.city.get_buildable_improvements()
         #print self.city.get_buildable_units()
@@ -118,7 +120,8 @@ class Dialog(ui.HorizontalLayoutWidget):
             panel.add(p)
         ui.set_dialog(panel, scroll=True)
 
-        #ui.not_implemented()
+    def show_trade_routes(self):
+        ui.message(self.city.get_trade_routes())
 
     def sell_dialog(self, name, handle):
         if not self.city.can_sell(handle):
