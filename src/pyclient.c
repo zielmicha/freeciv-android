@@ -1099,8 +1099,8 @@ PyObject* get_trade_routes(struct city* city) {
 }
 
 int count_trade_routes(struct city* city) {
-    int count = 0;
-    for (int i = 0; i < MAX_TRADE_ROUTES; i++) {
+    int count = 0, i=0;
+    for (i = 0; i < MAX_TRADE_ROUTES; i++) {
         if (city->trade[i] != 0) {
             count++;
         }
