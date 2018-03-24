@@ -107,7 +107,11 @@ class Player(object):
         return freeciv.func.can_meet_with_player(self.handle)
 
     def meet(self):
-        freeciv.func.py_init_meeting(freeciv.func.player_number(self.handle))
+        counterpart = freeciv.func.player_number(self.handle)
+        if counterpart in client.client.meetings:
+            # Quick fix: cancel previous meeting because it prevents the dialog to be shown
+            get_meeting(counterpart).cancel()
+        freeciv.func.py_init_meeting(counterpart)
 
     def get_state(self):
         return freeciv.func.py_get_dipl_state(self.handle)
