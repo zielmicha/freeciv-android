@@ -40,13 +40,13 @@
 /* #undef FREECIV_HAVE_WINTHREADS */
 
 /* Has thread condition variable implementation */
-#define FREECIV_HAVE_THREAD_COND 0
+#define FREECIV_HAVE_THREAD_COND 1
 
 /* Build xml-backend for registry */
 /* #undef FREECIV_HAVE_XML_REGISTRY */
 
 /* Native language support enabled */
-/*#define FREECIV_ENABLE_NLS 1*/
+/* #undef FREECIV_ENABLE_NLS */
 
 /* locale.h available */
 #define FREECIV_HAVE_LOCALE_H 1
@@ -118,7 +118,7 @@
 /* #undef FREECIV_HAVE_LIBBZ2 */
 
 /* liblzma is available */
-/*#define FREECIV_HAVE_LIBLZMA 1*/
+/* #undef FREECIV_HAVE_LIBLZMA */
 
 /* IPv6 Support built in */
 #define FREECIV_IPV6_SUPPORT 1
@@ -130,6 +130,6 @@
 #define FREECIV_C11_STATIC_ASSERT 1
 
 /* C++11 static assert supported */
-/* #undef FREECIV_CXX11_STATIC_ASSERT */
+#define FREECIV_CXX11_STATIC_ASSERT 1
 
 #endif /* FC__FREECIV_CONFIG_H */
