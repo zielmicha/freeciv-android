@@ -60,7 +60,6 @@ features.add_feature('app.launch_param', default=None)
 features.add_feature('app.launch_token', default=None, safe=True)
 features.add_feature('app.action', default=None, safe=True)
 features.add_feature('app.action_arg', default=None, safe=True)
-features.add_feature('app.hex_tileset', type=bool)
 
 features.add_feature('debug.remote', default=False, type=bool)
 features.add_feature('debug.remote.passphase', default='freeciv1234', type=str)
@@ -363,10 +362,7 @@ def main():
 
     if ctrl:
         ctrl.maybe_init()
-    tileset = 'amplio2'
-    if features.get('app.hex_tileset'):
-        tileset = 'hexemplio'
-    client.freeciv.run(['--log', monitor.get_log_path_base() + '.log', '-t', tileset])
+    client.freeciv.run(['--log', monitor.get_log_path_base() + '.log'])
 
 if __name__ == '__main__':
     main()
