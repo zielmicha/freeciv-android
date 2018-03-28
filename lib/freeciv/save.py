@@ -101,11 +101,18 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_aicount(4)
         self.add(self.aicount_button)
 
-        self.mapsize_button = ui.Button('...',
+        if features.get('app.ruleset') == 'civ2civ3':
+            self.mapsize_button = ui.Button('...',
                                         lambda:
-                                        uidialog.inputbox('How large your map will be? (1-20)',
+                                        uidialog.inputbox('How large your map will be? (in tiles per player) (1-1000)',
+                                                          finish=self.set_tilesperplayer))
+            self.set_tilesperplayer(100)
+        else:
+            self.mapsize_button = ui.Button('...',
+                                        lambda:
+                                        uidialog.inputbox('How large your map will be? (in thousands of tiles) (1-20)',
                                                           finish=self.set_mapsize))
-        self.set_mapsize(5)
+            self.set_mapsize(4)
         self.add(self.mapsize_button)
 
         self.barbarians_button = ui.Button('...', self.set_barbarians)
@@ -165,6 +172,17 @@ class ServerGUI(ui.LinearLayoutWidget):
             count = int(cmd)
             client.client.chat('/set aifill %d' % (count + 1))
             self.aicount_button.set_text('AI player count: %d' % count)
+        except (ValueError, TypeError):
+            pass
+
+    def set_tilesperplayer(self, val=None):
+        cmd = val
+        try:
+            count = int(cmd)
+            if count < 1 or count > 1000:
+                return
+            client.client.chat('/set tilesperplayer %d' % count)
+            self.mapsize_button.set_text('Map size: %d tiles per player' % count)
         except (ValueError, TypeError):
             pass
 
