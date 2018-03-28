@@ -153,7 +153,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.difficulty = name
             self.set_difficulty_settings()
 
-        ui.show_list_dialog(['novice', 'easy', 'normal', 'hard', 'cheating'], callback=set_do)
+        ui.show_list_dialog(['handicapped', 'novice', 'easy', 'normal', 'hard', 'cheating'], callback=set_do)
 
     def set_difficulty_settings(self):
         client.client.chat('/%s' % self.difficulty)
