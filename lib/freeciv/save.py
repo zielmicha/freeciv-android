@@ -101,17 +101,22 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_aicount(4)
         self.add(self.aicount_button)
 
+        hex_tiles = ''
+        if features.get('app.hex_tiles'):
+            hex_tiles = '|HEX'
         if features.get('app.ruleset') == 'civ2civ3':
             self.mapsize_button = ui.Button('...',
                                         lambda:
                                         uidialog.inputbox('How large your map will be? (in tiles per player) (1-1000)',
                                                           finish=self.set_tilesperplayer))
+            client.client.chat('/set topology WRAPX|WRAPY|ISO' + hex_tiles)
             self.set_tilesperplayer(100)
         else:
             self.mapsize_button = ui.Button('...',
                                         lambda:
                                         uidialog.inputbox('How large your map will be? (in thousands of tiles) (1-20)',
                                                           finish=self.set_mapsize))
+            client.client.chat('/set topology WRAPX|ISO' + hex_tiles)
             self.set_mapsize(4)
         self.add(self.mapsize_button)
 

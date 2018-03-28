@@ -81,6 +81,8 @@ def show_options():
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
+    st = 'Tiles topology:'
+    options.add_feature_bool(st + ' Hexagonal', st + ' Rectangular', 'app.hex_tiles')
 
     if osutil.is_desktop:
         st = 'Fullscreen (restart to take effect): '
