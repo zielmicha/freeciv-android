@@ -58,7 +58,7 @@ int civserver_main(int argc, char *argv[]);
 int test_glue(int val);
 const char *get_science_target_text(double *percent);
 const char *get_science_goal_text(Tech_type_id goal);
-void base_set_mapview_origin(int gui_x0, int gui_y0);
+void base_set_mapview_origin(float gui_x0, float gui_y0);
 void key_unit_move_direction(int gui_dir);
 void cancel_city_at_unit(long unit);
 void base_canvas_to_map_pos(int *map_x, int *map_y, int canvas_x, int canvas_y);

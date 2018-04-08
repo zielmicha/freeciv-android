@@ -21,7 +21,7 @@ diff -ru freeciv-2.6.0-beta2.orig/client/client_main.c freeciv-2.6.0-beta2/clien
  
 diff -ru freeciv-2.6.0-beta2.orig/client/mapview_common.c freeciv-2.6.0-beta2/client/mapview_common.c
 --- freeciv-2.6.0-beta2.orig/client/mapview_common.c	2018-01-20 15:32:29.000000000 +0100
-+++ freeciv-2.6.0-beta2/client/mapview_common.c	2018-02-24 18:27:27.000000000 +0100
++++ freeciv-2.6.0-beta2/client/mapview_common.c	2018-04-08 16:47:09.000000000 +0200
 @@ -78,7 +78,7 @@
  
  struct tile *center_tile = NULL;
@@ -49,6 +49,13 @@ diff -ru freeciv-2.6.0-beta2.orig/client/mapview_common.c freeciv-2.6.0-beta2/cl
  {
    float old_gui_x0, old_gui_y0;
    float dx, dy;
+@@ -955,6 +955,7 @@
+ void set_mapview_origin(float gui_x0, float gui_y0)
+ {
+   if (!calc_mapview_origin(&gui_x0, &gui_y0)) {
++    base_set_mapview_origin(gui_x0, gui_y0);
+     return;
+   }
 diff -ru freeciv-2.6.0-beta2.orig/client/options.c freeciv-2.6.0-beta2/client/options.c
 --- freeciv-2.6.0-beta2.orig/client/options.c	2018-01-20 15:32:29.000000000 +0100
 +++ freeciv-2.6.0-beta2/client/options.c	2018-02-24 18:27:27.000000000 +0100

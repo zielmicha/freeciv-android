@@ -49,7 +49,7 @@ void finish_city_at_unit(long unit, char* title)
 void cancel_city_at_unit(long unit)
 long canvas_pos_to_nearest_tile_id(int x, int y)
 void set_mapview_scroll_pos(int gui_x0, int gui_y0)
-void base_set_mapview_origin(int gui_x0, int gui_y0)
+void base_set_mapview_origin(float gui_x0, float gui_y0)
 PyObject* get_map_view_origin()
 
 struct unit_list* get_units_in_focus()
