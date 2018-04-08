@@ -31,7 +31,7 @@
 #define FREECIV_META_URL "http://meta.freeciv.org/metaserver.php"
 
 /* Month next version will be released */
-#define FREECIV_RELEASE_MONTH 0
+#define FREECIV_RELEASE_MONTH 6
 
 /* Use pthreads as thread implementation */
 #define FREECIV_HAVE_PTHREAD 1

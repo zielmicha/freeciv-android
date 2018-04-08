@@ -1,0 +1,27 @@
+Upgrade Freeciv (from 2.6.X to 2.6.Y)
+
+== Update Makefile ==
+- Download freeciv-2.6.Y.tar.bz2
+- Replace all occurences from the old version to the new version, and update freeciv-2.6-SHA256SUM
+- Remove the symlink freeciv-src
+- Run: make clean
+- Run: make freeciv-src/Makefile
+
+== Generate headers ==
+See android/gen_headers.sh : open this file with a text editor.
+First, update the version number and the sha256sum
+Then, follow the instructions written as comments. You'll have to run this file on android to generate fc_config.h and freeciv_config.h
+Once it's done, put these files in this workspace (src folder)
+Run: git diff src
+It shows differences from previus headers. In fc_config.h, there are #define that were commented. It's because these features are available in your phone but not in Android NDK version r12b. Comment these #define to disable them again.
+
+== Compile ==
+- Run: make
+- Fix compile errors. This should be easy for minor upgrades (for example from 2.6.1 to 2.6.2)
+- Run the app: make run
+- Build the APK: make -C android debugapk
+
+== Last steps ==
+- Update .gitignore and README because version have changed
+- Update the patch: extract freeciv-2.6.Y.tar.bz2 to directory freeciv-2.6.Y.orig and run:
+	diff -ru freeciv-2.6.Y.orig freeciv-2.6.Y | grep -v "Only in" >freeciv-2.6.patch

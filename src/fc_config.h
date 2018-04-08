@@ -171,7 +171,7 @@
 /* #undef FREECIV_NDEBUG */
 
 /* Month next version will be released */
-#define FREECIV_RELEASE_MONTH 0
+#define FREECIV_RELEASE_MONTH 6
 
 /* Mingw-specific setting - stdin */
 /* #undef FREECIV_SOCKET_ZERO_NOT_STDIN */
@@ -439,10 +439,10 @@
 #define HAVE_STRING_H 1
 
 /* Define to 1 if you have the `strlcat' function. */
-#define HAVE_STRLCAT 1
+/*#define HAVE_STRLCAT 1*/
 
 /* Define to 1 if you have the `strlcpy' function. */
-#define HAVE_STRLCPY 1
+/*#define HAVE_STRLCPY 1*/
 
 /* Define to 1 if you have the `strncasecmp' function. */
 #define HAVE_STRNCASECMP 1
@@ -612,7 +612,7 @@
 #define PACKAGE_NAME "Freeciv"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Freeciv 2.6.0-beta2"
+#define PACKAGE_STRING "Freeciv 2.6.0-beta3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "freeciv"
@@ -621,7 +621,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.6.0-beta2"
+#define PACKAGE_VERSION "2.6.0-beta3"
 
 /* Patch version */
 #define PATCH_VERSION 0
@@ -667,13 +667,13 @@
 
 
 /* Version number of package */
-#define VERSION "2.6.0-beta2"
+#define VERSION "2.6.0-beta3"
 
 /* Version label */
-#define VERSION_LABEL "-beta2"
+#define VERSION_LABEL "-beta3"
 
 /* Version string */
-#define VERSION_STRING "2.6.0-beta2"
+#define VERSION_STRING "2.6.0-beta3"
 
 /* Informational URL */
 #define WIKI_URL "http://www.freeciv.org/"
@@ -729,4 +729,3 @@
 /* #undef vfork */
 
 #define BINDIR "/notexisting"
-

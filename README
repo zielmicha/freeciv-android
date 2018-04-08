@@ -1,4 +1,4 @@
-It includes Freeciv 2.6.0-beta2
+It includes Freeciv 2.6.0-beta3
 
 If you don't need to change source code and don't need latest version simply download APK from http://civ.zielm.com
 
@@ -36,3 +36,5 @@ Build and run on desktop (for debugging):
 
 Build for Android:
    make -C android debugapk
+
+Upgrade Freeciv: see README.freeciv_upgrade

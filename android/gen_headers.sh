@@ -1,6 +1,6 @@
 #!/bin/sh
 
-FREECIV_DIR=freeciv-2.6.0-beta2
+FREECIV_DIR=freeciv-2.6.0-beta3
 FREECIV_TARBALL=$FREECIV_DIR.tar.bz2
 # This script runs Freeciv's ./configure script in Android, to generate fc_config.h and freeciv_config.h
 # You need about 500 MB of free space in your Android device, but you can delete it after the headers have been generated.
@@ -17,7 +17,7 @@ echo Installing dependancies...
 pkg install clang pkg-config libcurl-dev
 
 wget -c http://files.freeciv.org/beta/$FREECIV_TARBALL || true
-echo "d8f6c58b8f45033bc516f1c95a05d6a1515aa96dd710388b37c3bd47abed68ac  $FREECIV_TARBALL" | sha256sum -c -
+echo "7f259aecee88b631b4d64b5c5f6b864969deac5c0dc8e8b662e76cb7a4073b09  $FREECIV_TARBALL" | sha256sum -c -
 echo Extracting...
 tar xjf $FREECIV_TARBALL
 
