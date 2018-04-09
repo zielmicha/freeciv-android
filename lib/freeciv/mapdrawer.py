@@ -65,6 +65,7 @@ class MapWidget(ui.Widget):
             self.drawer.end_scrolling()
             self.start_drag = None
             self.last_drag_pos = None
+            freeciv.func.update_map_canvas_whole()
 
         elif ev.type in (graphics.const.KEYDOWN, graphics.const.KEYUP):
             self.client.key_event(ev.type, ev.key)
@@ -124,7 +125,6 @@ class MapDrawer(object):
         cliptex = graphics.create_surface(*self.widget_size)
         if not self.scrolling:
             target = (pos[0] - self.user_corner[0], pos[1] - self.user_corner[1])
-            self.maybe_update_whole_canvas()
             if self.zoom == 1:
                 self.client.draw_map(cliptex, target)
             else:
