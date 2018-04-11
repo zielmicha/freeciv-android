@@ -63,6 +63,7 @@ cp ../data/civ2civ3/README.civ2civ3 $B/civ2civ3/
 cp ../data/experimental/README.experimental $B/experimental/
 mkdir -p project/assets/userdata
 cp ../userdata/*.png ../userdata/*.jpg project/assets/userdata/
+mv project/assets/userdata/water*.png project/assets/data/hexemplio/
 cp ../userdata/android-help.txt project/assets/userdata/
 find $B/scenarios/ -type f -name "*.sav" -exec gzip "{}" \;
 (cd ../data/flags && ../../../android/compose.py '*-large.png' shield ../../../android/project/assets/data/flags/large)
