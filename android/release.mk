@@ -1,5 +1,5 @@
-VERSION=2601
-VERSION_NAME=2.6.0-beta2
+VERSION=2602
+VERSION_NAME=2.6.0-beta3
 
 release: build/build.xml debug ndk dropboxdep
 	cd build; ant release
