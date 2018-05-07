@@ -814,10 +814,10 @@ int get_gold_amount() {
 }
 
 int get_gold_income() {
-    int total, tax, entries_used;
-    struct improvement_entry entries[B_LAST];
-    get_economy_report_data(entries, &entries_used, &total, &tax);
-    return tax - total;
+    if(!client.conn.playing)
+        return 0;
+    else
+        return player_get_expected_income(client.conn.playing);
 }
 
 void set_tax_values(int tax, int luxury, int science) {
