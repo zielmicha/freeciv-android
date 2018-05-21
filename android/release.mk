@@ -1,4 +1,4 @@
-VERSION=2602
+VERSION=2603
 VERSION_NAME=2.6.0-beta3
 
 release: build/build.xml debug ndk dropboxdep
