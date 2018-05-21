@@ -169,9 +169,9 @@ flag_index = {}
 
 def init():
     global fonts
-    fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
+    fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 16) for i in range(4) ]
     # fonts[2] is for tch tree => scaling it based on screen DPI
-    fonts[2] = ui.load_font('fonts/OFLGoudyStMTT.ttf', 15)
+    fonts[2] = ui.load_font('fonts/OFLGoudyStMTT.ttf', 16)
     if osutil.is_android:
         init_flags()
 
