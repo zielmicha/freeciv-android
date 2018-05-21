@@ -189,7 +189,7 @@ class MapDrawer(object):
         if size[0] > 2048: size = (2048, size[1] * 2048 / size[0])
         if size[1] > 2048: size = (size[0] * 2048 / size[1], 2048)
         size = (int(size[0]), int(size[1]))
-        if size != self.map_cache.get_size():
+        if size != self.map_cache.get_size() or self.zoom != 1:
             self.client.set_map_size(size)
             self.map_cache = graphics.create_surface(size[0], size[1], alpha=False)
             if self.zoom != 1:
