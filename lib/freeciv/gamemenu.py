@@ -55,7 +55,7 @@ def get_order_sprite(name):
     i = order_sprites_names.index(name)
     return order_sprites[i][0]
 
-ZOOM_LEVELS = [0.3, 0.5, 0.7, 1, 1.3, 1.6, 2, 2.5]
+ZOOM_LEVELS = [0.3, 0.5, 0.7, 1, 1.3, 1.6, 2, 2.4, 3, 3.8, 4.75]
 
 class Menu(ui.LinearLayoutWidget):
     def __init__(self, client, width=0):
