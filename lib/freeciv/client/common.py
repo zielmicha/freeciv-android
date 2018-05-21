@@ -169,7 +169,7 @@ flag_index = {}
 
 def init():
     global fonts
-    fonts = [ ui.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
+    fonts = [ graphics.load_font('fonts/OFLGoudyStMTT.ttf', 15) for i in range(4) ]
     if osutil.is_android:
         init_flags()
 
