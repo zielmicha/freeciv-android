@@ -6,10 +6,12 @@ from client import freeciv
 SELECT_POPUP = 0
 
 class MapWidget(ui.Widget):
-    def __init__(self, client):
+    def __init__(self, client, zoom_levels):
         self.client = client
+        self.zoom_levels = zoom_levels
 
-        self.drawer = MapDrawer(client)
+        self.zoom_level = ui.DEFAULT_ZOOM_INDEX
+        self.drawer = MapDrawer(client, zoom_levels[self.zoom_level])
 
         self.size = (0, 0)
         self.last_size = None
@@ -84,11 +86,13 @@ class MapWidget(ui.Widget):
 
         self.drawer.move_map(delta)
 
-    def change_zoom(self, zoom):
-        self.drawer.change_zoom(zoom)
+    def incr_zoom(self, i=1):
+        self.zoom_level += i
+        self.zoom_level = max(0, min(len(self.zoom_levels) - 1, self.zoom_level))
+        self.drawer.change_zoom( self.zoom_levels[self.zoom_level] )
 
 class MapDrawer(object):
-    def __init__(self, client):
+    def __init__(self, client, zoom=1):
         self.client = client
 
         self.valid_for_origin = None # if get_map_view_origin() returns something else, redraw map
@@ -98,7 +102,7 @@ class MapDrawer(object):
         self.last_map_size = None
         self.widget_size = (0, 0)
         self.scrolling = False
-        self.zoom = 1
+        self.zoom = zoom
         self.canvas_next_update = 0
 
         self.MAP_CACHE_SIZE = 0.

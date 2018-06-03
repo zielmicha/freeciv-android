@@ -55,7 +55,6 @@ def get_order_sprite(name):
     i = order_sprites_names.index(name)
     return order_sprites[i][0]
 
-ZOOM_LEVELS = [0.3, 0.5, 0.7, 1, 1.3, 1.6, 2, 2.4, 3, 3.8, 4.75]
 
 class Menu(ui.LinearLayoutWidget):
     def __init__(self, client, width=0):
@@ -65,7 +64,6 @@ class Menu(ui.LinearLayoutWidget):
         self.zoom_panel = ui.HorizontalLayoutWidget(spacing=4)
         self.zoom_panel.add(ui.Button('+', self.incr_zoom, force_width=ui.scale_for_device(20)))
         self.zoom_panel.add(ui.Button('-', self.decr_zoom, force_width=ui.scale_for_device(20)))
-        self.zoom_level = ZOOM_LEVELS.index(1)
         self.panel = ui.HorizontalLayoutWidget(spacing=4)
         self.add(self.zoom_panel)
         self.add(self.panel)
@@ -80,9 +78,7 @@ class Menu(ui.LinearLayoutWidget):
         self.joystick_layout = ui.LinearLayoutWidget()
 
     def incr_zoom(self, i=1):
-        self.zoom_level += i
-        self.zoom_level = max(0, min(len(ZOOM_LEVELS) - 1, self.zoom_level))
-        self.client.ui.map.change_zoom( ZOOM_LEVELS[self.zoom_level] )
+        self.client.ui.map.incr_zoom(i)
 
     def decr_zoom(self):
         self.incr_zoom(-1)

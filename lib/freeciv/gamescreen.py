@@ -293,7 +293,7 @@ class ScreenWidget(ui.AbsoluteLayoutWidget):
             import maptiles
             self.map = maptiles.MapWidget(client)
         else:
-            self.map = mapdrawer.MapWidget(client)
+            self.map = mapdrawer.MapWidget(client, ui.init_zoom_levels())
         self.overview = OverviewWidget(client)
         self.console = ConsoleWidget(client)
         self.menu = gamemenu.Menu(client, ui.screen_width - width)

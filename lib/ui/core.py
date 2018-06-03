@@ -339,6 +339,26 @@ def scale_for_device(size):
         size = size * dev_dpi / good_dpi
     return size
 
+def init_zoom_levels():
+    zoom_multiplier = 1.3
+    default_zoom = scale_for_device(1.)
+    if default_zoom >= 1.2 and default_zoom <= zoom_multiplier:
+        # Upscaling, but allowing the 100% lossless zoom
+        default_zoom = zoom_multiplier
+        zoom_out1 = 1
+    else:
+        if default_zoom > 1 and default_zoom <= 1.2:
+            # Avoid to upscale because it is not much bigger and it's lossy
+            default_zoom = 1
+        zoom_out1 = default_zoom / zoom_multiplier
+    zoom_levels = [zoom_out1 / zoom_multiplier / zoom_multiplier, zoom_out1 / zoom_multiplier, zoom_out1, default_zoom]
+    for i in range(1, 8):
+        default_zoom = default_zoom * zoom_multiplier
+        zoom_levels.append(default_zoom)
+    return zoom_levels
+
+DEFAULT_ZOOM_INDEX = 3
+
 def load_image(name):
     return graphics.load_image(name)
 
