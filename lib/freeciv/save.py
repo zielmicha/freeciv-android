@@ -343,7 +343,7 @@ def start_server(port, args=(), line_callback=None, quit_on_disconnect=True):
     else:
         stream = subprocess_start_server(args)
     thread.start_new_thread(server_loop, (stream, line_callback))
-    time.sleep(0.4)
+    time.sleep(0.3)
 
 def server_loop(stream, line_callback=None):
     while True:

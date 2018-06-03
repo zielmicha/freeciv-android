@@ -176,12 +176,18 @@ class Client(object):
         print '\t' + '\n\t'.join(map(repr, lines))
 
     def connect_to_server(self, username, host, port):
-        bufflen = 512
-        buff = ' ' * bufflen
-        result = freeciv.func.connect_to_server(username, host, port, buff, bufflen)
-        buff = buff.rstrip(' ').rstrip('\0')
-        if result == -1:
-            raise ConnectionError(buff)
+        buff = ''
+        for i in range(1, 11):
+            bufflen = 512
+            buff = ' ' * bufflen
+            result = freeciv.func.connect_to_server(username, host, port, buff, bufflen)
+            buff = buff.rstrip(' ').rstrip('\0')
+            if result == -1:
+                print '%s (try %d)' % (buff, i)
+            else:
+                return
+            time.sleep(0.1)
+        raise ConnectionError(buff)
 
     def escape(self):
         if self.draw_patrol_lines:
