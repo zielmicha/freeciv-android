@@ -262,6 +262,8 @@ def except_dialog():
     panel.add(ui.Label(str(type) + ':\n' + str(value), font=ui.consolefont))
     panel.add(ui.Label(''.join(tb_str), font=ui.consolefont))
     ui.set_screen(ui.ScrollWrapper(panel))
+    while len(ui.history) > 0:
+        ui.history.pop()
 
 def start_marketnotice():
     if features.get('app.marketnotice'):
