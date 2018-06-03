@@ -80,6 +80,8 @@ class ServerGUI(ui.LinearLayoutWidget):
 
         client.client.chat('/set nettimeout 0')
         client.client.chat('/set pingtimeout 1800')
+        client.client.chat('/set endspaceship disabled')
+        client.client.chat('/set victories ALLIED')
 
         self.pick_nation_button = ui.Button('...', self.pick_nation)
         self.set_leader_name_button = ui.Button('...',
