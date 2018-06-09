@@ -71,9 +71,9 @@ class Dialog(ui.HorizontalLayoutWidget):
         self.update_layout() # to get updated position of self.prodpanel
         width = ui.screen_width - self.get_position_of(self.prodpanel)[0]
         self.prodpanel.add(ui.Label('Supported units', font=ui.smallfont))
-        self.prodpanel.add(ui.ScrollWrapper(self.supported_units, width=width, height=120, ways=ui.SCROLL_WIDTH))
+        self.prodpanel.add(ui.ScrollWrapper(self.supported_units, width=width, height=ui.scale_for_device(100), ways=ui.SCROLL_WIDTH))
         self.prodpanel.add(ui.Label('Present units', font=ui.smallfont))
-        self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=width, height=120, ways=ui.SCROLL_WIDTH))
+        self.prodpanel.add(ui.ScrollWrapper(self.units_in_city, width=width, height=ui.scale_for_device(100), ways=ui.SCROLL_WIDTH))
 
         #print self.city.get_buildable_improvements()
         #print self.city.get_buildable_units()
@@ -90,7 +90,10 @@ class Dialog(ui.HorizontalLayoutWidget):
         for unit in units:
             callback = functools.partial(focus, unit)
             panel = ui.LinearLayoutWidget(center=True)
-            panel.add(ui.Image(unit.get_image(), callback=callback))
+            image = unit.get_image()
+            w, h = image.get_size()
+            image = image.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+            panel.add(ui.Image(image, callback=callback))
             panel.add(ui.Label(unit.get_name(), font=ui.consolefont, callback=callback))
             widget.add(panel)
             widget.add(ui.Spacing(10, 0))
