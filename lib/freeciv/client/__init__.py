@@ -238,6 +238,9 @@ class Client(object):
     def science_dialog_text(self):
         return freeciv.func.science_dialog_text()
 
+    def get_info_label_text_popup(self):
+        return freeciv.func.get_info_label_text_popup()
+
     def get_techs(self, level=11):
         return map(Tech, freeciv.func.get_techs(level))
 

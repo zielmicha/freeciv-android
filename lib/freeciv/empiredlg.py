@@ -47,7 +47,11 @@ class EmpireDialog(ui.LinearLayoutWidget):
         self.add(ui.Label('Players'))
         self.add(ui.Button('Player list', self.player_list))
         self.add(ui.Button('Taxes & Government', lambda: ui.set_dialog(gamescreen.TaxesDialog(self.client))))
+        self.add(ui.Button('More empire informations', self.get_info_label_text_popup))
         self.update_layout()
+
+    def get_info_label_text_popup(self):
+        ui.message(self.client.get_info_label_text_popup())
 
     def update_tech_labels(self):
         self.tech_label.set_text(', '.join(self.client.get_current_tech()))
