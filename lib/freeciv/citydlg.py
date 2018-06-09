@@ -28,7 +28,7 @@ class Dialog(ui.HorizontalLayoutWidget):
 
     def make_ui(self):
         self.items = []
-        self.canvas = CityCanvas(self, self.city)
+        self.canvas = CityCanvas(self, self.city, ui.scale_for_device(320))
         self.info_label = self.get_labels()
         self.citypanel = ui.LinearLayoutWidget()
         self.prodpanel = ui.LinearLayoutWidget()
