@@ -143,7 +143,7 @@ class City(object):
         freeciv.func.city_rotate_specialist(self.handle, index)
 
     def map_click(self, x, y):
-        freeciv.func.city_map_click(self.handle, x, y)
+        freeciv.func.city_map_click(self.handle, int(x), int(y))
 
     def get_buildable_improvements(self):
         return freeciv.func.get_buildable_improvements_in_city(self.handle)
