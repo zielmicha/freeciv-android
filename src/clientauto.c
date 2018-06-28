@@ -556,8 +556,10 @@ void popup_sabotage_dialog(struct city *pcity){
 	PyObject* ret = PY_CALL("sO", "popup_sabotage_dialog", py_mapper_city(pcity));
 	Py_DECREF(ret);
 }
-// void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases)
-// ignored
+void py_popup_pillage_dialog(struct unit *punit, PyObject *act_list){
+	PyObject* ret = PY_CALL("sOO", "popup_pillage_dialog", py_mapper_unit(punit), act_list);
+	Py_DECREF(ret);
+}
 
 // void popup_tileset_suggestion_dialog(void)
 void popup_tileset_suggestion_dialog(void){

@@ -331,8 +331,27 @@ bool handmade_scenario_warning(void)
 
 
 
-void popup_pillage_dialog(struct unit *punit, bv_special may_pillage, bv_bases bases) {
-    log_error("TODO: popup_pillage_dialog\n");
+void popup_pillage_dialog(struct unit *punit, bv_extras extras) {
+    struct extra_type *tgt;
+    PyObject* list = PyList_New(0);
+    while ((tgt = get_preferred_pillage(extras))) {
+        int what = extra_index(tgt);
+        BV_CLR(extras, what);
+        PyList_Append(list, Py_BuildValue("i", what));
+    }
+    py_popup_pillage_dialog(punit, list);
+}
+
+const char* pillage_label(int what) {
+	return extra_name_translation(extra_by_number(what));
+}
+
+
+void pillage_callback(struct unit *punit, int what)
+{
+    struct extra_type *target = extra_by_number(what);
+    request_new_unit_activity_targeted(punit, ACTIVITY_PILLAGE,
+                                       target);
 }
 
 void init_things() {

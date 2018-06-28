@@ -197,6 +197,14 @@ class ScreenClient(client.Client):
             items.append((target_city.get_name(), functools.partial(callback, target_city)))
         ui.show_list_dialog(items, title='Airlift to', titlefont=ui.consolefont, scroll=True)
 
+    def popup_pillage_dialog(self, unit, act_list):
+        items = []
+        def callback(act):
+            freeciv.func.pillage_callback(unit.handle, act)
+        for act in act_list:
+            items.append((freeciv.func.pillage_label(act), functools.partial(callback, act)))
+        ui.show_list_dialog(items, title='Select what to pillage:', titlefont=ui.consolefont)
+
     def unit_select_dialog_popup(self, units):
         def focus(unit):
             unit.focus()

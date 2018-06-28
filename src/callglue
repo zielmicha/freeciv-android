@@ -192,6 +192,8 @@ void py_caravan_establish_trade(struct unit* punit, struct city* target_city)
 void py_request_do_action(enum gen_action action, struct unit* punit, struct city *target_city)
 void py_request_do_action_target_unit(enum gen_action action, struct unit* punit, struct unit *target_unit)
 void request_unit_non_action_move(struct unit *punit, struct tile *dest_tile)
+const char *pillage_label(int what)
+void pillage_callback(struct unit *punit, int what)
 
 void request_center_focus_unit(void)
 

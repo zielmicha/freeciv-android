@@ -81,6 +81,10 @@ def popup_incite_dialog(city, cost):
     client.client.popup_incite_dialog(action, cost,
                                       cost != freeciv.const.INCITE_IMPOSSIBLE_COST)
 
+@freeciv.register
+def popup_pillage_dialog(unit, act_list):
+    client.client.popup_pillage_dialog(actions.Unit(unit), act_list)
+
 class DiplomatAction(object):
     def __init__(self, diplomat, tile):
         client.client._last_diplomat_action = self
