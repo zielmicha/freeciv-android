@@ -121,6 +121,7 @@ class MapDrawer(object):
         self.reload()
 
     def change_zoom(self, zoom):
+        print 'change_zoom', zoom
         self.zoom = zoom
         self.reload()
 
