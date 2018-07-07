@@ -751,9 +751,10 @@ PyObject* get_buildable_improvements_in_city(struct city* pCity) {
             int stock = pCity->shield_stock;
             int cost = impr_build_shield_cost(pImprove);
 
+            struct sprite* sprite = get_building_sprite(tileset, pImprove);
             PyList_Append(list, Py_BuildValue(
                 "lisiii()O", (long)pImprove, VUT_IMPROVEMENT, name, -1, stock, cost,
-                (PyObject*)get_building_sprite(tileset, pImprove)
+                sprite != NULL ? (PyObject*)sprite : Py_None
             ));
         }
 

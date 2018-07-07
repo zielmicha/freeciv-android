@@ -56,9 +56,10 @@ class Dialog(ui.HorizontalLayoutWidget):
             showbuttons.add(ui.Button('Trade routes', self.show_trade_routes))
         self.prodpanel.add(showbuttons)
         self.prodpanel.add(ui.Label('Prod: ' + self.city.get_production_name(), font=ui.smallfont))
-        self.unit_img = ui.Image(self.city.get_production_image())
         prodbuttons = ui.HorizontalLayoutWidget(spacing=10)
-        prodbuttons.add(self.unit_img)
+        prod_img_sprite = self.city.get_production_image()
+        if prod_img_sprite is not None:
+            prodbuttons.add(ui.Image(prod_img_sprite))
         prodbuttons.add(ui.Button('Change', lambda: self.change_prod(add=False)))
         prodbuttons.add(ui.Button('Buy', lambda: self.buy_prod()))
         stock = self.city.get_shield_stock()
