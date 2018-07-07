@@ -90,9 +90,10 @@ class Dialog(ui.HorizontalLayoutWidget):
         for unit in units:
             callback = functools.partial(focus, unit)
             panel = ui.LinearLayoutWidget(center=True)
-            image = unit.get_image()
-            w, h = image.get_size()
-            image = image.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+            surf = unit.get_image()
+            w, h = surf.get_size()
+            image = surf.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+            surf.destroy()
             panel.add(ui.Image(image, callback=callback))
             panel.add(ui.Label(unit.get_name(), font=ui.consolefont, callback=callback))
             widget.add(panel)

@@ -133,6 +133,10 @@ struct sprite* get_unit_image(const struct unit* u) {
     return get_unittype_sprite(tileset, unit_type_get(u), direction8_invalid(), TRUE);
 }
 
+void py_put_unit(const struct unit *punit, struct canvas *pcanvas, int canvas_x, int canvas_y) {
+    put_unit(punit, pcanvas, 1, canvas_x, canvas_y);
+}
+
 void authenticate(const char* password) {
     struct packet_authentication_reply reply;
 

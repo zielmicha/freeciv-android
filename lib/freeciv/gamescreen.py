@@ -215,7 +215,11 @@ class ScreenClient(client.Client):
             name = unit.get_name()
             callback = functools.partial(focus, unit)
             p = ui.HorizontalLayoutWidget()
-            p.add(ui.Image(unit.get_image(), callback)) # Label(' ' * 10, callback, image=
+            surf = unit.get_image()
+            w, h = surf.get_size()
+            image = surf.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
+            surf.destroy()
+            p.add(ui.Image(image, callback)) # Label(' ' * 10, callback, image=
             p.add(ui.Button(name, callback))
             panel.add(p)
         ui.set_dialog(panel, scroll=True)

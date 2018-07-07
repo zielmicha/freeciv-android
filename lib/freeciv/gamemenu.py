@@ -119,7 +119,8 @@ class Menu(ui.LinearLayoutWidget):
         self.items.insert(0, self.joystick_layout)
 
     def update_actions(self, unit):
-        image = unit.get_image()
+        # get image from static memory to be reused for all units of the same type, because this reference may not be deallocated.
+        image = unit.get_image_simple()
         self.panel.add(ui.Button('', callback=lambda: self.show_action_list(unit),
                                  image=image, force_width=image.get_width(), force_height=image.get_height()))
         for action_ident, action_name, action_length in unit.get_actions():

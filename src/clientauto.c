@@ -78,8 +78,8 @@ void update_map_canvas_scrollbars_size(void){
 }
 // void put_cross_overlay_tile(struct tile *ptile)
 void put_cross_overlay_tile(struct tile *ptile){
-	PyObject* ret = PY_CALL("sO", "put_cross_overlay_tile", py_mapper_tile(ptile));
-	Py_DECREF(ret);
+	//PyObject* ret = PY_CALL("sO", "put_cross_overlay_tile", py_mapper_tile(ptile));
+	//Py_DECREF(ret);
 }
 // void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h)
 void draw_selection_rectangle(int canvas_x, int canvas_y, int w, int h){

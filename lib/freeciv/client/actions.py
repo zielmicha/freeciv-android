@@ -13,6 +13,7 @@
 from freeciv.client import _freeciv as freeciv
 from freeciv import client
 import city
+import graphics
 
 # Activity list: see freeciv-src/common/fc_types.h
 # We're still using old values as ACTIVITY_ROAD and ACTIVITY_RAILROAD instead of ACTIVITY_GEN_ROAD
@@ -191,8 +192,15 @@ class Unit(object):
     def get_name(self):
         return freeciv.func.get_unit_name(self.handle)
 
-    def get_image(self):
+    def get_image_simple(self):
         return freeciv.func.get_unit_image(self.handle)
+
+    def get_image(self):
+        w = 70
+        h = 55
+        surf = graphics.create_surface(w, h)
+        freeciv.func.py_put_unit(self.handle, surf, -31, -32)
+        return surf
 
     def focus(self):
         freeciv.func.request_new_unit_activity(self.handle, ACTIVITY_IDLE)
