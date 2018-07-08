@@ -196,10 +196,10 @@ class Unit(object):
         return freeciv.func.get_unit_image(self.handle)
 
     def get_image(self):
-        w = 70
-        h = 55
+        w = 87
+        h = 56
         surf = graphics.create_surface(w, h)
-        freeciv.func.py_put_unit(self.handle, surf, -31, -32)
+        freeciv.func.py_put_unit(self.handle, surf)
         return surf
 
     def focus(self):

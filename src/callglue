@@ -70,7 +70,7 @@ void unit_focus_set(struct unit *punit)
 PyObject* get_airlift_dest_cities(struct unit *unit)
 PyObject* get_home_citiy(struct unit *unit)
 
-void py_put_unit(const struct unit *punit, struct canvas *pcanvas, int canvas_x, int canvas_y)
+void py_put_unit(const struct unit *punit, struct canvas *pcanvas)
 void city_dialog_redraw_map(struct city *pcity, struct canvas* canvas)
 int get_citydlg_canvas_width()
 int get_citydlg_canvas_height()
