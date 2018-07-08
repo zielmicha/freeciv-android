@@ -154,7 +154,7 @@ def debug_menu():
 
     menu = ui.Menu()
 
-    menu.add('Fake screen size', fake_screen_size_menu)
+    #(broken) #menu.add('Fake screen size', fake_screen_size_menu)
     menu.add('Get screen size', lambda: ui.set_dialog(ui.Label(str(ui.screen_size))))
     menu.add('Change feature', change_feature)
     menu.add('Pernament feature', pernament_feature)
