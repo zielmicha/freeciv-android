@@ -21,7 +21,7 @@ diff -ru freeciv-2.6.0-beta3.orig/client/client_main.c freeciv-2.6.0-beta3/clien
  
 diff -ru freeciv-2.6.0-beta3.orig/client/mapview_common.c freeciv-2.6.0-beta3/client/mapview_common.c
 --- freeciv-2.6.0-beta3.orig/client/mapview_common.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/mapview_common.c	2018-06-09 16:52:50.000000000 +0200
++++ freeciv-2.6.0-beta3/client/mapview_common.c	2018-07-08 21:02:35.000000000 +0200
 @@ -78,7 +78,7 @@
  
  struct tile *center_tile = NULL;
@@ -209,8 +209,18 @@ diff -ru freeciv-2.6.0-beta3.orig/client/servers.c freeciv-2.6.0-beta3/client/se
    server_list = server_list_new();
 diff -ru freeciv-2.6.0-beta3.orig/client/tilespec.c freeciv-2.6.0-beta3/client/tilespec.c
 --- freeciv-2.6.0-beta3.orig/client/tilespec.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/tilespec.c	2018-04-11 21:43:33.000000000 +0200
-@@ -1457,6 +1457,10 @@
++++ freeciv-2.6.0-beta3/client/tilespec.c	2018-07-08 23:07:16.000000000 +0200
+@@ -1270,6 +1270,9 @@
+ 
+   /* Make local copies since these values may be freed down below */
+   sz_strlcpy(tileset_name, name);
++  if (!strcmp("trident", tileset_name)) {
++    sz_strlcpy(tileset_name, "amplio2");
++  }
+   sz_strlcpy(old_name, tileset->name);
+ 
+   log_normal(_("Loading tileset \"%s\"."), tileset_name);
+@@ -1457,6 +1460,10 @@
      }
    }
  
@@ -221,7 +231,7 @@ diff -ru freeciv-2.6.0-beta3.orig/client/tilespec.c freeciv-2.6.0-beta3/client/t
    log_error("Could not load gfx file \"%s\".", gfx_filename);
    return NULL;
  }
-@@ -1665,6 +1669,7 @@
+@@ -1665,6 +1672,7 @@
  ***********************************************************************/
  static char *tilespec_gfx_filename(const char *gfx_filename)
  {
@@ -229,7 +239,7 @@ diff -ru freeciv-2.6.0-beta3.orig/client/tilespec.c freeciv-2.6.0-beta3/client/t
    const char  *gfx_current_fileext;
    const char **gfx_fileexts = gfx_fileextensions();
  
-@@ -1687,6 +1692,9 @@
+@@ -1687,6 +1695,9 @@
                  gfx_filename);
  
    return NULL;
