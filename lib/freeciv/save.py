@@ -127,9 +127,10 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.set_barbarians()
         self.add(self.barbarians_button)
 
-        self.nation_id = random.choice(client.get_nations())[2]
+        nation = random.choice(client.get_nations())
+        self.nation_id = nation[2]
         self.leader_name = 'Player'
-        self.city_style = 1
+        self.city_style = nation[1]
         self.leader_sex = 2
         self.difficulty = 'easy'
 
@@ -218,7 +219,7 @@ class ServerGUI(ui.LinearLayoutWidget):
             self.setup_ui()
 
     def set_nation_settings(self):
-        client.freeciv.func.set_nation_settings(self.nation_id, self.leader_name, self.city_style, self.leader_sex)
+        client.freeciv.func.set_nation_settings(self.nation_id, self.leader_name, self.leader_sex, self.city_style)
 
         self.pick_nation_button.set_text('Pick nation: %s' % client.get_nation_name(self.nation_id))
         self.set_leader_name_button.set_text('Set leader name: %s' % self.leader_name)
