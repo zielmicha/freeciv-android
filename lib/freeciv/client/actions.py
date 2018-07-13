@@ -196,8 +196,8 @@ class Unit(object):
         return freeciv.func.get_unit_image(self.handle)
 
     def get_image(self):
-        w = 87
-        h = 56
+        w = 91
+        h = 61
         surf = graphics.create_surface(w, h)
         freeciv.func.py_put_unit(self.handle, surf)
         return surf

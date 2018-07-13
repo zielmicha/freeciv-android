@@ -210,17 +210,20 @@ class ScreenClient(client.Client):
             unit.focus()
             ui.back()
 
-        panel = ui.LinearLayoutWidget()
+        panel = ui.LinearLayoutWidget(spacing=0)#No vertical spacing because Images already contains margins.
         for unit in units:
             name = unit.get_name()
             callback = functools.partial(focus, unit)
-            p = ui.HorizontalLayoutWidget()
+            p = ui.HorizontalLayoutWidget(spacing=10)
             surf = unit.get_image()
             w, h = surf.get_size()
             image = surf.scale((ui.scale_for_device(w), ui.scale_for_device(h)))
             surf.destroy()
-            p.add(ui.Image(image, callback)) # Label(' ' * 10, callback, image=
-            p.add(ui.Button(name, callback))
+            p.add(ui.Image(image, callback))
+            container = ui.LinearLayoutWidget(spacing=0)
+            container.add(ui.Spacing(0, ui.scale_for_device(8)))
+            container.add(ui.Button(name, callback))
+            p.add(container)
             panel.add(p)
         ui.set_dialog(panel, scroll=True)
 

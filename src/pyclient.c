@@ -137,10 +137,10 @@ void py_put_unit(const struct unit *punit, struct canvas *pcanvas) {
 	int canvas_x = 0, canvas_y = 0;
 	if (!strcmp("hexemplio", tileset_basename(tileset))) {
 		canvas_x = -14; // In the file hexemplio/unitextras.png this is the number of pixels between the left and the "+"
-		canvas_y = -31; // In the file hexemplio/unitextras.png, 32 is the number of pixels between the top and the shield bar, but I add 1 pixel to display the "railroad" action completely
+		canvas_y = -25; // Height is big enough. This value will fit the bottom of the canvas with the bottom of the unit.
 	} else if (!strcmp("amplio2", tileset_basename(tileset))) {
 		canvas_x = 0; // This canvas is wide enough => there is no need to truncate margins
-		canvas_y = -7; // In the file amplio2/tiles.png, 10 is the number of pixels between the top and the shield bar, but I add 3 pixels to display the "Sentry" action completely
+		canvas_y = -3; // In the file amplio2/tiles.png, 10 is the number of pixels between the top and the shield bar, but I add 7 pixels to display the "Road" action completely
 	}
     put_unit(punit, pcanvas, 1, canvas_x, canvas_y);
 }
