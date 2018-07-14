@@ -176,18 +176,36 @@ class Dialog(ui.HorizontalLayoutWidget):
             self.city.rotate_specialist(i)
             # self.refresh()
 
-        panel = ui.HorizontalLayoutWidget(spacing=0)
+        citizens = self.city.get_citizens()
+        total = 0
+        for name, count in citizens:
+            total += count
+        panel1 = ui.HorizontalLayoutWidget(spacing=0)
+        panel2 = None
+        if total >= 14:
+            panel2 = ui.HorizontalLayoutWidget(spacing=0)
         index = 0
-        for name, count in self.city.get_citizens():
+        for name, count in citizens:
             for i in xrange(count):
                 try:
-                    icon = icons.get_small_image('%s-%d' % (name, i % 2)) # man and woman
+                    suffix = index % 2
+                    if panel2 is not None:
+                        suffix = ((index + 1) / 2) % 2
+                    icon = icons.get_small_image('%s-%d' % (name, suffix)) # man and woman
                 except KeyError:
                     icon = icons.get_small_image(name) # elvis, taxman, scientist
                 w, h = icon.get_size()
                 icon = icon.scale((ui.scale_for_device(w * 2), ui.scale_for_device(h * 2)))
-                panel.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
+                if panel2 is None or index % 2 == 0:
+                    panel1.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
+                else:
+                    panel2.add(ui.Image(icon, functools.partial(rotate_specialist, index)))
                 index += 1
+        if panel2 is None:
+            return panel1
+        panel = ui.LinearLayoutWidget(spacing=0)
+        panel.add(panel1)
+        panel.add(panel2)
         return panel
 
     def refresh(self):

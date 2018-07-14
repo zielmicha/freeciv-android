@@ -64,13 +64,13 @@ class City(object):
         return canvas
 
     def get_citizens(self):
-        yield 'happy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_HAPPY)
-        yield 'content', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_CONTENT)
-        yield 'unhappy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_UNHAPPY)
-        yield 'angry', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_ANGRY)
-        yield 'elvis', freeciv.func.city_get_citizen_count(self.handle, True, SP_ELVIS)
-        yield 'scientist', freeciv.func.city_get_citizen_count(self.handle, True, SP_SCIENTIST)
-        yield 'taxman', freeciv.func.city_get_citizen_count(self.handle, True, SP_TAXMAN)
+        return [('happy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_HAPPY)),
+            ('content', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_CONTENT)),
+            ('unhappy', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_UNHAPPY)),
+            ('angry', freeciv.func.city_get_citizen_count(self.handle, False, freeciv.const.CITIZEN_ANGRY)),
+            ('elvis', freeciv.func.city_get_citizen_count(self.handle, True, SP_ELVIS)),
+            ('scientist', freeciv.func.city_get_citizen_count(self.handle, True, SP_SCIENTIST)),
+            ('taxman', freeciv.func.city_get_citizen_count(self.handle, True, SP_TAXMAN))]
 
     def is_unhappy(self):
         return freeciv.func.city_unhappy(self.handle)
