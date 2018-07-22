@@ -1,6 +1,6 @@
-diff -ru freeciv-2.6.0-beta3.orig/client/client_main.c freeciv-2.6.0-beta3/client/client_main.c
---- freeciv-2.6.0-beta3.orig/client/client_main.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/client_main.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/client_main.c freeciv-2.6.0/client/client_main.c
+--- freeciv-2.6.0.orig/client/client_main.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/client_main.c	2018-07-22 19:45:50.000000000 +0200
 @@ -107,6 +107,7 @@
  #include "script_client.h"
  
@@ -19,9 +19,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/client_main.c freeciv-2.6.0-beta3/clien
  
    /* after log_init: */
  
-diff -ru freeciv-2.6.0-beta3.orig/client/mapview_common.c freeciv-2.6.0-beta3/client/mapview_common.c
---- freeciv-2.6.0-beta3.orig/client/mapview_common.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/mapview_common.c	2018-07-08 21:02:35.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/mapview_common.c freeciv-2.6.0/client/mapview_common.c
+--- freeciv-2.6.0.orig/client/mapview_common.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/mapview_common.c	2018-07-22 19:45:50.000000000 +0200
 @@ -78,7 +78,7 @@
  
  struct tile *center_tile = NULL;
@@ -75,10 +75,10 @@ diff -ru freeciv-2.6.0-beta3.orig/client/mapview_common.c freeciv-2.6.0-beta3/cl
        if (center_tile != NULL) {
          int x_left, y_top;
          float gui_x, gui_y;
-diff -ru freeciv-2.6.0-beta3.orig/client/options.c freeciv-2.6.0-beta3/client/options.c
---- freeciv-2.6.0-beta3.orig/client/options.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/options.c	2018-04-11 21:43:33.000000000 +0200
-@@ -495,7 +495,8 @@
+diff -ru freeciv-2.6.0.orig/client/options.c freeciv-2.6.0/client/options.c
+--- freeciv-2.6.0.orig/client/options.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/options.c	2018-07-22 19:45:50.000000000 +0200
+@@ -496,7 +496,8 @@
    /* Volatile. */
    void *gui_data;
  };
@@ -88,7 +88,7 @@ diff -ru freeciv-2.6.0-beta3.orig/client/options.c freeciv-2.6.0-beta3/client/op
  #define OPTION(poption) ((struct option *) (poption))
  
  #define OPTION_INIT(optset, spec_type, spec_table_var, common_table,        \
-@@ -6211,7 +6212,7 @@
+@@ -6220,7 +6221,7 @@
  ****************************************************************************/
  static void client_option_adjust_defaults(void)
  {
@@ -97,9 +97,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/options.c freeciv-2.6.0-beta3/client/op
  }
  
  /****************************************************************************
-diff -ru freeciv-2.6.0-beta3.orig/client/reqtree.c freeciv-2.6.0-beta3/client/reqtree.c
---- freeciv-2.6.0-beta3.orig/client/reqtree.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/reqtree.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/reqtree.c freeciv-2.6.0/client/reqtree.c
+--- freeciv-2.6.0.orig/client/reqtree.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/reqtree.c	2018-07-22 19:45:50.000000000 +0200
 @@ -1051,7 +1051,7 @@
          canvas_put_line(pcanvas,
  		        get_color(tileset, edge_color(node, NULL)),
@@ -181,9 +181,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/reqtree.c freeciv-2.6.0-beta3/client/re
                            endy - starty);
          }
        }
-diff -ru freeciv-2.6.0-beta3.orig/client/servers.c freeciv-2.6.0-beta3/client/servers.c
---- freeciv-2.6.0-beta3.orig/client/servers.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/servers.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/servers.c freeciv-2.6.0/client/servers.c
+--- freeciv-2.6.0.orig/client/servers.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/servers.c	2018-07-22 19:45:50.000000000 +0200
 @@ -139,19 +139,19 @@
                    _("Latest %s release of Freeciv is %s, this is %s."),
                    Q_(followtag), latest_ver, my_comparable);
@@ -207,9 +207,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/servers.c freeciv-2.6.0-beta3/client/se
    }
  
    server_list = server_list_new();
-diff -ru freeciv-2.6.0-beta3.orig/client/tilespec.c freeciv-2.6.0-beta3/client/tilespec.c
---- freeciv-2.6.0-beta3.orig/client/tilespec.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/tilespec.c	2018-07-08 23:07:16.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/tilespec.c freeciv-2.6.0/client/tilespec.c
+--- freeciv-2.6.0.orig/client/tilespec.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/tilespec.c	2018-07-22 19:45:50.000000000 +0200
 @@ -1270,6 +1270,9 @@
  
    /* Make local copies since these values may be freed down below */
@@ -249,9 +249,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/tilespec.c freeciv-2.6.0-beta3/client/t
  }
  
  /**********************************************************************
-diff -ru freeciv-2.6.0-beta3.orig/client/update_queue.c freeciv-2.6.0-beta3/client/update_queue.c
---- freeciv-2.6.0-beta3.orig/client/update_queue.c	2018-04-07 18:45:43.000000000 +0200
-+++ freeciv-2.6.0-beta3/client/update_queue.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/client/update_queue.c freeciv-2.6.0/client/update_queue.c
+--- freeciv-2.6.0.orig/client/update_queue.c	2018-07-21 23:42:11.000000000 +0200
++++ freeciv-2.6.0/client/update_queue.c	2018-07-22 19:45:50.000000000 +0200
 @@ -571,7 +571,7 @@
  ****************************************************************************/
  void multipliers_dialog_update(void)
@@ -268,9 +268,9 @@ diff -ru freeciv-2.6.0-beta3.orig/client/update_queue.c freeciv-2.6.0-beta3/clie
 -  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
 +//  update_queue_add(UQ_CALLBACK(unit_select_dialog_update_real), NULL);
  }
-diff -ru freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.6.0-beta3/dependencies/lua-5.3/src/lmathlib.c
---- freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/lmathlib.c	2018-04-07 18:45:45.000000000 +0200
-+++ freeciv-2.6.0-beta3/dependencies/lua-5.3/src/lmathlib.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.6.0/dependencies/lua-5.3/src/lmathlib.c
+--- freeciv-2.6.0.orig/dependencies/lua-5.3/src/lmathlib.c	2018-07-21 23:42:13.000000000 +0200
++++ freeciv-2.6.0/dependencies/lua-5.3/src/lmathlib.c	2018-07-22 19:45:50.000000000 +0200
 @@ -183,7 +183,8 @@
      res = l_mathop(log)(x);
    else {
@@ -281,9 +281,9 @@ diff -ru freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/lmathlib.c freeciv-2.
      if (base == l_mathop(2.0))
        res = l_mathop(log2)(x); else
  #endif
-diff -ru freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6.0-beta3/dependencies/lua-5.3/src/luaconf.h
---- freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/luaconf.h	2018-04-07 18:45:45.000000000 +0200
-+++ freeciv-2.6.0-beta3/dependencies/lua-5.3/src/luaconf.h	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6.0/dependencies/lua-5.3/src/luaconf.h
+--- freeciv-2.6.0.orig/dependencies/lua-5.3/src/luaconf.h	2018-07-21 23:42:13.000000000 +0200
++++ freeciv-2.6.0/dependencies/lua-5.3/src/luaconf.h	2018-07-22 19:45:50.000000000 +0200
 @@ -669,7 +669,7 @@
  ** macro must include header 'locale.h'.)
  */
@@ -293,9 +293,9 @@ diff -ru freeciv-2.6.0-beta3.orig/dependencies/lua-5.3/src/luaconf.h freeciv-2.6
  #endif
  
  /* }================================================================== */
-diff -ru freeciv-2.6.0-beta3.orig/server/connecthand.c freeciv-2.6.0-beta3/server/connecthand.c
---- freeciv-2.6.0-beta3.orig/server/connecthand.c	2018-04-07 18:45:45.000000000 +0200
-+++ freeciv-2.6.0-beta3/server/connecthand.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/server/connecthand.c freeciv-2.6.0/server/connecthand.c
+--- freeciv-2.6.0.orig/server/connecthand.c	2018-07-21 23:42:13.000000000 +0200
++++ freeciv-2.6.0/server/connecthand.c	2018-07-22 19:45:50.000000000 +0200
 @@ -456,6 +456,13 @@
  ****************************************************************************/
  void lost_connection_to_client(struct connection *pconn)
@@ -310,9 +310,9 @@ diff -ru freeciv-2.6.0-beta3.orig/server/connecthand.c freeciv-2.6.0-beta3/serve
    const char *desc = conn_description(pconn);
  
    fc_assert_ret(TRUE == pconn->server.is_closing);
-diff -ru freeciv-2.6.0-beta3.orig/server/settings.c freeciv-2.6.0-beta3/server/settings.c
---- freeciv-2.6.0-beta3.orig/server/settings.c	2018-04-07 18:45:45.000000000 +0200
-+++ freeciv-2.6.0-beta3/server/settings.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/server/settings.c freeciv-2.6.0/server/settings.c
+--- freeciv-2.6.0.orig/server/settings.c	2018-07-21 23:42:13.000000000 +0200
++++ freeciv-2.6.0/server/settings.c	2018-07-22 19:45:50.000000000 +0200
 @@ -1211,7 +1211,8 @@
    }
    return TRUE;
@@ -323,9 +323,9 @@ diff -ru freeciv-2.6.0-beta3.orig/server/settings.c freeciv-2.6.0-beta3/server/s
  #define GEN_BOOL(name, value, sclass, scateg, slevel, to_client,            \
                   short_help, extra_help, func_validate, func_action,        \
                   _default)                                                  \
-diff -ru freeciv-2.6.0-beta3.orig/utility/fcintl.c freeciv-2.6.0-beta3/utility/fcintl.c
---- freeciv-2.6.0-beta3.orig/utility/fcintl.c	2018-04-07 18:45:45.000000000 +0200
-+++ freeciv-2.6.0-beta3/utility/fcintl.c	2018-04-11 21:43:33.000000000 +0200
+diff -ru freeciv-2.6.0.orig/utility/fcintl.c freeciv-2.6.0/utility/fcintl.c
+--- freeciv-2.6.0.orig/utility/fcintl.c	2018-07-21 23:42:14.000000000 +0200
++++ freeciv-2.6.0/utility/fcintl.c	2018-07-22 19:45:50.000000000 +0200
 @@ -99,10 +99,3 @@
    return autocap;
  }

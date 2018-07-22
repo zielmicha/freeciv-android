@@ -5,7 +5,6 @@ Upgrade Freeciv (from 2.6.X to 2.6.Y)
 - Replace all occurences from the old version to the new version, and update freeciv-2.6-SHA256SUM
 - Remove the symlink freeciv-src
 - Run: make clean
-- Run: make freeciv-src/Makefile
 
 == Generate headers ==
 See android/gen_headers.sh : open this file with a text editor.

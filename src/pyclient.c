@@ -991,6 +991,10 @@ void py_action_selection_no_longer_in_progress(struct unit* punit) {
   action_selection_no_longer_in_progress(punit->id);
 }
 
+void action_selection_no_longer_in_progress_gui_specific(int actor_id)
+{
+}
+
 /****************************************************************
   Unit wants to get into some transport on given tile.
 *****************************************************************/

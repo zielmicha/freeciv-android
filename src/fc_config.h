@@ -66,7 +66,7 @@
 #define FC_STORE_CXXFLAGS "-Wno-tautological-compare -Wall -Wpointer-arith -Wcast-align -g -O2"
 
 /* Version tag to follow */
-#define FOLLOWTAG "S2_6"
+#define FOLLOWTAG "stable"
 
 /* Max number of AI modules */
 #define FREECIV_AI_MOD_LAST (0+1)
@@ -171,7 +171,7 @@
 /* #undef FREECIV_NDEBUG */
 
 /* Month next version will be released */
-#define FREECIV_RELEASE_MONTH 6
+#define FREECIV_RELEASE_MONTH 7
 
 /* Mingw-specific setting - stdin */
 /* #undef FREECIV_SOCKET_ZERO_NOT_STDIN */
@@ -551,7 +551,7 @@
 #define INIT_BRACE_END }
 
 /* Is this a beta version */
-#define IS_BETA_VERSION 1
+#define IS_BETA_VERSION 0
 
 /* Is this a devel version */
 #define IS_DEVEL_VERSION 0
@@ -594,7 +594,7 @@
 #define NETWORK_CAPSTRING_MANDATORY "+Freeciv-2.6-network"
 
 /* Additional optional network capabilities */
-#define NETWORK_CAPSTRING_OPTIONAL ""
+#define NETWORK_CAPSTRING_OPTIONAL "techloss_forgiveness"
 
 /* Version number of next release */
 #define NEXT_STABLE_VERSION "2.6.0"
@@ -612,7 +612,7 @@
 #define PACKAGE_NAME "Freeciv"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Freeciv 2.6.0-beta3"
+#define PACKAGE_STRING "Freeciv 2.6.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "freeciv"
@@ -621,7 +621,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.6.0-beta3"
+#define PACKAGE_VERSION "2.6.0"
 
 /* Patch version */
 #define PATCH_VERSION 0
@@ -667,13 +667,13 @@
 
 
 /* Version number of package */
-#define VERSION "2.6.0-beta3"
+#define VERSION "2.6.0"
 
 /* Version label */
-#define VERSION_LABEL "-beta3"
+#define VERSION_LABEL ""
 
 /* Version string */
-#define VERSION_STRING "2.6.0-beta3"
+#define VERSION_STRING "2.6.0"
 
 /* Informational URL */
 #define WIKI_URL "http://www.freeciv.org/"
