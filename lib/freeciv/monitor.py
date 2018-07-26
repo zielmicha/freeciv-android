@@ -51,15 +51,15 @@ def run():
                 osutil.wait_for_resume()
 
         time.sleep(6)
-        log('mem_self', get_mem_usage('self'))
+        #log('mem_self', get_mem_usage('self'))
         try:
             servpid = get_server_pid()
             server_use = get_mem_usage(servpid)
         except IOError:
             server_use = 'not running'
 
-        log('mem_server', server_use)
-        log('gc_stat', 'counts=%r garbage=%d' % (gc.get_count(), len(gc.garbage)))
+        #log('mem_server', server_use)
+        #log('gc_stat', 'counts=%r garbage=%d' % (gc.get_count(), len(gc.garbage)))
 
         if features.get('debug.gc_count'):
             gc.collect()
