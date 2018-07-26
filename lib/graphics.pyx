@@ -60,21 +60,24 @@ cdef SDL_Texture* _sdl_get_texture(SDL_Renderer* renderer, item):
 _debug_texturecount = 0
 _debug_texturepixels = 0
 _old_texturecount = 0
+_old_texturepixels = 0
 
 cdef _debug_createtexture(int w, int h):
-    global _debug_texturecount, _debug_texturepixels, _old_texturecount
+    global _debug_texturecount, _debug_texturepixels, _old_texturecount, _old_texturepixels
     _debug_texturecount += 1
     _debug_texturepixels += w * h
-    if _debug_texturecount - _old_texturecount >= 10:
+    if _debug_texturecount - _old_texturecount >= 5 and _debug_texturepixels - _old_texturepixels >= 1000000:
         _old_texturecount = _debug_texturecount
+        _old_texturepixels = _debug_texturepixels
         print "%d textures, %d Megapixels" % (_debug_texturecount, int(_debug_texturepixels / 1000000))
 
 def _debug_destroytexture(size):
-    global _debug_texturecount, _debug_texturepixels, _old_texturecount
+    global _debug_texturecount, _debug_texturepixels, _old_texturecount, _old_texturepixels
     _debug_texturecount -= 1
     _debug_texturepixels -= size[0] * size[1]
-    if _old_texturecount - _debug_texturecount >= 10:
+    if _old_texturecount - _debug_texturecount >= 5  and _old_texturepixels - _debug_texturepixels >= 1000000:
         _old_texturecount = _debug_texturecount
+        _old_texturepixels = _debug_texturepixels
         print "%d textures, %d Megapixels" % (_debug_texturecount, int(_debug_texturepixels / 1000000))
 
 MODE_BLEND = SDL_BLENDMODE_BLEND
