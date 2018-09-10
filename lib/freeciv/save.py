@@ -100,7 +100,7 @@ class ServerGUI(ui.LinearLayoutWidget):
                                         lambda:
                                         uidialog.inputbox('How many computer enemies will you fight?',
                                                           finish=self.set_aicount))
-        self.set_aicount(4)
+        self.set_aicount(3)
         self.add(self.aicount_button)
 
         hex_tiles = ''
@@ -132,7 +132,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.leader_name = 'Player'
         self.city_style = nation[1]
         self.leader_sex = 2
-        self.difficulty = 'easy'
+        self.difficulty = 'novice'
 
         self.set_nation_settings()
         self.set_difficulty_settings()
