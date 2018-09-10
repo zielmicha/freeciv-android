@@ -1,4 +1,4 @@
-VERSION=2606
+VERSION=2607
 VERSION_NAME=2.6.0
 
 release: build/build.xml debug ndk dropboxdep
