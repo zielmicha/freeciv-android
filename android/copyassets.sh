@@ -27,17 +27,17 @@ done
 
 # Copy the freeciv-server executables
 mkdir $A/bin
-ls -1 project/libs/*/freeciv-server | while read exec_path ; do
+ls -1 project/obj/local/*/freeciv-server | while read exec_path ; do
 	dirname=`dirname "$exec_path"`
 	mkdir "$A/bin/`basename $dirname`"
 	cp "$exec_path" "$A/bin/`basename $dirname`"
 done
 cp ../pyjnius/jnius/reflect.py $A/lib/python2.7/reflect.py
-rm -r project/assets/fonts
-mkdir project/assets/fonts
-cp ../fonts/*.ttf project/assets/fonts
-rm -r project/assets/data
-mkdir project/assets/data
+rm -r project/src/main/assets/fonts
+mkdir project/src/main/assets/fonts
+cp ../fonts/*.ttf project/src/main/assets/fonts
+rm -r project/src/main/assets/data
+mkdir project/src/main/assets/data
 
 B=project/obj/res
 rm -r $B
@@ -45,7 +45,7 @@ mkdir -p $B
 
 (cd ../data; find -type d) | while read line; do
     mkdir -p $B/$line
-    mkdir -p project/assets/data/$line
+    mkdir -p project/src/main/assets/data/$line
 done
 rmdir $B/flags
 rm -r $B/themes
@@ -55,18 +55,18 @@ rm -r $B/themes
         if [[ $line =~ \.(tilespec|ruleset|spec|serv|lua|sav|sav.gz)$ ]]; then
             cp ../data/$line $B/$line || exit 1
         elif [[ $line =~ \.(png)$ ]]; then
-            cp ../data/$line project/assets/data/$line || exit 1
+            cp ../data/$line project/src/main/assets/data/$line || exit 1
         fi
     fi
 done
 cp ../data/civ2civ3/README.civ2civ3 $B/civ2civ3/
 cp ../data/experimental/README.experimental $B/experimental/
-mkdir -p project/assets/userdata
-cp ../userdata/*.png ../userdata/*.jpg project/assets/userdata/
-mv project/assets/userdata/water*.png project/assets/data/hexemplio/
-cp ../userdata/android-help.txt project/assets/userdata/
+mkdir -p project/src/main/assets/userdata
+cp ../userdata/*.png ../userdata/*.jpg project/src/main/assets/userdata/
+mv project/src/main/assets/userdata/water*.png project/src/main/assets/data/hexemplio/
+cp ../userdata/android-help.txt project/src/main/assets/userdata/
 find $B/scenarios/ -type f -name "*.sav" -exec gzip "{}" \;
-(cd ../data/flags && ../../../android/compose.py '*-large.png' shield ../../../android/project/assets/data/flags/large)
-(cd ../data/flags && ../../../android/compose.py '*-shield-large.png' '' ../../../android/project/assets/data/flags/shield-large)
-(cd ../data/flags && ../../../android/compose.py '*.png' shield,large ../../../android/project/assets/data/flags/flags)
-(cd ../data/flags && ../../../android/compose.py '*-shield.png' large ../../../android/project/assets/data/flags/shield)
+(cd ../data/flags && ../../../android/compose.py '*-large.png' shield ../../../android/project/src/main/assets/data/flags/large)
+(cd ../data/flags && ../../../android/compose.py '*-shield-large.png' '' ../../../android/project/src/main/assets/data/flags/shield-large)
+(cd ../data/flags && ../../../android/compose.py '*.png' shield,large ../../../android/project/src/main/assets/data/flags/flags)
+(cd ../data/flags && ../../../android/compose.py '*-shield.png' large ../../../android/project/src/main/assets/data/flags/shield)

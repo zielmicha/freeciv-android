@@ -24,10 +24,13 @@ Dependency installation:
 Building for Android requires Android NDK with version r12b.
 
 Configuration:
-Add these environment variables:
-   ANDROIDSDK=<PATH to your SDK installation>
-   ANDROIDNDK=<PATH to your NDK installation>
-and make sure that p4a (python-for-android) is in your PATH
+For this step only, you need Android SDK 22.6.3.
+Make sure that p4a (python-for-android) is in your PATH and run:
+ANDROIDSDK=<PATH to your SDK 22.6.3 installation> ANDROIDNDK=<PATH to your NDK installation> make pythonforandroid
+
+Then, you need Android SDK >= 26. Add these environment variables:
+   ANDROID_HOME=<PATH to your SDK installation>
+   ANDROID_NDK_HOME=<PATH to your NDK installation>
 
 Build and run on desktop (for debugging):
    make run

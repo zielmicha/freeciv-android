@@ -1,18 +1,25 @@
 all: build javadep assets
 
 release:
-	$(MAKE) -f release.mk
+	cat project/AndroidManifest.xml \
+		| sed 's/pl.org.zielinscy.freeciv.debug/pl.org.zielinscy.freeciv/g' \
+		| sed 's/Freeciv Debug/Freeciv/g' \
+		| sed 's/versionCode="1"/versionCode="'`grep 'version = ....' ../lib/freeciv/sync.py|grep -o '[[:digit:]]*'`'"/g' \
+		| sed 's/versionName="1.0"/versionName="'`grep '#define VERSION_STRING .[.[:digit:]]*' ../src/fc_config.h|grep -o '[.[:digit:]]*'`'"/g' \
+		| cat > project/src/main/AndroidManifest.xml
+	./gradlew assembleRelease
 
 debugapk: all
-	cd project; ant debug
-debuginstall: debugapk
-	cd project; ant installd
-debugrun: debuginstall
-	$(MAKE) run
+	cp project/AndroidManifest.xml project/src/main/AndroidManifest.xml
+	./gradlew assembleDebug
+#debuginstall: all
+#	./gradlew installDebug
+#debugrun: debuginstall
+#	$(MAKE) run
 run:
 	adb shell am start -n pl.org.zielinscy.freeciv.debug/org.libsdl.app.SDLActivity
-debugrunlog: debuginstall
-	$(MAKE) runlog
+#debugrunlog: debuginstall
+#	$(MAKE) runlog
 runlog: run
 	./adb.py
 
@@ -23,24 +30,24 @@ javadep: dropboxdep
 dropboxdep: project/libs/commons-logging-1.1.1.jar project/libs/dropbox-android-sdk-1.5.4.jar project/libs/httpclient-4.0.3.jar project/libs/httpcore-4.0.1.jar project/libs/httpmime-4.0.3.jar project/libs/json_simple-1.1.jar
 
 project/libs/%.jar: project/dropbox-sdk/lib/%.jar
+	mkdir -p project/libs
 	cp $^ $@
 
 # ASSETS
 assets: copyassets
-	python archive.py project/obj/code > project/assets/code.archive
-	python archive.py project/obj/res > project/assets/res.archive
+	python archive.py project/obj/code > project/src/main/assets/code.archive
+	python archive.py project/obj/res > project/src/main/assets/res.archive
 copyassets:
 	./copyassets.sh
 
 # BUILD
 
-build: cython project/jni/freeciv-client project/jni/freeciv-server project/build.xml
+build: cython project/jni/freeciv-client project/jni/freeciv-server
 	(cd .. && make data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
 	(cd ../freeciv-src && make py_integration/callauto.c)
-	"${ANDROIDNDK}/ndk-build" -C project -j4
-
-project/build.xml:
-	"${ANDROIDSDK}/tools/android" update project --path project --name "FreecivDebug" --target android-17
+	"${ANDROID_NDK_HOME}/ndk-build" -C project -j4 freeciv-server
+	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi/freeciv-server
+	`ls -1 ${ANDROID_NDK_HOME}/toolchains/x86-*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/x86/freeciv-server
 
 cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyjnius.c
 
