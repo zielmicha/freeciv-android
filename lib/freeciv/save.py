@@ -363,9 +363,9 @@ def subprocess_start_server(args):
         print 'platform.machine():', machine
         if 'armv7' in machine:
             machine = 'armeabi-v7a'
-        else if 'arm' in machine:
+        elif 'arm' in machine:
             machine = 'armeabi'
-        else if 'mips' in machine:
+        elif 'mips' in machine:
             machine = 'mips'
         else:
             machine = 'x86'
