@@ -14,13 +14,13 @@ android {
         if (buildAsApplication) {
             applicationId "org.libsdl.app"
         }
-        minSdkVersion 14
+        minSdkVersion 17
         targetSdkVersion 19
         versionCode 1
         versionName "1.0"
         externalNativeBuild {
             ndkBuild {
-                arguments "APP_PLATFORM=android-14"
+                arguments "APP_PLATFORM=android-17"
             }
         }
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
