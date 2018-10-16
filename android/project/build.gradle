@@ -11,9 +11,6 @@ android {
     compileSdkVersion 19
     buildToolsVersion "26.0.1"
     defaultConfig {
-        if (buildAsApplication) {
-            applicationId "org.libsdl.app"
-        }
         minSdkVersion 17
         targetSdkVersion 19
         versionCode 1
