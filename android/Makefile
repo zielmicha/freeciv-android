@@ -48,7 +48,6 @@ build: cython project/jni/freeciv-client project/jni/freeciv-server
 	"${ANDROID_NDK_HOME}/ndk-build" -C project -j4 freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi/freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi-v7a/freeciv-server
-	`ls -1 ${ANDROID_NDK_HOME}/toolchains/mipsel-linux-android*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/mips/freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/x86-*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/x86/freeciv-server
 
 cython: project/jni/src/graphics.c project/jni/src/android.c project/jni/src/pyjnius.c
