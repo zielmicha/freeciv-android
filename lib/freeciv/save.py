@@ -365,8 +365,8 @@ def subprocess_start_server(args):
             machine = 'armeabi-v7a'
         elif 'arm' in machine:
             machine = 'armeabi'
-        elif 'mips' in machine:
-            machine = 'mips'
+#        elif 'mips' in machine:
+#            machine = 'mips'
         else:
             machine = 'x86'
         executable = 'bin/' + machine + '/freeciv-server'
