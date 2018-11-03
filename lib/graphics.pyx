@@ -496,6 +496,12 @@ def set_logical_size(w, h):
 def get_window():
     return _window
 
+def get_renderer_label():
+    cdef SDL_RendererInfo info
+    if SDL_GetRendererInfo(_window._sdl, &info) != 0:
+        return SDL_GetError()
+    return info.name
+
 def get_events():
     events = []
     cdef SDL_Event ev
