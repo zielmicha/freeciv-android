@@ -1,4 +1,4 @@
-This patch modifies SDL2.0.4
+This patch modifies SDL2.0.5
 List of modifications:
 - Blending modifications from https://github.com/zielmicha/SDL2
 - Revert of commit 7502:6ff02ff3cf06 (mercurial) because freeciv-android has been developped before this change (SDL2 was not released yet), and this change made freeciv-android's graphics completely unusable.

@@ -45,6 +45,8 @@ copyassets:
 build: cython project/jni/freeciv-client project/jni/freeciv-server
 	(cd .. && make data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
 	(cd ../freeciv-src && make py_integration/callauto.c)
+	mkdir -p project/src/main/java/org/libsdl/app
+	sed 's/protected static SDLActivity mSingleton/public static SDLActivity mSingleton/g' project/jni/SDL/android-project/src/org/libsdl/app/SDLActivity.java >project/src/main/java/org/libsdl/app/SDLActivity.java
 	"${ANDROID_NDK_HOME}/ndk-build" -C project -j4 freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi/freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi-v7a/freeciv-server

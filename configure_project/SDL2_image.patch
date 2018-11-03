@@ -1,0 +1,28 @@
+diff -ru SDL2_image.orig/Android.mk SDL2_image/Android.mk
+--- SDL2_image.orig/Android.mk	2017-10-23 17:31:29.000000000 +0200
++++ SDL2_image/Android.mk	2018-11-03 23:04:51.000000000 +0100
+@@ -13,7 +13,7 @@
+ 
+ # Enable this if you want to support loading WebP images
+ # The library path should be a relative path to this directory.
+-SUPPORT_WEBP ?= true
++SUPPORT_WEBP := false
+ WEBP_LIBRARY_PATH := external/libwebp-0.6.0
+ 
+ 
+@@ -53,14 +53,13 @@
+     IMG_tga.c       \
+     IMG_tif.c       \
+     IMG_webp.c      \
+-    IMG_WIC.c       \
+     IMG_xcf.c       \
+     IMG_xpm.c.arm   \
+     IMG_xv.c        \
+     IMG_xxx.c
+ 
+ LOCAL_CFLAGS := -DLOAD_BMP -DLOAD_GIF -DLOAD_LBM -DLOAD_PCX -DLOAD_PNM \
+-                -DLOAD_SVG -DLOAD_TGA -DLOAD_XCF -DLOAD_XPM -DLOAD_XV
++                -DLOAD_TGA -DLOAD_XCF -DLOAD_XPM -DLOAD_XV
+ LOCAL_LDLIBS :=
+ LOCAL_STATIC_LIBRARIES :=
+ LOCAL_SHARED_LIBRARIES := SDL2

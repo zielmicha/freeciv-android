@@ -1,0 +1,18 @@
+diff -ru SDL2_mixer.orig/Android.mk SDL2_mixer/Android.mk
+--- SDL2_mixer.orig/Android.mk	2016-01-03 07:15:57.000000000 +0100
++++ SDL2_mixer/Android.mk	2018-11-03 23:02:41.000000000 +0100
+@@ -11,12 +11,12 @@
+ 
+ # Enable this if you want to support loading MOD music via mikmod
+ # The library path should be a relative path to this directory.
+-SUPPORT_MOD_MIKMOD ?= true
++SUPPORT_MOD_MIKMOD := false
+ MIKMOD_LIBRARY_PATH := external/libmikmod-3.1.12
+ 
+ # Enable this if you want to support loading MP3 music via SMPEG
+ # The library path should be a relative path to this directory.
+-SUPPORT_MP3_SMPEG ?= true
++SUPPORT_MP3_SMPEG := false
+ SMPEG_LIBRARY_PATH := external/smpeg2-2.0.0
+ 
+ # Enable this if you want to support loading OGG Vorbis music via Tremor

@@ -1,6 +1,6 @@
 diff -ru SDL.orig/include/SDL_blendmode.h SDL/include/SDL_blendmode.h
---- SDL.orig/include/SDL_blendmode.h	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/include/SDL_blendmode.h	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/include/SDL_blendmode.h	2016-10-20 05:56:26.000000000 +0200
++++ SDL/include/SDL_blendmode.h	2018-11-03 20:02:49.649954774 +0100
 @@ -39,17 +39,10 @@
   */
  typedef enum
@@ -24,9 +24,9 @@ diff -ru SDL.orig/include/SDL_blendmode.h SDL/include/SDL_blendmode.h
  
  /* Ends C function definitions when using C++ */
 diff -ru SDL.orig/include/SDL_surface.h SDL/include/SDL_surface.h
---- SDL.orig/include/SDL_surface.h	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/include/SDL_surface.h	2017-09-16 15:26:40.000000000 +0200
-@@ -399,42 +399,44 @@
+--- SDL.orig/include/SDL_surface.h	2016-10-20 05:56:27.000000000 +0200
++++ SDL/include/SDL_surface.h	2018-11-03 20:02:49.653955795 +0100
+@@ -409,42 +409,44 @@
   *
   *  The blit function should not be called on a locked surface.
   *
@@ -86,8 +86,8 @@ diff -ru SDL.orig/include/SDL_surface.h SDL/include/SDL_surface.h
        both:
          if SDL_SRCCOLORKEY set, only copy the pixels matching the
 diff -ru SDL.orig/src/render/direct3d/SDL_render_d3d.c SDL/src/render/direct3d/SDL_render_d3d.c
---- SDL.orig/src/render/direct3d/SDL_render_d3d.c	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/direct3d/SDL_render_d3d.c	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/render/direct3d/SDL_render_d3d.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/direct3d/SDL_render_d3d.c	2018-11-03 20:02:49.653955795 +0100
 @@ -182,7 +182,6 @@
      D3DPRESENT_PARAMETERS pparams;
      SDL_bool updateSize;
@@ -96,7 +96,7 @@ diff -ru SDL.orig/src/render/direct3d/SDL_render_d3d.c SDL/src/render/direct3d/S
      D3DTEXTUREFILTERTYPE scaleMode[8];
      IDirect3DSurface9 *defaultRenderTarget;
      IDirect3DSurface9 *currentRenderTarget;
-@@ -1357,12 +1356,6 @@
+@@ -1367,12 +1366,6 @@
                                          D3DBLEND_SRCALPHA);
          IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
                                          D3DBLEND_INVSRCALPHA);
@@ -109,7 +109,7 @@ diff -ru SDL.orig/src/render/direct3d/SDL_render_d3d.c SDL/src/render/direct3d/S
          break;
      case SDL_BLENDMODE_ADD:
          IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-@@ -1371,12 +1364,6 @@
+@@ -1381,12 +1374,6 @@
                                          D3DBLEND_SRCALPHA);
          IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
                                          D3DBLEND_ONE);
@@ -122,7 +122,7 @@ diff -ru SDL.orig/src/render/direct3d/SDL_render_d3d.c SDL/src/render/direct3d/S
          break;
      case SDL_BLENDMODE_MOD:
          IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-@@ -1385,12 +1372,6 @@
+@@ -1395,12 +1382,6 @@
                                          D3DBLEND_ZERO);
          IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
                                          D3DBLEND_SRCCOLOR);
@@ -136,8 +136,8 @@ diff -ru SDL.orig/src/render/direct3d/SDL_render_d3d.c SDL/src/render/direct3d/S
      }
  }
 diff -ru SDL.orig/src/render/opengl/SDL_glfuncs.h SDL/src/render/opengl/SDL_glfuncs.h
---- SDL.orig/src/render/opengl/SDL_glfuncs.h	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengl/SDL_glfuncs.h	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/render/opengl/SDL_glfuncs.h	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengl/SDL_glfuncs.h	2018-11-03 20:02:49.653955795 +0100
 @@ -36,7 +36,6 @@
                  (GLsizei, GLsizei, GLfloat, GLfloat, GLfloat, GLfloat,
                   const GLubyte *))
@@ -147,23 +147,21 @@ diff -ru SDL.orig/src/render/opengl/SDL_glfuncs.h SDL/src/render/opengl/SDL_glfu
  SDL_PROC_UNUSED(void, glCallLists, (GLsizei, GLenum, const GLvoid *))
  SDL_PROC(void, glClear, (GLbitfield))
 diff -ru SDL.orig/src/render/opengl/SDL_render_gl.c SDL/src/render/opengl/SDL_render_gl.c
---- SDL.orig/src/render/opengl/SDL_render_gl.c	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengl/SDL_render_gl.c	2017-09-16 15:26:40.000000000 +0200
-@@ -1095,17 +1095,17 @@
+--- SDL.orig/src/render/opengl/SDL_render_gl.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengl/SDL_render_gl.c	2018-11-03 20:02:49.653955795 +0100
+@@ -1099,15 +1099,15 @@
+             break;
          case SDL_BLENDMODE_BLEND:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            data->glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 +            data->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
              break;
          case SDL_BLENDMODE_ADD:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            data->glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ZERO, GL_ONE);
 +            data->glBlendFunc(GL_SRC_ALPHA, GL_ONE);
              break;
          case SDL_BLENDMODE_MOD:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            data->glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE);
 +            data->glBlendFunc(GL_ZERO, GL_SRC_COLOR);
@@ -171,8 +169,8 @@ diff -ru SDL.orig/src/render/opengl/SDL_render_gl.c SDL/src/render/opengl/SDL_re
          }
          data->current.blendMode = blendMode;
 diff -ru SDL.orig/src/render/opengles/SDL_glesfuncs.h SDL/src/render/opengles/SDL_glesfuncs.h
---- SDL.orig/src/render/opengles/SDL_glesfuncs.h	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengles/SDL_glesfuncs.h	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/render/opengles/SDL_glesfuncs.h	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengles/SDL_glesfuncs.h	2018-11-03 20:02:49.653955795 +0100
 @@ -21,7 +21,6 @@
  
  SDL_PROC(void, glBindTexture, (GLenum, GLuint))
@@ -182,17 +180,9 @@ diff -ru SDL.orig/src/render/opengles/SDL_glesfuncs.h SDL/src/render/opengles/SD
  SDL_PROC(void, glClearColor, (GLclampf, GLclampf, GLclampf, GLclampf))
  SDL_PROC(void, glColor4f, (GLfloat, GLfloat, GLfloat, GLfloat))
 diff -ru SDL.orig/src/render/opengles/SDL_render_gles.c SDL/src/render/opengles/SDL_render_gles.c
---- SDL.orig/src/render/opengles/SDL_render_gles.c	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengles/SDL_render_gles.c	2017-09-16 15:26:40.000000000 +0200
-@@ -131,7 +131,6 @@
- 
-     SDL_bool useDrawTexture;
-     SDL_bool GL_OES_draw_texture_supported;
--    SDL_bool GL_OES_blend_func_separate_supported;
- } GLES_RenderData;
- 
- typedef struct
-@@ -400,10 +399,6 @@
+--- SDL.orig/src/render/opengles/SDL_render_gles.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengles/SDL_render_gles.c	2018-11-03 20:02:49.653955795 +0100
+@@ -385,10 +385,6 @@
      }
      data->framebuffers = NULL;
  
@@ -203,9 +193,9 @@ diff -ru SDL.orig/src/render/opengles/SDL_render_gles.c SDL/src/render/opengles/
      /* Set up parameters for rendering */
      GLES_ResetState(renderer);
  
-@@ -755,29 +750,17 @@
+@@ -748,27 +744,15 @@
+             break;
          case SDL_BLENDMODE_BLEND:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            if (data->GL_OES_blend_func_separate_supported) {
 -                data->glBlendFuncSeparateOES(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -215,7 +205,6 @@ diff -ru SDL.orig/src/render/opengles/SDL_render_gles.c SDL/src/render/opengles/
 +            data->glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
              break;
          case SDL_BLENDMODE_ADD:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            if (data->GL_OES_blend_func_separate_supported) {
 -                data->glBlendFuncSeparateOES(GL_SRC_ALPHA, GL_ONE, GL_ZERO, GL_ONE);
@@ -225,7 +214,6 @@ diff -ru SDL.orig/src/render/opengles/SDL_render_gles.c SDL/src/render/opengles/
 +            data->glBlendFunc(GL_SRC_ALPHA, GL_ONE);
              break;
          case SDL_BLENDMODE_MOD:
-             data->glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
              data->glEnable(GL_BLEND);
 -            if (data->GL_OES_blend_func_separate_supported) {
 -                data->glBlendFuncSeparateOES(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE);
@@ -237,8 +225,8 @@ diff -ru SDL.orig/src/render/opengles/SDL_render_gles.c SDL/src/render/opengles/
          }
          data->current.blendMode = blendMode;
 diff -ru SDL.orig/src/render/opengles2/SDL_gles2funcs.h SDL/src/render/opengles2/SDL_gles2funcs.h
---- SDL.orig/src/render/opengles2/SDL_gles2funcs.h	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengles2/SDL_gles2funcs.h	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/render/opengles2/SDL_gles2funcs.h	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengles2/SDL_gles2funcs.h	2018-11-03 20:02:49.653955795 +0100
 @@ -23,6 +23,7 @@
  SDL_PROC(void, glAttachShader, (GLuint, GLuint))
  SDL_PROC(void, glBindAttribLocation, (GLuint, GLuint, const char *))
@@ -248,9 +236,9 @@ diff -ru SDL.orig/src/render/opengles2/SDL_gles2funcs.h SDL/src/render/opengles2
  SDL_PROC(void, glClear, (GLbitfield))
  SDL_PROC(void, glClearColor, (GLclampf, GLclampf, GLclampf, GLclampf))
 diff -ru SDL.orig/src/render/opengles2/SDL_render_gles2.c SDL/src/render/opengles2/SDL_render_gles2.c
---- SDL.orig/src/render/opengles2/SDL_render_gles2.c	2017-09-10 20:09:20.000000000 +0200
-+++ SDL/src/render/opengles2/SDL_render_gles2.c	2017-09-16 15:26:40.000000000 +0200
-@@ -1343,15 +1343,15 @@
+--- SDL.orig/src/render/opengles2/SDL_render_gles2.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/render/opengles2/SDL_render_gles2.c	2018-11-03 20:02:49.657956816 +0100
+@@ -1351,15 +1351,15 @@
              break;
          case SDL_BLENDMODE_BLEND:
              data->glEnable(GL_BLEND);
@@ -270,8 +258,8 @@ diff -ru SDL.orig/src/render/opengles2/SDL_render_gles2.c SDL/src/render/opengle
          }
          data->current.blendMode = blendMode;
 diff -ru SDL.orig/src/video/SDL_blit_0.c SDL/src/video/SDL_blit_0.c
---- SDL.orig/src/video/SDL_blit_0.c	2017-09-10 20:09:21.000000000 +0200
-+++ SDL/src/video/SDL_blit_0.c	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/video/SDL_blit_0.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/video/SDL_blit_0.c	2018-11-03 20:02:49.657956816 +0100
 @@ -363,10 +363,7 @@
      SDL_PixelFormat *dstfmt = info->dst_fmt;
      int dstbpp;
@@ -335,8 +323,8 @@ diff -ru SDL.orig/src/video/SDL_blit_0.c SDL/src/video/SDL_blit_0.c
              byte <<= 1;
              dst += dstbpp;
 diff -ru SDL.orig/src/video/SDL_blit_1.c SDL/src/video/SDL_blit_1.c
---- SDL.orig/src/video/SDL_blit_1.c	2017-09-10 20:09:21.000000000 +0200
-+++ SDL/src/video/SDL_blit_1.c	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/video/SDL_blit_1.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/video/SDL_blit_1.c	2018-11-03 20:02:49.657956816 +0100
 @@ -437,29 +437,30 @@
      SDL_PixelFormat *dstfmt = info->dst_fmt;
      const SDL_Color *srcpal = info->src_fmt->palette->colors;
@@ -421,8 +409,8 @@ diff -ru SDL.orig/src/video/SDL_blit_1.c SDL/src/video/SDL_blit_1.c
  			src++;
  			dst += dstbpp;
 diff -ru SDL.orig/src/video/SDL_blit_A.c SDL/src/video/SDL_blit_A.c
---- SDL.orig/src/video/SDL_blit_A.c	2017-09-10 20:09:21.000000000 +0200
-+++ SDL/src/video/SDL_blit_A.c	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/video/SDL_blit_A.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/video/SDL_blit_A.c	2018-11-03 20:02:49.657956816 +0100
 @@ -39,28 +39,37 @@
      SDL_PixelFormat *srcfmt = info->src_fmt;
      SDL_PixelFormat *dstfmt = info->dst_fmt;
@@ -1541,8 +1529,8 @@ diff -ru SDL.orig/src/video/SDL_blit_A.c SDL/src/video/SDL_blit_A.c
          break;
      }
 diff -ru SDL.orig/src/video/SDL_blit_auto.c SDL/src/video/SDL_blit_auto.c
---- SDL.orig/src/video/SDL_blit_auto.c	2017-09-10 20:09:21.000000000 +0200
-+++ SDL/src/video/SDL_blit_auto.c	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/video/SDL_blit_auto.c	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/video/SDL_blit_auto.c	2018-11-03 20:02:49.661957837 +0100
 @@ -895,7 +895,6 @@
                  dstR = srcR + ((255 - srcA) * dstR) / 255;
                  dstG = srcG + ((255 - srcA) * dstG) / 255;
@@ -1736,8 +1724,8 @@ diff -ru SDL.orig/src/video/SDL_blit_auto.c SDL/src/video/SDL_blit_auto.c
              case SDL_COPY_ADD:
                  dstR = srcR + dstR; if (dstR > 255) dstR = 255;
 diff -ru SDL.orig/src/video/SDL_blit.h SDL/src/video/SDL_blit.h
---- SDL.orig/src/video/SDL_blit.h	2017-09-10 20:09:21.000000000 +0200
-+++ SDL/src/video/SDL_blit.h	2017-09-16 15:26:40.000000000 +0200
+--- SDL.orig/src/video/SDL_blit.h	2016-10-20 05:56:26.000000000 +0200
++++ SDL/src/video/SDL_blit.h	2018-11-03 20:02:49.661957837 +0100
 @@ -440,22 +440,12 @@
      }                                                                   \
  }
