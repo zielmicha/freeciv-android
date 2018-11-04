@@ -125,7 +125,7 @@ def main_menu():
         version += '+' + features.get('gold.status')
     if features.get('gold.session_warning'):
         version += ' WARNING! Login with Dropbox in options menu to save your purchases.'
-    menu.add(ui.Label('civsync.com; ' + version + ' ' + get_renderer_label(),
+    menu.add(ui.Label('civsync.com; ' + version + '     ' + get_renderer_label(),
                       color=(255, 0, 0, 150), font=ui.consolefont), (0, 0))
 
     new_game_button = MenuButton('New\ngame', new_game_menu)
@@ -155,7 +155,7 @@ def get_renderer_label():
         return renderer_name
     if renderer_name == 'opengles2':
         return ''
-    return 'Warning: %s instead of opengles2' % (renderer_name)
+    return 'Warning: found %s instead of opengles2, graphics may display badly' % (renderer_name)
 
 def new_game_menu():
     menu = ui.Menu(force_full = False)
