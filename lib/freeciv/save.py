@@ -39,6 +39,7 @@ from freeciv.client import _freeciv as freeciv
 from monitor import get_save_dir
 
 features.add_feature('app.ruleset', default='classic')
+features.add_feature('app.difficulty', default='easy')
 
 # Using fork causes the "Failed to connect to game server" error that happens randomly
 # https://stackoverflow.com/questions/6078712/is-it-safe-to-fork-from-within-a-thread#6079669
@@ -132,7 +133,7 @@ class ServerGUI(ui.LinearLayoutWidget):
         self.leader_name = 'Player'
         self.city_style = nation[1]
         self.leader_sex = 2
-        self.difficulty = 'novice'
+        self.difficulty = features.get('app.difficulty')
 
         self.set_nation_settings()
         self.set_difficulty_settings()
@@ -324,6 +325,7 @@ def load_game(path, user_callback=None, before_callback=None):
 
 def load_game_now(port, username):
     client.client.chat('/take "%s"' % username)
+    client.client.chat('/%s' % features.get('app.difficulty'))
     client.client.chat('/start')
     client.client.tick()
     ui.back(allow_override=False)

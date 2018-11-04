@@ -72,12 +72,20 @@ class OptionsPanel(ui.LinearLayoutWidget):
     def add_feature_bool(self, label_t, label_f, key):
         self.add(BoolOptionsButton(label_t, label_f, key))
 
+    def add_difficulty_button(self):
+        def _callback(optionsPanel):
+            change_difficulty(self.difficulty_button)
+
+        self.difficulty_button = ui.Button('Default difficulty for new games: ' + features.get('app.difficulty'), functools.partial(_callback, self))
+        self.add(self.difficulty_button)
+
 def show_options():
     options = OptionsPanel(marginleft=10)
     options.add(ui.Label(('Touch' if osutil.is_android else 'Click') + ' an option to change'))
     options.add_feature('Shutdown game after %d seconds of pause', 'app.shutdown')
     #options.add_feature_bool('New joystick', 'Old joystick', 'app.new_joystick')
     options.add(ui.Button('Change joystick', change_joystick))
+    options.add_difficulty_button()
     options.add(ui.Button('Change ruleset for new games', change_ruleset))
     st = 'Full city label toggle button:'
     options.add_feature_bool(st + ' show', st + ' hide', 'app.full_label_toggle_button')
@@ -176,6 +184,20 @@ def change_ruleset():
 
     for ruleset in rulesets:
         panel.add(ui.Button(ruleset, functools.partial(set_ruleset, ruleset)))
+
+    ui.set_dialog(panel)
+
+def change_difficulty(difficulty_button):
+    def set_difficulty(name):
+        features.set_perm('app.difficulty', name)
+        difficulty_button.set_text('Default difficulty for new games: ' + name)
+        ui.back()
+
+    difficulties = ['handicapped', 'novice', 'easy', 'normal', 'hard', 'cheating']
+    panel = ui.LinearLayoutWidget()
+
+    for difficulty in difficulties:
+        panel.add(ui.Button(difficulty, functools.partial(set_difficulty, difficulty)))
 
     ui.set_dialog(panel)
 
