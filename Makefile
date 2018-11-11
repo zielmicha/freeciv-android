@@ -68,7 +68,7 @@ android/project/jni/python: pythonforandroid
 	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Parser android/project/jni/python/
 	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Objects android/project/jni/python/
 	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Include android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/pyconfig.h android/project/jni/python/
+	grep -v HAVE_GETSID pythonforandroid/../../build/other_builds/python2/armeabi/python2/pyconfig.h >android/project/jni/python/pyconfig.h
 	cp -r configure_project/python/* android/project/jni/python/
 	touch android/project/jni/python
 android/project/jni/curl:
