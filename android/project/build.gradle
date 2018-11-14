@@ -5,6 +5,7 @@ android {
     buildToolsVersion "26.0.1"
     defaultConfig {
         minSdkVersion 10
+        maxSdkVersion 18
         targetSdkVersion 26
         externalNativeBuild {
             ndkBuild {
