@@ -37,7 +37,7 @@ import android.support.v4.app.ActivityCompat;
 /**
     SDL Activity
 */
-public class SDLActivity extends Activity {
+public class SDLActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback {
     private static final String TAG = "SDL";
 
     // Keep track of the paused state
@@ -63,6 +63,8 @@ public class SDLActivity extends Activity {
 
     // Audio
     protected static AudioTrack mAudioTrack;
+
+    private Object requestPermissionsMonitor = new Object();
 
     /**
      * This method is called by SDL before loading the native shared libraries.
@@ -168,9 +170,9 @@ public class SDLActivity extends Activity {
 		if (!haveStoragePermissions()) {
 			String[] requiredPermissions = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
 			ActivityCompat.requestPermissions(this, requiredPermissions, 1);
-			synchronized(this) {
+			synchronized(requestPermissionsMonitor) {
 				try {
-					wait();
+					requestPermissionsMonitor.wait();
 				} catch (InterruptedException ex) {
 					ex.printStackTrace();
 				}
@@ -223,8 +225,10 @@ public class SDLActivity extends Activity {
     }
 
 	@Override
-	public synchronized void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-		notify();
+	public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+		synchronized(requestPermissionsMonitor) {
+			requestPermissionsMonitor.notify();
+		}
 	}
 
 	private boolean haveStoragePermissions() {
