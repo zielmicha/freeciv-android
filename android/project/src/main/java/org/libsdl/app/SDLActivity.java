@@ -172,7 +172,11 @@ public class SDLActivity extends Activity implements ActivityCompat.OnRequestPer
 			ActivityCompat.requestPermissions(this, requiredPermissions, 1);
 			synchronized(requestPermissionsMonitor) {
 				try {
-					requestPermissionsMonitor.wait();
+					// Dirty fix because I don't know why requestPermissionsMonitor.wait(0) never wakes up
+					// => lets'do some polling during a maximum of 1 minute
+					for (int i=0; i<240 && !haveStoragePermissions();i++) {
+						requestPermissionsMonitor.wait(250);
+					}
 				} catch (InterruptedException ex) {
 					ex.printStackTrace();
 				}
