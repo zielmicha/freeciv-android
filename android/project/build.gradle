@@ -4,11 +4,11 @@ android {
     compileSdkVersion 26
     buildToolsVersion "26.0.1"
     defaultConfig {
-        minSdkVersion 19
+        minSdkVersion 23
         targetSdkVersion 26
         externalNativeBuild {
             ndkBuild {
-                arguments "APP_PLATFORM=android-19"
+                arguments "APP_PLATFORM=android-23"
             }
         }
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
