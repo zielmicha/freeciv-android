@@ -363,8 +363,12 @@ def subprocess_start_server(args):
     else: # on android
         machine = platform.machine()
         print 'platform.machine():', machine
-        if 'arm' in machine:
+        if 'armv7' in machine:
+            machine = 'armeabi-v7a'
+        elif 'arm' in machine:
             machine = 'armeabi'
+#        elif 'mips' in machine:
+#            machine = 'mips'
         else:
             machine = 'x86'
         executable = 'bin/' + machine + '/freeciv-server'
