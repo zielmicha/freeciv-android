@@ -59,7 +59,6 @@ android/project/jni/SDL2_mixer:
 	wget -c https://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.4.tar.gz
 	tar xzf SDL2_mixer-2.0.4.tar.gz
 	mv SDL2_mixer-2.0.4 android/project/jni/SDL2_mixer
-	(cd android/project/jni/SDL2_mixer && patch -p1 <../../../../configure_project/SDL2_mixer.patch)
 	touch android/project/jni/SDL2_mixer
 android/project/jni/python: pythonforandroid
 	mkdir -p android/project/jni/python
