@@ -46,7 +46,8 @@ build: cython project/jni/freeciv-client project/jni/freeciv-server
 	(cd .. && make data freeciv-src/Makefile pythonforandroid android/project/jni/SDL android/project/jni/SDL2_image android/project/jni/SDL2_ttf android/project/jni/SDL2_mixer android/project/jni/python android/project/jni/curl)
 	(cd ../freeciv-src && make py_integration/callauto.c)
 	mkdir -p project/src/main/java/org/libsdl/app
-	cp project/jni/SDL/android-project/app/src/main/java/org/libsdl/app/SDL*.java project/src/main/java/org/libsdl/app/
+	rm project/src/main/java/org/libsdl/app/*
+	cp project/jni/SDL/android-project/app/src/main/java/org/libsdl/app/*.java project/src/main/java/org/libsdl/app/
 	cat project/jni/SDL/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java | sed 's/protected static SDLActivity mSingleton/public static SDLActivity mSingleton/g' \
 		| sed 's/.. "SDL2_image"/"SDL2_image"/g' | sed 's/.. "SDL2_mixer"/"SDL2_mixer"/g' | sed 's/.. "SDL2_ttf"/"SDL2_ttf", "python2.7", "freeciv-client"/g' \
 		>project/src/main/java/org/libsdl/app/SDLActivity.java

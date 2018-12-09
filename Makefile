@@ -45,9 +45,9 @@ android/project/jni/SDL:
 	(cd android/project/jni/SDL && patch -p1 <../../../../configure_project/SDL_modify_blending.patch)
 	touch android/project/jni/SDL
 android/project/jni/SDL2_image:
-	wget -c https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.2.tar.gz
-	tar xzf SDL2_image-2.0.2.tar.gz
-	mv SDL2_image-2.0.2 android/project/jni/SDL2_image
+	wget -c https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.4.tar.gz
+	tar xzf SDL2_image-2.0.4.tar.gz
+	mv SDL2_image-2.0.4 android/project/jni/SDL2_image
 	(cd android/project/jni/SDL2_image && patch -p1 <../../../../configure_project/SDL2_image.patch)
 	touch android/project/jni/SDL2_image
 android/project/jni/SDL2_ttf:
@@ -56,9 +56,9 @@ android/project/jni/SDL2_ttf:
 	mv SDL2_ttf-2.0.14 android/project/jni/SDL2_ttf
 	touch android/project/jni/SDL2_ttf
 android/project/jni/SDL2_mixer:
-	wget -c https://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.1.tar.gz
-	tar xzf SDL2_mixer-2.0.1.tar.gz
-	mv SDL2_mixer-2.0.1 android/project/jni/SDL2_mixer
+	wget -c https://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-2.0.4.tar.gz
+	tar xzf SDL2_mixer-2.0.4.tar.gz
+	mv SDL2_mixer-2.0.4 android/project/jni/SDL2_mixer
 	(cd android/project/jni/SDL2_mixer && patch -p1 <../../../../configure_project/SDL2_mixer.patch)
 	touch android/project/jni/SDL2_mixer
 android/project/jni/python: pythonforandroid
