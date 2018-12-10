@@ -50,7 +50,7 @@ build: cython project/jni/freeciv-client project/jni/freeciv-server
 	cp project/jni/SDL/android-project/app/src/main/java/org/libsdl/app/*.java project/src/main/java/org/libsdl/app/
 	cat project/jni/SDL/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java | sed 's/protected static SDLActivity mSingleton/public static SDLActivity mSingleton/g' \
 		| sed 's/.. "SDL2_image"/"SDL2_image"/g' | sed 's/.. "SDL2_mixer"/"SDL2_mixer"/g' | sed 's/.. "SDL2_ttf"/"SDL2_ttf", "python2.7", "freeciv-client"/g' \
-		>project/src/main/java/org/libsdl/app/SDLActivity.java
+		| sed 's/setWindowStyle.false./setWindowStyle(true)/g' >project/src/main/java/org/libsdl/app/SDLActivity.java
 	"${ANDROID_NDK_HOME}/ndk-build" -C project -j4 freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi/freeciv-server
 	`ls -1 ${ANDROID_NDK_HOME}/toolchains/arm-linux-androideabi*/prebuilt/*/bin/*strip|head -n 1` --strip-unneeded project/obj/local/armeabi-v7a/freeciv-server

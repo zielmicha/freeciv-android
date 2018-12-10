@@ -39,9 +39,9 @@ run: all
 pythonforandroid:
 	p4a symlink_dist --dist-name freeciv-android-jni-dependancies --android_api 17 --ndk_ver r12b --output pythonforandroid
 android/project/jni/SDL:
-	wget -c https://www.libsdl.org/release/SDL2-2.0.8.tar.gz
-	tar xzf SDL2-2.0.8.tar.gz
-	mv SDL2-2.0.8 android/project/jni/SDL
+	wget -c https://www.libsdl.org/release/SDL2-2.0.9.tar.gz
+	tar xzf SDL2-2.0.9.tar.gz
+	mv SDL2-2.0.9 android/project/jni/SDL
 	(cd android/project/jni/SDL && patch -p1 <../../../../configure_project/SDL_modify_blending.patch)
 	touch android/project/jni/SDL
 android/project/jni/SDL2_image:

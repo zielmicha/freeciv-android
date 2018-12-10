@@ -1,7 +1,7 @@
 diff -ru SDL.orig/src/render/SDL_render.c SDL/src/render/SDL_render.c
---- SDL.orig/src/render/SDL_render.c	2018-03-01 17:34:42.000000000 +0100
-+++ SDL/src/render/SDL_render.c	2018-12-02 11:34:22.000000000 +0100
-@@ -2220,15 +2220,13 @@
+--- SDL.orig/src/render/SDL_render.c	2018-10-31 16:07:22.000000000 +0100
++++ SDL/src/render/SDL_render.c	2018-12-02 11:48:59.000000000 +0100
+@@ -2279,15 +2279,13 @@
  SDL_BlendFactor
  SDL_GetBlendModeDstAlphaFactor(SDL_BlendMode blendMode)
  {
