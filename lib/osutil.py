@@ -49,9 +49,9 @@ def init():
 _jni_initted = False
 
 def init_jni():
-    global SDLActivity, Intent, Uri, _jni_initted
+    global FreecivActivity, Intent, Uri, _jni_initted
     if _jni_initted: return
-    SDLActivity = jnius_reflect.autoclass('org.libsdl.app.SDLActivity')
+    FreecivActivity = jnius_reflect.autoclass('com.zielm.freeciv.FreecivActivity')
     Intent = jnius_reflect.autoclass('android.content.Intent')
     Uri = jnius_reflect.autoclass('android.net.Uri')
     _jni_initted = True
@@ -102,7 +102,7 @@ def get_dpi():
         return features.get('app.emulatedpi')
 
 def _get_activity():
-    return SDLActivity.mSingleton
+    return FreecivActivity.getSingleton();
 
 version_map = {
     None: ('desktop', None),

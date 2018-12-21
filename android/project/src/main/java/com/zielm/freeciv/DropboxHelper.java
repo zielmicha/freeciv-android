@@ -4,7 +4,7 @@ import com.dropbox.client2.*;
 import com.dropbox.client2.session.*;
 import com.dropbox.client2.android.*;
 import com.dropbox.client2.exception.*;
-import org.libsdl.app.*;
+import com.zielm.freeciv.FreecivActivity;
 import java.io.*;
 import java.util.*;
 import android.util.Log;
@@ -34,7 +34,7 @@ public class DropboxHelper {
     }
 
     public synchronized static void init() {
-        SDLActivity.mSingleton.runOnUiThread(new Runnable() {
+        FreecivActivity.getSingleton().runOnUiThread(new Runnable() {
                 public void run(){
                     if(mDBApi == null) {
                         AppKeyPair appKeys = new AppKeyPair(APP_KEY, APP_SECRET);
@@ -66,9 +66,9 @@ public class DropboxHelper {
 
     public static void doAuth() {
         authFinished = false;
-        SDLActivity.mSingleton.runOnUiThread(new Runnable() {
+        FreecivActivity.getSingleton().runOnUiThread(new Runnable() {
                 public void run(){
-                    mDBApi.getSession().startAuthentication(SDLActivity.mSingleton);
+                    mDBApi.getSession().startAuthentication(FreecivActivity.getSingleton());
                 }
             });
     }
