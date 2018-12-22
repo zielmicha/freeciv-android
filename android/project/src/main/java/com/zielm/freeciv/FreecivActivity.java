@@ -23,6 +23,7 @@ public class FreecivActivity extends SDLActivity implements ActivityCompat.OnReq
 		return new String[] { "SDL2", "SDL2_image", "SDL2_mixer", "SDL2_ttf", "python2.7", "freeciv-client", "main" };
 	}
 
+	// Called by onCreate()
 	@Override
 	public void loadLibraries() {
 		super.loadLibraries();
@@ -31,8 +32,32 @@ public class FreecivActivity extends SDLActivity implements ActivityCompat.OnReq
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setWindowStyle(true);
+		super.onCreate(savedInstanceState); // Calls loadLibraries()
+		if (haveStoragePermissions()) {
+			setWindowStyle(true); // fullscreen
+		} else {
+			// Avoid to start the app because it'll crash.
+			// Replace the startup thread with an empty thread.
+			mSDLThread = new Thread(new Runnable() {
+					@Override public void run() {}
+				},
+				"SDLThread");
+			mSDLThread.start();
+
+			AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(this);
+	        dlgAlert.setMessage("Freeciv cannot start without access to storage.");
+	        dlgAlert.setTitle("Storage access required");
+	        dlgAlert.setPositiveButton("Exit",
+	            new DialogInterface.OnClickListener() {
+	                @Override
+	                public void onClick(DialogInterface dialog,int id) {
+	                    // if this button is clicked, close current activity
+	                    SDLActivity.mSingleton.finish();
+	                }
+	            });
+	       dlgAlert.setCancelable(false);
+	       dlgAlert.create().show();
+		}
 	}
 
 	private void requestStoragePermissions() {
@@ -49,30 +74,6 @@ public class FreecivActivity extends SDLActivity implements ActivityCompat.OnReq
 				} catch (InterruptedException ex) {
 					ex.printStackTrace();
 				}
-			}
-
-			if (!haveStoragePermissions()) {
-				AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(this);
-		        dlgAlert.setMessage("Freeciv cannot start without access to storage.");
-		        dlgAlert.setTitle("Storage access required");
-		        final Object closeMonitor = new Object();
-		        dlgAlert.setPositiveButton("Exit",
-		            new DialogInterface.OnClickListener() {
-		                @Override
-		                public void onClick(DialogInterface dialog,int id) {
-		                    // if this button is clicked, close current activity
-		                    SDLActivity.mSingleton.finish();
-		                    closeMonitor.notify();
-		                }
-		            });
-		       dlgAlert.setCancelable(false);
-		       dlgAlert.create().show();
-		       try {
-			       closeMonitor.wait();
-		       } catch (InterruptedException ex) {
-			       ex.printStackTrace();
-		       }
-		       return;
 			}
 		}
 	}
