@@ -1,0 +1,272 @@
+diff -ru Python-2.7.2.orig/Modules/_ctypes/callproc.c Python-2.7.2/Modules/_ctypes/callproc.c
+--- Python-2.7.2.orig/Modules/_ctypes/callproc.c	2011-06-11 17:46:26.000000000 +0200
++++ Python-2.7.2/Modules/_ctypes/callproc.c	2019-07-22 16:16:47.264200668 +0200
+@@ -1423,7 +1423,7 @@
+     mode |= RTLD_NOW;
+     handle = ctypes_dlopen(name, mode);
+     if (!handle) {
+-        char *errmsg = ctypes_dlerror();
++        const char *errmsg = ctypes_dlerror();
+         if (!errmsg)
+             errmsg = "dlopen() error";
+         PyErr_SetString(PyExc_OSError,
+diff -ru Python-2.7.2.orig/Modules/_ctypes/libffi/src/dlmalloc.c Python-2.7.2/Modules/_ctypes/libffi/src/dlmalloc.c
+--- Python-2.7.2.orig/Modules/_ctypes/libffi/src/dlmalloc.c	2011-06-11 17:46:26.000000000 +0200
++++ Python-2.7.2/Modules/_ctypes/libffi/src/dlmalloc.c	2019-07-22 16:16:47.264200668 +0200
+@@ -614,18 +614,6 @@
+ #include "/usr/include/malloc.h"
+ #else /* HAVE_USR_INCLUDE_MALLOC_H */
+ 
+-struct mallinfo {
+-  MALLINFO_FIELD_TYPE arena;    /* non-mmapped space allocated from system */
+-  MALLINFO_FIELD_TYPE ordblks;  /* number of free chunks */
+-  MALLINFO_FIELD_TYPE smblks;   /* always 0 */
+-  MALLINFO_FIELD_TYPE hblks;    /* always 0 */
+-  MALLINFO_FIELD_TYPE hblkhd;   /* space in mmapped regions */
+-  MALLINFO_FIELD_TYPE usmblks;  /* maximum total allocated space */
+-  MALLINFO_FIELD_TYPE fsmblks;  /* always 0 */
+-  MALLINFO_FIELD_TYPE uordblks; /* total allocated space */
+-  MALLINFO_FIELD_TYPE fordblks; /* total free space */
+-  MALLINFO_FIELD_TYPE keepcost; /* releasable (via malloc_trim) space */
+-};
+ 
+ #endif /* HAVE_USR_INCLUDE_MALLOC_H */
+ #endif /* NO_MALLINFO */
+@@ -966,7 +954,7 @@
+   p = malloc(n);
+   assert(malloc_usable_size(p) >= 256);
+ */
+-size_t dlmalloc_usable_size(void*);
++size_t dlmalloc_usable_size(const void*);
+ 
+ /*
+   malloc_stats();
+@@ -4384,7 +4372,7 @@
+   internal_malloc_stats(gm);
+ }
+ 
+-size_t dlmalloc_usable_size(void* mem) {
++size_t dlmalloc_usable_size(const void* mem) {
+   if (mem != 0) {
+     mchunkptr p = mem2chunk(mem);
+     if (cinuse(p))
+diff -ru Python-2.7.2.orig/Modules/posixmodule.c Python-2.7.2/Modules/posixmodule.c
+--- Python-2.7.2.orig/Modules/posixmodule.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Modules/posixmodule.c	2019-07-22 16:16:47.264200668 +0200
+@@ -3787,13 +3787,6 @@
+     slave_fd = open(slave_name, O_RDWR | O_NOCTTY); /* open slave */
+     if (slave_fd < 0)
+         return posix_error();
+-#if !defined(__CYGWIN__) && !defined(HAVE_DEV_PTC)
+-    ioctl(slave_fd, I_PUSH, "ptem"); /* push ptem */
+-    ioctl(slave_fd, I_PUSH, "ldterm"); /* push ldterm */
+-#ifndef __hpux
+-    ioctl(slave_fd, I_PUSH, "ttcompat"); /* push ttcompat */
+-#endif /* __hpux */
+-#endif /* HAVE_CYGWIN */
+ #endif /* HAVE_OPENPTY */
+ 
+     return Py_BuildValue("(ii)", master_fd, slave_fd);
+diff -ru Python-2.7.2.orig/Modules/pwdmodule.c Python-2.7.2/Modules/pwdmodule.c
+--- Python-2.7.2.orig/Modules/pwdmodule.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Modules/pwdmodule.c	2019-07-22 16:16:47.268200669 +0200
+@@ -75,11 +75,7 @@
+ #endif
+     SETI(setIndex++, p->pw_uid);
+     SETI(setIndex++, p->pw_gid);
+-#ifdef __VMS
+     SETS(setIndex++, "");
+-#else
+-    SETS(setIndex++, p->pw_gecos);
+-#endif
+     SETS(setIndex++, p->pw_dir);
+     SETS(setIndex++, p->pw_shell);
+ 
+diff -ru Python-2.7.2.orig/Modules/socketmodule.c Python-2.7.2/Modules/socketmodule.c
+--- Python-2.7.2.orig/Modules/socketmodule.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Modules/socketmodule.c	2019-07-22 16:16:47.268200669 +0200
+@@ -146,6 +146,9 @@
+    On the other hand, not all Linux versions agree, so there the settings
+    computed by the configure script are needed! */
+ 
++/* Android hack, same reason are what is described above */
++#undef HAVE_GETHOSTBYNAME_R
++
+ #ifndef linux
+ # undef HAVE_GETHOSTBYNAME_R_3_ARG
+ # undef HAVE_GETHOSTBYNAME_R_5_ARG
+diff -ru Python-2.7.2.orig/Modules/termios.c Python-2.7.2/Modules/termios.c
+--- Python-2.7.2.orig/Modules/termios.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Modules/termios.c	2019-07-22 16:16:47.268200669 +0200
+@@ -227,6 +227,7 @@
+     return Py_None;
+ }
+ 
++#if 0 // No tcdrain defined for Android.
+ PyDoc_STRVAR(termios_tcdrain__doc__,
+ "tcdrain(fd) -> None\n\
+ \n\
+@@ -246,6 +247,7 @@
+     Py_INCREF(Py_None);
+     return Py_None;
+ }
++#endif
+ 
+ PyDoc_STRVAR(termios_tcflush__doc__,
+ "tcflush(fd, queue) -> None\n\
+@@ -301,8 +303,10 @@
+      METH_VARARGS, termios_tcsetattr__doc__},
+     {"tcsendbreak", termios_tcsendbreak,
+      METH_VARARGS, termios_tcsendbreak__doc__},
++#if 0 // No tcdrain defined for Android.
+     {"tcdrain", termios_tcdrain,
+      METH_VARARGS, termios_tcdrain__doc__},
++#endif
+     {"tcflush", termios_tcflush,
+      METH_VARARGS, termios_tcflush__doc__},
+     {"tcflow", termios_tcflow,
+diff -ru Python-2.7.2.orig/Objects/stringlib/formatter.h Python-2.7.2/Objects/stringlib/formatter.h
+--- Python-2.7.2.orig/Objects/stringlib/formatter.h	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Objects/stringlib/formatter.h	2019-07-22 16:17:03.388200930 +0200
+@@ -639,13 +639,7 @@
+ get_locale_info(int type, LocaleInfo *locale_info)
+ {
+     switch (type) {
+-    case LT_CURRENT_LOCALE: {
+-        struct lconv *locale_data = localeconv();
+-        locale_info->decimal_point = locale_data->decimal_point;
+-        locale_info->thousands_sep = locale_data->thousands_sep;
+-        locale_info->grouping = locale_data->grouping;
+-        break;
+-    }
++    case LT_CURRENT_LOCALE:
+     case LT_DEFAULT_LOCALE:
+         locale_info->decimal_point = ".";
+         locale_info->thousands_sep = ",";
+diff -ru Python-2.7.2.orig/Objects/stringlib/localeutil.h Python-2.7.2/Objects/stringlib/localeutil.h
+--- Python-2.7.2.orig/Objects/stringlib/localeutil.h	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Objects/stringlib/localeutil.h	2019-07-22 16:17:03.388200930 +0200
+@@ -202,9 +202,8 @@
+                                   Py_ssize_t n_digits,
+                                   Py_ssize_t min_width)
+ {
+-        struct lconv *locale_data = localeconv();
+-        const char *grouping = locale_data->grouping;
+-        const char *thousands_sep = locale_data->thousands_sep;
++        const char *grouping = "\3\0";
++        const char *thousands_sep = ",";
+ 
+         return _Py_InsertThousandsGrouping(buffer, n_buffer, digits, n_digits,
+                                            min_width, grouping, thousands_sep);
+diff -ru Python-2.7.2.orig/Python/bltinmodule.c Python-2.7.2/Python/bltinmodule.c
+--- Python-2.7.2.orig/Python/bltinmodule.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Python/bltinmodule.c	2019-07-22 16:16:36.016200486 +0200
+@@ -22,7 +22,7 @@
+ #elif defined(__APPLE__)
+ const char *Py_FileSystemDefaultEncoding = "utf-8";
+ #else
+-const char *Py_FileSystemDefaultEncoding = NULL; /* use default */
++const char *Py_FileSystemDefaultEncoding = "utf-8"; /* use default */
+ #endif
+ 
+ /* Forward */
+diff -ru Python-2.7.2.orig/Python/dynload_shlib.c Python-2.7.2/Python/dynload_shlib.c
+--- Python-2.7.2.orig/Python/dynload_shlib.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Python/dynload_shlib.c	2019-07-22 16:16:36.016200486 +0200
+@@ -6,6 +6,7 @@
+ 
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#include <stdlib.h>
+ 
+ #if defined(__NetBSD__)
+ #include <sys/param.h>
+@@ -75,6 +76,21 @@
+     char pathbuf[260];
+     int dlopenflags=0;
+ 
++    static void *libpymodules = -1;
++    void *rv = NULL;
++
++    /* Ensure we have access to libpymodules. */
++    if (libpymodules == -1) {
++        printf("ANDROID_PRIVATE = %s\n", getenv("ANDROID_PRIVATE"));
++        PyOS_snprintf(pathbuf, sizeof(pathbuf), "%s/libpymodules.so", getenv("ANDROID_PRIVATE"));
++        libpymodules = dlopen(pathbuf, RTLD_NOW);
++
++        if (libpymodules == NULL) {
++            //abort();
++        }
++    }
++        
++
+     if (strchr(pathname, '/') == NULL) {
+         /* Prefix bare filename with "./" */
+         PyOS_snprintf(pathbuf, sizeof(pathbuf), "./%-.255s", pathname);
+@@ -84,6 +100,17 @@
+     PyOS_snprintf(funcname, sizeof(funcname),
+                   LEAD_UNDERSCORE "init%.200s", shortname);
+ 
++
++    /* Read symbols that have been linked into the main binary. */
++
++    if (libpymodules) {
++        rv = dlsym(libpymodules, funcname);
++        if (rv != NULL) {
++            return rv;
++        }
++    }
++
++
+     if (fp != NULL) {
+         int i;
+         struct stat statb;
+diff -ru Python-2.7.2.orig/Python/pystrtod.c Python-2.7.2/Python/pystrtod.c
+--- Python-2.7.2.orig/Python/pystrtod.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Python/pystrtod.c	2019-07-22 16:16:36.016200486 +0200
+@@ -126,7 +126,6 @@
+ {
+     char *fail_pos;
+     double val = -1.0;
+-    struct lconv *locale_data;
+     const char *decimal_point;
+     size_t decimal_point_len;
+     const char *p, *decimal_point_pos;
+@@ -138,8 +137,7 @@
+ 
+     fail_pos = NULL;
+ 
+-    locale_data = localeconv();
+-    decimal_point = locale_data->decimal_point;
++    decimal_point = ".";
+     decimal_point_len = strlen(decimal_point);
+ 
+     assert(decimal_point_len != 0);
+@@ -375,8 +373,7 @@
+ Py_LOCAL_INLINE(void)
+ change_decimal_from_locale_to_dot(char* buffer)
+ {
+-    struct lconv *locale_data = localeconv();
+-    const char *decimal_point = locale_data->decimal_point;
++    const char *decimal_point = ".";
+ 
+     if (decimal_point[0] != '.' || decimal_point[1] != 0) {
+         size_t decimal_point_len = strlen(decimal_point);
+diff -ru Python-2.7.2.orig/Python/pythonrun.c Python-2.7.2/Python/pythonrun.c
+--- Python-2.7.2.orig/Python/pythonrun.c	2011-06-11 17:46:27.000000000 +0200
++++ Python-2.7.2/Python/pythonrun.c	2019-07-22 16:16:36.016200486 +0200
+@@ -254,9 +254,13 @@
+     _PyGILState_Init(interp, tstate);
+ #endif /* WITH_THREAD */
+ 
++    /* For PGS4A, we don't want to call initsite, as we won't have the
++       library path set up until start.pyx finishes running. */
++#if 0
+     if (!Py_NoSiteFlag)
+         initsite(); /* Module site */
+-
++#endif 
++    
+     if ((p = Py_GETENV("PYTHONIOENCODING")) && *p != '\0') {
+         p = icodeset = codeset = strdup(p);
+         free_codeset = 1;

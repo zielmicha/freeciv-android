@@ -36,8 +36,6 @@ lib:
 run: all
 	./main.sh freeciv.main $(ARG0) $(ARG1)
 
-pythonforandroid:
-	p4a symlink_dist --dist-name freeciv-android-jni-dependancies --android_api 17 --ndk_ver r12b --output pythonforandroid
 android/project/jni/SDL:
 	wget -c https://www.libsdl.org/release/SDL2-2.0.9.tar.gz
 	tar xzf SDL2-2.0.9.tar.gz
@@ -60,14 +58,12 @@ android/project/jni/SDL2_mixer:
 	tar xzf SDL2_mixer-2.0.4.tar.gz
 	mv SDL2_mixer-2.0.4 android/project/jni/SDL2_mixer
 	touch android/project/jni/SDL2_mixer
-android/project/jni/python: pythonforandroid
-	mkdir -p android/project/jni/python
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Python android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Modules android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Parser android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Objects android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/Include android/project/jni/python/
-	cp -r pythonforandroid/../../build/other_builds/python2/armeabi/python2/pyconfig.h android/project/jni/python/
+android/project/jni/python:
+	wget -c https://www.python.org/ftp/python/2.7.2/Python-2.7.2.tar.bz2
+	tar xjf Python-2.7.2.tar.bz2
+	mv Python-2.7.2 android/project/jni/python
+	(cd android/project/jni/python && patch -p1 <../../../../configure_project/Python-2.7.2-android.patch)
+	cp -r configure_project/pyconfig.h android/project/jni/python/
 	cp -r configure_project/python/* android/project/jni/python/
 	touch android/project/jni/python
 android/project/jni/curl:

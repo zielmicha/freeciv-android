@@ -22,7 +22,7 @@ encodings/aliases encodings/hex_codec encodings/string_escape
 hashlib weakref _weakrefset codecs SocketServer platform"
 mkdir $A/lib/python2.7/encodings
 for mod in $STDMODULES; do
-    cp ../pythonforandroid/python-install/lib/python2.7/$mod.py $A/lib/python2.7/$mod.py || exit 1
+    cp project/jni/python/Lib/$mod.py $A/lib/python2.7/$mod.py || exit 1
 done
 
 # Copy the freeciv-server executables

@@ -13,8 +13,8 @@ Dependency installation:
    pip install Cython==0.15
    # for running web/proxy.py
    pip install tornado==3.1.1
-   pip install python-for-android==0.4
    apt-get install -y python-imaging
+   pip install pygame
    # if on fairly new system
    ln -s /usr/bin/aclocal /usr/local/bin/aclocal-1.13
    ln -s /usr/bin/automake /usr/local/bin/automake-1.13
@@ -24,13 +24,10 @@ Dependency installation:
 Building for Android requires Android NDK with version r12b.
 
 Configuration:
-For this step only, you need Android SDK 22.6.3.
-Make sure that p4a (python-for-android) is in your PATH and run:
-ANDROIDSDK=<PATH to your SDK 22.6.3 installation> ANDROIDNDK=<PATH to your NDK installation> make pythonforandroid
-
-Then, you need Android SDK >= 26. Add these environment variables:
+You need Android SDK >= 26. Add these environment variables:
    ANDROID_HOME=<PATH to your SDK installation>
    ANDROID_NDK_HOME=<PATH to your NDK installation>
+   You also need Java8. If this version is not your system default, use JAVA_HOME environment variable.
 
 Build and run on desktop (for debugging):
    make run
